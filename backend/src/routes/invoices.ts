@@ -101,6 +101,25 @@ async function queueRdSubmission(invoiceId: string) {
   });
 }
 
+async function enqueueInvoicePdf(invoiceId: string, language: string) {
+  try {
+    await invoiceQueue.add('generate-pdf', { invoiceId, language }, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+  } catch (err) {
+    console.error('Failed to enqueue invoice PDF job:', err);
+  }
+}
+
+async function queueRdSubmissionBestEffort(invoiceId: string) {
+  try {
+    await queueRdSubmission(invoiceId);
+  } catch (err) {
+    console.error('Failed to enqueue RD submission job:', err);
+  }
+}
+
 /* ─── Excel Export ─── */
 invoicesRouter.get('/export/excel', async (req, res) => {
   try {
@@ -365,17 +384,14 @@ invoicesRouter.post('/', async (req, res) => {
     });
     });
 
-    await invoiceQueue.add('generate-pdf', { invoiceId: invoice.id, language: body.language }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    await enqueueInvoicePdf(invoice.id, body.language);
 
     // T01 + T02: auto-approve + auto-submit ไป RD ทันที
     // T01 (ขายสด): VAT เกิดตอนรับเงิน — submit ทันที
     // T02 (ขายเงินเชื่อ): VAT เกิดตอนส่งมอบสินค้า ม. 78(1) — submit ทันทีที่ออกใบ
     // T04/T05: ยัง manual เพราะต้องการ explicit approval
     if (autoSubmitTypes.includes(body.type) && policy.canSubmitToRD) {
-      await queueRdSubmission(invoice.id);
+      await queueRdSubmissionBestEffort(invoice.id);
     }
 
     await auditLog({
@@ -524,10 +540,7 @@ invoicesRouter.patch('/:id', async (req, res) => {
       });
     });
 
-    await invoiceQueue.add('generate-pdf', { invoiceId: updatedInvoice.id, language: body.language }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    await enqueueInvoicePdf(updatedInvoice.id, body.language);
 
     await auditLog({
       companyId: req.user!.companyId,
@@ -633,14 +646,11 @@ invoicesRouter.post('/:id/issue-receipt', requireRole('admin', 'accountant'), as
     });
 
     // Queue PDF generation
-    await invoiceQueue.add('generate-pdf', { invoiceId: receipt.id, language: receipt.language }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    await enqueueInvoicePdf(receipt.id, receipt.language);
 
     // T03 (receipt): เงินรับแล้ว → auto-approve + auto-submit ไป RD ทันที
     if (policy.canSubmitToRD) {
-      await queueRdSubmission(receipt.id);
+      await queueRdSubmissionBestEffort(receipt.id);
     }
 
     await auditLog({

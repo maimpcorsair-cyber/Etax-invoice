@@ -32,18 +32,24 @@ function withPort(hostname: string, port: string, protocol: string) {
   return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
 }
 
-export function detectSurface(hostname = window.location.hostname): AppSurface {
+export function detectSurface(hostname = window.location.hostname, pathname = window.location.pathname): AppSurface {
   if (hostname.startsWith('ops.')) {
     return 'ops';
   }
   if (hostname.startsWith('app.')) {
     return 'app';
   }
+  if (pathname === '/ops' || pathname.startsWith('/ops/')) {
+    return 'ops';
+  }
+  if (pathname === '/app' || pathname.startsWith('/app/')) {
+    return 'app';
+  }
   return 'apex';
 }
 
-export function detectPlane(hostname = window.location.hostname): AppPlane {
-  return detectSurface(hostname) === 'ops' ? 'ops' : 'app';
+export function detectPlane(hostname = window.location.hostname, pathname = window.location.pathname): AppPlane {
+  return detectSurface(hostname, pathname) === 'ops' ? 'ops' : 'app';
 }
 
 function inferSiblingOrigin(plane: AppPlane) {

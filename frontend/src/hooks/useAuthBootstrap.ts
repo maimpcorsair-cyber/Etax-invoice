@@ -88,11 +88,6 @@ export function useAuthBootstrap() {
             return;
           }
 
-          if (surface === 'app' && user.role === 'super_admin') {
-            window.location.replace(buildPlaneUrl('/ops/overview', 'ops', { token, user }));
-            return;
-          }
-
           if (surface === 'ops' && user.role !== 'super_admin') {
             window.location.replace(buildPlaneUrl('/app/dashboard', 'app', { token, user }));
           }

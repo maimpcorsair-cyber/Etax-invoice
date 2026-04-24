@@ -740,7 +740,9 @@ export async function generatePdfFromHtml(html: string): Promise<Buffer> {
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    page.setDefaultNavigationTimeout(30_000);
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    await page.emulateMediaType('print');
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -929,7 +931,9 @@ export async function generateCustomerStatementPdf(data: CustomerStatementPdfDat
 
   try {
     const page = await browser.newPage();
-    await page.setContent(buildCustomerStatementHtml(data), { waitUntil: 'networkidle0' });
+    page.setDefaultNavigationTimeout(30_000);
+    await page.setContent(buildCustomerStatementHtml(data), { waitUntil: 'domcontentloaded' });
+    await page.emulateMediaType('print');
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
