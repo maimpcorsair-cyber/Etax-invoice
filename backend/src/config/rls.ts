@@ -49,6 +49,9 @@ export async function withRlsContext<T>(
   return prisma.$transaction(async (tx) => {
     await applyRlsContext(tx, ctx);
     return fn(tx);
+  }, {
+    maxWait: 10_000,
+    timeout: 60_000,
   });
 }
 
