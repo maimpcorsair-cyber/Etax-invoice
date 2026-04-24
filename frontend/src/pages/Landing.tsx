@@ -259,6 +259,13 @@ export default function Landing() {
       .map((plan) => plan.key),
   );
   const selectedPlanMeta = pricingPlans.find((plan) => plan.key === selectedPlan);
+  const planPriceLabel = (plan?: PricingPlan) => {
+    if (!plan) return '';
+    if (plan.key === 'free') return isThai ? plan.price : plan.priceEn ?? plan.price;
+    if (plan.key === 'enterprise') return isThai ? plan.price : plan.priceEn ?? plan.price;
+    return `฿${isThai ? plan.price : plan.priceEn ?? plan.price}`;
+  };
+  const showMonthlyPrice = (plan?: PricingPlan) => plan?.key === 'starter' || plan?.key === 'business';
 
   async function handleCheckout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -531,9 +538,9 @@ export default function Landing() {
                   <h3 className="font-bold text-xl text-gray-900 capitalize mb-2">{plan.key}</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold text-primary-600">
-                      ฿{isThai ? plan.price : (plan.priceEn ?? plan.price)}
+                      {planPriceLabel(plan)}
                     </span>
-                    {plan.key !== 'enterprise' && (
+                    {showMonthlyPrice(plan) && (
                       <span className="text-base font-semibold text-gray-500">
                         /{isThai ? 'เดือน' : 'month'}
                       </span>
@@ -689,20 +696,29 @@ export default function Landing() {
       </footer>
 
       {checkoutOpen && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-8 sm:py-12">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-5 sm:px-6 sm:py-10">
           <div className="absolute inset-0" onClick={closeCheckout} />
-          <div className="relative w-full max-w-5xl rounded-[28px] bg-white shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 sm:px-8">
-              <div>
-                <p className="text-sm font-semibold text-primary-700 mb-2">
+          <div className="relative w-full max-w-6xl overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-5 sm:px-7">
+              <div className="max-w-3xl">
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                    <ShieldCheck className="h-3.5 w-3.5 text-primary-700" />
+                    {isThai ? 'ยืนยันผ่าน Google' : 'Google verified'}
+                  </span>
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                    {isThai ? 'แยกข้อมูลตามบริษัท' : 'Tenant isolated'}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-primary-800 mb-1">
                   {selectedPlan === 'free'
                     ? (isThai ? 'สมัครใช้งานฟรี' : 'Start your free workspace')
                     : (isThai ? 'สมัครใช้งานและชำระเงินออนไลน์' : 'Subscribe and pay online')}
                 </p>
-                <h3 className="text-2xl font-bold text-gray-900">
+                <h3 className="text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
                   {isThai ? 'เปิดบริษัทใหม่และเริ่มใช้งานระบบ' : 'Create your company and start operating'}
                 </h3>
-                <p className="text-sm text-gray-600 mt-2 max-w-2xl">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                   {selectedPlan === 'free'
                     ? (isThai
                       ? 'ระบบจะเปิดบริษัทและบัญชีผู้ดูแลแพ็กเกจ Free ให้ทันที จากนั้นเข้าสู่ระบบด้วย Google อีเมลเดียวกัน'
@@ -722,49 +738,47 @@ export default function Landing() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-0 items-start">
-              <div className="p-6 sm:p-8">
-                <div className="mb-6 flex flex-wrap items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 w-fit">
-                  <ShieldCheck className="w-4 h-4" />
-                  {isThai ? 'Secure Checkout' : 'Secure Checkout'}
-                </div>
-
-                <div className="mb-6 rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-primary-700">
-                        {isThai ? 'แพ็กเกจที่เลือก' : 'Selected plan'}
-                      </p>
-                      <p className="mt-1 text-xl font-bold text-gray-900 capitalize">{selectedPlanMeta?.key}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_380px]">
+              <div className="bg-white p-5 sm:p-7">
+                <div className="mb-6 grid gap-3 sm:grid-cols-3">
+                  {[
+                    isThai ? 'เลือกแพ็กเกจ' : 'Choose plan',
+                    isThai ? 'ยืนยันผู้ดูแล' : 'Verify admin',
+                    isThai ? 'ข้อมูลบริษัท' : 'Company profile',
+                  ].map((step, index) => (
+                    <div key={step} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-primary-800 ring-1 ring-slate-200">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-700">{step}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-primary-700">
-                        ฿{isThai ? selectedPlanMeta?.price : selectedPlanMeta?.priceEn ?? selectedPlanMeta?.price}
-                      </p>
-                      <p className="text-xs text-gray-500">/{isThai ? 'เดือน' : 'month'}</p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm text-gray-600">
-                    {isThai ? selectedPlanMeta?.summaryTh : selectedPlanMeta?.summaryEn}
-                  </p>
+                  ))}
                 </div>
 
                 <form className="space-y-4" onSubmit={handleCheckout}>
                   {selectedPlan === 'free' && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="mb-3 text-sm font-semibold text-slate-900">
-                        {isThai ? 'สมัครด้วย Google หรือกรอกเอง' : 'Sign up with Google or enter details manually'}
-                      </p>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {isThai ? 'สมัครด้วย Google หรือกรอกเอง' : 'Sign up with Google or enter details manually'}
+                          </p>
+                          <p className="text-xs leading-5 text-slate-600">
+                            {isThai ? 'แนะนำให้ใช้ Google เพื่อยืนยันอีเมลและเข้าใช้งานต่อได้ทันที' : 'Recommended for verified email and immediate access after signup.'}
+                          </p>
+                        </div>
+                        {googleSignupReady && (
+                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                            <Check className="h-3.5 w-3.5" />
+                            {isThai ? 'เชื่อมต่อแล้ว' : 'Connected'}
+                          </span>
+                        )}
+                      </div>
                       <div ref={googleSignupRef} className="min-h-[44px] w-full" />
                       {!googleConfig?.enabled && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                           {isThai ? 'Google Sign-In ยังไม่พร้อมใช้งาน สามารถกรอกข้อมูลเองได้' : 'Google Sign-In is not available yet. You can still enter details manually.'}
                         </div>
-                      )}
-                      {googleSignupReady && (
-                        <p className="mt-3 text-sm font-medium text-emerald-700">
-                          {isThai ? 'เชื่อมต่อ Google แล้ว ข้อมูลผู้ดูแลถูกเติมให้อัตโนมัติ' : 'Google connected. Admin details have been filled automatically.'}
-                        </p>
                       )}
                     </div>
                   )}
@@ -780,31 +794,38 @@ export default function Landing() {
                           type="button"
                           disabled={!isAvailable}
                           onClick={() => setSelectedPlan(planKey)}
-                          className={`rounded-2xl border p-4 text-left transition-all ${
+                          className={`rounded-lg border p-4 text-left transition-all ${
                             isSelected
-                              ? 'border-primary-500 bg-primary-50 shadow-md'
-                              : 'border-gray-200 bg-white hover:border-primary-200'
+                              ? 'border-primary-700 bg-primary-50 shadow-sm ring-1 ring-primary-700/15'
+                              : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
                           } ${!isAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center justify-between gap-3 mb-2">
-                            <span className="font-semibold text-gray-900 capitalize">{plan.key}</span>
+                            <span className="font-semibold text-slate-950 capitalize">{plan.key}</span>
                             {plan.popular && (
-                              <span className="rounded-full bg-primary-600 px-2.5 py-1 text-[11px] font-bold text-white">
+                              <span className="rounded-full bg-primary-700 px-2.5 py-1 text-[11px] font-bold text-white">
                                 {isThai ? 'ยอดนิยม' : 'Popular'}
                               </span>
                             )}
                           </div>
-                          <div className="text-2xl font-bold text-primary-700">
-                            ฿{isThai ? plan.price : (plan.priceEn ?? plan.price)}
-                            <span className="ml-1 text-sm font-medium text-gray-500">/{isThai ? 'เดือน' : 'month'}</span>
+                          <div className="text-2xl font-bold text-primary-800">
+                            {planPriceLabel(plan)}
+                            {showMonthlyPrice(plan) && (
+                              <span className="ml-1 text-sm font-medium text-slate-500">/{isThai ? 'เดือน' : 'month'}</span>
+                            )}
                           </div>
-                          <p className="mt-2 text-sm text-gray-600">{isThai ? plan.limitTh : plan.limitEn}</p>
+                          <p className="mt-2 text-sm leading-5 text-slate-600">{isThai ? plan.limitTh : plan.limitEn}</p>
                         </button>
                       );
                     })}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-5 rounded-lg border border-slate-200 bg-white p-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{isThai ? 'ข้อมูลบริษัท' : 'Company details'}</p>
+                      <p className="text-xs leading-5 text-slate-500">{isThai ? 'ใช้สำหรับตั้งค่าเอกสารและแยกข้อมูลของ tenant' : 'Used for document setup and tenant isolation.'}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {selectedPlan !== 'free' && (
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'วิธีชำระเงิน' : 'Payment method'}</label>
@@ -815,10 +836,10 @@ export default function Landing() {
                             type="button"
                             disabled={!method.enabled}
                             onClick={() => setPaymentMethod(method.key)}
-                            className={`rounded-2xl border p-4 text-left transition-all ${
+                            className={`rounded-lg border p-4 text-left transition-all ${
                               paymentMethod === method.key
-                                ? 'border-primary-500 bg-primary-50 shadow-md'
-                                : 'border-gray-200 bg-white hover:border-primary-200'
+                                ? 'border-primary-700 bg-primary-50 shadow-sm ring-1 ring-primary-700/15'
+                                : 'border-slate-200 bg-white hover:border-primary-200'
                             } ${!method.enabled ? 'cursor-not-allowed opacity-50' : ''}`}
                           >
                             <div className="flex items-center gap-2 font-semibold text-gray-900">
@@ -874,16 +895,17 @@ export default function Landing() {
                       <label className="label">{isThai ? 'ที่อยู่บริษัท (ไทย)' : 'Company Address (Thai)'}</label>
                       <textarea className="input-field min-h-[96px]" value={form.addressTh} onChange={(e) => setForm((prev) => ({ ...prev, addressTh: e.target.value }))} required />
                     </div>
+                    </div>
                   </div>
 
                   {error && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                       {error}
                     </div>
                   )}
 
                   {signupComplete && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                       {isThai
                         ? `สร้างบัญชี Free ให้ ${signupComplete.adminEmail} แล้ว สามารถเข้าสู่ระบบด้วย Google ได้ทันที`
                         : `Free account created for ${signupComplete.adminEmail}. You can now sign in with Google.`}
@@ -891,7 +913,7 @@ export default function Landing() {
                   )}
 
                   {selectedPlan !== 'free' && !configLoading && !config?.enabled && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                       {isThai
                         ? 'ระบบรับชำระออนไลน์ยังไม่ถูกตั้งค่าในเครื่องนี้ กรุณาใส่ Stripe หรือ PromptPay config ก่อน'
                         : 'No online payment method is configured yet. Add Stripe and/or PromptPay config first.'}
@@ -899,7 +921,7 @@ export default function Landing() {
                   )}
 
                   {checkoutResult?.paymentMethod === 'promptpay_qr' && checkoutResult.promptPay && (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-gray-900">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-slate-950">
                       <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
                         <QrCode className="h-4 w-4" />
                         {isThai ? 'PromptPay QR พร้อมชำระ' : 'PromptPay QR ready'}
@@ -933,7 +955,7 @@ export default function Landing() {
                       ? (isThai ? 'ไปหน้าชำระเงินด้วยบัตรเครดิต' : 'Continue to secure card checkout')
                       : paymentMethod === 'stripe_promptpay'
                         ? (isThai ? 'ไปหน้าชำระเงิน PromptPay ของ Stripe' : 'Continue to Stripe PromptPay checkout')
-                        : (isThai ? 'สร้าง PromptPay QR' : 'Generate PromptPay QR')}
+                          : (isThai ? 'สร้าง PromptPay QR' : 'Generate PromptPay QR')}
                   </button>
                   {signupComplete && (
                     <a href={getPlanePath('/login', 'app')} className="btn-secondary lg w-full justify-center">
@@ -943,19 +965,55 @@ export default function Landing() {
                 </form>
               </div>
 
-              <div className="border-t lg:border-t-0 lg:border-l border-slate-200 bg-slate-900 px-6 py-6 sm:px-8 sm:py-8 text-white">
-                <p className="text-xs uppercase tracking-[0.18em] text-primary-200 mb-3">
-                  {isThai ? 'หลังชำระสำเร็จ' : 'After payment succeeds'}
+              <div className="border-t border-slate-200 bg-slate-900 px-5 py-6 text-white lg:border-l lg:border-t-0 sm:px-7">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                  {selectedPlan === 'free' ? (isThai ? 'สิ่งที่จะได้' : 'What happens next') : (isThai ? 'หลังเปิดใช้งาน' : 'After activation')}
                 </p>
-                <ul className="space-y-3 text-sm text-gray-200">
-                  <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'สร้างบริษัทในระบบให้อัตโนมัติ' : 'Automatically creates your company profile'}</li>
-                  <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'สร้างบัญชีผู้ดูแลจากอีเมล Google ที่สมัคร' : 'Creates your admin account from the Google email used during checkout'}</li>
-                  <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{selectedPlan === 'free' ? (isThai ? 'ใช้ฟรี 10 เอกสาร/เดือน' : 'Free access with 10 documents per month') : (isThai ? 'เปิดสิทธิ์แพ็กเกจและบันทึกสถานะสมาชิก' : 'Activates your plan and stores subscription status')}</li>
-                  <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'เข้าใช้ต่อด้วย Continue with Google ได้ทันที' : 'Lets you continue with Google right away'}</li>
+                <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-slate-300">{isThai ? 'แพ็กเกจปัจจุบัน' : 'Selected plan'}</p>
+                      <p className="mt-1 text-2xl font-bold capitalize text-white">{selectedPlanMeta?.key}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white">{planPriceLabel(selectedPlanMeta)}</p>
+                      {showMonthlyPrice(selectedPlanMeta) && (
+                        <p className="text-xs text-slate-300">/{isThai ? 'เดือน' : 'month'}</p>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">
+                    {isThai ? selectedPlanMeta?.summaryTh : selectedPlanMeta?.summaryEn}
+                  </p>
+                </div>
+
+                <ul className="mt-5 space-y-3 text-sm text-slate-200">
+                  {[
+                    isThai ? 'สร้างบริษัทในระบบให้อัตโนมัติ' : 'Automatically creates your company profile',
+                    isThai ? 'สร้างบัญชีผู้ดูแลจากอีเมล Google ที่สมัคร' : 'Creates your admin account from the Google email used during signup',
+                    selectedPlan === 'free' ? (isThai ? 'ใช้ฟรี 10 เอกสาร/เดือน' : 'Free access with 10 documents per month') : (isThai ? 'เปิดสิทธิ์แพ็กเกจและบันทึกสถานะสมาชิก' : 'Activates your plan and stores subscription status'),
+                    isThai ? 'เข้าใช้ต่อด้วย Continue with Google ได้ทันที' : 'Lets you continue with Google right away',
+                  ].map((item) => (
+                    <li key={item} className="flex gap-3">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/25">
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="leading-6">{item}</span>
+                    </li>
+                  ))}
                 </ul>
 
+                <div className="mt-6 rounded-lg border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200">
+                  <p className="font-semibold text-white">{isThai ? 'ข้อมูลปลอดภัย' : 'Secure by design'}</p>
+                  <p className="mt-1 text-slate-200">
+                    {isThai
+                      ? 'บัญชีใหม่ถูกแยกตามบริษัทและใช้ Google เพื่อยืนยันตัวตนผู้ดูแล'
+                      : 'New workspaces are isolated by company and verified with Google identity.'}
+                  </p>
+                </div>
+
                 {selectedPlan !== 'free' && (
-                <div className="mt-8 rounded-2xl bg-white/8 border border-white/10 p-4">
+                <div className="mt-6 rounded-lg bg-white/5 border border-white/10 p-4">
                   <h4 className="font-semibold text-white mb-3">
                     {isThai ? 'การตั้งค่าที่ต้องมีใน Stripe' : 'Stripe setup checklist'}
                   </h4>
