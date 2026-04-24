@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+build/
+frontend/dist/
+backend/dist/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+backend.log
+backend.out
+backend.dev.log
+frontend.log
+frontend.out
+frontend.dev.log
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Runtime / temp
+tmp/
+temp/
+coverage/
+
+# Local certificates and secrets
+backend/certs/
+*.p12
+*.pem
+*.key
+
+# Prisma local artifacts
+node_modules/.prisma/
+backend/node_modules/.prisma/
+
+# Render / Vercel local state
+.vercel/
+.render/

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+logs/
+
+# Certificate private keys — NEVER commit
+certs/
+*.p12
+*.pfx
+*.pem
+*.key

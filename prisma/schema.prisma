@@ -1,0 +1,444 @@
+// Prisma schema for e-Tax Invoice System
+// Bilingual support: all user-facing string fields have _th and _en variants
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  super_admin
+  admin
+  accountant
+  viewer
+}
+
+enum InvoiceType {
+  tax_invoice
+  tax_invoice_receipt
+  receipt
+  credit_note
+  debit_note
+}
+
+enum InvoiceStatus {
+  draft
+  pending
+  approved
+  submitted
+  rejected
+  cancelled
+}
+
+enum RDSubmissionStatus {
+  pending
+  in_progress
+  success
+  failed
+  retrying
+}
+
+enum VatType {
+  vat7
+  vatExempt
+  vatZero
+}
+
+enum BillingPlan {
+  starter
+  business
+  enterprise
+}
+
+enum BillingStatus {
+  pending
+  active
+  past_due
+  canceled
+  incomplete
+  incomplete_expired
+  trialing
+  unpaid
+}
+
+enum SignupStatus {
+  pending
+  paid
+  activated
+  expired
+  failed
+}
+
+model Company {
+  id            String  @id @default(cuid())
+  nameTh        String
+  nameEn        String?
+  taxId         String  @unique
+  branchCode    String  @default("00000")
+  branchNameTh  String?
+  branchNameEn  String?
+  addressTh     String
+  addressEn     String?
+  phone         String?
+  email         String?
+  website       String?
+  logoUrl       String?
+
+  // Serialized certificate (encrypted)
+  certificatePath     String?
+  certificatePassword String?
+
+  // RD Config
+  rdClientId     String?
+  rdClientSecret String?
+  rdEnvironment  String  @default("sandbox")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  customers Customer[]
+  products  Product[]
+  invoices  Invoice[]
+  subscription CompanySubscription?
+  billingTransactions BillingTransaction[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  companyId    String
+  email        String   @unique
+  name         String
+  passwordHash String?
+  googleSub    String?  @unique
+  role         UserRole @default(viewer)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices  Invoice[]  @relation("CreatedBy")
+  auditLogs AuditLog[]
+
+  @@index([companyId])
+  @@map("users")
+}
+
+model Customer {
+  id            String  @id @default(cuid())
+  companyId     String
+  nameTh        String
+  nameEn        String?
+  taxId         String
+  branchCode    String  @default("00000")
+  branchNameTh  String?
+  branchNameEn  String?
+  addressTh     String
+  addressEn     String?
+  email         String?
+  phone         String?
+  contactPerson String?
+  personalId    String?  // เลขบัตรประชาชน 13 หลัก (สำหรับ Easy e-Receipt)
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@unique([companyId, taxId, branchCode])
+  @@index([companyId])
+  @@map("customers")
+}
+
+model Product {
+  id            String  @id @default(cuid())
+  companyId     String
+  code          String
+  nameTh        String
+  nameEn        String?
+  descriptionTh String?
+  descriptionEn String?
+  unit          String
+  unitPrice     Float
+  vatType       VatType @default(vat7)
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoiceItems InvoiceItem[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("products")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  companyId     String
+  invoiceNumber String
+  type          InvoiceType
+  status        InvoiceStatus @default(draft)
+  language      String        @default("th")
+
+  invoiceDate DateTime
+  dueDate     DateTime?
+
+  buyerId String
+  seller  Json
+
+  subtotal  Float
+  vatAmount Float
+  discount  Float @default(0)
+  total     Float
+
+  notes         String?
+  paymentMethod String?
+
+  // RD submission
+  rdSubmissionStatus RDSubmissionStatus?
+  rdDocId            String?
+  rdSubmittedAt      DateTime?
+  rdResponseXml      String?
+
+  // Storage
+  pdfUrl String?
+  xmlUrl String?
+
+  // Reference (for credit/debit notes and receipts linked to a tax invoice)
+  referenceDocNumber  String?
+  referenceInvoiceId  String?   // FK → Invoice (ใบอ้างอิงสำหรับ receipt/credit/debit)
+
+  // Payment tracking
+  isPaid     Boolean   @default(false)
+  paidAt     DateTime?
+  paidAmount Float?
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company          Company       @relation(fields: [companyId], references: [id])
+  buyer            Customer      @relation(fields: [buyerId], references: [id])
+  creator          User          @relation("CreatedBy", fields: [createdBy], references: [id])
+  items            InvoiceItem[]
+  referenceInvoice Invoice?      @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
+  relatedDocuments Invoice[]     @relation("InvoiceReference")
+  payments         Payment[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, invoiceDate])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id            String  @id @default(cuid())
+  invoiceId     String
+  productId     String?
+  nameTh        String
+  nameEn        String?
+  descriptionTh String?
+  descriptionEn String?
+  quantity      Float
+  unit          String
+  unitPrice     Float
+  discount      Float   @default(0)
+  vatType       VatType @default(vat7)
+  amount        Float
+  vatAmount     Float
+  totalAmount   Float
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  companyId    String
+  userId       String
+  action       String
+  resourceType String
+  resourceId   String
+  details      Json
+  ipAddress    String
+  userAgent    String
+  language     String   @default("th")
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@index([companyId, action])
+  @@map("audit_logs")
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  amount        Float
+  method        String   // cash, transfer, cheque, credit_card, other
+  reference     String?  // เลขอ้างอิงการชำระ / slip ref
+  paidAt        DateTime @default(now())
+  note          String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model DocumentTemplate {
+  id       String @id @default(cuid())
+  companyId String
+  type     String
+  language String
+  name     String
+  htmlTh   String @db.Text
+  htmlEn   String @db.Text
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, type, language])
+  @@map("document_templates")
+}
+
+model CompanySubscription {
+  id                    String        @id @default(cuid())
+  companyId             String        @unique
+  plan                  BillingPlan
+  status                BillingStatus @default(pending)
+  billingInterval       String        @default("month")
+  docLimit              Int?
+  stripeCustomerId      String?       @unique
+  stripeSubscriptionId  String?       @unique
+  stripePriceId         String?
+  stripeCheckoutSessionId String?     @unique
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean       @default(false)
+  activatedAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([plan])
+  @@index([status])
+  @@map("company_subscriptions")
+}
+
+model Coupon {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  name               String
+  description        String?
+  discountType       String
+  discountValue      Float
+  minSubtotalAmount  Float?
+  maxDiscountAmount  Float?
+  maxRedemptions     Int?
+  redeemedCount      Int      @default(0)
+  stripePromotionCodeId String? @unique
+  active             Boolean  @default(true)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  transactions BillingTransaction[]
+
+  @@index([active])
+  @@index([startsAt, endsAt])
+  @@map("coupons")
+}
+
+model BillingTransaction {
+  id                String      @id @default(cuid())
+  companyId         String?
+  pendingSignupId   String?
+  couponId          String?
+  plan              BillingPlan
+  channel           String
+  status            String      @default("pending")
+  currency          String      @default("THB")
+  subtotalAmount    Float
+  discountAmount    Float       @default(0)
+  totalAmount       Float
+  couponCode        String?
+  externalReference String?
+  qrPayload         String?     @db.Text
+  qrImageDataUrl    String?     @db.Text
+  paidAt            DateTime?
+  metadata          Json?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  company       Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  pendingSignup PendingSignup? @relation(fields: [pendingSignupId], references: [id], onDelete: SetNull)
+  coupon        Coupon?        @relation(fields: [couponId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([pendingSignupId])
+  @@index([couponId])
+  @@index([channel, status])
+  @@index([plan, createdAt])
+  @@index([createdAt])
+  @@map("billing_transactions")
+}
+
+model PendingSignup {
+  id                     String       @id @default(cuid())
+  companyNameTh          String
+  companyNameEn          String?
+  taxId                  String
+  addressTh              String
+  adminName              String
+  adminEmail             String
+  phone                  String?
+  plan                   BillingPlan
+  paymentMethod          String       @default("stripe")
+  couponCode             String?
+  subtotalAmount         Float?
+  discountAmount         Float        @default(0)
+  totalAmount            Float?
+  status                 SignupStatus @default(pending)
+  locale                 String       @default("th")
+  stripeCheckoutSessionId String?     @unique
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  companyId              String?
+  userId                 String?
+  activatedAt            DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  transactions BillingTransaction[]
+
+  @@index([adminEmail])
+  @@index([status])
+  @@index([plan])
+  @@map("pending_signups")
+}

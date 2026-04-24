@@ -1,0 +1,1401 @@
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../hooks/useLanguage';
+import { useAuthStore } from '../store/authStore';
+import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
+
+const baseTabs = [
+  { key: 'company', icon: Building, labelKey: 'admin.company' },
+  { key: 'users', icon: Users, labelKey: 'admin.users' },
+  { key: 'templates', icon: FileText, labelKey: 'admin.templates' },
+  { key: 'certificate', icon: Key, labelKey: 'admin.certificate' },
+  { key: 'rdConfig', icon: Server, labelKey: 'admin.rdConfig' },
+  { key: 'billing', icon: CreditCard, labelKey: 'admin.billing' },
+];
+
+export default function AdminPanel() {
+  const { t } = useTranslation();
+  const { isThai } = useLanguage();
+  const { policy } = useCompanyAccessPolicy();
+  const [activeTab, setActiveTab] = useState('company');
+  const tabs = baseTabs.filter((tab) => {
+      if (tab.key === 'users') return policy?.canInviteUsers !== false;
+      if (tab.key === 'templates') return policy?.canUseCustomTemplates !== false;
+      if (tab.key === 'certificate') return policy?.canManageCertificate !== false;
+      if (tab.key === 'rdConfig') return policy?.canManageRDConfig !== false;
+      return true;
+    });
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(tabs[0]?.key ?? 'company');
+    }
+  }, [activeTab, tabs]);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-gray-900">{t('admin.title')}</h1>
+      {policy && <PlanAccessSummary isThai={isThai} />}
+
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Sidebar */}
+        <nav className="lg:w-56 flex-shrink-0">
+          <div className="card p-2 space-y-0.5">
+            {tabs.map(({ key, icon: Icon, labelKey }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-lg text-left transition-colors ${
+                  activeTab === key
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {/* Content */}
+        <div className="flex-1 card">
+          {activeTab === 'company' && <CompanyTab isThai={isThai} t={t} />}
+          {activeTab === 'users' && <UsersTab isThai={isThai} t={t} />}
+          {activeTab === 'templates' && <TemplatesTab isThai={isThai} t={t} />}
+          {activeTab === 'rdConfig' && <RDConfigTab isThai={isThai} t={t} />}
+          {activeTab === 'billing' && <BillingTab isThai={isThai} />}
+          {activeTab === 'certificate' && <CertificateTab isThai={isThai} t={t} />}
+          {!['company', 'users', 'templates', 'rdConfig', 'billing', 'certificate'].includes(activeTab) && (
+            <div className="text-center py-12 text-gray-400">
+              {isThai ? 'เนื้อหาสำหรับแท็บนี้' : 'Content for this tab'}: {activeTab}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanAccessSummary({ isThai }: { isThai: boolean }) {
+  const { policy } = useCompanyAccessPolicy();
+
+  if (!policy) return null;
+
+  const lockedFeatures = [
+    !policy.canSubmitToRD ? (isThai ? 'ส่งข้อมูลไป RD' : 'RD submission') : null,
+    !policy.canInviteUsers ? (isThai ? 'เพิ่มผู้ใช้ในบริษัท' : 'Invite more users') : null,
+    !policy.canUseCustomTemplates ? (isThai ? 'Document templates แบบกำหนดเอง' : 'Custom document templates') : null,
+    !policy.canViewAuditLogs ? (isThai ? 'Audit logs' : 'Audit logs') : null,
+    !policy.canExportGoogleSheets ? (isThai ? 'Google Sheets export' : 'Google Sheets export') : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700">
+              {isThai ? 'แพ็กเกจปัจจุบัน' : 'Current plan'}
+            </span>
+            <span className="text-lg font-bold text-gray-900 capitalize">{policy.planLabel}</span>
+            {!policy.isPaidPlan && (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                {isThai ? 'เหมาะสำหรับทดลองระบบ' : 'Trial-oriented access'}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-600">
+            {isThai
+              ? `ใช้งานเอกสารเดือนนี้ ${policy.usage.documentsThisMonth}${policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''} • ผู้ใช้ ${policy.usage.users}${policy.maxUsers ? ` / ${policy.maxUsers}` : ''} • ลูกค้า ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`
+              : `Documents this month ${policy.usage.documentsThisMonth}${policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''} • Users ${policy.usage.users}${policy.maxUsers ? ` / ${policy.maxUsers}` : ''} • Customers ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`}
+          </p>
+          {lockedFeatures.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {lockedFeatures.map((feature) => (
+                <span key={feature} className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">
+                  <Lock className="w-3.5 h-3.5" />
+                  {feature}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Link to="/#pricing-checkout" className="btn-secondary sm w-full justify-center lg:w-auto">
+          {isThai ? 'ดูแพ็กเกจและอัปเกรด' : 'View plans and upgrade'}
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+const templatePreviewSamples = {
+  th: {
+    documentTitle: 'ใบกำกับภาษี / ใบเสร็จรับเงิน',
+    invoiceNumber: 'IV-2026-000128',
+    invoiceDate: '24 เมษายน 2569',
+    dueDate: '30 เมษายน 2569',
+    sellerName: 'บริษัท สยาม เทคโนโลยี จำกัด',
+    buyerName: 'บริษัท เมฆา คอมเมิร์ซ จำกัด',
+    subtotal: '45,000.00',
+    vatAmount: '3,150.00',
+    total: '48,150.00',
+    amountInWords: 'สี่หมื่นแปดพันหนึ่งร้อยห้าสิบบาทถ้วน',
+    paymentMethod: 'โอนเงินผ่านธนาคาร',
+    notes: 'กรุณาชำระเงินภายในกำหนดเพื่อรักษาวงเงินเครดิต',
+  },
+  en: {
+    documentTitle: 'Tax Invoice / Receipt',
+    invoiceNumber: 'IV-2026-000128',
+    invoiceDate: '24 April 2026',
+    dueDate: '30 April 2026',
+    sellerName: 'Siam Technology Co., Ltd.',
+    buyerName: 'Mekha Commerce Co., Ltd.',
+    subtotal: '45,000.00',
+    vatAmount: '3,150.00',
+    total: '48,150.00',
+    amountInWords: 'Forty-eight thousand one hundred fifty baht only',
+    paymentMethod: 'Bank transfer',
+    notes: 'Please settle payment within the stated terms.',
+  },
+} as const;
+
+const templatePresets = {
+  hero: {
+    th: `<div style="display:grid;gap:8px">
+  <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Collection Note</div>
+  <div style="font-size:18px;font-weight:700;color:#0f172a">{{buyerName}}</div>
+  <div style="color:#475569">อ้างอิงเอกสาร {{invoiceNumber}} ลงวันที่ {{invoiceDate}}</div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px">
+    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
+      <div style="font-size:11px;color:#64748b">Subtotal</div>
+      <strong style="font-size:16px">{{subtotal}}</strong>
+    </div>
+    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
+      <div style="font-size:11px;color:#64748b">VAT</div>
+      <strong style="font-size:16px">{{vatAmount}}</strong>
+    </div>
+    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#eff6ff">
+      <div style="font-size:11px;color:#1d4ed8">Total Due</div>
+      <strong style="font-size:16px;color:#1d4ed8">{{total}}</strong>
+    </div>
+  </div>
+</div>`,
+    en: `<div style="display:grid;gap:8px">
+  <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Collection Note</div>
+  <div style="font-size:18px;font-weight:700;color:#0f172a">{{buyerName}}</div>
+  <div style="color:#475569">Reference {{invoiceNumber}} dated {{invoiceDate}}</div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px">
+    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
+      <div style="font-size:11px;color:#64748b">Subtotal</div>
+      <strong style="font-size:16px">{{subtotal}}</strong>
+    </div>
+    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
+      <div style="font-size:11px;color:#64748b">VAT</div>
+      <strong style="font-size:16px">{{vatAmount}}</strong>
+    </div>
+    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#eff6ff">
+      <div style="font-size:11px;color:#1d4ed8">Total Due</div>
+      <strong style="font-size:16px;color:#1d4ed8">{{total}}</strong>
+    </div>
+  </div>
+</div>`,
+  },
+  formal: {
+    th: `<div style="border-left:4px solid #1e3a8a;padding:4px 0 4px 14px">
+  <div style="font-size:12px;font-weight:700;color:#1e3a8a">{{documentTitle}}</div>
+  <div style="margin-top:6px;color:#334155">ผู้ขาย: {{sellerName}}</div>
+  <div style="color:#334155">ผู้ซื้อ: {{buyerName}}</div>
+  <div style="color:#334155">จำนวนเงินทั้งสิ้น: <strong>{{total}}</strong></div>
+  <div style="margin-top:6px;color:#64748b">หมายเหตุ: {{notes}}</div>
+</div>`,
+    en: `<div style="border-left:4px solid #1e3a8a;padding:4px 0 4px 14px">
+  <div style="font-size:12px;font-weight:700;color:#1e3a8a">{{documentTitle}}</div>
+  <div style="margin-top:6px;color:#334155">Seller: {{sellerName}}</div>
+  <div style="color:#334155">Buyer: {{buyerName}}</div>
+  <div style="color:#334155">Grand Total: <strong>{{total}}</strong></div>
+  <div style="margin-top:6px;color:#64748b">Notes: {{notes}}</div>
+</div>`,
+  },
+  footer: {
+    th: `<div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end">
+  <div>
+    <div style="font-weight:700;color:#0f172a">ชำระผ่าน {{paymentMethod}}</div>
+    <div style="font-size:12px;color:#64748b">ครบกำหนด {{dueDate}}</div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:12px;color:#64748b">Amount in words</div>
+    <div style="font-weight:700;color:#0f172a">{{amountInWords}}</div>
+  </div>
+</div>`,
+    en: `<div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end">
+  <div>
+    <div style="font-weight:700;color:#0f172a">Payment via {{paymentMethod}}</div>
+    <div style="font-size:12px;color:#64748b">Due on {{dueDate}}</div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:12px;color:#64748b">Amount in words</div>
+    <div style="font-weight:700;color:#0f172a">{{amountInWords}}</div>
+  </div>
+</div>`,
+  },
+} as const;
+
+function compileTemplatePreview(html: string, sample: Record<string, string>) {
+  return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => sample[key] ?? '');
+}
+
+function CompanyTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) {
+  return (
+    <div className="space-y-4">
+      <h2 className="font-semibold text-lg text-gray-900">{t('admin.company')}</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">{t('customer.nameTh')}</label>
+          <input className="input-field" defaultValue="บริษัท สยาม เทคโนโลยี จำกัด" />
+        </div>
+        <div>
+          <label className="label">{t('customer.nameEn')}</label>
+          <input className="input-field" defaultValue="Siam Technology Co., Ltd." />
+        </div>
+        <div>
+          <label className="label">{t('customer.taxId')}</label>
+          <input className="input-field" defaultValue="0105560123456" />
+        </div>
+        <div>
+          <label className="label">{isThai ? 'รหัส/ชื่อสาขา' : 'Branch Code/Name'}</label>
+          <input className="input-field" defaultValue="00000 / สำนักงานใหญ่" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">{t('customer.addressTh')}</label>
+          <textarea className="input-field" rows={2} defaultValue="123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">{t('customer.addressEn')}</label>
+          <textarea className="input-field" rows={2} defaultValue="123 Sukhumvit Road, Khlong Toei, Bangkok 10110" />
+        </div>
+      </div>
+      <button className="btn-primary">{t('settings.save')}</button>
+    </div>
+  );
+}
+
+function UsersTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) {
+  const { token, user: currentUser } = useAuthStore();
+  const [users, setUsers] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: 'admin' | 'accountant' | 'viewer' | 'super_admin';
+    isActive: boolean;
+    createdAt: string;
+    lastLoginAt?: string | null;
+    auth?: {
+      hasPassword: boolean;
+      hasGoogle: boolean;
+    };
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    role: 'viewer',
+    password: '',
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadUsers() {
+      try {
+        const res = await fetch('/api/admin/users', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json() as { data?: typeof users; error?: string };
+        if (!res.ok) {
+          throw new Error(json.error ?? 'Failed to fetch users');
+        }
+        if (active) {
+          setUsers(json.data ?? []);
+        }
+      } catch (e) {
+        if (active) {
+          setMsg({ type: 'err', text: (e as Error).message });
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadUsers();
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setMsg(null);
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: form.name.trim() || undefined,
+          email: form.email.trim(),
+          role: form.role,
+          password: form.password.trim() || undefined,
+        }),
+      });
+
+      const json = await res.json() as { data?: typeof users[number]; error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? 'Failed to create user');
+      }
+
+      if (json.data) {
+        const createdUser = json.data;
+        setUsers((prev) => [...prev, createdUser]);
+      }
+      setForm({ name: '', email: '', role: 'viewer', password: '' });
+      setMsg({
+        type: 'ok',
+        text: isThai ? 'เพิ่มผู้ใช้สำเร็จ และบัญชีนี้สามารถเข้า Google ได้ทันที' : 'User added. This account can now sign in with Google.',
+      });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleUpdateUser(targetUser: typeof users[number], updates: Partial<typeof users[number]> & { password?: string }) {
+    setSavingId(targetUser.id);
+    setMsg(null);
+
+    try {
+      const res = await fetch(`/api/admin/users/${targetUser.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const json = await res.json() as { data?: typeof users[number]; error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? 'Failed to update user');
+      }
+
+      if (json.data) {
+        setUsers((prev) => prev.map((item) => item.id === json.data!.id ? json.data! : item));
+      }
+      setMsg({ type: 'ok', text: isThai ? 'อัปเดตผู้ใช้แล้ว' : 'User updated' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400" /></div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="font-semibold text-lg text-gray-900">{t('admin.users')}</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {isThai
+              ? 'เพิ่มอีเมลเพื่ออนุญาตให้ผู้ใช้เข้าสู่ระบบด้วย Google และกำหนดบทบาทได้จากหน้านี้'
+              : 'Add user emails here to authorize Google sign-in and manage roles in one place.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50/70">
+        <form className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" onSubmit={handleCreateUser}>
+          <div>
+            <label className="label">{t('common.name')}</label>
+            <input
+              className="input-field"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder={isThai ? 'ชื่อที่แสดงผล' : 'Display name'}
+            />
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input
+              type="email"
+              className="input-field"
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              placeholder="user@company.com"
+              required
+            />
+          </div>
+          <div>
+            <label className="label">{isThai ? 'บทบาท' : 'Role'}</label>
+            <select
+              className="input-field"
+              value={form.role}
+              onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
+            >
+              <option value="viewer">{isThai ? 'ผู้ดู' : 'Viewer'}</option>
+              <option value="accountant">{isThai ? 'บัญชี' : 'Accountant'}</option>
+              <option value="admin">{isThai ? 'ผู้ดูแล' : 'Admin'}</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">{isThai ? 'รหัสผ่านเริ่มต้น (ไม่บังคับ)' : 'Initial password (optional)'}</label>
+            <input
+              type="password"
+              className="input-field"
+              value={form.password}
+              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+              placeholder={isThai ? 'ปล่อยว่างเพื่อใช้ Google อย่างเดียว' : 'Leave blank for Google-only access'}
+            />
+          </div>
+          <div className="md:col-span-2 xl:col-span-4 flex justify-end">
+            <button type="submit" className="btn-primary" disabled={creating}>
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : (isThai ? '+ เพิ่มผู้ใช้' : '+ Add user')}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {msg && (
+        <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {msg.type === 'ok' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+          {msg.text}
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100">
+              <th className="table-header">{t('common.name')}</th>
+              <th className="table-header">Email</th>
+              <th className="table-header">{isThai ? 'สิทธิ์' : 'Access'}</th>
+              <th className="table-header">{isThai ? 'วิธีเข้าใช้' : 'Sign-in methods'}</th>
+              <th className="table-header">{isThai ? 'เข้าใช้ล่าสุด' : 'Last login'}</th>
+              <th className="table-header">{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {users.map((managedUser) => {
+              const isSelf = managedUser.id === currentUser?.id;
+              const canToggleActive = !isSelf;
+              return (
+                <tr key={managedUser.id} className="hover:bg-gray-50">
+                  <td className="table-cell">
+                    <div className="font-medium text-gray-900">{managedUser.name}</div>
+                    <div className="text-xs text-gray-400">
+                      {managedUser.isActive ? t('common.active') : t('common.inactive')}
+                    </div>
+                  </td>
+                  <td className="table-cell text-gray-600 font-mono text-xs">{managedUser.email}</td>
+                  <td className="table-cell">
+                    <select
+                      className="input-field min-w-[140px] py-2"
+                      value={managedUser.role}
+                      onChange={(e) => {
+                        const role = e.target.value as typeof managedUser.role;
+                        setUsers((prev) => prev.map((item) => item.id === managedUser.id ? { ...item, role } : item));
+                      }}
+                    >
+                      {managedUser.role === 'super_admin' && <option value="super_admin">Super Admin</option>}
+                      <option value="viewer">{isThai ? 'ผู้ดู' : 'Viewer'}</option>
+                      <option value="accountant">{isThai ? 'บัญชี' : 'Accountant'}</option>
+                      <option value="admin">{isThai ? 'ผู้ดูแล' : 'Admin'}</option>
+                    </select>
+                  </td>
+                  <td className="table-cell">
+                    <div className="flex flex-wrap gap-2">
+                      <span className={managedUser.auth?.hasGoogle ? 'badge-success' : 'badge-info'}>
+                        Google
+                      </span>
+                      <span className={managedUser.auth?.hasPassword ? 'badge-success' : 'badge-info'}>
+                        Password
+                      </span>
+                    </div>
+                  </td>
+                  <td className="table-cell text-gray-500">
+                    {managedUser.lastLoginAt
+                      ? new Date(managedUser.lastLoginAt).toLocaleString(isThai ? 'th-TH' : 'en-GB')
+                      : (isThai ? 'ยังไม่เคยเข้าใช้' : 'Never logged in')}
+                  </td>
+                  <td className="table-cell">
+                    <div className="flex items-center gap-3">
+                      <label className={`flex items-center gap-2 text-xs ${canToggleActive ? 'text-gray-700' : 'text-gray-400'}`}>
+                        <input
+                          type="checkbox"
+                          checked={managedUser.isActive}
+                          disabled={!canToggleActive}
+                          onChange={(e) => {
+                            const isActive = e.target.checked;
+                            setUsers((prev) => prev.map((item) => item.id === managedUser.id ? { ...item, isActive } : item));
+                          }}
+                        />
+                        {isThai ? 'เปิดใช้งาน' : 'Active'}
+                      </label>
+                      <button
+                        className="text-xs font-semibold text-primary-600 hover:text-primary-700 disabled:text-gray-400"
+                        disabled={savingId === managedUser.id || managedUser.role === 'super_admin'}
+                        onClick={() => handleUpdateUser(managedUser, {
+                          role: managedUser.role,
+                          isActive: managedUser.isActive,
+                        })}
+                      >
+                        {savingId === managedUser.id ? (isThai ? 'กำลังบันทึก...' : 'Saving...') : t('common.save')}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) {
+  const { token } = useAuthStore();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const emptyTemplateForm = {
+    name: '',
+    type: 'tax_invoice' as 'tax_invoice' | 'tax_invoice_receipt' | 'receipt' | 'credit_note' | 'debit_note',
+    language: 'both' as 'th' | 'en' | 'both',
+    htmlTh: '<div class="template-note">หมายเหตุ: ใช้แม่แบบเอกสารนี้</div>',
+    htmlEn: '<div class="template-note">Template note: Use this document template</div>',
+    isActive: false,
+  };
+  const [templates, setTemplates] = useState<Array<{
+    id: string;
+    name: string;
+    type: 'tax_invoice' | 'tax_invoice_receipt' | 'receipt' | 'credit_note' | 'debit_note';
+    language: 'th' | 'en' | 'both';
+    htmlTh: string;
+    htmlEn: string;
+    isActive: boolean;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [form, setForm] = useState(emptyTemplateForm);
+  const previewLanguage = form.language === 'en' ? 'en' : 'th';
+  const previewHtml = compileTemplatePreview(
+    previewLanguage === 'en' ? form.htmlEn : form.htmlTh,
+    templatePreviewSamples[previewLanguage],
+  );
+  const typeOptions = [
+    {
+      value: 'tax_invoice',
+      label: 'T02',
+      th: 'ใบกำกับภาษีสำหรับขายเชื่อหรือยังไม่รับชำระ',
+      en: 'Tax invoice for credit sales or unpaid transactions',
+    },
+    {
+      value: 'tax_invoice_receipt',
+      label: 'T01',
+      th: 'ใบกำกับภาษีพร้อมใบเสร็จสำหรับขายสด',
+      en: 'Combined tax invoice and receipt for immediate payment',
+    },
+    {
+      value: 'receipt',
+      label: 'T03',
+      th: 'ใบเสร็จรับเงินจากใบกำกับภาษีเดิม',
+      en: 'Receipt issued against an earlier tax invoice',
+    },
+    {
+      value: 'credit_note',
+      label: 'T04',
+      th: 'ใบลดหนี้เพื่อปรับลดมูลค่าเอกสารเดิม',
+      en: 'Credit note used to reduce an earlier document value',
+    },
+    {
+      value: 'debit_note',
+      label: 'T05',
+      th: 'ใบเพิ่มหนี้เพื่อเพิ่มยอดจากเอกสารเดิม',
+      en: 'Debit note used to add charges to an earlier document',
+    },
+  ] as const;
+  const presetOptions = [
+    {
+      key: 'hero' as const,
+      name: isThai ? 'Summary Hero' : 'Summary Hero',
+      description: isThai ? 'กล่องสรุปยอดแบบเด่น อ่านง่ายสำหรับหัวเอกสาร' : 'A bold summary block for the top of the document.',
+    },
+    {
+      key: 'formal' as const,
+      name: isThai ? 'Formal Side Note' : 'Formal Side Note',
+      description: isThai ? 'สไตล์ทางการ เน้นข้อมูลคู่ค้าและยอดรวม' : 'A formal side-note layout focused on parties and totals.',
+    },
+    {
+      key: 'footer' as const,
+      name: isThai ? 'Payment Footer' : 'Payment Footer',
+      description: isThai ? 'เน้นวิธีชำระและยอดเป็นตัวอักษรช่วงท้ายเอกสาร' : 'A footer-style block highlighting payment and amount in words.',
+    },
+  ];
+
+  useEffect(() => {
+    let active = true;
+    async function loadTemplates() {
+      try {
+        const res = await fetch('/api/admin/templates', { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json() as { data?: typeof templates; error?: string };
+        if (!res.ok) throw new Error(json.error ?? 'Failed to fetch templates');
+        if (active) setTemplates(json.data ?? []);
+      } catch (e) {
+        if (active) setMsg({ type: 'err', text: (e as Error).message });
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadTemplates();
+    return () => { active = false; };
+  }, [token]);
+
+  async function saveTemplate(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMsg(null);
+    try {
+      const url = editingId ? `/api/admin/templates/${editingId}` : '/api/admin/templates';
+      const method = editingId ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      const json = await res.json() as { data?: typeof templates[number]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Failed');
+      if (json.data) {
+        setTemplates((prev) => editingId ? prev.map((item) => item.id === json.data!.id ? json.data! : item) : [...prev, json.data!]);
+      }
+      setMsg({ type: 'ok', text: isThai ? 'บันทึกแม่แบบแล้ว' : 'Template saved' });
+      setEditingId(null);
+      setForm(emptyTemplateForm);
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(template: typeof templates[number]) {
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ isActive: !template.isActive }),
+      });
+      const json = await res.json() as { data?: typeof templates[number]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Failed');
+      if (json.data) {
+        setTemplates((prev) => prev.map((item) => item.id === json.data!.id ? json.data! : { ...item, isActive: item.id === json.data!.id ? json.data!.isActive : false }));
+      }
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!confirm(isThai ? 'ลบแม่แบบนี้ใช่ไหม' : 'Delete this template?')) return;
+    try {
+      const res = await fetch(`/api/admin/templates/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'Failed');
+      setTemplates((prev) => prev.filter((item) => item.id !== id));
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
+  function exportTemplate(template: typeof templates[number]) {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      template: {
+        name: template.name,
+        type: template.type,
+        language: template.language,
+        htmlTh: template.htmlTh,
+        htmlEn: template.htmlEn,
+        isActive: false,
+      },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${template.name.replace(/\s+/g, '-').toLowerCase() || 'template'}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setMsg({
+      type: 'ok',
+      text: isThai ? 'ส่งออก template เป็น JSON แล้ว' : 'Template exported as JSON.',
+    });
+  }
+
+  async function importTemplateFile(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        template?: {
+          name?: string;
+          type?: typeof emptyTemplateForm.type;
+          language?: typeof emptyTemplateForm.language;
+          htmlTh?: string;
+          htmlEn?: string;
+          isActive?: boolean;
+        };
+      };
+      const imported = parsed.template;
+      if (!imported?.name || !imported.type || !imported.language || !imported.htmlTh || !imported.htmlEn) {
+        throw new Error(isThai ? 'ไฟล์ template JSON ไม่ครบหรือรูปแบบไม่ถูกต้อง' : 'Template JSON is incomplete or invalid.');
+      }
+      setEditingId(null);
+      setForm({
+        name: imported.name,
+        type: imported.type,
+        language: imported.language,
+        htmlTh: imported.htmlTh,
+        htmlEn: imported.htmlEn,
+        isActive: imported.isActive ?? false,
+      });
+      setMsg({
+        type: 'ok',
+        text: isThai ? 'นำเข้า template แล้ว ตรวจสอบและกดบันทึกได้เลย' : 'Template imported. Review it and save when ready.',
+      });
+    } catch (error) {
+      setMsg({
+        type: 'err',
+        text: error instanceof Error ? error.message : (isThai ? 'นำเข้า template ไม่สำเร็จ' : 'Template import failed.'),
+      });
+    }
+  }
+
+  function applyPreset(presetKey: keyof typeof templatePresets) {
+    setForm((prev) => ({
+      ...prev,
+      htmlTh: templatePresets[presetKey].th,
+      htmlEn: templatePresets[presetKey].en,
+      name: prev.name || `${presetOptions.find((preset) => preset.key === presetKey)?.name ?? 'Template'} ${prev.type.toUpperCase()}`,
+    }));
+    setMsg({
+      type: 'ok',
+      text: isThai ? 'เติม preset ให้แล้ว คุณแก้ข้อความต่อได้ทันที' : 'Preset applied. You can keep editing the copy and layout.',
+    });
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400"/></div>;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="font-semibold text-lg text-gray-900">{t('admin.templates')}</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {isThai ? 'จัดการแม่แบบเอกสารที่ระบบใช้ตอน Preview / PDF' : 'Manage document templates used by preview and PDF rendering.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                void importTemplateFile(file);
+              }
+              e.currentTarget.value = '';
+            }}
+          />
+          <button type="button" className="btn-secondary text-sm" onClick={() => importInputRef.current?.click()}>
+            {isThai ? 'นำเข้า JSON' : 'Import JSON'}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+        <p className="font-semibold">
+          {isThai ? 'หน้านี้ไม่ใช่หน้าสร้าง invoice' : 'This is not the invoice creation screen'}
+        </p>
+        <p className="mt-1">
+          {isThai
+            ? 'ใช้สำหรับปรับ HTML แม่แบบของ preview/PDF เท่านั้น ส่วนการออกเอกสารจริงให้ไปที่เมนูสร้างใบกำกับภาษี'
+            : 'Use this page only to customize the HTML template used in preview and PDF output. To create actual documents, go to the invoice builder.'}
+        </p>
+      </div>
+
+      <form onSubmit={saveTemplate} className="rounded-2xl border border-gray-200 p-4 space-y-4 bg-gray-50/60">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div>
+            <label className="label">{isThai ? 'ชื่อแม่แบบ' : 'Template name'}</label>
+            <input className="input-field" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">{isThai ? 'ประเภทเอกสาร' : 'Document type'}</label>
+            <select className="input-field" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as typeof form.type }))}>
+              {typeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} - {isThai ? option.th : option.en}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">{isThai ? 'ภาษา' : 'Language'}</label>
+            <select className="input-field" value={form.language} onChange={(e) => setForm((p) => ({ ...p, language: e.target.value as typeof form.language }))}>
+              <option value="th">TH</option>
+              <option value="en">EN</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))} />
+              {isThai ? 'เปิดใช้งานทันที' : 'Activate now'}
+            </label>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl bg-white px-4 py-3 text-xs text-gray-600">
+          <div>
+            <p className="font-semibold text-gray-900">{isThai ? 'Template ทำอะไร' : 'What a template changes'}</p>
+            <p className="mt-1">{isThai ? 'มีผลกับรูปแบบ preview และ PDF เช่น header, footer, block ข้อความ' : 'It changes preview and PDF layout such as headers, footers, and text blocks.'}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">{isThai ? 'Template ไม่ได้ทำอะไร' : 'What a template does not change'}</p>
+            <p className="mt-1">{isThai ? 'ไม่ได้สร้าง invoice ใหม่ และไม่ได้เปลี่ยนข้อมูลลูกค้า/ยอดเงินในเอกสารเดิม' : 'It does not create invoices and does not change customer or amount data in existing documents.'}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">{isThai ? 'ก่อนเปิดใช้งาน' : 'Before activating'}</p>
+            <p className="mt-1">{isThai ? 'ควรทดสอบด้วย preview จากหน้าออกเอกสารก่อนเสมอ' : 'Always test with document preview in the invoice builder first.'}</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-xs text-sky-900">
+          <p className="font-semibold">{isThai ? 'ตัวแปรที่ใช้ใน template ได้' : 'Template variables you can use'}</p>
+          <p className="mt-1">
+            {isThai
+              ? 'รองรับตัวแปรเช่น {{documentTitle}}, {{invoiceNumber}}, {{invoiceDate}}, {{dueDate}}, {{sellerName}}, {{buyerName}}, {{subtotal}}, {{vatAmount}}, {{total}}, {{amountInWords}}, {{paymentMethod}}, {{notes}}'
+              : 'Supported placeholders include {{documentTitle}}, {{invoiceNumber}}, {{invoiceDate}}, {{dueDate}}, {{sellerName}}, {{buyerName}}, {{subtotal}}, {{vatAmount}}, {{total}}, {{amountInWords}}, {{paymentMethod}}, and {{notes}}.'}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+            <FlaskConical className="h-4 w-4 text-sky-600" />
+            {isThai ? 'Preset เริ่มต้น' : 'Starter presets'}
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            {isThai ? 'เลือก preset เพื่อเริ่มจากโครงที่สวยก่อน แล้วค่อยแก้ copy/spacing ต่อ' : 'Pick a polished starting point, then refine the copy and spacing as needed.'}
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {presetOptions.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => applyPreset(preset.key)}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-sky-300 hover:bg-sky-50"
+              >
+                <div className="text-sm font-semibold text-slate-900">{preset.name}</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">{preset.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.1fr,1.1fr,0.95fr]">
+          <div>
+            <label className="label">HTML TH</label>
+            <textarea className="input-field font-mono text-xs min-h-36" value={form.htmlTh} onChange={(e) => setForm((p) => ({ ...p, htmlTh: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">HTML EN</label>
+            <textarea className="input-field font-mono text-xs min-h-36" value={form.htmlEn} onChange={(e) => setForm((p) => ({ ...p, htmlEn: e.target.value }))} />
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{isThai ? 'Live Preview' : 'Live Preview'}</p>
+                <p className="text-xs text-slate-500">
+                  {previewLanguage === 'en'
+                    ? (isThai ? 'กำลังดูตัวอย่างภาษาอังกฤษ' : 'Showing the English sample')
+                    : (isThai ? 'กำลังดูตัวอย่างภาษาไทย' : 'Showing the Thai sample')}
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {previewLanguage}
+              </span>
+            </div>
+            <div className="mt-3 h-[22rem] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <iframe
+                title="Template live preview"
+                srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{margin:0;padding:18px;font-family:Sarabun,system-ui,sans-serif;background:#f8fafc;color:#0f172a} .stage{border:1px solid #dbe2ea;border-radius:18px;background:#fff;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.06)} .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;margin-bottom:10px} .title{font-size:20px;font-weight:700;color:#1e3a8a;margin-bottom:14px} .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px} .meta-card{border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;background:#f8fafc;font-size:12px;color:#475569} .slot{border:1px dashed #cbd5e1;border-radius:16px;padding:14px;background:#fff}</style></head><body><div class="stage"><div class="eyebrow">Live Template Preview</div><div class="title">${templatePreviewSamples[previewLanguage].documentTitle}</div><div class="meta"><div class="meta-card">No. ${templatePreviewSamples[previewLanguage].invoiceNumber}</div><div class="meta-card">Date ${templatePreviewSamples[previewLanguage].invoiceDate}</div></div><div class="slot">${previewHtml || '<div style="color:#94a3b8">Empty template</div>'}</div></div></body></html>`}
+                className="h-full w-full bg-white"
+                sandbox="allow-same-origin"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {editingId ? (isThai ? 'บันทึกการแก้ไข' : 'Save changes') : (isThai ? 'สร้างแม่แบบ' : 'Create template')}
+          </button>
+          {editingId && (
+            <button type="button" className="btn-secondary" onClick={() => {
+              setEditingId(null);
+              setForm(emptyTemplateForm);
+            }}>
+              {isThai ? 'ยกเลิก' : 'Cancel'}
+            </button>
+          )}
+        </div>
+      </form>
+
+      {msg && (
+        <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {msg.type === 'ok' ? <CheckCircle className="w-4 h-4"/> : <XCircle className="w-4 h-4"/>}
+          {msg.text}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {templates.map((tpl) => (
+          <div key={tpl.id} className={`border rounded-xl p-4 ${tpl.isActive ? 'border-primary-300 bg-primary-50/40' : 'border-gray-200 bg-white'}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-gray-900">{tpl.name}</span>
+                  {tpl.isActive && <span className="badge-success text-xs">{isThai ? 'ใช้งานอยู่' : 'Active'}</span>}
+                </div>
+                <p className="text-xs text-gray-500 uppercase">{tpl.type} · {tpl.language}</p>
+              </div>
+              <Sparkles className="w-4 h-4 text-primary-500 flex-shrink-0" />
+            </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button className="btn-secondary text-xs" onClick={() => {
+                setEditingId(tpl.id);
+                setForm({
+                  name: tpl.name,
+                  type: tpl.type,
+                  language: tpl.language,
+                  htmlTh: tpl.htmlTh,
+                  htmlEn: tpl.htmlEn,
+                  isActive: tpl.isActive,
+                });
+              }}>
+                {t('common.edit')}
+              </button>
+              <button className="btn-primary text-xs" onClick={() => toggleActive(tpl)}>
+                {tpl.isActive ? (isThai ? 'ปิดใช้งาน' : 'Disable') : (isThai ? 'ตั้งเป็นใช้งาน' : 'Set active')}
+              </button>
+            </div>
+            <button className="mt-2 text-xs text-sky-700 hover:underline" onClick={() => exportTemplate(tpl)}>
+              {isThai ? 'ส่งออก JSON' : 'Export JSON'}
+            </button>
+            <button className="mt-2 text-xs text-red-600 hover:underline" onClick={() => deleteTemplate(tpl.id)}>
+              {t('common.delete')}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BillingTab({ isThai }: { isThai: boolean }) {
+  const { token } = useAuthStore();
+  const { policy } = useCompanyAccessPolicy();
+  const [loading, setLoading] = useState(true);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [subscription, setSubscription] = useState<null | {
+    plan: string;
+    status: string;
+    billingInterval: string;
+    docLimit?: number | null;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd: boolean;
+    activatedAt?: string | null;
+  }>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBilling() {
+      try {
+        const res = await fetch('/api/billing/subscription', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json() as { data?: typeof subscription; error?: string };
+        if (!res.ok) throw new Error(json.error ?? 'Failed to load billing');
+        if (active) setSubscription(json.data ?? null);
+      } catch (err) {
+        if (active) setError((err as Error).message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadBilling();
+    return () => { active = false; };
+  }, [token]);
+
+  async function openPortal() {
+    setPortalLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/billing/portal-session', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json() as { data?: { url?: string }; error?: string };
+      if (!res.ok || !json.data?.url) throw new Error(json.error ?? 'Unable to open billing portal');
+      window.location.href = json.data.url;
+    } catch (err) {
+      setError((err as Error).message);
+      setPortalLoading(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-semibold text-lg text-gray-900">{isThai ? 'แพ็กเกจและการชำระเงิน' : 'Billing & Plan'}</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          {isThai ? 'ดูสถานะแพ็กเกจปัจจุบันและเปิด Stripe customer portal เพื่อจัดการการชำระเงิน' : 'Review your active plan and open the Stripe customer portal to manage billing.'}
+        </p>
+      </div>
+
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {!subscription ? (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+          {policy?.plan === 'free'
+            ? (isThai ? 'บริษัทนี้ใช้แพ็กเกจ Free อยู่ สามารถอัปเกรดเป็น Starter หรือ Business เพื่อปลดล็อกฟีเจอร์เพิ่มได้' : 'This company is on the Free plan. Upgrade to Starter or Business to unlock more features.')
+            : (isThai ? 'บริษัทยังไม่มีข้อมูลสมาชิกแบบชำระเงิน' : 'This company does not have an active paid subscription yet.')}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="card">
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-400 mb-2">{isThai ? 'แพ็กเกจปัจจุบัน' : 'Current plan'}</p>
+            <p className="text-3xl font-bold text-gray-900 capitalize">{subscription.plan}</p>
+            <p className="mt-2 text-sm text-gray-600">
+              {subscription.docLimit
+                ? (isThai ? `รองรับสูงสุด ${subscription.docLimit.toLocaleString()} เอกสาร/เดือน` : `Up to ${subscription.docLimit.toLocaleString()} documents per month`)
+                : (isThai ? 'ไม่จำกัดจำนวนเอกสาร' : 'Unlimited documents')}
+            </p>
+          </div>
+
+          <div className="card">
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-400 mb-2">{isThai ? 'สถานะสมาชิก' : 'Subscription status'}</p>
+            <p className="text-3xl font-bold text-gray-900">{subscription.status}</p>
+            <p className="mt-2 text-sm text-gray-600">
+              {subscription.currentPeriodEnd
+                ? (isThai
+                  ? `รอบบิลปัจจุบันสิ้นสุด ${new Date(subscription.currentPeriodEnd).toLocaleDateString('th-TH')}`
+                  : `Current billing period ends ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-GB')}`)
+                : (isThai ? 'ยังไม่มีวันสิ้นสุดรอบบิล' : 'No billing period end date yet')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button className="btn-primary" onClick={openPortal} disabled={portalLoading || !subscription}>
+          {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+          {isThai ? 'จัดการบัตรและใบเสร็จใน Stripe' : 'Manage cards and invoices in Stripe'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RDConfigTab({ isThai }: { isThai: boolean; t: (k: string) => string }) {
+  const { token } = useAuthStore();
+  const [config, setConfig] = useState({ clientId: '', clientSecret: '', environment: 'sandbox' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'ok'|'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/rd-config', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(j => {
+        const d = (j as { data?: { environment?: string; clientId?: string } }).data;
+        setConfig(c => ({ ...c, environment: d?.environment ?? 'sandbox', clientId: d?.clientId ?? '' }));
+      }).catch(() => {}).finally(() => setLoading(false));
+  }, [token]);
+
+  async function handleSave() {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await fetch('/api/admin/rd-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(config),
+      });
+      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'Failed');
+      setMsg({ type: 'ok', text: isThai ? 'บันทึกสำเร็จ' : 'Saved successfully' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally { setSaving(false); }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400"/></div>;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="font-semibold text-lg text-gray-900">{isThai ? 'ตั้งค่า RD API' : 'RD API Configuration'}</h2>
+      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 flex gap-2">
+        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5"/>
+        {isThai ? 'กรอก Client ID / Secret ที่ได้รับจากสรรพากรหลังได้รับอนุมัติ ตอน sandbox ปล่อยว่างไว้ได้' : 'Enter Client ID / Secret received from RD after approval. Leave blank for sandbox mock mode.'}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">{isThai ? 'สภาพแวดล้อม' : 'Environment'}</label>
+          <select className="input-field" value={config.environment}
+            onChange={e => setConfig(c => ({ ...c, environment: e.target.value }))}>
+            <option value="sandbox">{isThai ? '🧪 ทดสอบ (Sandbox / Mock)' : '🧪 Sandbox (Mock)'}</option>
+            <option value="production">{isThai ? '🚀 จริง (Production)' : '🚀 Production'}</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">RD Client ID</label>
+          <input className="input-field font-mono text-xs" placeholder="rd_client_xxxxx"
+            value={config.clientId} onChange={e => setConfig(c => ({ ...c, clientId: e.target.value }))} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">RD Client Secret</label>
+          <input type="password" className="input-field font-mono text-xs" placeholder="••••••••••••"
+            value={config.clientSecret} onChange={e => setConfig(c => ({ ...c, clientSecret: e.target.value }))} />
+          <p className="text-xs text-gray-400 mt-1">{isThai ? 'ข้อมูลนี้เข้ารหัสก่อนบันทึก' : 'This value is encrypted before storing'}</p>
+        </div>
+      </div>
+
+      {msg && (
+        <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          {msg.type === 'ok' ? <CheckCircle className="w-4 h-4"/> : <XCircle className="w-4 h-4"/>}
+          {msg.text}
+        </div>
+      )}
+
+      <button className="btn-primary" onClick={handleSave} disabled={saving}>
+        {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : isThai ? 'บันทึก' : 'Save'}
+      </button>
+    </div>
+  );
+}
+
+function CertificateTab({ isThai }: { isThai: boolean; t: (k: string) => string }) {
+  const { token } = useAuthStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [certInfo, setCertInfo] = useState<Record<string, unknown> | null>(null);
+  const [password, setPassword] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
+  const [msg, setMsg] = useState<{ type: 'ok'|'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/certificate', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(j => setCertInfo((j as { data?: Record<string, unknown> }).data ?? null))
+      .catch(() => {});
+  }, [token]);
+
+  async function handleUpload() {
+    if (!selectedFile || !password) {
+      setMsg({ type: 'err', text: isThai ? 'กรุณาเลือกไฟล์และใส่รหัสผ่าน' : 'Please select a file and enter password' });
+      return;
+    }
+    setUploading(true); setMsg(null);
+    try {
+      const arrayBuf = await selectedFile.arrayBuffer();
+      const p12Base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+      const res = await fetch('/api/admin/certificate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ p12Base64, password }),
+      });
+      const json = await res.json() as { data?: Record<string, unknown>; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Upload failed');
+      setCertInfo(json.data ?? null);
+      setMsg({ type: 'ok', text: isThai ? '✅ อัพโหลด Certificate สำเร็จ' : '✅ Certificate uploaded successfully' });
+      setSelectedFile(null);
+      setPassword('');
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally { setUploading(false); }
+  }
+
+  async function handleTest() {
+    setTesting(true); setTestResult(null);
+    try {
+      const res = await fetch('/api/admin/signing-test', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTestResult(await res.json() as Record<string, unknown>);
+    } catch (e) {
+      setTestResult({ success: false, error: (e as Error).message });
+    } finally { setTesting(false); }
+  }
+
+  const loaded = certInfo?.loaded as boolean | undefined;
+  const isDev   = certInfo?.isDev as boolean | undefined;
+  const isExpired = certInfo?.isExpired as boolean | undefined;
+
+  return (
+    <div className="space-y-5">
+      <h2 className="font-semibold text-lg text-gray-900">
+        {isThai ? '🔐 ใบรับรองดิจิทัล (Digital Certificate)' : '🔐 Digital Certificate'}
+      </h2>
+
+      {/* Current cert status */}
+      <div className={`p-4 rounded-xl border ${loaded ? (isExpired ? 'bg-red-50 border-red-200' : isDev ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200') : 'bg-gray-50 border-gray-200'}`}>
+        <div className="flex items-start gap-3">
+          {loaded
+            ? isExpired ? <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0"/>
+            : <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0"/>
+            : <AlertTriangle className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"/>
+          }
+          <div className="space-y-1 text-sm">
+            {loaded ? (
+              <>
+                <p className="font-semibold">{certInfo?.commonName as string}</p>
+                {isDev && <span className="inline-block px-2 py-0.5 bg-amber-200 text-amber-800 text-xs rounded font-medium">DEV Self-Signed</span>}
+                {isExpired && <span className="inline-block px-2 py-0.5 bg-red-200 text-red-800 text-xs rounded font-medium">EXPIRED</span>}
+                <p className="text-gray-500">{isThai ? 'หมดอายุ:' : 'Valid until:'} {new Date(certInfo?.validUntil as string).toLocaleDateString('th-TH')}</p>
+                <p className="text-gray-400 font-mono text-xs break-all">SHA-256: {(certInfo?.thumbprint as string)?.slice(0, 32)}...</p>
+              </>
+            ) : (
+              <p className="text-gray-500">{certInfo?.error as string ?? (isThai ? 'ยังไม่ได้ตั้งค่า Certificate' : 'No certificate configured')}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isDev && loaded && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 space-y-1">
+          <p className="font-semibold">⚠️ {isThai ? 'ใช้ Self-Signed Certificate (Dev Mode)' : 'Using Self-Signed Certificate (Dev Mode)'}</p>
+          <p>{isThai ? 'Certificate นี้สร้างขึ้นเพื่อทดสอบเท่านั้น สรรพากรจะ reject ถ้าส่งจริง ต้องใช้ Certificate จาก TDID/INET/TOT' : 'This certificate is for testing only. RD will reject it in production. Replace with a TDID/INET/TOT issued certificate.'}</p>
+        </div>
+      )}
+
+      {/* Upload new cert */}
+      <div className="space-y-3">
+        <h3 className="font-medium text-gray-800">{isThai ? 'อัพโหลด Certificate ใหม่' : 'Upload New Certificate'}</h3>
+        <div
+          className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary-400 transition-colors cursor-pointer"
+          onClick={() => fileRef.current?.click()}
+        >
+          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2"/>
+          {selectedFile ? (
+            <p className="text-sm font-medium text-primary-600">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-gray-700">{isThai ? 'คลิกเพื่อเลือกไฟล์ .p12 / .pfx' : 'Click to select .p12 / .pfx file'}</p>
+              <p className="text-xs text-gray-400 mt-1">PKCS#12 format</p>
+            </>
+          )}
+          <input ref={fileRef} type="file" accept=".p12,.pfx" className="hidden"
+            onChange={e => setSelectedFile(e.target.files?.[0] ?? null)} />
+        </div>
+
+        <div>
+          <label className="label">{isThai ? 'รหัสผ่าน Certificate' : 'Certificate Password'}</label>
+          <input type="password" className="input-field" placeholder="••••••••"
+            value={password} onChange={e => setPassword(e.target.value)} />
+        </div>
+
+        {msg && (
+          <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {msg.type === 'ok' ? <CheckCircle className="w-4 h-4"/> : <XCircle className="w-4 h-4"/>}
+            {msg.text}
+          </div>
+        )}
+
+        <button className="btn-primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4"/>}
+          {isThai ? 'อัพโหลดและตรวจสอบ' : 'Upload & Validate'}
+        </button>
+      </div>
+
+      {/* Signing test */}
+      <div className="border-t pt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-gray-800">{isThai ? '🧪 ทดสอบระบบ Signing' : '🧪 Signing System Test'}</h3>
+          <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={handleTest} disabled={testing || !loaded}>
+            {testing ? <Loader2 className="w-4 h-4 animate-spin"/> : <FlaskConical className="w-4 h-4"/>}
+            {isThai ? 'ทดสอบเลย' : 'Run Test'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          {isThai ? 'ทดสอบ: โหลด cert → Sign XML (XAdES-BES) → ขอ Timestamp (TSA) — ตรวจสอบว่า pipeline ทำงานได้ก่อนส่งจริง' : 'Tests: load cert → Sign XML (XAdES-BES) → Request TSA timestamp — verify pipeline works before live submission'}
+        </p>
+
+        {testResult && (
+          <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
+            <div className={`flex items-center gap-2 font-semibold ${(testResult.success as boolean) ? 'text-green-700' : 'text-red-600'}`}>
+              {(testResult.success as boolean) ? <CheckCircle className="w-4 h-4"/> : <XCircle className="w-4 h-4"/>}
+              {(testResult.success as boolean)
+                ? (isThai ? 'ทุกขั้นตอนผ่าน ✅' : 'All steps passed ✅')
+                : (isThai ? 'มีขั้นตอนที่ล้มเหลว ❌' : 'Some steps failed ❌')}
+            </div>
+            {((testResult.steps ?? []) as { step: string; status: string; detail?: string; ms?: number }[]).map((s, i) => (
+              <div key={i} className={`flex items-start gap-2 text-xs ${s.status === 'ok' ? 'text-gray-600' : 'text-red-600'}`}>
+                {s.status === 'ok' ? <CheckCircle className="w-3.5 h-3.5 mt-0.5 text-green-500 flex-shrink-0"/> : <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0"/>}
+                <div>
+                  <span className="font-medium">{s.step}</span>
+                  {s.ms !== undefined && <span className="text-gray-400 ml-1">({s.ms}ms)</span>}
+                  {s.detail && <p className="text-gray-500 font-mono break-all">{s.detail}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
