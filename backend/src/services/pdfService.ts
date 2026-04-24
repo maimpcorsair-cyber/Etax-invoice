@@ -101,9 +101,118 @@ interface CustomerStatementPdfData {
 
 const DOC_TITLE: Record<string, Record<Language | 'both', string>> = {
   tax_invoice: { th: 'ใบกำกับภาษี', en: 'Tax Invoice', both: 'ใบกำกับภาษี / Tax Invoice' },
+  tax_invoice_receipt: { th: 'ใบกำกับภาษี/ใบเสร็จรับเงิน', en: 'Tax Invoice / Receipt', both: 'ใบกำกับภาษี/ใบเสร็จรับเงิน / Tax Invoice / Receipt' },
   receipt: { th: 'ใบเสร็จรับเงิน', en: 'Receipt', both: 'ใบเสร็จรับเงิน / Receipt' },
   credit_note: { th: 'ใบลดหนี้', en: 'Credit Note', both: 'ใบลดหนี้ / Credit Note' },
   debit_note: { th: 'ใบเพิ่มหนี้', en: 'Debit Note', both: 'ใบเพิ่มหนี้ / Debit Note' },
+};
+
+const ALL_DOCUMENT_TYPES = ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'];
+
+const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
+  name: string;
+  supportedTypes: string[];
+  htmlTh: string;
+  htmlEn: string;
+}> = {
+  'builtin:executive-blue': {
+    name: 'Executive Blue',
+    supportedTypes: ALL_DOCUMENT_TYPES,
+    htmlTh: `
+      <div><strong>Executive document profile</strong></div>
+      <div>เอกสารนี้จัดรูปแบบสำหรับงานองค์กร โดยเน้นเลขที่เอกสาร {{invoiceNumber}}, วันที่ {{invoiceDate}}, และคู่ค้า {{buyerName}} เพื่อให้ตรวจสอบและอนุมัติได้รวดเร็ว</div>
+      <div>ยอดสุทธิที่ต้องชำระ/รับรู้: <strong>{{total}} THB</strong></div>
+    `,
+    htmlEn: `
+      <div><strong>Executive document profile</strong></div>
+      <div>This document highlights reference {{invoiceNumber}}, date {{invoiceDate}}, and customer {{buyerName}} for fast approval and review.</div>
+      <div>Net document amount: <strong>{{total}} THB</strong></div>
+    `,
+  },
+  'builtin:paid-stamp': {
+    name: 'Paid Stamp Receipt',
+    supportedTypes: ['tax_invoice_receipt', 'receipt'],
+    htmlTh: `
+      <div><strong>สถานะการรับชำระเงิน: รับชำระแล้ว</strong></div>
+      <div>เอกสารนี้ใช้ยืนยันการรับเงินจาก {{buyerName}} สำหรับเลขที่ {{invoiceNumber}} ยอดรวม <strong>{{total}} THB</strong></div>
+      <div>วิธีชำระเงิน: {{paymentMethod}}</div>
+    `,
+    htmlEn: `
+      <div><strong>Payment status: Paid</strong></div>
+      <div>This document confirms payment received from {{buyerName}} for {{invoiceNumber}} totaling <strong>{{total}} THB</strong>.</div>
+      <div>Payment method: {{paymentMethod}}</div>
+    `,
+  },
+  'builtin:bank-transfer': {
+    name: 'Bank Transfer Ready',
+    supportedTypes: ['tax_invoice', 'tax_invoice_receipt', 'receipt'],
+    htmlTh: `
+      <div><strong>ข้อมูลสำหรับตรวจยอดโอนเงิน</strong></div>
+      <div>โปรดใช้อ้างอิงเลขที่เอกสาร {{invoiceNumber}} เมื่อชำระเงิน และส่งหลักฐานการโอนเพื่อปิดยอดบัญชี</div>
+      <div>ยอดก่อนภาษี {{subtotal}} THB | VAT {{vatAmount}} THB | ยอดสุทธิ <strong>{{total}} THB</strong></div>
+    `,
+    htmlEn: `
+      <div><strong>Bank transfer reconciliation</strong></div>
+      <div>Please quote document number {{invoiceNumber}} when paying and send transfer proof for reconciliation.</div>
+      <div>Subtotal {{subtotal}} THB | VAT {{vatAmount}} THB | Net <strong>{{total}} THB</strong></div>
+    `,
+  },
+  'builtin:modern-minimal': {
+    name: 'Modern Minimal',
+    supportedTypes: ALL_DOCUMENT_TYPES,
+    htmlTh: `
+      <div><strong>สรุปเอกสาร</strong></div>
+      <div>{{documentTitle}} เลขที่ {{invoiceNumber}} ออกให้ {{buyerName}} วันที่ {{invoiceDate}}</div>
+      <div>ยอดสุทธิ <strong>{{total}} THB</strong> ({{amountInWords}})</div>
+    `,
+    htmlEn: `
+      <div><strong>Document summary</strong></div>
+      <div>{{documentTitle}} {{invoiceNumber}} issued to {{buyerName}} on {{invoiceDate}}</div>
+      <div>Grand total <strong>{{total}} THB</strong> ({{amountInWords}})</div>
+    `,
+  },
+  'builtin:credit-control': {
+    name: 'Credit Control',
+    supportedTypes: ['credit_note'],
+    htmlTh: `
+      <div><strong>บันทึกการลดหนี้</strong></div>
+      <div>เอกสารนี้ใช้ปรับลดยอดของ {{buyerName}} โปรดตรวจสอบเอกสารอ้างอิง เหตุผล และผลกระทบภาษีก่อนบันทึกบัญชี</div>
+      <div>มูลค่าปรับปรุงสุทธิ: <strong>{{total}} THB</strong></div>
+    `,
+    htmlEn: `
+      <div><strong>Credit adjustment note</strong></div>
+      <div>This credit note adjusts {{buyerName}} balance. Verify reference document, reason, and VAT impact before posting.</div>
+      <div>Net adjustment: <strong>{{total}} THB</strong></div>
+    `,
+  },
+  'builtin:debit-adjustment': {
+    name: 'Debit Adjustment',
+    supportedTypes: ['debit_note'],
+    htmlTh: `
+      <div><strong>บันทึกการเพิ่มหนี้</strong></div>
+      <div>เอกสารนี้ใช้ปรับเพิ่มยอดของ {{buyerName}} โปรดตรวจสอบรายการเพิ่มเติมและวันที่มีผลกับเอกสารเดิม</div>
+      <div>มูลค่าเพิ่มสุทธิ: <strong>{{total}} THB</strong></div>
+    `,
+    htmlEn: `
+      <div><strong>Debit adjustment note</strong></div>
+      <div>This debit note increases {{buyerName}} balance. Verify added items and effective date against the original document.</div>
+      <div>Net increase: <strong>{{total}} THB</strong></div>
+    `,
+  },
+  'builtin:compliance-ledger': {
+    name: 'Compliance Ledger',
+    supportedTypes: ALL_DOCUMENT_TYPES,
+    htmlTh: `
+      <div><strong>Accounting audit checklist</strong></div>
+      <div>เลขที่เอกสาร {{invoiceNumber}} | วันที่ {{invoiceDate}} | เลขผู้ขาย {{sellerTaxId}} | เลขผู้ซื้อ {{buyerTaxId}}</div>
+      <div>ยอดภาษี {{vatAmount}} THB และยอดสุทธิ <strong>{{total}} THB</strong> ถูกสรุปเพื่อการตรวจสอบย้อนหลัง</div>
+    `,
+    htmlEn: `
+      <div><strong>Accounting audit checklist</strong></div>
+      <div>Document {{invoiceNumber}} | Date {{invoiceDate}} | Seller tax ID {{sellerTaxId}} | Buyer tax ID {{buyerTaxId}}</div>
+      <div>VAT {{vatAmount}} THB and net total <strong>{{total}} THB</strong> are highlighted for audit trail review.</div>
+    `,
+  },
 };
 
 function formatDateTh(date: Date): string {
@@ -134,6 +243,19 @@ function resolveTemplateLanguageHtml(template: { htmlTh: string; htmlEn: string 
   if (language === 'en') return template.htmlEn;
   if (language === 'th') return template.htmlTh;
   return `${template.htmlTh}\n${template.htmlEn}`;
+}
+
+function resolveBuiltinTemplate(type: string, language: Language, templateId?: string | null) {
+  if (!templateId?.startsWith('builtin:')) return null;
+
+  const template = BUILTIN_DOCUMENT_TEMPLATES[templateId];
+  if (!template || !template.supportedTypes.includes(type)) return null;
+
+  return {
+    id: templateId,
+    name: template.name,
+    html: resolveTemplateLanguageHtml(template, language),
+  };
 }
 
 function compileTemplateHtml(templateHtml: string, context: Record<string, string>): string {
@@ -714,6 +836,11 @@ async function resolveTemplateForDocument(
   language: Language,
   templateId?: string | null,
 ) {
+  const builtinTemplate = resolveBuiltinTemplate(type, language, templateId);
+  if (builtinTemplate) return builtinTemplate;
+
+  if (templateId?.startsWith('builtin:')) return null;
+
   const where = templateId
     ? { id: templateId, companyId }
     : { companyId, type, language, isActive: true };

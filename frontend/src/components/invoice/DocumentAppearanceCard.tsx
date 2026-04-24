@@ -1,5 +1,6 @@
 import type { DocumentTemplateOption, InvoiceType, Language } from '../../types';
 import { useLanguage } from '../../hooks/useLanguage';
+import { builtinDocumentTemplates, supportsDocumentType } from '../../lib/documentTemplatePresets';
 
 interface Props {
   templates: DocumentTemplateOption[];
@@ -29,6 +30,15 @@ export default function DocumentAppearanceCard({
   const filteredTemplates = templates.filter((template) => (
     template.type === docType && (template.language === docLanguage || template.language === 'both' || docLanguage === 'both')
   ));
+  const matchingBuiltinTemplates = builtinDocumentTemplates.filter((template) => supportsDocumentType(template, docType));
+  const selectedBuiltinTemplate = builtinDocumentTemplates.find((template) => template.id === selectedTemplateId);
+  const selectedCustomTemplate = filteredTemplates.find((template) => template.id === selectedTemplateId);
+  const hasUnsupportedSelection = Boolean(
+    selectedTemplateId
+      && !selectedBuiltinTemplate
+      && !selectedCustomTemplate,
+  ) || Boolean(selectedBuiltinTemplate && !supportsDocumentType(selectedBuiltinTemplate, docType));
+  const featuredTemplates = matchingBuiltinTemplates.slice(0, 4);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,17 +71,94 @@ export default function DocumentAppearanceCard({
           <option value="">
             {isThai ? 'ใช้แบบมาตรฐานของระบบ' : 'Use the polished default template'}
           </option>
-          {filteredTemplates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name}{template.isActive ? ` ${isThai ? '(ค่าเริ่มต้น)' : '(default)'}` : ''}
-            </option>
-          ))}
+          <optgroup label={isThai ? 'แม่แบบสำเร็จรูปของระบบ' : 'Built-in system templates'}>
+            {matchingBuiltinTemplates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {isThai ? template.nameTh : template.nameEn} - {isThai ? template.tagTh : template.tagEn}
+              </option>
+            ))}
+          </optgroup>
+          {filteredTemplates.length > 0 && (
+            <optgroup label={isThai ? 'แม่แบบของบริษัท' : 'Company templates'}>
+              {filteredTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}{template.isActive ? ` ${isThai ? '(ค่าเริ่มต้น)' : '(default)'}` : ''}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
-        <p className="mt-2 text-xs text-slate-500">
-          {filteredTemplates.length > 0
-            ? (isThai ? 'Template ที่ตรงกับประเภทเอกสารและภาษาจะขึ้นให้เลือกที่นี่' : 'Templates matching this document type and language are available here.')
-            : (isThai ? 'ยังไม่มี template สำหรับเอกสารประเภท/ภาษานี้ ระบบจะใช้แบบมาตรฐานแทน' : 'No matching template exists for this document type/language yet, so the default design will be used.')}
-        </p>
+        {hasUnsupportedSelection ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <span>
+              {isThai
+                ? 'Template ที่เลือกไว้ไม่ตรงกับประเภทเอกสารนี้แล้ว'
+                : 'The selected template no longer matches this document type.'}
+            </span>
+            <button
+              type="button"
+              onClick={() => onTemplateChange(null)}
+              className="font-semibold text-amber-900 underline underline-offset-2"
+            >
+              {isThai ? 'กลับไปใช้มาตรฐาน' : 'Use default'}
+            </button>
+          </div>
+        ) : selectedBuiltinTemplate ? (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${selectedBuiltinTemplate.accentClass}`}>
+                {isThai ? selectedBuiltinTemplate.tagTh : selectedBuiltinTemplate.tagEn}
+              </span>
+              <span className="text-sm font-semibold text-slate-900">
+                {isThai ? selectedBuiltinTemplate.nameTh : selectedBuiltinTemplate.nameEn}
+              </span>
+              <span className="text-xs text-slate-400">{isThai ? 'แม่แบบระบบ' : 'System template'}</span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              {isThai ? selectedBuiltinTemplate.descriptionTh : selectedBuiltinTemplate.descriptionEn}
+            </p>
+          </div>
+        ) : selectedCustomTemplate ? (
+          <p className="mt-2 text-xs text-slate-500">
+            {isThai ? 'ใช้แม่แบบของบริษัทที่สร้างไว้ใน Admin Console' : 'Using a company template created in the Admin Console.'}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">
+            {isThai
+              ? 'ค่าเริ่มต้นใช้แบบมาตรฐานที่รองรับ e-Tax ทุกประเภท หรือเลือกแม่แบบสำเร็จรูปด้านล่างเพื่อให้เอกสารเด่นขึ้น'
+              : 'The default supports every e-Tax document type, or choose a built-in style below for a more distinctive document.'}
+          </p>
+        )}
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {featuredTemplates.map((template) => {
+          const isSelected = selectedTemplateId === template.id;
+          return (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => onTemplateChange(isSelected ? null : template.id)}
+              className={`rounded-xl border p-3 text-left transition ${
+                isSelected
+                  ? 'border-blue-400 bg-blue-50 shadow-sm'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-slate-900">
+                  {isThai ? template.nameTh : template.nameEn}
+                </span>
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${template.accentClass}`}>
+                  {isThai ? template.tagTh : template.tagEn}
+                </span>
+              </div>
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                {isThai ? template.descriptionTh : template.descriptionEn}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
