@@ -163,6 +163,12 @@ const checkoutSchema = z.object({
   locale: z.enum(['th', 'en']).default('th'),
 });
 
+const freeSignupSchema = checkoutSchema.omit({
+  plan: true,
+  paymentMethod: true,
+  couponCode: true,
+});
+
 const couponSchema = z.object({
   code: z.string().trim().min(3).max(50),
   name: z.string().trim().min(3).max(120),
@@ -642,6 +648,69 @@ billingRouter.get('/config', (_req, res) => {
     plans: listBillingPlans(),
     paymentMethods: listPaymentMethods(),
   });
+});
+
+billingRouter.post('/free-signup', async (req, res) => {
+  try {
+    const body = freeSignupSchema.parse(req.body);
+    const email = body.adminEmail.toLowerCase();
+
+    const [existingUser, existingCompany] = await Promise.all([
+      prisma.user.findUnique({ where: { email } }),
+      prisma.company.findUnique({ where: { taxId: body.taxId } }),
+    ]);
+
+    if (existingUser) {
+      res.status(409).json({ error: 'This admin email is already registered in the system' });
+      return;
+    }
+    if (existingCompany) {
+      res.status(409).json({ error: 'This tax ID is already registered in the system' });
+      return;
+    }
+
+    const result = await withSystemRlsContext(prisma, async (tx) => {
+      const company = await tx.company.create({
+        data: {
+          nameTh: body.companyNameTh,
+          nameEn: body.companyNameEn || null,
+          taxId: body.taxId,
+          addressTh: body.addressTh,
+          email,
+          phone: body.phone || null,
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          companyId: company.id,
+          email,
+          name: body.adminName,
+          role: 'admin',
+          isActive: true,
+        },
+      });
+
+      return { company, user };
+    }, { role: 'free-signup' });
+
+    res.status(201).json({
+      data: {
+        companyId: result.company.id,
+        userId: result.user.id,
+        plan: 'free',
+        status: 'activated',
+        loginMethod: 'google',
+        nextStep: 'Login with the same Google email used during signup',
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    res.status(500).json({ error: (err as Error).message || 'Failed to create free account' });
+  }
 });
 
 billingRouter.post('/checkout-session', async (req, res) => {

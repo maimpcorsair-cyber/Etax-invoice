@@ -41,7 +41,7 @@ function currency(value: number) {
 export default function Landing() {
   const { t, i18n } = useTranslation();
   const isThai = i18n.language === 'th';
-  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'business'>('business');
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'starter' | 'business'>('business');
   const [config, setConfig] = useState<{
     enabled: boolean;
     plans: Array<{ key: string; isConfigured: boolean; purchasable: boolean }>;
@@ -53,6 +53,7 @@ export default function Landing() {
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'stripe_promptpay' | 'promptpay_qr'>('stripe');
   const [couponCode, setCouponCode] = useState('');
+  const [signupComplete, setSignupComplete] = useState<null | { plan: 'free'; adminEmail: string }>(null);
   const [checkoutResult, setCheckoutResult] = useState<null | {
       paymentMethod: 'stripe' | 'stripe_promptpay' | 'promptpay_qr';
     reference?: string;
@@ -182,14 +183,13 @@ export default function Landing() {
     setCheckoutResult(null);
 
     try {
-      const res = await fetch('/api/billing/checkout-session', {
+      const isFreeSignup = selectedPlan === 'free';
+      const res = await fetch(isFreeSignup ? '/api/billing/free-signup' : '/api/billing/checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          plan: selectedPlan,
-          paymentMethod,
-          couponCode,
+          ...(isFreeSignup ? {} : { plan: selectedPlan, paymentMethod, couponCode }),
           locale: isThai ? 'th' : 'en',
         }),
       });
@@ -216,7 +216,9 @@ export default function Landing() {
         throw new Error(json.error ?? 'Unable to start checkout');
       }
 
-      if (json.data.paymentMethod === 'promptpay_qr' && json.data.promptPay) {
+      if (isFreeSignup) {
+        setSignupComplete({ plan: 'free', adminEmail: form.adminEmail });
+      } else if (json.data.paymentMethod === 'promptpay_qr' && json.data.promptPay) {
         setCheckoutResult({
           paymentMethod: 'promptpay_qr',
           reference: json.data.reference,
@@ -235,10 +237,11 @@ export default function Landing() {
     }
   }
 
-  function openCheckout(plan: 'starter' | 'business') {
+  function openCheckout(plan: 'free' | 'starter' | 'business') {
     setSelectedPlan(plan);
     setError('');
     setCheckoutResult(null);
+    setSignupComplete(null);
     setCheckoutOpen(true);
   }
 
@@ -463,12 +466,13 @@ export default function Landing() {
                 </div>
 
                 {plan.key === 'free' ? (
-                  <a
-                    href={getPlanePath('/login', 'app')}
+                  <button
+                    type="button"
+                    onClick={() => openCheckout('free')}
                     className="w-full justify-center font-semibold btn-secondary lg"
                   >
                     {isThai ? 'เริ่มใช้ฟรี' : 'Start free'}
-                  </a>
+                  </button>
                 ) : (
                 <button
                   type="button"
@@ -592,13 +596,19 @@ export default function Landing() {
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 sm:px-8">
               <div>
                 <p className="text-sm font-semibold text-primary-700 mb-2">
-                  {isThai ? 'สมัครใช้งานและชำระเงินออนไลน์' : 'Subscribe and pay online'}
+                  {selectedPlan === 'free'
+                    ? (isThai ? 'สมัครใช้งานฟรี' : 'Start your free workspace')
+                    : (isThai ? 'สมัครใช้งานและชำระเงินออนไลน์' : 'Subscribe and pay online')}
                 </p>
                 <h3 className="text-2xl font-bold text-gray-900">
                   {isThai ? 'เปิดบริษัทใหม่และเริ่มใช้งานระบบ' : 'Create your company and start operating'}
                 </h3>
                 <p className="text-sm text-gray-600 mt-2 max-w-2xl">
-                  {isThai
+                  {selectedPlan === 'free'
+                    ? (isThai
+                      ? 'ระบบจะเปิดบริษัทและบัญชีผู้ดูแลแพ็กเกจ Free ให้ทันที จากนั้นเข้าสู่ระบบด้วย Google อีเมลเดียวกัน'
+                      : 'We will create a Free workspace and admin account immediately. Then sign in with the same Google email.')
+                    : isThai
                     ? 'หลังชำระสำเร็จ ระบบจะเปิดบริษัทและบัญชีผู้ดูแลให้ทันที โดยใช้อีเมล Google เดียวกับที่สมัคร'
                     : 'After payment succeeds, we provision your company and admin account automatically for the same Google email.'}
                 </p>
@@ -641,11 +651,11 @@ export default function Landing() {
                 </div>
 
                 <form className="space-y-4" onSubmit={handleCheckout}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {(['starter', 'business'] as const).map((planKey) => {
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(['free', 'starter', 'business'] as const).map((planKey) => {
                       const plan = pricingPlans.find((item) => item.key === planKey)!;
                       const isSelected = selectedPlan === planKey;
-                      const isAvailable = configLoading || purchasablePlans.has(planKey);
+                      const isAvailable = planKey === 'free' || configLoading || purchasablePlans.has(planKey);
                       return (
                         <button
                           key={planKey}
@@ -677,6 +687,7 @@ export default function Landing() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {selectedPlan !== 'free' && (
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'วิธีชำระเงิน' : 'Payment method'}</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -707,6 +718,8 @@ export default function Landing() {
                         ))}
                       </div>
                     </div>
+                    )}
+                    {selectedPlan !== 'free' && (
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'Coupon Code' : 'Coupon Code'}</label>
                       <div className="relative">
@@ -714,6 +727,7 @@ export default function Landing() {
                         <input className="input-field pl-10" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder={isThai ? 'เช่น LAUNCH20' : 'e.g. LAUNCH20'} />
                       </div>
                     </div>
+                    )}
                     <div>
                       <label className="label">{isThai ? 'ชื่อบริษัท (ไทย)' : 'Company Name (Thai)'}</label>
                       <input className="input-field" value={form.companyNameTh} onChange={(e) => setForm((prev) => ({ ...prev, companyNameTh: e.target.value }))} required />
@@ -750,7 +764,15 @@ export default function Landing() {
                     </div>
                   )}
 
-                  {!configLoading && !config?.enabled && (
+                  {signupComplete && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      {isThai
+                        ? `สร้างบัญชี Free ให้ ${signupComplete.adminEmail} แล้ว สามารถเข้าสู่ระบบด้วย Google ได้ทันที`
+                        : `Free account created for ${signupComplete.adminEmail}. You can now sign in with Google.`}
+                    </div>
+                  )}
+
+                  {selectedPlan !== 'free' && !configLoading && !config?.enabled && (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                       {isThai
                         ? 'ระบบรับชำระออนไลน์ยังไม่ถูกตั้งค่าในเครื่องนี้ กรุณาใส่ Stripe หรือ PromptPay config ก่อน'
@@ -783,16 +805,23 @@ export default function Landing() {
 
                   <button
                     type="submit"
-                    disabled={submitting || configLoading || !config?.enabled}
+                    disabled={submitting || !!signupComplete || (selectedPlan !== 'free' && (configLoading || !config?.enabled))}
                     className="btn-primary lg w-full justify-center"
                   >
-                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : paymentMethod === 'stripe' ? <CreditCard className="w-5 h-5" /> : <QrCode className="w-5 h-5" />}
-                    {paymentMethod === 'stripe'
+                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : selectedPlan === 'free' ? <ArrowRight className="w-5 h-5" /> : paymentMethod === 'stripe' ? <CreditCard className="w-5 h-5" /> : <QrCode className="w-5 h-5" />}
+                    {selectedPlan === 'free'
+                      ? (isThai ? 'สร้างบัญชี Free' : 'Create free account')
+                      : paymentMethod === 'stripe'
                       ? (isThai ? 'ไปหน้าชำระเงินด้วยบัตรเครดิต' : 'Continue to secure card checkout')
                       : paymentMethod === 'stripe_promptpay'
                         ? (isThai ? 'ไปหน้าชำระเงิน PromptPay ของ Stripe' : 'Continue to Stripe PromptPay checkout')
                         : (isThai ? 'สร้าง PromptPay QR' : 'Generate PromptPay QR')}
                   </button>
+                  {signupComplete && (
+                    <a href={getPlanePath('/login', 'app')} className="btn-secondary lg w-full justify-center">
+                      {isThai ? 'ไปหน้า Login' : 'Go to login'}
+                    </a>
+                  )}
                 </form>
               </div>
 
@@ -803,10 +832,11 @@ export default function Landing() {
                 <ul className="space-y-3 text-sm text-gray-200">
                   <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'สร้างบริษัทในระบบให้อัตโนมัติ' : 'Automatically creates your company profile'}</li>
                   <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'สร้างบัญชีผู้ดูแลจากอีเมล Google ที่สมัคร' : 'Creates your admin account from the Google email used during checkout'}</li>
-                  <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'เปิดสิทธิ์แพ็กเกจและบันทึกสถานะสมาชิก' : 'Activates your plan and stores subscription status'}</li>
+                  <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{selectedPlan === 'free' ? (isThai ? 'ใช้ฟรี 10 เอกสาร/เดือน' : 'Free access with 10 documents per month') : (isThai ? 'เปิดสิทธิ์แพ็กเกจและบันทึกสถานะสมาชิก' : 'Activates your plan and stores subscription status')}</li>
                   <li className="flex gap-3"><Check className="w-4 h-4 mt-0.5 text-green-400" />{isThai ? 'เข้าใช้ต่อด้วย Continue with Google ได้ทันที' : 'Lets you continue with Google right away'}</li>
                 </ul>
 
+                {selectedPlan !== 'free' && (
                 <div className="mt-8 rounded-2xl bg-white/8 border border-white/10 p-4">
                   <h4 className="font-semibold text-white mb-3">
                     {isThai ? 'การตั้งค่าที่ต้องมีใน Stripe' : 'Stripe setup checklist'}
@@ -818,6 +848,7 @@ export default function Landing() {
                     <li>{isThai ? 'เปิด Customer Portal ถ้าต้องการให้ลูกค้าจัดการบัตรเอง' : 'Enable Customer Portal if you want self-service billing management'}</li>
                   </ul>
                 </div>
+                )}
               </div>
             </div>
           </div>
