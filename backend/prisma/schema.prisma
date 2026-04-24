@@ -313,7 +313,7 @@ model DocumentTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([companyId, type, language])
+  @@index([companyId, type, language])
   @@map("document_templates")
 }
 

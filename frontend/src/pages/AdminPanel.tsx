@@ -165,81 +165,173 @@ const templatePreviewSamples = {
 } as const;
 
 const templatePresets = {
-  hero: {
-    th: `<div style="display:grid;gap:8px">
-  <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Collection Note</div>
-  <div style="font-size:18px;font-weight:700;color:#0f172a">{{buyerName}}</div>
-  <div style="color:#475569">อ้างอิงเอกสาร {{invoiceNumber}} ลงวันที่ {{invoiceDate}}</div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px">
-    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
-      <div style="font-size:11px;color:#64748b">Subtotal</div>
-      <strong style="font-size:16px">{{subtotal}}</strong>
+  taxInvoice: {
+    type: 'tax_invoice',
+    label: 'T02',
+    nameTh: 'Tax Invoice - Executive Blue',
+    nameEn: 'Tax Invoice - Executive Blue',
+    descriptionTh: 'ใบกำกับภาษีสำหรับขายเชื่อ เน้นยอดค้างชำระ วันครบกำหนด และความน่าเชื่อถือ',
+    descriptionEn: 'A polished tax invoice layout for credit sales, due dates, and outstanding balance.',
+    th: `<div style="display:grid;grid-template-columns:1.15fr .85fr;gap:14px;align-items:stretch">
+  <div style="border:1px solid #dbeafe;border-radius:8px;padding:14px;background:#f8fbff">
+    <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#1d4ed8;font-weight:700">Tax Invoice T02</div>
+    <div style="margin-top:8px;font-size:18px;font-weight:800;color:#0f172a">{{buyerName}}</div>
+    <div style="margin-top:6px;color:#475569">เลขที่ {{invoiceNumber}} · วันที่ {{invoiceDate}}</div>
+    <div style="margin-top:10px;color:#334155">ครบกำหนดชำระ {{dueDate}} · วิธีชำระ {{paymentMethod}}</div>
+  </div>
+  <div style="border-radius:8px;padding:14px;background:#0f2f6b;color:#fff">
+    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#bfdbfe">Amount Due</div>
+    <div style="margin-top:8px;font-size:28px;font-weight:800">{{total}}</div>
+    <div style="margin-top:8px;color:#dbeafe;font-size:12px">VAT {{vatAmount}} · Subtotal {{subtotal}}</div>
+  </div>
+</div>`,
+    en: `<div style="display:grid;grid-template-columns:1.15fr .85fr;gap:14px;align-items:stretch">
+  <div style="border:1px solid #dbeafe;border-radius:8px;padding:14px;background:#f8fbff">
+    <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#1d4ed8;font-weight:700">Tax Invoice T02</div>
+    <div style="margin-top:8px;font-size:18px;font-weight:800;color:#0f172a">{{buyerName}}</div>
+    <div style="margin-top:6px;color:#475569">No. {{invoiceNumber}} · Date {{invoiceDate}}</div>
+    <div style="margin-top:10px;color:#334155">Due {{dueDate}} · Payment {{paymentMethod}}</div>
+  </div>
+  <div style="border-radius:8px;padding:14px;background:#0f2f6b;color:#fff">
+    <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#bfdbfe">Amount Due</div>
+    <div style="margin-top:8px;font-size:28px;font-weight:800">{{total}}</div>
+    <div style="margin-top:8px;color:#dbeafe;font-size:12px">VAT {{vatAmount}} · Subtotal {{subtotal}}</div>
+  </div>
+</div>`,
+  },
+  taxInvoiceReceipt: {
+    type: 'tax_invoice_receipt',
+    label: 'T01',
+    nameTh: 'Tax Invoice Receipt - Paid Stamp',
+    nameEn: 'Tax Invoice Receipt - Paid Stamp',
+    descriptionTh: 'ใบกำกับภาษี/ใบเสร็จรวม เน้นสถานะรับชำระแล้วและยอดสุทธิ',
+    descriptionEn: 'A combined tax invoice and receipt layout with a clear paid confirmation.',
+    th: `<div style="border:1px solid #bbf7d0;border-radius:8px;padding:14px;background:#f0fdf4">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+    <div>
+      <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#15803d;font-weight:800">Paid Receipt T01</div>
+      <div style="margin-top:8px;font-size:18px;font-weight:800;color:#052e16">{{documentTitle}}</div>
+      <div style="margin-top:6px;color:#166534">รับเงินจาก {{buyerName}} เรียบร้อยแล้ว</div>
     </div>
-    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
-      <div style="font-size:11px;color:#64748b">VAT</div>
-      <strong style="font-size:16px">{{vatAmount}}</strong>
+    <div style="border:1px solid #86efac;border-radius:999px;padding:8px 14px;background:#fff;color:#15803d;font-weight:800">PAID</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px">
+    <div><div style="font-size:11px;color:#166534">Subtotal</div><strong>{{subtotal}}</strong></div>
+    <div><div style="font-size:11px;color:#166534">VAT</div><strong>{{vatAmount}}</strong></div>
+    <div><div style="font-size:11px;color:#166534">Net Paid</div><strong>{{total}}</strong></div>
+  </div>
+</div>`,
+    en: `<div style="border:1px solid #bbf7d0;border-radius:8px;padding:14px;background:#f0fdf4">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+    <div>
+      <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#15803d;font-weight:800">Paid Receipt T01</div>
+      <div style="margin-top:8px;font-size:18px;font-weight:800;color:#052e16">{{documentTitle}}</div>
+      <div style="margin-top:6px;color:#166534">Payment from {{buyerName}} has been received.</div>
     </div>
-    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#eff6ff">
-      <div style="font-size:11px;color:#1d4ed8">Total Due</div>
-      <strong style="font-size:16px;color:#1d4ed8">{{total}}</strong>
+    <div style="border:1px solid #86efac;border-radius:999px;padding:8px 14px;background:#fff;color:#15803d;font-weight:800">PAID</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px">
+    <div><div style="font-size:11px;color:#166534">Subtotal</div><strong>{{subtotal}}</strong></div>
+    <div><div style="font-size:11px;color:#166534">VAT</div><strong>{{vatAmount}}</strong></div>
+    <div><div style="font-size:11px;color:#166534">Net Paid</div><strong>{{total}}</strong></div>
+  </div>
+</div>`,
+  },
+  receipt: {
+    type: 'receipt',
+    label: 'T03',
+    nameTh: 'Receipt - Settlement Record',
+    nameEn: 'Receipt - Settlement Record',
+    descriptionTh: 'ใบเสร็จรับเงินสำหรับอ้างอิงใบกำกับภาษีเดิม ดูเป็นหลักฐานรับชำระ',
+    descriptionEn: 'A receipt layout for settlement against a prior tax invoice.',
+    th: `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;background:#fff">
+  <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#64748b;font-weight:800">Receipt T03</div>
+  <div style="margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:end">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">บันทึกรับชำระจาก {{buyerName}}</div>
+      <div style="margin-top:6px;color:#475569">เอกสารเลขที่ {{invoiceNumber}} · วันที่รับชำระ {{invoiceDate}}</div>
+      <div style="margin-top:6px;color:#475569">ชำระโดย {{paymentMethod}}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:#64748b">Received Amount</div>
+      <div style="font-size:24px;font-weight:800;color:#0f766e">{{total}}</div>
     </div>
   </div>
 </div>`,
-    en: `<div style="display:grid;gap:8px">
-  <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Collection Note</div>
-  <div style="font-size:18px;font-weight:700;color:#0f172a">{{buyerName}}</div>
-  <div style="color:#475569">Reference {{invoiceNumber}} dated {{invoiceDate}}</div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px">
-    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
-      <div style="font-size:11px;color:#64748b">Subtotal</div>
-      <strong style="font-size:16px">{{subtotal}}</strong>
+    en: `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;background:#fff">
+  <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#64748b;font-weight:800">Receipt T03</div>
+  <div style="margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:end">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">Payment received from {{buyerName}}</div>
+      <div style="margin-top:6px;color:#475569">Document {{invoiceNumber}} · Receipt date {{invoiceDate}}</div>
+      <div style="margin-top:6px;color:#475569">Paid by {{paymentMethod}}</div>
     </div>
-    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#fff">
-      <div style="font-size:11px;color:#64748b">VAT</div>
-      <strong style="font-size:16px">{{vatAmount}}</strong>
-    </div>
-    <div style="border:1px solid #dbeafe;border-radius:14px;padding:10px 12px;background:#eff6ff">
-      <div style="font-size:11px;color:#1d4ed8">Total Due</div>
-      <strong style="font-size:16px;color:#1d4ed8">{{total}}</strong>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:#64748b">Received Amount</div>
+      <div style="font-size:24px;font-weight:800;color:#0f766e">{{total}}</div>
     </div>
   </div>
 </div>`,
   },
-  formal: {
-    th: `<div style="border-left:4px solid #1e3a8a;padding:4px 0 4px 14px">
-  <div style="font-size:12px;font-weight:700;color:#1e3a8a">{{documentTitle}}</div>
-  <div style="margin-top:6px;color:#334155">ผู้ขาย: {{sellerName}}</div>
-  <div style="color:#334155">ผู้ซื้อ: {{buyerName}}</div>
-  <div style="color:#334155">จำนวนเงินทั้งสิ้น: <strong>{{total}}</strong></div>
-  <div style="margin-top:6px;color:#64748b">หมายเหตุ: {{notes}}</div>
+  creditNote: {
+    type: 'credit_note',
+    label: 'T04',
+    nameTh: 'Credit Note - Adjustment',
+    nameEn: 'Credit Note - Adjustment',
+    descriptionTh: 'ใบลดหนี้ เน้นมูลค่าปรับลดและเหตุผลประกอบการแก้ไข',
+    descriptionEn: 'A credit note layout focused on reduction amount and adjustment context.',
+    th: `<div style="border:1px solid #fed7aa;border-radius:8px;padding:14px;background:#fff7ed">
+  <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#c2410c;font-weight:800">Credit Note T04</div>
+  <div style="margin-top:8px;font-size:18px;font-weight:800;color:#7c2d12">เอกสารลดหนี้สำหรับ {{buyerName}}</div>
+  <div style="margin-top:6px;color:#9a3412">อ้างอิง {{invoiceNumber}} ลงวันที่ {{invoiceDate}}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+    <div style="border:1px solid #fdba74;border-radius:8px;background:#fff;padding:10px"><div style="font-size:11px;color:#9a3412">ยอดลดหนี้</div><strong>{{total}}</strong></div>
+    <div style="border:1px solid #fdba74;border-radius:8px;background:#fff;padding:10px"><div style="font-size:11px;color:#9a3412">หมายเหตุ</div><strong>{{notes}}</strong></div>
+  </div>
 </div>`,
-    en: `<div style="border-left:4px solid #1e3a8a;padding:4px 0 4px 14px">
-  <div style="font-size:12px;font-weight:700;color:#1e3a8a">{{documentTitle}}</div>
-  <div style="margin-top:6px;color:#334155">Seller: {{sellerName}}</div>
-  <div style="color:#334155">Buyer: {{buyerName}}</div>
-  <div style="color:#334155">Grand Total: <strong>{{total}}</strong></div>
-  <div style="margin-top:6px;color:#64748b">Notes: {{notes}}</div>
+    en: `<div style="border:1px solid #fed7aa;border-radius:8px;padding:14px;background:#fff7ed">
+  <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#c2410c;font-weight:800">Credit Note T04</div>
+  <div style="margin-top:8px;font-size:18px;font-weight:800;color:#7c2d12">Credit adjustment for {{buyerName}}</div>
+  <div style="margin-top:6px;color:#9a3412">Reference {{invoiceNumber}} dated {{invoiceDate}}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+    <div style="border:1px solid #fdba74;border-radius:8px;background:#fff;padding:10px"><div style="font-size:11px;color:#9a3412">Credit Amount</div><strong>{{total}}</strong></div>
+    <div style="border:1px solid #fdba74;border-radius:8px;background:#fff;padding:10px"><div style="font-size:11px;color:#9a3412">Notes</div><strong>{{notes}}</strong></div>
+  </div>
 </div>`,
   },
-  footer: {
-    th: `<div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end">
-  <div>
-    <div style="font-weight:700;color:#0f172a">ชำระผ่าน {{paymentMethod}}</div>
-    <div style="font-size:12px;color:#64748b">ครบกำหนด {{dueDate}}</div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:12px;color:#64748b">Amount in words</div>
-    <div style="font-weight:700;color:#0f172a">{{amountInWords}}</div>
+  debitNote: {
+    type: 'debit_note',
+    label: 'T05',
+    nameTh: 'Debit Note - Additional Charge',
+    nameEn: 'Debit Note - Additional Charge',
+    descriptionTh: 'ใบเพิ่มหนี้ เน้นยอดเรียกเก็บเพิ่มและข้อมูลอ้างอิงเอกสารเดิม',
+    descriptionEn: 'A debit note layout for additional charge and reference context.',
+    th: `<div style="border:1px solid #fecdd3;border-radius:8px;padding:14px;background:#fff1f2">
+  <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#be123c;font-weight:800">Debit Note T05</div>
+  <div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-top:10px;align-items:center">
+    <div>
+      <div style="font-size:18px;font-weight:800;color:#881337">เรียกเก็บเพิ่มเติมจาก {{buyerName}}</div>
+      <div style="margin-top:6px;color:#9f1239">อ้างอิงเอกสาร {{invoiceNumber}} · {{invoiceDate}}</div>
+      <div style="margin-top:6px;color:#9f1239">{{notes}}</div>
+    </div>
+    <div style="border-radius:8px;background:#be123c;color:#fff;padding:12px 16px;text-align:right">
+      <div style="font-size:11px;color:#ffe4e6">Additional Due</div>
+      <div style="font-size:24px;font-weight:800">{{total}}</div>
+    </div>
   </div>
 </div>`,
-    en: `<div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end">
-  <div>
-    <div style="font-weight:700;color:#0f172a">Payment via {{paymentMethod}}</div>
-    <div style="font-size:12px;color:#64748b">Due on {{dueDate}}</div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:12px;color:#64748b">Amount in words</div>
-    <div style="font-weight:700;color:#0f172a">{{amountInWords}}</div>
+    en: `<div style="border:1px solid #fecdd3;border-radius:8px;padding:14px;background:#fff1f2">
+  <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#be123c;font-weight:800">Debit Note T05</div>
+  <div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-top:10px;align-items:center">
+    <div>
+      <div style="font-size:18px;font-weight:800;color:#881337">Additional charge to {{buyerName}}</div>
+      <div style="margin-top:6px;color:#9f1239">Reference {{invoiceNumber}} · {{invoiceDate}}</div>
+      <div style="margin-top:6px;color:#9f1239">{{notes}}</div>
+    </div>
+    <div style="border-radius:8px;background:#be123c;color:#fff;padding:12px 16px;text-align:right">
+      <div style="font-size:11px;color:#ffe4e6">Additional Due</div>
+      <div style="font-size:24px;font-weight:800">{{total}}</div>
+    </div>
   </div>
 </div>`,
   },
@@ -248,6 +340,18 @@ const templatePresets = {
 function compileTemplatePreview(html: string, sample: Record<string, string>) {
   return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => sample[key] ?? '');
 }
+
+type TemplatePresetKey = keyof typeof templatePresets;
+type TemplateDocType = 'tax_invoice' | 'tax_invoice_receipt' | 'receipt' | 'credit_note' | 'debit_note';
+type TemplateLanguage = 'th' | 'en' | 'both';
+type TemplateFormState = {
+  name: string;
+  type: TemplateDocType;
+  language: TemplateLanguage;
+  htmlTh: string;
+  htmlEn: string;
+  isActive: boolean;
+};
 
 function CompanyTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) {
   return (
@@ -584,19 +688,19 @@ function UsersTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) 
 function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) {
   const { token } = useAuthStore();
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const emptyTemplateForm = {
+  const emptyTemplateForm: TemplateFormState = {
     name: '',
-    type: 'tax_invoice' as 'tax_invoice' | 'tax_invoice_receipt' | 'receipt' | 'credit_note' | 'debit_note',
-    language: 'both' as 'th' | 'en' | 'both',
-    htmlTh: '<div class="template-note">หมายเหตุ: ใช้แม่แบบเอกสารนี้</div>',
-    htmlEn: '<div class="template-note">Template note: Use this document template</div>',
+    type: 'tax_invoice' as TemplateDocType,
+    language: 'both' as TemplateLanguage,
+    htmlTh: templatePresets.taxInvoice.th,
+    htmlEn: templatePresets.taxInvoice.en,
     isActive: false,
   };
   const [templates, setTemplates] = useState<Array<{
     id: string;
     name: string;
-    type: 'tax_invoice' | 'tax_invoice_receipt' | 'receipt' | 'credit_note' | 'debit_note';
-    language: 'th' | 'en' | 'both';
+    type: TemplateDocType;
+    language: TemplateLanguage;
     htmlTh: string;
     htmlEn: string;
     isActive: boolean;
@@ -645,19 +749,29 @@ function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: string) => string
   ] as const;
   const presetOptions = [
     {
-      key: 'hero' as const,
-      name: isThai ? 'Summary Hero' : 'Summary Hero',
-      description: isThai ? 'กล่องสรุปยอดแบบเด่น อ่านง่ายสำหรับหัวเอกสาร' : 'A bold summary block for the top of the document.',
+      key: 'taxInvoice' as const,
+      name: templatePresets.taxInvoice.nameTh,
+      description: isThai ? templatePresets.taxInvoice.descriptionTh : templatePresets.taxInvoice.descriptionEn,
     },
     {
-      key: 'formal' as const,
-      name: isThai ? 'Formal Side Note' : 'Formal Side Note',
-      description: isThai ? 'สไตล์ทางการ เน้นข้อมูลคู่ค้าและยอดรวม' : 'A formal side-note layout focused on parties and totals.',
+      key: 'taxInvoiceReceipt' as const,
+      name: templatePresets.taxInvoiceReceipt.nameTh,
+      description: isThai ? templatePresets.taxInvoiceReceipt.descriptionTh : templatePresets.taxInvoiceReceipt.descriptionEn,
     },
     {
-      key: 'footer' as const,
-      name: isThai ? 'Payment Footer' : 'Payment Footer',
-      description: isThai ? 'เน้นวิธีชำระและยอดเป็นตัวอักษรช่วงท้ายเอกสาร' : 'A footer-style block highlighting payment and amount in words.',
+      key: 'receipt' as const,
+      name: templatePresets.receipt.nameTh,
+      description: isThai ? templatePresets.receipt.descriptionTh : templatePresets.receipt.descriptionEn,
+    },
+    {
+      key: 'creditNote' as const,
+      name: templatePresets.creditNote.nameTh,
+      description: isThai ? templatePresets.creditNote.descriptionTh : templatePresets.creditNote.descriptionEn,
+    },
+    {
+      key: 'debitNote' as const,
+      name: templatePresets.debitNote.nameTh,
+      description: isThai ? templatePresets.debitNote.descriptionTh : templatePresets.debitNote.descriptionEn,
     },
   ];
 
@@ -802,17 +916,57 @@ function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: string) => string
     }
   }
 
-  function applyPreset(presetKey: keyof typeof templatePresets) {
+  function applyPreset(presetKey: TemplatePresetKey) {
+    const preset = templatePresets[presetKey];
     setForm((prev) => ({
       ...prev,
-      htmlTh: templatePresets[presetKey].th,
-      htmlEn: templatePresets[presetKey].en,
-      name: prev.name || `${presetOptions.find((preset) => preset.key === presetKey)?.name ?? 'Template'} ${prev.type.toUpperCase()}`,
+      type: preset.type as TemplateDocType,
+      language: 'both',
+      htmlTh: preset.th,
+      htmlEn: preset.en,
+      name: prev.name || preset.nameTh,
     }));
     setMsg({
       type: 'ok',
       text: isThai ? 'เติม preset ให้แล้ว คุณแก้ข้อความต่อได้ทันที' : 'Preset applied. You can keep editing the copy and layout.',
     });
+  }
+
+  async function createStandardTemplateSet() {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const createdTemplates: typeof templates = [];
+      for (const preset of Object.values(templatePresets)) {
+        const res = await fetch('/api/admin/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            name: preset.nameTh,
+            type: preset.type,
+            language: 'both',
+            htmlTh: preset.th,
+            htmlEn: preset.en,
+            isActive: false,
+          }),
+        });
+        const json = await res.json() as { data?: typeof templates[number]; error?: string };
+        if (!res.ok || !json.data) throw new Error(json.error ?? 'Failed to create template set');
+        createdTemplates.push(json.data);
+      }
+      setTemplates((prev) => [...prev, ...createdTemplates]);
+      setMsg({
+        type: 'ok',
+        text: isThai ? 'สร้างชุด template มาตรฐานครบ T01-T05 แล้ว' : 'Created the full T01-T05 standard template set.',
+      });
+    } catch (error) {
+      setMsg({
+        type: 'err',
+        text: error instanceof Error ? error.message : (isThai ? 'สร้างชุด template ไม่สำเร็จ' : 'Failed to create template set.'),
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400"/></div>;
@@ -842,6 +996,10 @@ function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: string) => string
           />
           <button type="button" className="btn-secondary text-sm" onClick={() => importInputRef.current?.click()}>
             {isThai ? 'นำเข้า JSON' : 'Import JSON'}
+          </button>
+          <button type="button" className="btn-primary text-sm" onClick={createStandardTemplateSet} disabled={saving}>
+            <Sparkles className="h-4 w-4" />
+            {isThai ? 'สร้างชุด T01-T05' : 'Create T01-T05 set'}
           </button>
         </div>
       </div>
@@ -919,17 +1077,18 @@ function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: string) => string
             {isThai ? 'Preset เริ่มต้น' : 'Starter presets'}
           </div>
           <p className="mt-1 text-xs text-gray-500">
-            {isThai ? 'เลือก preset เพื่อเริ่มจากโครงที่สวยก่อน แล้วค่อยแก้ copy/spacing ต่อ' : 'Pick a polished starting point, then refine the copy and spacing as needed.'}
+            {isThai ? 'เลือก template ตามประเภทเอกสาร หรือกดสร้างชุด T01-T05 เพื่อเพิ่มครบทุกแบบให้เลือกใช้' : 'Pick a document-specific template, or create the full T01-T05 set for selection in the invoice builder.'}
           </p>
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
             {presetOptions.map((preset) => (
               <button
                 key={preset.key}
                 type="button"
                 onClick={() => applyPreset(preset.key)}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-sky-300 hover:bg-sky-50"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-sky-300 hover:bg-sky-50"
               >
-                <div className="text-sm font-semibold text-slate-900">{preset.name}</div>
+                <div className="text-xs font-bold text-sky-700">{templatePresets[preset.key].label}</div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">{preset.name}</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">{preset.description}</div>
               </button>
             ))}
