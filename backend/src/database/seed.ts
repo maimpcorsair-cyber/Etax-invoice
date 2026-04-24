@@ -323,7 +323,13 @@ async function seedCompanyData(db: DbClient, companyId: string, seedOffset: numb
 }
 
 async function main() {
-  const extraCompanyCount = 4;
+  const seedMode = process.env.SEED_MODE ?? 'bootstrap';
+  const isBootstrap = seedMode !== 'full';
+  const extraCompanyCount = isBootstrap ? 0 : 4;
+  const primaryCustomerCount = isBootstrap ? 8 : 50;
+  const primaryInvoiceCount = isBootstrap ? 12 : 300;
+  const extraCustomerCount = isBootstrap ? 0 : 10;
+  const extraInvoiceCount = isBootstrap ? 0 : 30;
 
   await withSystemRlsContext(prisma, async (db) => {
     const existingCompany = await db.company.findUnique({ where: { id: COMPANY_ID } });
@@ -370,7 +376,7 @@ async function main() {
     }
 
     await upsertSubscriptionWithDb(db, COMPANY_ID, 'business');
-    await seedCompanyData(db, COMPANY_ID, 0, 50, 300);
+    await seedCompanyData(db, COMPANY_ID, 0, primaryCustomerCount, primaryInvoiceCount);
 
     const extraPlans: Array<'starter' | 'business' | 'enterprise'> = ['starter', 'business', 'enterprise', 'starter'];
     const seededCompanies = [COMPANY_ID];
@@ -379,7 +385,7 @@ async function main() {
       await upsertCompany(db, company);
       await upsertAdminForCompany(db, company.id, i + 1);
       await upsertSubscriptionWithDb(db, company.id, extraPlans[i]);
-      await seedCompanyData(db, company.id, 100 + i * 50, 10, 30);
+      await seedCompanyData(db, company.id, 100 + i * 50, extraCustomerCount, extraInvoiceCount);
       seededCompanies.push(company.id);
     }
 
@@ -500,7 +506,11 @@ async function main() {
     });
   }, { role: 'seed-script' });
 
-  console.log(`Seeded main company + ${extraCompanyCount} extra companies (multi-company dataset)`);
+  console.log(
+    isBootstrap
+      ? 'Seeded bootstrap dataset for production deploy'
+      : `Seeded main company + ${extraCompanyCount} extra companies (multi-company dataset)`,
+  );
 }
 
 main()
