@@ -23,6 +23,8 @@ services:
         value: 7d
       - key: FRONTEND_URLS
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        value: 420889491125-p2pgamg2kb3574o213ep0om8pn94suar.apps.googleusercontent.com
       - key: RD_ENVIRONMENT
         value: sandbox
       - key: S3_BUCKET
