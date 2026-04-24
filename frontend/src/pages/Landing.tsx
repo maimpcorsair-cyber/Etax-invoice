@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { FileText, Globe, FileCheck, Zap, ArrowRight, Check, Smartphone, Loader2, CreditCard, ShieldCheck, X, Lock, Users, Send, Files, FileSpreadsheet, ScrollText, QrCode, TicketPercent } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { buildPlaneUrl, getPlanePath } from '../lib/platform';
+import { digitsOnly, englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isThaiText, isThirteenDigitId, thaiTextOnly } from '../lib/inputGuards';
 import { useAuthStore } from '../store/authStore';
 
 const features = [
@@ -267,6 +268,12 @@ export default function Landing() {
   };
   const showMonthlyPrice = (plan?: PricingPlan) => plan?.key === 'starter' || plan?.key === 'business';
   const isGoogleBoundFreeSignup = selectedPlan === 'free' && googleSignupReady;
+  const formValidation = {
+    companyNameTh: form.companyNameTh.trim().length > 0 && !isThaiText(form.companyNameTh, true),
+    companyNameEn: form.companyNameEn.trim().length > 0 && !isEnglishText(form.companyNameEn),
+    taxId: form.taxId.length > 0 && !isThirteenDigitId(form.taxId),
+    addressTh: form.addressTh.trim().length > 0 && !isThaiText(form.addressTh, true),
+  };
 
   async function handleCheckout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -870,15 +877,24 @@ export default function Landing() {
                     )}
                     <div>
                       <label className="label">{isThai ? 'ชื่อบริษัท (ไทย)' : 'Company Name (Thai)'}</label>
-                      <input className="input-field" value={form.companyNameTh} onChange={(e) => setForm((prev) => ({ ...prev, companyNameTh: e.target.value }))} required />
+                      <input className={guardedInputClass(formValidation.companyNameTh)} value={form.companyNameTh} onChange={(e) => setForm((prev) => ({ ...prev, companyNameTh: thaiTextOnly(e.target.value) }))} required />
+                      <p className={inputGuide(formValidation.companyNameTh)}>
+                        {isThai ? 'ใช้ตัวอักษรไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Use Thai characters, e.g. บริษัท ตัวอย่าง จำกัด'}
+                      </p>
                     </div>
                     <div>
                       <label className="label">{isThai ? 'ชื่อบริษัท (อังกฤษ)' : 'Company Name (English)'}</label>
-                      <input className="input-field" value={form.companyNameEn} onChange={(e) => setForm((prev) => ({ ...prev, companyNameEn: e.target.value }))} />
+                      <input className={guardedInputClass(formValidation.companyNameEn)} value={form.companyNameEn} onChange={(e) => setForm((prev) => ({ ...prev, companyNameEn: englishTextOnly(e.target.value) }))} />
+                      <p className={inputGuide(formValidation.companyNameEn)}>
+                        {isThai ? 'ใช้ตัวอักษรอังกฤษเท่านั้น เช่น Example Co., Ltd.' : 'Use English characters, e.g. Example Co., Ltd.'}
+                      </p>
                     </div>
                     <div>
                       <label className="label">{isThai ? 'เลขประจำตัวผู้เสียภาษี 13 หลัก' : '13-digit Tax ID'}</label>
-                      <input className="input-field" value={form.taxId} onChange={(e) => setForm((prev) => ({ ...prev, taxId: e.target.value.replace(/\D/g, '').slice(0, 13) }))} required />
+                      <input className={guardedInputClass(formValidation.taxId, 'font-mono')} value={form.taxId} onChange={(e) => setForm((prev) => ({ ...prev, taxId: digitsOnly(e.target.value, 13) }))} inputMode="numeric" maxLength={13} required />
+                      <p className={inputGuide(formValidation.taxId)}>
+                        {isThai ? `กรอกตัวเลข ${form.taxId.length}/13 หลัก` : `Enter ${form.taxId.length}/13 digits`}
+                      </p>
                     </div>
                     <div>
                       <label className="label">{isThai ? 'เบอร์โทรติดต่อ' : 'Phone Number'}</label>
@@ -926,7 +942,10 @@ export default function Landing() {
                     )}
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'ที่อยู่บริษัท (ไทย)' : 'Company Address (Thai)'}</label>
-                      <textarea className="input-field min-h-[96px]" value={form.addressTh} onChange={(e) => setForm((prev) => ({ ...prev, addressTh: e.target.value }))} required />
+                      <textarea className={guardedInputClass(formValidation.addressTh, 'min-h-[96px]')} value={form.addressTh} onChange={(e) => setForm((prev) => ({ ...prev, addressTh: thaiTextOnly(e.target.value) }))} required />
+                      <p className={inputGuide(formValidation.addressTh)}>
+                        {isThai ? 'ที่อยู่ภาษาไทย เช่น เลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Use Thai address text: street, district, province, postal code.'}
+                      </p>
                     </div>
                     </div>
                   </div>

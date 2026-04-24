@@ -5,6 +5,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Product } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
+import { englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isThaiText, thaiTextOnly } from '../lib/inputGuards';
 
 const VAT_OPTIONS = ['vat7', 'vatExempt', 'vatZero'] as const;
 
@@ -33,6 +34,12 @@ export default function Products() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const formValidation = {
+    nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
+    nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
+    descriptionTh: (form.descriptionTh ?? '').trim().length > 0 && !isThaiText(form.descriptionTh ?? ''),
+    descriptionEn: (form.descriptionEn ?? '').trim().length > 0 && !isEnglishText(form.descriptionEn ?? ''),
+  };
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -84,7 +91,7 @@ export default function Products() {
 
   async function handleSave() {
     if (!form.code.trim()) { setError(isThai ? 'กรุณากรอกรหัสสินค้า' : 'Product code is required'); return; }
-    if (!form.nameTh.trim()) { setError(isThai ? 'กรุณากรอกชื่อภาษาไทย' : 'Thai name is required'); return; }
+    if (!form.nameTh.trim() || formValidation.nameTh) { setError(isThai ? 'กรุณากรอกชื่อภาษาไทยให้ถูกต้อง' : 'Please enter a valid Thai name'); return; }
     if (!form.unit.trim()) { setError(isThai ? 'กรุณากรอกหน่วย' : 'Unit is required'); return; }
     if (form.unitPrice < 0) { setError(isThai ? 'ราคาต้องไม่ติดลบ' : 'Price must be non-negative'); return; }
 
@@ -257,11 +264,17 @@ export default function Products() {
                 </div>
                 <div>
                   <label className="label">{t('product.nameTh')} *</label>
-                  <input value={form.nameTh} onChange={(e) => field('nameTh', e.target.value)} className="input-field" placeholder="ซอฟต์แวร์พัฒนาระบบ" />
+                  <input value={form.nameTh} onChange={(e) => field('nameTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.nameTh)} placeholder="ซอฟต์แวร์พัฒนาระบบ" />
+                  <p className={inputGuide(formValidation.nameTh)}>
+                    {isThai ? 'ใช้ชื่อภาษาไทย เช่น บริการพัฒนาระบบ' : 'Thai only, e.g. บริการพัฒนาระบบ'}
+                  </p>
                 </div>
                 <div>
                   <label className="label">{t('product.nameEn')}</label>
-                  <input value={form.nameEn} onChange={(e) => field('nameEn', e.target.value)} className="input-field" placeholder="Software Development" />
+                  <input value={form.nameEn} onChange={(e) => field('nameEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.nameEn)} placeholder="Software Development" />
+                  <p className={inputGuide(formValidation.nameEn)}>
+                    {isThai ? 'ใช้ชื่ออังกฤษ เช่น Software Development' : 'English only, e.g. Software Development'}
+                  </p>
                 </div>
                 <div>
                   <label className="label">{t('product.price')} (THB) *</label>
@@ -284,11 +297,11 @@ export default function Products() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{isThai ? 'รายละเอียด (ไทย)' : 'Description (TH)'}</label>
-                  <textarea value={form.descriptionTh} onChange={(e) => field('descriptionTh', e.target.value)} className="input-field" rows={2} placeholder={isThai ? 'รายละเอียดสินค้าเพิ่มเติม...' : 'Additional details...'} />
+                  <textarea value={form.descriptionTh} onChange={(e) => field('descriptionTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.descriptionTh)} rows={2} placeholder={isThai ? 'รายละเอียดสินค้าเพิ่มเติม...' : 'Additional details...'} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{isThai ? 'รายละเอียด (อังกฤษ)' : 'Description (EN)'}</label>
-                  <textarea value={form.descriptionEn} onChange={(e) => field('descriptionEn', e.target.value)} className="input-field" rows={2} placeholder="Additional details in English..." />
+                  <textarea value={form.descriptionEn} onChange={(e) => field('descriptionEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.descriptionEn)} rows={2} placeholder="Additional details in English..." />
                 </div>
               </div>
             </div>

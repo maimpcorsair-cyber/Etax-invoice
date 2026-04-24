@@ -2,6 +2,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { InvoiceItem } from '../../types';
+import { englishTextOnly, guardedInputClass, isEnglishText, isThaiText, thaiTextOnly } from '../../lib/inputGuards';
 
 interface Props {
   items: InvoiceItem[];
@@ -62,16 +63,16 @@ export default function ItemsTable({
                 <td className="py-2 pr-2">
                   <input
                     value={item.nameTh}
-                    onChange={(e) => onUpdateItem(i, 'nameTh', e.target.value)}
-                    className="input-field text-xs"
+                    onChange={(e) => onUpdateItem(i, 'nameTh', thaiTextOnly(e.target.value))}
+                    className={guardedInputClass(item.nameTh.trim().length > 0 && !isThaiText(item.nameTh, true), 'text-xs')}
                     placeholder="ชื่อสินค้า"
                   />
                 </td>
                 <td className="py-2 pr-2">
                   <input
                     value={item.nameEn ?? ''}
-                    onChange={(e) => onUpdateItem(i, 'nameEn', e.target.value)}
-                    className="input-field text-xs"
+                    onChange={(e) => onUpdateItem(i, 'nameEn', englishTextOnly(e.target.value))}
+                    className={guardedInputClass(!!item.nameEn && !isEnglishText(item.nameEn), 'text-xs')}
                     placeholder="Item name"
                   />
                 </td>
