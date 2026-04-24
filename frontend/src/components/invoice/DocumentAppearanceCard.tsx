@@ -6,6 +6,10 @@ interface Props {
   templates: DocumentTemplateOption[];
   selectedTemplateId: string | null;
   onTemplateChange: (value: string | null) => void;
+  documentMode: 'ordinary' | 'electronic';
+  onDocumentModeChange: (value: 'ordinary' | 'electronic') => void;
+  bankPaymentInfo: string;
+  onBankPaymentInfoChange: (value: string) => void;
   showCompanyLogo: boolean;
   onShowCompanyLogoChange: (value: boolean) => void;
   documentLogoUrl: string | null;
@@ -18,6 +22,10 @@ export default function DocumentAppearanceCard({
   templates,
   selectedTemplateId,
   onTemplateChange,
+  documentMode,
+  onDocumentModeChange,
+  bankPaymentInfo,
+  onBankPaymentInfoChange,
   showCompanyLogo,
   onShowCompanyLogoChange,
   documentLogoUrl,
@@ -59,6 +67,45 @@ export default function DocumentAppearanceCard({
             ? 'เลือกธีมสีและสไตล์ของเอกสาร โดยโครงสร้างข้อมูลภาษียังเหมือนเดิม'
             : 'Choose the document theme and color tone while keeping the same tax-document structure.'}
         </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => onDocumentModeChange('ordinary')}
+          className={`rounded-xl border p-4 text-left transition ${
+            documentMode === 'ordinary'
+              ? 'border-slate-500 bg-slate-50 shadow-sm'
+              : 'border-slate-200 bg-white hover:border-slate-300'
+          }`}
+        >
+          <div className="text-sm font-semibold text-slate-900">
+            {isThai ? 'เอกสารธรรมดา' : 'Ordinary document'}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            {isThai
+              ? 'ใช้สำหรับพิมพ์หรือส่งเป็นเอกสารทั่วไป ไม่มี QR ตรวจสอบออนไลน์และไม่มีข้อความกำกับ e-Tax'
+              : 'For regular printed/shared documents without online QR verification or e-Tax footer wording.'}
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => onDocumentModeChange('electronic')}
+          className={`rounded-xl border p-4 text-left transition ${
+            documentMode === 'electronic'
+              ? 'border-blue-500 bg-blue-50 shadow-sm'
+              : 'border-slate-200 bg-white hover:border-slate-300'
+          }`}
+        >
+          <div className="text-sm font-semibold text-slate-900">
+            {isThai ? 'Electronic / e-Tax' : 'Electronic / e-Tax'}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            {isThai
+              ? 'มีข้อความกำกับเอกสารอิเล็กทรอนิกส์ด้านล่าง พร้อม QR สำหรับดู/ตรวจสอบเอกสารออนไลน์'
+              : 'Adds electronic-document footer wording and a QR for online viewing or verification.'}
+          </p>
+        </button>
       </div>
 
       <div>
@@ -179,6 +226,25 @@ export default function DocumentAppearanceCard({
           </span>
         </span>
       </label>
+
+      <div>
+        <label className="label">
+          {isThai ? 'บัญชีธนาคารผู้เรียกเก็บเงิน (แสดงท้ายเอกสาร)' : 'Collector bank account (shown at document bottom)'}
+        </label>
+        <textarea
+          value={bankPaymentInfo}
+          onChange={(e) => onBankPaymentInfoChange(e.target.value)}
+          className="input-field min-h-[92px]"
+          placeholder={isThai
+            ? 'เช่น ธนาคารกสิกรไทย\nชื่อบัญชี บริษัท ตัวอย่าง จำกัด\nเลขที่บัญชี 123-4-56789-0'
+            : 'e.g. Kasikorn Bank\nAccount name Example Co., Ltd.\nAccount no. 123-4-56789-0'}
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          {isThai
+            ? 'ถ้าเว้นว่าง ระบบจะไม่แสดงกล่องข้อมูลโอนเงินใน PDF'
+            : 'Leave blank to hide the bank transfer box in the PDF.'}
+        </p>
+      </div>
 
       <div>
         <label className="label">

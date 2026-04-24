@@ -44,6 +44,8 @@ const createInvoiceSchema = z.object({
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
   templateId: z.string().optional(),
+  documentMode: z.enum(['ordinary', 'electronic']).optional(),
+  bankPaymentInfo: z.string().optional(),
   showCompanyLogo: z.boolean().optional(),
   documentLogoUrl: z.string().optional(),
   referenceInvoiceId: z.string().optional(),
@@ -60,6 +62,8 @@ const previewInvoiceSchema = z.object({
   notes: z.string().optional(),
   logoUrl: z.string().optional(),
   templateId: z.string().optional(),
+  documentMode: z.enum(['ordinary', 'electronic']).optional(),
+  bankPaymentInfo: z.string().optional(),
   showCompanyLogo: z.boolean().optional(),
 })
 
@@ -333,6 +337,8 @@ invoicesRouter.post('/', async (req, res) => {
       email: company.email, logoUrl: company.logoUrl,
       documentPreferences: {
         templateId: body.templateId ?? null,
+        documentMode: body.documentMode ?? 'electronic',
+        bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
       },
@@ -411,6 +417,8 @@ invoicesRouter.post('/', async (req, res) => {
       data: {
         ...invoice,
         templateId: body.templateId ?? null,
+        documentMode: body.documentMode ?? 'electronic',
+        bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
       },
@@ -433,6 +441,8 @@ invoicesRouter.get('/:id', async (req, res) => {
     const sellerSnap = invoice.seller as {
       documentPreferences?: {
         templateId?: string | null;
+        documentMode?: 'ordinary' | 'electronic' | null;
+        bankPaymentInfo?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
       };
@@ -441,6 +451,8 @@ invoicesRouter.get('/:id', async (req, res) => {
       data: {
         ...invoice,
         templateId: sellerSnap?.documentPreferences?.templateId ?? null,
+        documentMode: sellerSnap?.documentPreferences?.documentMode ?? 'electronic',
+        bankPaymentInfo: sellerSnap?.documentPreferences?.bankPaymentInfo ?? null,
         showCompanyLogo: sellerSnap?.documentPreferences?.showCompanyLogo ?? true,
         documentLogoUrl: sellerSnap?.documentPreferences?.documentLogoUrl ?? null,
       },
@@ -490,6 +502,8 @@ invoicesRouter.patch('/:id', async (req, res) => {
       email: company.email, logoUrl: company.logoUrl,
       documentPreferences: {
         templateId: body.templateId ?? null,
+        documentMode: body.documentMode ?? 'electronic',
+        bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
       },
@@ -555,7 +569,16 @@ invoicesRouter.patch('/:id', async (req, res) => {
       language: body.language === 'both' ? 'th' : body.language,
     });
 
-    res.json({ data: updatedInvoice });
+    res.json({
+      data: {
+        ...updatedInvoice,
+        templateId: body.templateId ?? null,
+        documentMode: body.documentMode ?? 'electronic',
+        bankPaymentInfo: body.bankPaymentInfo ?? null,
+        showCompanyLogo: body.showCompanyLogo ?? true,
+        documentLogoUrl: body.documentLogoUrl ?? null,
+      },
+    });
   } catch (err) {
     if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
     res.status(500).json({ error: 'Failed to update invoice' });
@@ -818,6 +841,8 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
     const documentPrefs = ((invoice.seller as {
       documentPreferences?: {
         templateId?: string | null;
+        documentMode?: 'ordinary' | 'electronic' | null;
+        bankPaymentInfo?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
       };
@@ -868,6 +893,8 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
       notes:         invoice.notes,
       paymentMethod: invoice.paymentMethod,
       templateId: documentPrefs.templateId ?? null,
+      documentMode: documentPrefs.documentMode ?? 'electronic',
+      bankPaymentInfo: documentPrefs.bankPaymentInfo ?? null,
       showCompanyLogo: documentPrefs.showCompanyLogo ?? true,
       documentLogoUrl: documentPrefs.documentLogoUrl ?? null,
       referenceDocNumber: invoice.referenceDocNumber ?? undefined,
@@ -956,6 +983,8 @@ invoicesRouter.post('/preview', async (req, res) => {
       notes: body.notes,
       documentLogoUrl: body.logoUrl || null,
       templateId: body.templateId ?? null,
+      documentMode: body.documentMode ?? 'electronic',
+      bankPaymentInfo: body.bankPaymentInfo ?? null,
       showCompanyLogo: body.showCompanyLogo ?? true,
     };
 

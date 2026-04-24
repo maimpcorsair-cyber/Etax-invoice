@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import QRCode from 'qrcode';
 import { amountInWordsThai, amountInWordsEnglish } from './invoiceService';
 import { logger } from '../config/logger';
 import prisma from '../config/database';
@@ -56,6 +57,10 @@ interface PdfInvoiceData {
   templateName?: string | null;
   templateHtml?: string | null;
   templateNote?: string | null;
+  documentMode?: 'ordinary' | 'electronic' | null;
+  bankPaymentInfo?: string | null;
+  onlineViewUrl?: string | null;
+  onlineQrDataUrl?: string | null;
 }
 
 interface CustomerStatementPdfData {
@@ -203,6 +208,24 @@ function resolveDocumentTheme(templateId?: string | null) {
   return themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
 }
 
+function buildOnlineViewUrl(invoiceNumber: string) {
+  const baseUrl = process.env.FRONTEND_URL ?? process.env.APP_URL ?? 'https://etax-invoice.vercel.app';
+  return `${baseUrl.replace(/\/$/, '')}/verify/${encodeURIComponent(invoiceNumber)}`;
+}
+
+async function enrichElectronicDocument(data: PdfInvoiceData): Promise<PdfInvoiceData> {
+  if (data.documentMode !== 'electronic' || data.onlineQrDataUrl) return data;
+
+  const onlineViewUrl = data.onlineViewUrl ?? buildOnlineViewUrl(data.invoiceNumber);
+  const onlineQrDataUrl = await QRCode.toDataURL(onlineViewUrl, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 180,
+  });
+
+  return { ...data, onlineViewUrl, onlineQrDataUrl };
+}
+
 function buildHtml(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
@@ -269,6 +292,10 @@ function buildHtml(data: PdfInvoiceData): string {
     preparedBy: isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : isEn ? 'Prepared by / Issuer' : 'ผู้จัดทำ / Prepared by',
     receivedBy: isTh ? 'ผู้รับสินค้า / ลูกค้า' : isEn ? 'Received by / Customer' : 'ผู้รับ / Customer',
     electronicDoc: isTh ? 'เอกสารนี้สร้างและจัดเก็บในรูปแบบอิเล็กทรอนิกส์' : isEn ? 'This document is generated and stored electronically.' : 'เอกสารนี้สร้างและจัดเก็บในรูปแบบอิเล็กทรอนิกส์ / This document is generated and stored electronically.',
+    ordinaryDoc: isTh ? 'เอกสารฉบับปกติ' : isEn ? 'Ordinary document' : 'เอกสารฉบับปกติ / Ordinary document',
+    electronicCertified: isTh ? 'เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax' : isEn ? 'Electronic e-Tax document' : 'เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax / Electronic e-Tax document',
+    onlineQr: isTh ? 'สแกนเพื่อตรวจสอบ/ดูเอกสารออนไลน์' : isEn ? 'Scan to view or verify online' : 'สแกนเพื่อตรวจสอบ/ดูเอกสารออนไลน์ / Scan to verify online',
+    bankPayment: isTh ? 'ข้อมูลบัญชีสำหรับโอนเงิน' : isEn ? 'Bank transfer information' : 'ข้อมูลบัญชีสำหรับโอนเงิน / Bank transfer information',
   };
 
   const sellerName = isTh ? data.seller.nameTh : isEn ? (data.seller.nameEn ?? data.seller.nameTh) : `${data.seller.nameTh} / ${data.seller.nameEn ?? data.seller.nameTh}`;
@@ -305,6 +332,7 @@ function buildHtml(data: PdfInvoiceData): string {
     ...(data.dueDate ? [{ label: labels.dueDate, value: isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate) }] : []),
     ...(data.paymentMethod ? [{ label: labels.paymentMethod, value: data.paymentMethod }] : []),
   ];
+  const isElectronicDocument = data.documentMode === 'electronic';
 
   return `<!DOCTYPE html>
 <html lang="${isTh ? 'th' : 'en'}">
@@ -644,6 +672,61 @@ function buildHtml(data: PdfInvoiceData): string {
     font-weight: 600;
     color: #556171;
   }
+  .document-support {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 170px;
+    gap: 16px;
+    align-items: stretch;
+    margin-top: 18px;
+  }
+  .bank-box, .online-box {
+    border: 1px solid #dde5f0;
+    border-radius: 16px;
+    background: #ffffff;
+    padding: 14px 16px;
+  }
+  .bank-text {
+    white-space: pre-line;
+    color: #344154;
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+  .online-box {
+    text-align: center;
+    background: linear-gradient(180deg, var(--accent-soft) 0%, #ffffff 100%);
+  }
+  .online-qr {
+    width: 112px;
+    height: 112px;
+    object-fit: contain;
+    border: 1px solid #d9e2ef;
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 6px;
+    margin-bottom: 8px;
+  }
+  .electronic-cert {
+    margin-top: 16px;
+    border-top: 1px solid #e6edf6;
+    padding-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    color: #5e6b7d;
+    font-size: 10.5px;
+    line-height: 1.6;
+  }
+  .cert-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-2);
+    border: 1px solid var(--accent);
+    padding: 5px 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
   .footer {
     margin-top: 18px;
     padding-top: 14px;
@@ -854,6 +937,32 @@ function buildHtml(data: PdfInvoiceData): string {
         </div>
       </div>
 
+      ${(data.bankPaymentInfo || isElectronicDocument) ? `
+        <div class="document-support">
+          ${data.bankPaymentInfo ? `
+            <div class="bank-box">
+              <div class="section-label">${labels.bankPayment}</div>
+              <div class="bank-text">${escapeHtml(data.bankPaymentInfo)}</div>
+            </div>
+          ` : '<div></div>'}
+          ${isElectronicDocument ? `
+            <div class="online-box">
+              ${data.onlineQrDataUrl ? `<img class="online-qr" src="${data.onlineQrDataUrl}" alt="online document QR"/>` : ''}
+              <div class="section-label" style="margin-bottom:4px">${labels.onlineQr}</div>
+              <div style="font-size:10px;line-height:1.45;color:#64748b;word-break:break-all;">${escapeHtml(data.onlineViewUrl ?? buildOnlineViewUrl(data.invoiceNumber))}</div>
+            </div>
+          ` : '<div></div>'}
+        </div>
+      ` : ''}
+
+      <div class="electronic-cert">
+        <div>
+          ${isElectronicDocument ? labels.electronicDoc : labels.ordinaryDoc}
+          ${isElectronicDocument ? `<br/>${labels.electronicCertified}` : ''}
+        </div>
+        <div class="cert-pill">${isElectronicDocument ? 'ELECTRONIC DOCUMENT' : 'ORDINARY DOCUMENT'}</div>
+      </div>
+
       <div class="footer">
         <div>
           <div>${labels.electronicDoc}</div>
@@ -925,8 +1034,9 @@ export async function generatePdfFromHtml(html: string): Promise<Buffer> {
 }
 
 export async function generatePdf(data: PdfInvoiceData): Promise<Buffer> {
+  const enrichedData = await enrichElectronicDocument(data);
   return generatePdfFromHtml(buildHtml({
-    ...data,
+    ...enrichedData,
     templateNote: data.templateNote ?? null,
   }));
 }
@@ -935,8 +1045,9 @@ export { buildHtml };
 
 export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: string): Promise<string> {
   const template = await resolveTemplateForDocument(companyId, data.type, data.language, data.templateId);
+  const enrichedData = await enrichElectronicDocument(data);
   return buildHtml({
-    ...data,
+    ...enrichedData,
     templateName: data.templateName ?? template?.name ?? null,
     templateHtml: data.templateHtml ?? template?.html ?? null,
     templateNote: null,

@@ -44,6 +44,8 @@ export const pdfWorker = new Worker<PdfJobData>(
       logoUrl?: string | null;
       documentPreferences?: {
         templateId?: string | null;
+        documentMode?: 'ordinary' | 'electronic' | null;
+        bankPaymentInfo?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
       };
@@ -94,6 +96,8 @@ export const pdfWorker = new Worker<PdfJobData>(
       notes: invoice.notes,
       paymentMethod: invoice.paymentMethod,
       templateId: sellerSnap?.documentPreferences?.templateId ?? null,
+      documentMode: sellerSnap?.documentPreferences?.documentMode ?? 'electronic',
+      bankPaymentInfo: sellerSnap?.documentPreferences?.bankPaymentInfo ?? null,
       showCompanyLogo: sellerSnap?.documentPreferences?.showCompanyLogo ?? true,
       documentLogoUrl: sellerSnap?.documentPreferences?.documentLogoUrl ?? null,
     }, invoice.companyId);

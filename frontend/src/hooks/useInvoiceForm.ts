@@ -25,6 +25,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [showCompanyLogo, setShowCompanyLogo] = useState(true);
   const [templateId, setTemplateId] = useState<string | null>(null);
+  const [documentMode, setDocumentMode] = useState<'ordinary' | 'electronic'>('electronic');
+  const [bankPaymentInfo, setBankPaymentInfo] = useState('');
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
 
@@ -59,6 +61,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setNotes(invoice.notes ?? '');
     setPaymentMethod(invoice.paymentMethod ?? '');
     setTemplateId(invoice.templateId ?? null);
+    setDocumentMode(invoice.documentMode ?? 'electronic');
+    setBankPaymentInfo(invoice.bankPaymentInfo ?? '');
     setShowCompanyLogo(invoice.showCompanyLogo ?? true);
     setLogoUrl(invoice.documentLogoUrl ?? null);
     setItems(
@@ -134,6 +138,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
         notes: notes || undefined,
         paymentMethod: paymentMethod || undefined,
         templateId: templateId || undefined,
+        documentMode,
+        bankPaymentInfo: bankPaymentInfo || undefined,
         showCompanyLogo,
         documentLogoUrl: logoUrl || undefined,
         referenceDocNumber: referenceDocNumber || undefined,
@@ -220,6 +226,10 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setShowCompanyLogo,
     templateId,
     setTemplateId,
+    documentMode,
+    setDocumentMode,
+    bankPaymentInfo,
+    setBankPaymentInfo,
     subtotal,
     totalVat,
     total,

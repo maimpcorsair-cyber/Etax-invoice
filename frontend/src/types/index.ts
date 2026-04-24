@@ -166,6 +166,8 @@ export interface Invoice {
   notes?: string;
   paymentMethod?: string;
   templateId?: string | null;
+  documentMode?: 'ordinary' | 'electronic' | null;
+  bankPaymentInfo?: string | null;
   showCompanyLogo?: boolean;
   documentLogoUrl?: string | null;
   referenceDocNumber?: string;

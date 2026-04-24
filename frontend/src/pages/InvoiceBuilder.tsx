@@ -129,6 +129,8 @@ export default function InvoiceBuilder() {
       notes: form.notes || undefined,
       logoUrl: form.logoUrl || undefined,
       templateId: form.templateId || undefined,
+      documentMode: form.documentMode,
+      bankPaymentInfo: form.bankPaymentInfo || undefined,
       showCompanyLogo: form.showCompanyLogo,
     });
   };
@@ -285,6 +287,10 @@ export default function InvoiceBuilder() {
           templates={templates}
           selectedTemplateId={form.templateId}
           onTemplateChange={form.setTemplateId}
+          documentMode={form.documentMode}
+          onDocumentModeChange={form.setDocumentMode}
+          bankPaymentInfo={form.bankPaymentInfo}
+          onBankPaymentInfoChange={form.setBankPaymentInfo}
           showCompanyLogo={form.showCompanyLogo}
           onShowCompanyLogoChange={form.setShowCompanyLogo}
           documentLogoUrl={form.logoUrl}
