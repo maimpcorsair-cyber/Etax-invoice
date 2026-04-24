@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FileText, Globe, FileCheck, Zap, ArrowRight, Check, Smartphone, Loader2, CreditCard, ShieldCheck, X, Lock, Users, Send, Files, FileSpreadsheet, ScrollText, QrCode, TicketPercent } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
-import { getPlanePath } from '../lib/platform';
+import { buildPlaneUrl, getPlanePath } from '../lib/platform';
+import { useAuthStore } from '../store/authStore';
 
 const features = [
   { icon: FileCheck, key: 'rd' },
@@ -41,6 +42,8 @@ function currency(value: number) {
 export default function Landing() {
   const { t, i18n } = useTranslation();
   const isThai = i18n.language === 'th';
+  const { setAuth } = useAuthStore();
+  const googleSignupRef = useRef<HTMLDivElement | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'starter' | 'business'>('business');
   const [config, setConfig] = useState<{
     enabled: boolean;
@@ -54,6 +57,9 @@ export default function Landing() {
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'stripe_promptpay' | 'promptpay_qr'>('stripe');
   const [couponCode, setCouponCode] = useState('');
   const [signupComplete, setSignupComplete] = useState<null | { plan: 'free'; adminEmail: string }>(null);
+  const [googleCredential, setGoogleCredential] = useState('');
+  const [googleSignupReady, setGoogleSignupReady] = useState(false);
+  const [googleConfig, setGoogleConfig] = useState<null | { enabled: boolean; clientId: string | null }>(null);
   const [checkoutResult, setCheckoutResult] = useState<null | {
       paymentMethod: 'stripe' | 'stripe_promptpay' | 'promptpay_qr';
     reference?: string;
@@ -151,6 +157,84 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    async function loadGoogleConfig() {
+      try {
+        const res = await fetch('/api/auth/google/config');
+        if (!res.ok) return;
+        const json = await res.json() as { enabled: boolean; clientId: string | null };
+        if (active) setGoogleConfig(json);
+      } catch {
+        if (active) setGoogleConfig({ enabled: false, clientId: null });
+      }
+    }
+    loadGoogleConfig();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!checkoutOpen || selectedPlan !== 'free' || !googleConfig?.enabled || !googleConfig.clientId || !googleSignupRef.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const renderGoogleSignupButton = () => {
+      if (cancelled || !googleSignupRef.current || !window.google) {
+        return false;
+      }
+
+      googleSignupRef.current.innerHTML = '';
+      window.google.accounts.id.initialize({
+        client_id: googleConfig.clientId!,
+        callback: (response) => {
+          setGoogleCredential(response.credential);
+          setGoogleSignupReady(true);
+          setError('');
+
+          const payloadBase64 = response.credential.split('.')[1];
+          if (payloadBase64) {
+            try {
+              const payloadJson = window.atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'));
+              const payload = JSON.parse(decodeURIComponent(Array.from(payloadJson).map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''))) as { email?: string; name?: string };
+              setForm((prev) => ({
+                ...prev,
+                adminEmail: payload.email ?? prev.adminEmail,
+                adminName: payload.name ?? prev.adminName,
+              }));
+            } catch {
+              // The backend still verifies the credential; prefill is best-effort.
+            }
+          }
+        },
+      });
+      window.google.accounts.id.renderButton(googleSignupRef.current, {
+        theme: 'outline',
+        size: 'large',
+        shape: 'pill',
+        text: 'signup_with',
+        width: Math.min(420, googleSignupRef.current.clientWidth || 420),
+        logo_alignment: 'left',
+      });
+      return true;
+    };
+
+    if (renderGoogleSignupButton()) {
+      return () => { cancelled = true; };
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (renderGoogleSignupButton()) {
+        window.clearInterval(intervalId);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [checkoutOpen, googleConfig, selectedPlan]);
+
+  useEffect(() => {
     if (!checkoutOpen) return undefined;
 
     const originalOverflow = document.body.style.overflow;
@@ -189,7 +273,7 @@ export default function Landing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          ...(isFreeSignup ? {} : { plan: selectedPlan, paymentMethod, couponCode }),
+          ...(isFreeSignup ? { googleCredential: googleCredential || undefined } : { plan: selectedPlan, paymentMethod, couponCode }),
           locale: isThai ? 'th' : 'en',
         }),
       });
@@ -209,6 +293,16 @@ export default function Landing() {
             qrImageDataUrl: string;
             qrPayload: string;
           };
+          token?: string;
+          user?: {
+            id: string;
+            email: string;
+            name: string;
+            role: 'super_admin' | 'admin' | 'accountant' | 'viewer';
+            companyId: string;
+            auth?: { hasPassword: boolean; hasGoogle: boolean };
+            company?: { nameTh: string; nameEn?: string | null; taxId: string };
+          };
         };
         error?: string;
       };
@@ -216,7 +310,10 @@ export default function Landing() {
         throw new Error(json.error ?? 'Unable to start checkout');
       }
 
-      if (isFreeSignup) {
+      if (isFreeSignup && json.data.token && json.data.user) {
+        setAuth(json.data.token, json.data.user);
+        window.location.href = buildPlaneUrl('/app/dashboard', 'app', { token: json.data.token, user: json.data.user });
+      } else if (isFreeSignup) {
         setSignupComplete({ plan: 'free', adminEmail: form.adminEmail });
       } else if (json.data.paymentMethod === 'promptpay_qr' && json.data.promptPay) {
         setCheckoutResult({
@@ -242,6 +339,8 @@ export default function Landing() {
     setError('');
     setCheckoutResult(null);
     setSignupComplete(null);
+    setGoogleCredential('');
+    setGoogleSignupReady(false);
     setCheckoutOpen(true);
   }
 
@@ -651,6 +750,25 @@ export default function Landing() {
                 </div>
 
                 <form className="space-y-4" onSubmit={handleCheckout}>
+                  {selectedPlan === 'free' && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="mb-3 text-sm font-semibold text-slate-900">
+                        {isThai ? 'สมัครด้วย Google หรือกรอกเอง' : 'Sign up with Google or enter details manually'}
+                      </p>
+                      <div ref={googleSignupRef} className="min-h-[44px] w-full" />
+                      {!googleConfig?.enabled && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                          {isThai ? 'Google Sign-In ยังไม่พร้อมใช้งาน สามารถกรอกข้อมูลเองได้' : 'Google Sign-In is not available yet. You can still enter details manually.'}
+                        </div>
+                      )}
+                      {googleSignupReady && (
+                        <p className="mt-3 text-sm font-medium text-emerald-700">
+                          {isThai ? 'เชื่อมต่อ Google แล้ว ข้อมูลผู้ดูแลถูกเติมให้อัตโนมัติ' : 'Google connected. Admin details have been filled automatically.'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {(['free', 'starter', 'business'] as const).map((planKey) => {
                       const plan = pricingPlans.find((item) => item.key === planKey)!;

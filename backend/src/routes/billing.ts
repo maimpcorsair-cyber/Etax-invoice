@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { z } from 'zod';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
@@ -27,6 +29,9 @@ import {
   sendBillingPaymentFailedEmail,
   sendRenewalLinkEmail,
 } from '../services/emailService';
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
 function getSubscriptionPeriod(subscription: unknown) {
   const data = subscription as {
@@ -167,6 +172,8 @@ const freeSignupSchema = checkoutSchema.omit({
   plan: true,
   paymentMethod: true,
   couponCode: true,
+}).extend({
+  googleCredential: z.string().min(1).optional(),
 });
 
 const couponSchema = z.object({
@@ -183,6 +190,40 @@ const couponSchema = z.object({
   stripePromotionCodeId: z.string().trim().max(120).optional().or(z.literal('')),
   active: z.boolean().default(true),
 });
+
+function issueToken(user: { id: string; companyId: string; role: string; email: string }) {
+  return jwt.sign(
+    { userId: user.id, companyId: user.companyId, role: user.role, email: user.email },
+    process.env.JWT_SECRET!,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any },
+  );
+}
+
+async function verifySignupGoogleCredential(credential?: string) {
+  if (!credential) {
+    return null;
+  }
+  if (!googleClient || !googleClientId) {
+    throw new Error('Google Sign-In is not configured');
+  }
+
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: googleClientId,
+  });
+  const payload = ticket.getPayload();
+
+  if (!payload?.sub || !payload.email || !payload.email_verified) {
+    throw new Error('Invalid Google account');
+  }
+
+  return {
+    sub: payload.sub,
+    email: payload.email.toLowerCase(),
+    name: payload.name?.trim() || '',
+  };
+}
 
 async function syncBillingTransactionByReference(
   externalReference: string,
@@ -653,7 +694,14 @@ billingRouter.get('/config', (_req, res) => {
 billingRouter.post('/free-signup', async (req, res) => {
   try {
     const body = freeSignupSchema.parse(req.body);
-    const email = body.adminEmail.toLowerCase();
+    const googleAccount = await verifySignupGoogleCredential(body.googleCredential);
+    const email = googleAccount?.email ?? body.adminEmail.toLowerCase();
+    const adminName = googleAccount?.name || body.adminName;
+
+    if (googleAccount && body.adminEmail.toLowerCase() !== googleAccount.email) {
+      res.status(400).json({ error: 'Google account email does not match the signup email' });
+      return;
+    }
 
     const [existingUser, existingCompany] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
@@ -685,7 +733,8 @@ billingRouter.post('/free-signup', async (req, res) => {
         data: {
           companyId: company.id,
           email,
-          name: body.adminName,
+          name: adminName,
+          googleSub: googleAccount?.sub ?? null,
           role: 'admin',
           isActive: true,
         },
@@ -701,6 +750,22 @@ billingRouter.post('/free-signup', async (req, res) => {
         plan: 'free',
         status: 'activated',
         loginMethod: 'google',
+        token: googleAccount ? issueToken(result.user) : null,
+        user: googleAccount
+          ? {
+              id: result.user.id,
+              email: result.user.email,
+              name: result.user.name,
+              role: result.user.role,
+              companyId: result.user.companyId,
+              auth: { hasPassword: false, hasGoogle: true },
+              company: {
+                nameTh: result.company.nameTh,
+                nameEn: result.company.nameEn,
+                taxId: result.company.taxId,
+              },
+            }
+          : null,
         nextStep: 'Login with the same Google email used during signup',
       },
     });
