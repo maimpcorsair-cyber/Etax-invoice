@@ -262,6 +262,28 @@ function compileTemplateHtml(templateHtml: string, context: Record<string, strin
   return templateHtml.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => context[key] ?? '');
 }
 
+function resolveDocumentTheme(templateId?: string | null) {
+  const themes: Record<string, {
+    className: string;
+    accent: string;
+    accent2: string;
+    soft: string;
+    ink: string;
+    label: string;
+    mark: string;
+  }> = {
+    'builtin:executive-blue': { className: 'theme-executive', accent: '#1d4ed8', accent2: '#0f172a', soft: '#eef4ff', ink: '#102044', label: 'Executive Blue', mark: 'EXECUTIVE' },
+    'builtin:paid-stamp': { className: 'theme-paid', accent: '#059669', accent2: '#047857', soft: '#ecfdf5', ink: '#063d2a', label: 'Paid Stamp Receipt', mark: 'PAID' },
+    'builtin:bank-transfer': { className: 'theme-transfer', accent: '#0891b2', accent2: '#155e75', soft: '#ecfeff', ink: '#123d4b', label: 'Bank Transfer Ready', mark: 'TRANSFER' },
+    'builtin:modern-minimal': { className: 'theme-minimal', accent: '#334155', accent2: '#0f172a', soft: '#f8fafc', ink: '#111827', label: 'Modern Minimal', mark: 'MINIMAL' },
+    'builtin:credit-control': { className: 'theme-credit', accent: '#d97706', accent2: '#92400e', soft: '#fffbeb', ink: '#4a2d08', label: 'Credit Control', mark: 'CREDIT' },
+    'builtin:debit-adjustment': { className: 'theme-debit', accent: '#e11d48', accent2: '#9f1239', soft: '#fff1f2', ink: '#4c1020', label: 'Debit Adjustment', mark: 'DEBIT' },
+    'builtin:compliance-ledger': { className: 'theme-ledger', accent: '#4f46e5', accent2: '#312e81', soft: '#eef2ff', ink: '#1f1b4d', label: 'Compliance Ledger', mark: 'AUDIT' },
+  };
+
+  return themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
+}
+
 function buildHtml(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
@@ -276,6 +298,7 @@ function buildHtml(data: PdfInvoiceData): string {
       : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
 
   const fontUrl = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap';
+  const theme = resolveDocumentTheme(data.templateId);
 
   const itemRows = data.items.map((item, idx) => {
     const nameLine = isBoth
@@ -372,25 +395,49 @@ function buildHtml(data: PdfInvoiceData): string {
 <link href="${fontUrl}" rel="stylesheet"/>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Sarabun', sans-serif; font-size: 13px; color: #172033; background: #ffffff; padding: 20px; }
+  body {
+    --accent: ${theme.accent};
+    --accent-2: ${theme.accent2};
+    --accent-soft: ${theme.soft};
+    --theme-ink: ${theme.ink};
+    font-family: 'Sarabun', sans-serif;
+    font-size: 13px;
+    color: #172033;
+    background: #ffffff;
+    padding: 20px;
+  }
   .page { max-width: 210mm; margin: 0 auto; }
   .muted-inline { color: #5f6b7a; }
   .document-shell {
-    border: 1px solid #d8dfeb;
+    border: 1px solid var(--accent);
     border-radius: 24px;
     overflow: hidden;
     background: #ffffff;
     box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+    position: relative;
   }
-  .top-accent { height: 8px; background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 48%, #cbd5f5 100%); }
-  .document-body { padding: 28px 30px 24px; }
+  .top-accent { height: 10px; background: linear-gradient(90deg, var(--accent-2) 0%, var(--accent) 52%, var(--accent-soft) 100%); }
+  .watermark {
+    position: absolute;
+    right: 24px;
+    top: 118px;
+    font-size: 54px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    opacity: 0.055;
+    transform: rotate(-8deg);
+    pointer-events: none;
+  }
+  .document-body { padding: 28px 30px 24px; position: relative; z-index: 1; }
   .hero {
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr);
     gap: 24px;
     align-items: start;
     padding-bottom: 18px;
-    border-bottom: 1px solid #dde5f0;
+    border-bottom: 1px solid var(--accent);
   }
   .brand-area { display: flex; gap: 16px; align-items: flex-start; }
   .brand-logo {
@@ -407,7 +454,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-size: 22px;
     line-height: 1.2;
     font-weight: 700;
-    color: #15254b;
+    color: var(--theme-ink);
     margin-bottom: 8px;
   }
   .company-legal {
@@ -426,7 +473,7 @@ function buildHtml(data: PdfInvoiceData): string {
     width: 88px;
     height: 88px;
     object-fit: contain;
-    border: 1px solid #dbe4f2;
+    border: 1px solid var(--accent);
     border-radius: 18px;
     padding: 8px;
     background: #f8fbff;
@@ -435,7 +482,7 @@ function buildHtml(data: PdfInvoiceData): string {
     width: 100%;
     border: 1px solid #dbe4f2;
     border-radius: 20px;
-    background: linear-gradient(180deg, #f8fbff 0%, #f2f6fd 100%);
+    background: linear-gradient(180deg, #ffffff 0%, var(--accent-soft) 100%);
     padding: 16px 18px 14px;
     text-align: right;
   }
@@ -443,7 +490,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-size: 10.5px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #61708b;
+    color: var(--accent);
     font-weight: 600;
     margin-bottom: 8px;
   }
@@ -451,7 +498,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-size: 28px;
     line-height: 1.1;
     font-weight: 700;
-    color: #1e3a8a;
+    color: var(--accent-2);
     margin-bottom: 6px;
   }
   .copy-pill {
@@ -460,12 +507,26 @@ function buildHtml(data: PdfInvoiceData): string {
     justify-content: center;
     padding: 5px 11px;
     border-radius: 999px;
-    border: 1px solid #c4d2ee;
+    border: 1px solid var(--accent);
     background: #ffffff;
     font-size: 10.5px;
     font-weight: 700;
     letter-spacing: 0.1em;
-    color: #38517f;
+    color: var(--accent-2);
+    text-transform: uppercase;
+  }
+  .template-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: var(--accent-2);
+    color: #ffffff;
+    padding: 6px 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
   .overview-grid {
@@ -476,10 +537,11 @@ function buildHtml(data: PdfInvoiceData): string {
   }
   .template-banner {
     margin-top: 18px;
-    border: 1px solid #d7e4fa;
+    border: 1px solid var(--accent);
     border-radius: 18px;
-    background: linear-gradient(180deg, #f8fbff 0%, #eef4fd 100%);
+    background: linear-gradient(135deg, var(--accent-soft) 0%, #ffffff 72%);
     padding: 16px 18px;
+    border-left: 7px solid var(--accent);
   }
   .template-banner .section-label { margin-bottom: 8px; }
   .template-banner p,
@@ -490,7 +552,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-size: 11.5px;
     line-height: 1.7;
   }
-  .template-banner strong { color: #162444; }
+  .template-banner strong { color: var(--accent-2); }
   .party-card, .meta-card, .notes-card, .words-card, .totals-card {
     border: 1px solid #dde5f0;
     border-radius: 18px;
@@ -552,7 +614,7 @@ function buildHtml(data: PdfInvoiceData): string {
   .meta-row:last-child { border-bottom: none; padding-bottom: 0; }
   .meta-key { color: #6d7789; }
   .meta-value { color: #162444; font-weight: 600; word-break: break-word; }
-  .meta-value.emphasize { font-size: 15px; font-weight: 700; color: #1e3a8a; }
+  .meta-value.emphasize { font-size: 15px; font-weight: 700; color: var(--accent-2); }
   .items-section {
     margin-top: 8px;
     border: 1px solid #dde5f0;
@@ -572,7 +634,7 @@ function buildHtml(data: PdfInvoiceData): string {
   }
   table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
   thead th {
-    background: #1e3a8a;
+    background: var(--accent-2);
     color: #ffffff;
     padding: 10px 8px;
     text-align: left;
@@ -634,7 +696,7 @@ function buildHtml(data: PdfInvoiceData): string {
   }
   .totals-row strong { color: #162444; font-weight: 700; }
   .totals-row.grand {
-    background: #1e3a8a;
+    background: var(--accent-2);
     color: #ffffff;
     border-bottom: none;
   }
@@ -675,13 +737,45 @@ function buildHtml(data: PdfInvoiceData): string {
     color: #778296;
   }
   .footer-right { text-align: right; }
+  .theme-paid .document-shell { border-width: 2px; }
+  .theme-paid .title-card::after {
+    content: 'PAID';
+    display: inline-block;
+    margin-top: 10px;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    border-radius: 10px;
+    padding: 4px 14px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    transform: rotate(-4deg);
+  }
+  .theme-minimal .document-shell { box-shadow: none; border-radius: 10px; }
+  .theme-minimal .top-accent { height: 4px; }
+  .theme-minimal .title-card,
+  .theme-minimal .party-card,
+  .theme-minimal .meta-card,
+  .theme-minimal .items-section,
+  .theme-minimal .totals-card,
+  .theme-minimal .sig-card {
+    border-radius: 8px;
+  }
+  .theme-credit thead th { background: #92400e; }
+  .theme-debit thead th { background: #9f1239; }
+  .theme-ledger .party-column,
+  .theme-ledger .meta-card {
+    background-image: linear-gradient(#eef2ff 1px, transparent 1px);
+    background-size: 100% 28px;
+  }
   @media print { body { padding: 0; } }
 </style>
 </head>
-<body>
+<body class="${theme.className}">
 <div class="page">
   <div class="document-shell">
     <div class="top-accent"></div>
+    <div class="watermark">${theme.mark}</div>
     <div class="document-body">
       <div class="hero">
         <div class="brand-area">
@@ -702,6 +796,7 @@ function buildHtml(data: PdfInvoiceData): string {
             <div class="eyebrow">Electronic Tax Document</div>
             <h1>${docTitle}</h1>
             <div class="copy-pill">${labels.origDoc}</div>
+            <div class="template-badge">${escapeHtml(data.templateName ?? theme.label)}</div>
           </div>
         </div>
       </div>
