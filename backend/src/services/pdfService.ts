@@ -112,107 +112,20 @@ const ALL_DOCUMENT_TYPES = ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'cr
 const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   name: string;
   supportedTypes: string[];
-  htmlTh: string;
-  htmlEn: string;
 }> = {
-  'builtin:executive-blue': {
-    name: 'Executive Blue',
-    supportedTypes: ALL_DOCUMENT_TYPES,
-    htmlTh: `
-      <div><strong>Executive document profile</strong></div>
-      <div>เอกสารนี้จัดรูปแบบสำหรับงานองค์กร โดยเน้นเลขที่เอกสาร {{invoiceNumber}}, วันที่ {{invoiceDate}}, และคู่ค้า {{buyerName}} เพื่อให้ตรวจสอบและอนุมัติได้รวดเร็ว</div>
-      <div>ยอดสุทธิที่ต้องชำระ/รับรู้: <strong>{{total}} THB</strong></div>
-    `,
-    htmlEn: `
-      <div><strong>Executive document profile</strong></div>
-      <div>This document highlights reference {{invoiceNumber}}, date {{invoiceDate}}, and customer {{buyerName}} for fast approval and review.</div>
-      <div>Net document amount: <strong>{{total}} THB</strong></div>
-    `,
-  },
-  'builtin:paid-stamp': {
-    name: 'Paid Stamp Receipt',
-    supportedTypes: ['tax_invoice_receipt', 'receipt'],
-    htmlTh: `
-      <div><strong>สถานะการรับชำระเงิน: รับชำระแล้ว</strong></div>
-      <div>เอกสารนี้ใช้ยืนยันการรับเงินจาก {{buyerName}} สำหรับเลขที่ {{invoiceNumber}} ยอดรวม <strong>{{total}} THB</strong></div>
-      <div>วิธีชำระเงิน: {{paymentMethod}}</div>
-    `,
-    htmlEn: `
-      <div><strong>Payment status: Paid</strong></div>
-      <div>This document confirms payment received from {{buyerName}} for {{invoiceNumber}} totaling <strong>{{total}} THB</strong>.</div>
-      <div>Payment method: {{paymentMethod}}</div>
-    `,
-  },
-  'builtin:bank-transfer': {
-    name: 'Bank Transfer Ready',
-    supportedTypes: ['tax_invoice', 'tax_invoice_receipt', 'receipt'],
-    htmlTh: `
-      <div><strong>ข้อมูลสำหรับตรวจยอดโอนเงิน</strong></div>
-      <div>โปรดใช้อ้างอิงเลขที่เอกสาร {{invoiceNumber}} เมื่อชำระเงิน และส่งหลักฐานการโอนเพื่อปิดยอดบัญชี</div>
-      <div>ยอดก่อนภาษี {{subtotal}} THB | VAT {{vatAmount}} THB | ยอดสุทธิ <strong>{{total}} THB</strong></div>
-    `,
-    htmlEn: `
-      <div><strong>Bank transfer reconciliation</strong></div>
-      <div>Please quote document number {{invoiceNumber}} when paying and send transfer proof for reconciliation.</div>
-      <div>Subtotal {{subtotal}} THB | VAT {{vatAmount}} THB | Net <strong>{{total}} THB</strong></div>
-    `,
-  },
-  'builtin:modern-minimal': {
-    name: 'Modern Minimal',
-    supportedTypes: ALL_DOCUMENT_TYPES,
-    htmlTh: `
-      <div><strong>สรุปเอกสาร</strong></div>
-      <div>{{documentTitle}} เลขที่ {{invoiceNumber}} ออกให้ {{buyerName}} วันที่ {{invoiceDate}}</div>
-      <div>ยอดสุทธิ <strong>{{total}} THB</strong> ({{amountInWords}})</div>
-    `,
-    htmlEn: `
-      <div><strong>Document summary</strong></div>
-      <div>{{documentTitle}} {{invoiceNumber}} issued to {{buyerName}} on {{invoiceDate}}</div>
-      <div>Grand total <strong>{{total}} THB</strong> ({{amountInWords}})</div>
-    `,
-  },
-  'builtin:credit-control': {
-    name: 'Credit Control',
-    supportedTypes: ['credit_note'],
-    htmlTh: `
-      <div><strong>บันทึกการลดหนี้</strong></div>
-      <div>เอกสารนี้ใช้ปรับลดยอดของ {{buyerName}} โปรดตรวจสอบเอกสารอ้างอิง เหตุผล และผลกระทบภาษีก่อนบันทึกบัญชี</div>
-      <div>มูลค่าปรับปรุงสุทธิ: <strong>{{total}} THB</strong></div>
-    `,
-    htmlEn: `
-      <div><strong>Credit adjustment note</strong></div>
-      <div>This credit note adjusts {{buyerName}} balance. Verify reference document, reason, and VAT impact before posting.</div>
-      <div>Net adjustment: <strong>{{total}} THB</strong></div>
-    `,
-  },
-  'builtin:debit-adjustment': {
-    name: 'Debit Adjustment',
-    supportedTypes: ['debit_note'],
-    htmlTh: `
-      <div><strong>บันทึกการเพิ่มหนี้</strong></div>
-      <div>เอกสารนี้ใช้ปรับเพิ่มยอดของ {{buyerName}} โปรดตรวจสอบรายการเพิ่มเติมและวันที่มีผลกับเอกสารเดิม</div>
-      <div>มูลค่าเพิ่มสุทธิ: <strong>{{total}} THB</strong></div>
-    `,
-    htmlEn: `
-      <div><strong>Debit adjustment note</strong></div>
-      <div>This debit note increases {{buyerName}} balance. Verify added items and effective date against the original document.</div>
-      <div>Net increase: <strong>{{total}} THB</strong></div>
-    `,
-  },
-  'builtin:compliance-ledger': {
-    name: 'Compliance Ledger',
-    supportedTypes: ALL_DOCUMENT_TYPES,
-    htmlTh: `
-      <div><strong>Accounting audit checklist</strong></div>
-      <div>เลขที่เอกสาร {{invoiceNumber}} | วันที่ {{invoiceDate}} | เลขผู้ขาย {{sellerTaxId}} | เลขผู้ซื้อ {{buyerTaxId}}</div>
-      <div>ยอดภาษี {{vatAmount}} THB และยอดสุทธิ <strong>{{total}} THB</strong> ถูกสรุปเพื่อการตรวจสอบย้อนหลัง</div>
-    `,
-    htmlEn: `
-      <div><strong>Accounting audit checklist</strong></div>
-      <div>Document {{invoiceNumber}} | Date {{invoiceDate}} | Seller tax ID {{sellerTaxId}} | Buyer tax ID {{buyerTaxId}}</div>
-      <div>VAT {{vatAmount}} THB and net total <strong>{{total}} THB</strong> are highlighted for audit trail review.</div>
-    `,
-  },
+  'builtin:simple-slate': { name: 'เรียบง่าย', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:official-navy': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:luxury-gold': { name: 'หรูหรา', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:local-friendly': { name: 'ชาวบ้าน อ่านง่าย', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:accounting-green': { name: 'บัญชีเขียว', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:soft-cyan': { name: 'ทันสมัย', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:executive-blue': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:paid-stamp': { name: 'บัญชีเขียว', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:bank-transfer': { name: 'ทันสมัย', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:modern-minimal': { name: 'เรียบง่าย', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:credit-control': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:debit-adjustment': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:compliance-ledger': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
 };
 
 function formatDateTh(date: Date): string {
@@ -254,7 +167,7 @@ function resolveBuiltinTemplate(type: string, language: Language, templateId?: s
   return {
     id: templateId,
     name: template.name,
-    html: resolveTemplateLanguageHtml(template, language),
+    html: '',
   };
 }
 
@@ -272,6 +185,12 @@ function resolveDocumentTheme(templateId?: string | null) {
     label: string;
     mark: string;
   }> = {
+    'builtin:simple-slate': { className: 'theme-minimal', accent: '#475569', accent2: '#1e293b', soft: '#f8fafc', ink: '#111827', label: 'เรียบง่าย', mark: '' },
+    'builtin:official-navy': { className: 'theme-official', accent: '#1d4ed8', accent2: '#0f172a', soft: '#eef4ff', ink: '#102044', label: 'ทางการ', mark: '' },
+    'builtin:luxury-gold': { className: 'theme-luxury', accent: '#b7791f', accent2: '#17120a', soft: '#fff8e6', ink: '#231a0b', label: 'หรูหรา', mark: '' },
+    'builtin:local-friendly': { className: 'theme-local', accent: '#c2410c', accent2: '#7c2d12', soft: '#fff7ed', ink: '#431407', label: 'ชาวบ้าน อ่านง่าย', mark: '' },
+    'builtin:accounting-green': { className: 'theme-green', accent: '#059669', accent2: '#064e3b', soft: '#ecfdf5', ink: '#063d2a', label: 'บัญชีเขียว', mark: '' },
+    'builtin:soft-cyan': { className: 'theme-cyan', accent: '#0891b2', accent2: '#155e75', soft: '#ecfeff', ink: '#123d4b', label: 'ทันสมัย', mark: '' },
     'builtin:executive-blue': { className: 'theme-executive', accent: '#1d4ed8', accent2: '#0f172a', soft: '#eef4ff', ink: '#102044', label: 'Executive Blue', mark: 'EXECUTIVE' },
     'builtin:paid-stamp': { className: 'theme-paid', accent: '#059669', accent2: '#047857', soft: '#ecfdf5', ink: '#063d2a', label: 'Paid Stamp Receipt', mark: 'PAID' },
     'builtin:bank-transfer': { className: 'theme-transfer', accent: '#0891b2', accent2: '#155e75', soft: '#ecfeff', ink: '#123d4b', label: 'Bank Transfer Ready', mark: 'TRANSFER' },
@@ -445,7 +364,7 @@ function buildHtml(data: PdfInvoiceData): string {
     height: 78px;
     object-fit: contain;
     flex-shrink: 0;
-    border: 1px solid #dbe4f2;
+    border: 1px solid var(--accent);
     border-radius: 18px;
     padding: 10px;
     background: #f8fbff;
@@ -763,6 +682,33 @@ function buildHtml(data: PdfInvoiceData): string {
   }
   .theme-credit thead th { background: #92400e; }
   .theme-debit thead th { background: #9f1239; }
+  .theme-luxury .document-shell {
+    border-width: 2px;
+    box-shadow: 0 22px 70px rgba(23, 18, 10, 0.14);
+  }
+  .theme-luxury .title-card {
+    background: linear-gradient(135deg, #17120a 0%, #3a2a10 58%, #fff3c4 100%);
+    color: #ffffff;
+  }
+  .theme-luxury .title-card h1,
+  .theme-luxury .eyebrow {
+    color: #fff7d6;
+  }
+  .theme-luxury .copy-pill {
+    border-color: #f4d06f;
+    color: #3a2a10;
+  }
+  .theme-local .document-shell,
+  .theme-local .party-card,
+  .theme-local .meta-card,
+  .theme-local .items-section,
+  .theme-local .totals-card,
+  .theme-local .sig-card {
+    border-radius: 12px;
+  }
+  .theme-local tbody td {
+    font-size: 12px;
+  }
   .theme-ledger .party-column,
   .theme-ledger .meta-card {
     background-image: linear-gradient(#eef2ff 1px, transparent 1px);
@@ -993,7 +939,7 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
     ...data,
     templateName: data.templateName ?? template?.name ?? null,
     templateHtml: data.templateHtml ?? template?.html ?? null,
-    templateNote: template?.name ? `Template: ${template.name}` : null,
+    templateNote: null,
   });
 }
 

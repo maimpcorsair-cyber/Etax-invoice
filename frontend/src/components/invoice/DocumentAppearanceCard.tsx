@@ -56,22 +56,22 @@ export default function DocumentAppearanceCard({
         </h3>
         <p className="mt-1 text-sm text-slate-500">
           {isThai
-            ? 'เลือก template ของ invoice/receipt และกำหนดว่าจะใช้โลโก้บริษัทหรือโลโก้เฉพาะเอกสาร'
-            : 'Choose the invoice/receipt template and decide whether to show the company logo or a document-specific mark.'}
+            ? 'เลือกธีมสีและสไตล์ของเอกสาร โดยโครงสร้างข้อมูลภาษียังเหมือนเดิม'
+            : 'Choose the document theme and color tone while keeping the same tax-document structure.'}
         </p>
       </div>
 
       <div>
-        <label className="label">{isThai ? 'Template ที่ใช้กับเอกสารนี้' : 'Template for this document'}</label>
+        <label className="label">{isThai ? 'ธีมที่ใช้กับเอกสารนี้' : 'Document theme'}</label>
         <select
           className="input-field"
           value={selectedTemplateId ?? ''}
           onChange={(e) => onTemplateChange(e.target.value || null)}
         >
           <option value="">
-            {isThai ? 'ใช้แบบมาตรฐานของระบบ' : 'Use the polished default template'}
+            {isThai ? 'ใช้ธีมมาตรฐานของระบบ' : 'Use the standard system theme'}
           </option>
-          <optgroup label={isThai ? 'แม่แบบสำเร็จรูปของระบบ' : 'Built-in system templates'}>
+          <optgroup label={isThai ? 'ธีมสำเร็จรูปของระบบ' : 'Built-in document themes'}>
             {matchingBuiltinTemplates.map((template) => (
               <option key={template.id} value={template.id}>
                 {isThai ? template.nameTh : template.nameEn} - {isThai ? template.tagTh : template.tagEn}
@@ -112,7 +112,7 @@ export default function DocumentAppearanceCard({
               <span className="text-sm font-semibold text-slate-900">
                 {isThai ? selectedBuiltinTemplate.nameTh : selectedBuiltinTemplate.nameEn}
               </span>
-              <span className="text-xs text-slate-400">{isThai ? 'แม่แบบระบบ' : 'System template'}</span>
+              <span className="text-xs text-slate-400">{isThai ? 'ธีมระบบ' : 'System theme'}</span>
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-600">
               {isThai ? selectedBuiltinTemplate.descriptionTh : selectedBuiltinTemplate.descriptionEn}
@@ -125,8 +125,8 @@ export default function DocumentAppearanceCard({
         ) : (
           <p className="mt-2 text-xs text-slate-500">
             {isThai
-              ? 'ค่าเริ่มต้นใช้แบบมาตรฐานที่รองรับ e-Tax ทุกประเภท หรือเลือกแม่แบบสำเร็จรูปด้านล่างเพื่อให้เอกสารเด่นขึ้น'
-              : 'The default supports every e-Tax document type, or choose a built-in style below for a more distinctive document.'}
+              ? 'ค่าเริ่มต้นใช้ธีมมาตรฐานที่รองรับ e-Tax ทุกประเภท หรือเลือกโทนสีด้านล่างเพื่อเปลี่ยนบุคลิกเอกสาร'
+              : 'The default supports every e-Tax document type, or choose a tone below to change the document personality.'}
           </p>
         )}
       </div>
