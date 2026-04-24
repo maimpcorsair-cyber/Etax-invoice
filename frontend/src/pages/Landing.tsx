@@ -266,6 +266,7 @@ export default function Landing() {
     return `฿${isThai ? plan.price : plan.priceEn ?? plan.price}`;
   };
   const showMonthlyPrice = (plan?: PricingPlan) => plan?.key === 'starter' || plan?.key === 'business';
+  const isGoogleBoundFreeSignup = selectedPlan === 'free' && googleSignupReady;
 
   async function handleCheckout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -321,7 +322,7 @@ export default function Landing() {
         setAuth(json.data.token, json.data.user);
         window.location.href = buildPlaneUrl('/app/dashboard', 'app', { token: json.data.token, user: json.data.user });
       } else if (isFreeSignup) {
-        setSignupComplete({ plan: 'free', adminEmail: form.adminEmail });
+        setSignupComplete({ plan: 'free', adminEmail: json.data.user?.email ?? form.adminEmail });
       } else if (json.data.paymentMethod === 'promptpay_qr' && json.data.promptPay) {
         setCheckoutResult({
           paymentMethod: 'promptpay_qr',
@@ -885,11 +886,34 @@ export default function Landing() {
                     </div>
                     <div>
                       <label className="label">{isThai ? 'ชื่อผู้ดูแลระบบ' : 'Admin Name'}</label>
-                      <input className="input-field" value={form.adminName} onChange={(e) => setForm((prev) => ({ ...prev, adminName: e.target.value }))} required />
+                      <input
+                        className="input-field"
+                        value={form.adminName}
+                        onChange={(e) => setForm((prev) => ({ ...prev, adminName: e.target.value }))}
+                        required={!isGoogleBoundFreeSignup}
+                        disabled={isGoogleBoundFreeSignup}
+                      />
+                      {isGoogleBoundFreeSignup && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          {isThai ? 'ใช้ชื่อจากบัญชี Google ที่เลือก' : 'Using the name from the selected Google account.'}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="label">{isThai ? 'อีเมล Google ของผู้ดูแล' : 'Admin Google Email'}</label>
-                      <input className="input-field" type="email" value={form.adminEmail} onChange={(e) => setForm((prev) => ({ ...prev, adminEmail: e.target.value }))} required />
+                      <input
+                        className="input-field"
+                        type="email"
+                        value={form.adminEmail}
+                        onChange={(e) => setForm((prev) => ({ ...prev, adminEmail: e.target.value }))}
+                        required={!isGoogleBoundFreeSignup}
+                        disabled={isGoogleBoundFreeSignup}
+                      />
+                      {isGoogleBoundFreeSignup && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          {isThai ? 'ระบบจะสมัครด้วยอีเมล Google ที่ยืนยันแล้วเท่านั้น' : 'Signup is locked to the verified Google email.'}
+                        </p>
+                      )}
                     </div>
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'ที่อยู่บริษัท (ไทย)' : 'Company Address (Thai)'}</label>

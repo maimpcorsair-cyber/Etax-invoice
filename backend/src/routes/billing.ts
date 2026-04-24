@@ -168,11 +168,15 @@ const checkoutSchema = z.object({
   locale: z.enum(['th', 'en']).default('th'),
 });
 
-const freeSignupSchema = checkoutSchema.omit({
-  plan: true,
-  paymentMethod: true,
-  couponCode: true,
-}).extend({
+const freeSignupSchema = z.object({
+  companyNameTh: z.string().trim().min(2).max(200),
+  companyNameEn: z.string().trim().max(200).optional().or(z.literal('')),
+  taxId: z.string().trim().regex(/^\d{13}$/),
+  addressTh: z.string().trim().min(10).max(500),
+  adminName: z.string().trim().min(2).max(120).optional().or(z.literal('')),
+  adminEmail: z.string().trim().email().optional().or(z.literal('')),
+  phone: z.string().trim().max(30).optional().or(z.literal('')),
+  locale: z.enum(['th', 'en']).default('th'),
   googleCredential: z.string().min(1).optional(),
 });
 
@@ -695,13 +699,16 @@ billingRouter.post('/free-signup', async (req, res) => {
   try {
     const body = freeSignupSchema.parse(req.body);
     const googleAccount = await verifySignupGoogleCredential(body.googleCredential);
-    const email = googleAccount?.email ?? body.adminEmail.toLowerCase();
-    const adminName = googleAccount?.name || body.adminName;
+    const manualEmail = body.adminEmail?.trim().toLowerCase();
+    const manualAdminName = body.adminName?.trim();
 
-    if (googleAccount && body.adminEmail.toLowerCase() !== googleAccount.email) {
-      res.status(400).json({ error: 'Google account email does not match the signup email' });
+    if (!googleAccount && (!manualEmail || !manualAdminName)) {
+      res.status(400).json({ error: 'Admin name and email are required when Google Sign-In is not used' });
       return;
     }
+
+    const email = googleAccount?.email ?? manualEmail!;
+    const adminName = googleAccount?.name || manualAdminName || email.split('@')[0];
 
     const [existingUser, existingCompany] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
