@@ -884,37 +884,46 @@ export default function Landing() {
                       <label className="label">{isThai ? 'เบอร์โทรติดต่อ' : 'Phone Number'}</label>
                       <input className="input-field" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
                     </div>
-                    <div>
-                      <label className="label">{isThai ? 'ชื่อผู้ดูแลระบบ' : 'Admin Name'}</label>
-                      <input
-                        className="input-field"
-                        value={form.adminName}
-                        onChange={(e) => setForm((prev) => ({ ...prev, adminName: e.target.value }))}
-                        required={!isGoogleBoundFreeSignup}
-                        disabled={isGoogleBoundFreeSignup}
-                      />
-                      {isGoogleBoundFreeSignup && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          {isThai ? 'ใช้ชื่อจากบัญชี Google ที่เลือก' : 'Using the name from the selected Google account.'}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="label">{isThai ? 'อีเมล Google ของผู้ดูแล' : 'Admin Google Email'}</label>
-                      <input
-                        className="input-field"
-                        type="email"
-                        value={form.adminEmail}
-                        onChange={(e) => setForm((prev) => ({ ...prev, adminEmail: e.target.value }))}
-                        required={!isGoogleBoundFreeSignup}
-                        disabled={isGoogleBoundFreeSignup}
-                      />
-                      {isGoogleBoundFreeSignup && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          {isThai ? 'ระบบจะสมัครด้วยอีเมล Google ที่ยืนยันแล้วเท่านั้น' : 'Signup is locked to the verified Google email.'}
-                        </p>
-                      )}
-                    </div>
+                    {isGoogleBoundFreeSignup ? (
+                      <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                        <div className="flex items-start gap-3">
+                          <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-200">
+                            <Check className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold text-emerald-950">
+                              {isThai ? 'บัญชีผู้ดูแลจาก Google' : 'Google admin account'}
+                            </p>
+                            <p className="mt-1 text-sm text-emerald-900">
+                              {form.adminName || form.adminEmail}
+                              {form.adminEmail && <span className="text-emerald-800"> · {form.adminEmail}</span>}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="label">{isThai ? 'ชื่อผู้ดูแลระบบ' : 'Admin Name'}</label>
+                          <input
+                            className="input-field"
+                            value={form.adminName}
+                            onChange={(e) => setForm((prev) => ({ ...prev, adminName: e.target.value }))}
+                            required={selectedPlan === 'free'}
+                          />
+                        </div>
+                        <div>
+                          <label className="label">{isThai ? 'อีเมล Google ของผู้ดูแล' : 'Admin Google Email'}</label>
+                          <input
+                            className="input-field"
+                            type="email"
+                            value={form.adminEmail}
+                            onChange={(e) => setForm((prev) => ({ ...prev, adminEmail: e.target.value }))}
+                            required={selectedPlan === 'free'}
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'ที่อยู่บริษัท (ไทย)' : 'Company Address (Thai)'}</label>
                       <textarea className="input-field min-h-[96px]" value={form.addressTh} onChange={(e) => setForm((prev) => ({ ...prev, addressTh: e.target.value }))} required />
