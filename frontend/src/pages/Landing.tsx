@@ -269,9 +269,9 @@ export default function Landing() {
             <a href={getPlanePath('/login', 'ops')} className="hidden rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:inline-flex">
               {isThai ? 'Owner Login' : 'Owner Login'}
             </a>
-            <a href={getPlanePath('/login', 'app')} className="btn-primary sm hidden sm:flex">
+            <button type="button" onClick={() => openCheckout('free')} className="btn-primary sm hidden sm:flex">
               {t('landing.hero.cta')}
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -297,10 +297,10 @@ export default function Landing() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <a href={getPlanePath('/login', 'app')} className="btn-primary lg">
+                <button type="button" onClick={() => openCheckout('free')} className="btn-primary lg">
                   {t('landing.hero.cta')}
                   <ArrowRight className="w-5 h-5" />
-                </a>
+                </button>
                 <a href="#pricing-checkout" className="btn-secondary lg">
                   {isThai ? 'ดูแพ็กเกจและวิธีชำระเงิน' : 'View plans and payment options'}
                   <Smartphone className="w-5 h-5" />
@@ -537,10 +537,10 @@ export default function Landing() {
               ? 'เข้าร่วมระบบ e-Tax Invoice ที่มีความปลอดภัยและเชื่อถือได้'
               : 'Join thousands of businesses using our secure and reliable e-Invoice system'}
           </p>
-          <a href={getPlanePath('/login', 'app')} className="inline-flex btn-primary lg bg-white text-slate-900 hover:bg-slate-50">
+          <button type="button" onClick={() => openCheckout('free')} className="inline-flex btn-primary lg bg-white text-slate-900 hover:bg-slate-50">
             {t('landing.hero.cta')}
             <ArrowRight className="w-5 h-5" />
-          </a>
+          </button>
         </div>
       </section>
 
