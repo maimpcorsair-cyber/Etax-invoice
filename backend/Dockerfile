@@ -1,6 +1,6 @@
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont openssl
 
 # Thai font support
 RUN apk add --no-cache font-noto font-noto-cjk
