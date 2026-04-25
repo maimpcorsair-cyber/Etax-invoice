@@ -515,7 +515,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-weight: 700;
     margin-bottom: 12px;
   }
-  .party-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .party-column {
     padding: 14px 14px 12px;
     border-radius: 16px;
@@ -835,8 +835,17 @@ function buildHtml(data: PdfInvoiceData): string {
 
       <div class="overview-grid">
         <div class="party-card">
-          <div class="section-label">${isTh ? 'ผู้ซื้อ' : isEn ? 'Buyer' : 'ผู้ซื้อ / Buyer'}</div>
           <div class="party-grid">
+            <div class="party-column">
+              <div class="party-title">${labels.seller}</div>
+              <div class="party-name">${sellerName}</div>
+              <div class="party-detail">
+                <div>${labels.taxId}: <strong>${data.seller.taxId}</strong></div>
+                <div>${labels.branch}: <strong>${sellerBranch}</strong></div>
+                <div>${sellerAddr}</div>
+                ${data.seller.phone || data.seller.email ? `<div style="margin-top:4px">${[data.seller.phone ? `Tel. ${data.seller.phone}` : '', data.seller.email ?? ''].filter(Boolean).join(' | ')}</div>` : ''}
+              </div>
+            </div>
             <div class="party-column">
               <div class="party-title">${labels.buyer}</div>
               <div class="party-name">${buyerName}</div>
@@ -946,21 +955,16 @@ function buildHtml(data: PdfInvoiceData): string {
 
       <div class="electronic-cert">
         <div>
-          ${isElectronicDocument ? labels.electronicDoc : labels.ordinaryDoc}
-          ${isElectronicDocument ? `<br/>${labels.electronicCertified}` : ''}
+          ${isElectronicDocument
+            ? `${labels.electronicCertified}`
+            : labels.ordinaryDoc}
         </div>
         <div class="cert-pill">${isElectronicDocument ? 'ELECTRONIC DOCUMENT' : 'ORDINARY DOCUMENT'}</div>
       </div>
 
       <div class="footer">
-        <div>
-          <div>${isElectronicDocument ? labels.electronicDoc : labels.ordinaryDoc}</div>
-          <div>e-Tax Invoice System</div>
-        </div>
-        <div class="footer-right">
-          <div>${new Date().getFullYear()}</div>
-          <div>${docTitle}</div>
-        </div>
+        <div>e-Tax Invoice System &nbsp;|&nbsp; ${isElectronicDocument ? 'e-Tax Electronic Document' : 'Standard Document'}</div>
+        <div class="footer-right">${docTitle} &nbsp;·&nbsp; ${new Date().getFullYear()}</div>
       </div>
     </div>
   </div>
