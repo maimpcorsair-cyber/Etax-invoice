@@ -47,5 +47,17 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+
+	<!-- Camera & Photos permissions (required for logo upload) -->
+	<key>NSCameraUsageDescription</key>
+	<string>ใช้กล้องเพื่ออัปโหลดโลโก้บริษัทในใบกำกับภาษี</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>เลือกรูปภาพโลโก้บริษัทจากคลัง Photos</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>บันทึก PDF ใบกำกับภาษีลงใน Photos</string>
+
+	<!-- Face ID (future biometric login) -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>ใช้ Face ID เพื่อเข้าสู่ระบบอย่างรวดเร็ว</string>
 </dict>
 </plist>

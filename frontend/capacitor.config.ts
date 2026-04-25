@@ -5,10 +5,10 @@ const config: CapacitorConfig = {
   appName: 'e-Tax Invoice',
   webDir: 'dist',
   server: {
-    // Production: ชี้ไปที่ Render.com backend โดยตรง (ไม่ใช้ Vite proxy)
     androidScheme: 'https',
-    // สำหรับ dev ให้ comment บรรทัดนี้และใช้ npx cap run android --livereload
-    // url: 'http://192.168.x.x:3000',
+    hostname: 'etax-invoice.vercel.app',
+    // In production native build, /api/* calls are proxied to Render via Vercel rewrites
+    // For local native dev with live reload: set url to your machine IP e.g. 'http://192.168.1.x:3000'
   },
   plugins: {
     SplashScreen: {

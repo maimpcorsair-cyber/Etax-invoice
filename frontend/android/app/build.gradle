@@ -16,10 +16,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            // Set via environment variables or local keystore.properties
+            // Run: ./gradlew bundleRelease -Pandroid.injected.signing.store.file=...
+            storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore/etax-release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("KEY_ALIAS") ?: "etax-invoice"
+            keyPassword System.getenv("KEY_PASSWORD") ?: ""
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }

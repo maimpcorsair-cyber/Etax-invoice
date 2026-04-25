@@ -1,1 +1,15 @@
 .vercel
+
+# Android keystore — NEVER commit to git
+android/app/keystore/*.keystore
+android/app/keystore/*.jks
+android/app/google-services.json
+*.keystore
+*.jks
+
+# iOS provisioning
+ios/App/App/GoogleService-Info.plist
+
+# Local env
+.env.local
+.env.*.local
