@@ -28,6 +28,7 @@ const OwnerCoupons      = React.lazy(() => import('./pages/OwnerCoupons'));
 const OwnerRenewals     = React.lazy(() => import('./pages/OwnerRenewals'));
 import { useAuthStore } from './store/authStore';
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
+import { usePushNotifications } from './hooks/usePushNotifications';
 import { buildPlaneUrl, detectSurface, getPlanePath } from './lib/platform';
 import { isNative } from './hooks/useNative';
 
@@ -90,6 +91,7 @@ function LoadingSpinner() {
 export default function App() {
   const { i18n } = useTranslation();
   useAuthBootstrap();
+  usePushNotifications();
   const surface = detectSurface();
 
   useEffect(() => {

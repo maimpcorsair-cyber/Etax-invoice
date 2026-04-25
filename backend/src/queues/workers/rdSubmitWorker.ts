@@ -16,6 +16,7 @@ import redis from '../../config/redis';
 import prisma from '../../config/database';
 import { withSystemRlsContext } from '../../config/rls';
 import { sendRdSuccessEmail, sendRdFailedEmail } from '../../services/emailService';
+import { sendRdResultNotification } from '../../services/notificationService';
 import { generateRDXml } from '../../services/xmlService';
 import { signXml }          from '../../services/signatureService';
 import { requestTimestamp, embedTimestampInXml } from '../../services/tsaService';
@@ -152,7 +153,11 @@ export const rdSubmitWorker = new Worker<RDJobData>(
 
     logger.info(`[RD Worker] ✅ Invoice ${invoice.invoiceNumber} submitted — rdDocId=${rdResult.docId}`);
 
-    // ─── 7. Notify admin ────────────────────────────────────────────────────
+    // ─── 7. Push notification ───────────────────────────────────────────────
+    await sendRdResultNotification(invoiceId, true, invoice.invoiceNumber, invoice.createdBy)
+      .catch((e: Error) => logger.warn(`Push notify failed: ${e.message}`));
+
+    // ─── 8. Notify admin via email ──────────────────────────────────────────
     if (invoice.company.email) {
       await sendRdSuccessEmail(invoice.company.email, {
         invoiceNumber: invoice.invoiceNumber,
@@ -190,6 +195,13 @@ rdSubmitWorker.on('failed', async (job, err) => {
         where: { id: job.data.invoiceId },
         include: { buyer: true, company: true },
       }), { role: 'worker' });
+
+      // Push notification on final failure
+      if (invoice) {
+        await sendRdResultNotification(job.data.invoiceId, false, invoice.invoiceNumber, invoice.createdBy)
+          .catch((e: Error) => logger.warn(`Push notify failed: ${e.message}`));
+      }
+
       if (invoice?.company.email) {
         await sendRdFailedEmail(
           invoice.company.email,

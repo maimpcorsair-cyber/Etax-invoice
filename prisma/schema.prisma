@@ -127,6 +127,7 @@ model User {
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices  Invoice[]  @relation("CreatedBy")
   auditLogs AuditLog[]
+  fcmTokens FcmToken[]
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -423,6 +424,20 @@ model BillingTransaction {
   @@index([plan, createdAt])
   @@index([createdAt])
   @@map("billing_transactions")
+}
+
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // "android" | "ios" | "web"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
 }
 
 model PendingSignup {
