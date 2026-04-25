@@ -362,7 +362,19 @@ export default function Landing() {
         throw new Error('Missing checkout URL');
       }
     } catch (err) {
-      setError((err as Error).message);
+      const raw = (err as Error).message;
+      const thaiErrors: Record<string, string> = {
+        'This tax ID is already registered in the system': 'เลขผู้เสียภาษีนี้มีในระบบแล้ว กรุณาตรวจสอบหรือติดต่อเรา',
+        'This admin email is already registered in the system': 'อีเมลนี้มีในระบบแล้ว กรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ',
+        'Unable to start checkout': 'ไม่สามารถเริ่มการชำระเงินได้ กรุณาลองใหม่อีกครั้ง',
+        'Missing checkout URL': 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
+      };
+      const msg = isThai ? (thaiErrors[raw] ?? raw) : raw;
+      setError(msg);
+      // scroll error into view
+      setTimeout(() => {
+        document.querySelector('[data-checkout-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
     } finally {
       setSubmitting(false);
     }
@@ -1060,8 +1072,9 @@ export default function Landing() {
                   </div>
 
                   {error && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                      {error}
+                    <div data-checkout-error className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-start gap-2">
+                      <span className="shrink-0 font-bold">⚠</span>
+                      <span>{error}</span>
                     </div>
                   )}
 
