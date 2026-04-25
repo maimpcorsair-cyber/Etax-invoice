@@ -1,0 +1,20 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Backend API (Express + tsx watch)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "backend",
+      "port": 4000,
+      "autoPort": false
+    },
+    {
+      "name": "Frontend (Vite dev server)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "port": 3000
+    }
+  ]
+}

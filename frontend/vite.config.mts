@@ -26,6 +26,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Capacitor requires relative paths for assets
+    base: './',
     rollupOptions: {
       output: {
         manualChunks: {

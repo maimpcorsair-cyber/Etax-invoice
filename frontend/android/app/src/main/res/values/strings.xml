@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">e-Tax Invoice</string>
+    <string name="title_activity_main">e-Tax Invoice</string>
+    <string name="package_name">co.th.etax.invoice</string>
+    <string name="custom_url_scheme">co.th.etax.invoice</string>
+</resources>
