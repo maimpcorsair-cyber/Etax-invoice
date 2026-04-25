@@ -658,6 +658,92 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Download App Section ── */}
+      <section className="py-20 bg-white border-t border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          {/* Badge */}
+          <span className="inline-flex items-center gap-2 rounded-full bg-primary-50 border border-primary-100 px-4 py-1.5 text-sm font-medium text-primary-700 mb-6">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-600" />
+            </span>
+            {isThai ? 'แอปมือถือ — เร็วๆ นี้' : 'Mobile App — Coming Soon'}
+          </span>
+
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            {isThai ? 'ใช้งานได้ทุกที่ ทุกเวลา' : 'Use anywhere, anytime'}
+          </h2>
+          <p className="text-gray-500 text-lg max-w-xl mx-auto mb-10">
+            {isThai
+              ? 'แอป e-Tax Invoice บน Android และ iOS กำลังจะเปิดให้โหลดเร็วๆ นี้ ลงทะเบียนรับแจ้งเตือนก่อนใคร'
+              : 'The e-Tax Invoice app for Android and iOS is coming soon. Register to be notified first.'}
+          </p>
+
+          {/* Store Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-10">
+            {/* Google Play */}
+            <a
+              href="#"
+              onClick={(e) => e.preventDefault()}
+              className="group relative flex items-center gap-4 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl px-6 py-4 min-w-[200px] transition-all duration-200 hover:scale-105 hover:shadow-xl cursor-not-allowed"
+              title={isThai ? 'เร็วๆ นี้' : 'Coming Soon'}
+            >
+              {/* Google Play icon */}
+              <svg viewBox="0 0 24 24" className="w-8 h-8 flex-shrink-0" fill="currentColor">
+                <path d="M3.18 23.76c.37.2.8.2 1.18 0l11.1-6.42-2.5-2.5-9.78 8.92zM.5 2.02C.19 2.4 0 2.93 0 3.6v16.8c0 .67.19 1.2.5 1.58l.08.08 9.41-9.41v-.22L.58 1.94.5 2.02zM20.65 10.44l-2.56-1.48-2.8 2.8 2.8 2.8 2.58-1.49c.74-.43.74-1.2-.02-1.63zM4.36.24L15.46 6.66l-2.5 2.5L3.18.24C3.56.04 3.98.04 4.36.24z"/>
+              </svg>
+              <div className="text-left">
+                <p className="text-xs text-gray-400 leading-none mb-0.5">
+                  {isThai ? 'เร็วๆ นี้บน' : 'Coming soon on'}
+                </p>
+                <p className="text-base font-semibold leading-none">Google Play</p>
+              </div>
+              <span className="absolute -top-2 -right-2 bg-amber-400 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                Soon
+              </span>
+            </a>
+
+            {/* App Store */}
+            <a
+              href="#"
+              onClick={(e) => e.preventDefault()}
+              className="group relative flex items-center gap-4 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl px-6 py-4 min-w-[200px] transition-all duration-200 hover:scale-105 hover:shadow-xl cursor-not-allowed"
+              title={isThai ? 'เร็วๆ นี้' : 'Coming Soon'}
+            >
+              {/* Apple icon */}
+              <svg viewBox="0 0 24 24" className="w-8 h-8 flex-shrink-0" fill="currentColor">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+              <div className="text-left">
+                <p className="text-xs text-gray-400 leading-none mb-0.5">
+                  {isThai ? 'เร็วๆ นี้บน' : 'Coming soon on'}
+                </p>
+                <p className="text-base font-semibold leading-none">App Store</p>
+              </div>
+              <span className="absolute -top-2 -right-2 bg-amber-400 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                Soon
+              </span>
+            </a>
+          </div>
+
+          {/* Features preview */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto text-sm text-gray-500">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-green-500">✓</span>
+              {isThai ? 'สร้างใบกำกับภาษีบนมือถือ' : 'Create invoices on mobile'}
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-green-500">✓</span>
+              {isThai ? 'แชร์ PDF ผ่าน LINE / Email' : 'Share PDF via LINE / Email'}
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-green-500">✓</span>
+              {isThai ? 'ส่ง RD อัตโนมัติ' : 'Auto RD submission'}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-gray-50/50 py-12">
         <div className="max-w-6xl mx-auto px-4">
