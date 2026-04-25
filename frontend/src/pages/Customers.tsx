@@ -185,9 +185,9 @@ export default function Customers() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header">{isThai ? 'ชื่อ' : 'Name'}</th>
-                <th className="table-header">{t('customer.taxId')}</th>
-                <th className="table-header">{t('customer.phone')}</th>
-                <th className="table-header">{t('customer.email')}</th>
+                <th className="table-header hidden sm:table-cell">{t('customer.taxId')}</th>
+                <th className="table-header hidden sm:table-cell">{t('customer.phone')}</th>
+                <th className="table-header hidden sm:table-cell">{t('customer.email')}</th>
                 <th className="table-header">{t('common.status')}</th>
                 <th className="table-header">{t('common.actions')}</th>
               </tr>
@@ -214,16 +214,16 @@ export default function Customers() {
                       {c.nameEn && isThai && <p className="text-xs text-gray-400">{c.nameEn}</p>}
                       {!isThai && <p className="text-xs text-gray-400">{c.nameTh}</p>}
                     </td>
-                    <td className="table-cell font-mono text-xs">{c.taxId}</td>
-                    <td className="table-cell text-gray-500">{c.phone ?? '—'}</td>
-                    <td className="table-cell text-gray-500">{c.email ?? '—'}</td>
+                    <td className="table-cell font-mono text-xs hidden sm:table-cell">{c.taxId}</td>
+                    <td className="table-cell text-gray-500 hidden sm:table-cell">{c.phone ?? '—'}</td>
+                    <td className="table-cell text-gray-500 hidden sm:table-cell">{c.email ?? '—'}</td>
                     <td className="table-cell">
                       <span className={c.isActive ? 'badge-success' : 'badge-error'}>
                         {c.isActive ? t('common.active') : t('common.inactive')}
                       </span>
                     </td>
                     <td className="table-cell">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <Link
                           to={`/app/customers/${c.id}/statement`}
                           className="p-1 text-slate-600 hover:text-slate-900"

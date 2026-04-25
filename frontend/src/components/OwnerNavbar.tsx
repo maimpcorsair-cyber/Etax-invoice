@@ -27,7 +27,7 @@ export default function OwnerNavbar() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
             <Shield className="w-5 h-5" />
           </div>
-          <div>
+          <div className="hidden sm:block">
             <div className="text-sm font-semibold text-slate-900">Owner Control Plane</div>
             <div className="text-xs text-slate-500">{user?.email}</div>
           </div>
@@ -49,7 +49,7 @@ export default function OwnerNavbar() {
                 )}
               >
                 <Icon className="w-4 h-4" />
-                {item.label}
+                <span className="hidden lg:inline">{item.label}</span>
               </Link>
             );
           })}
@@ -59,7 +59,7 @@ export default function OwnerNavbar() {
             className="hidden min-h-11 sm:inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           >
             <ArrowLeftRight className="w-4 h-4" />
-            Switch To Tenant
+            <span className="hidden lg:inline">Switch To Tenant</span>
           </Link>
 
           <button
@@ -67,7 +67,7 @@ export default function OwnerNavbar() {
             className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-700 hover:bg-rose-50"
           >
             <LogOut className="w-4 h-4" />
-            Logout
+            <span className="hidden lg:inline">Logout</span>
           </button>
         </div>
       </div>

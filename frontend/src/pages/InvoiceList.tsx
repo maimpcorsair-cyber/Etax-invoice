@@ -305,7 +305,7 @@ export default function InvoiceList() {
       {/* Filters */}
       <div className="card">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 w-full sm:min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -353,13 +353,13 @@ export default function InvoiceList() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header" scope="col">{isThai ? 'เลขที่' : 'Number'}</th>
-                <th className="table-header" scope="col">{isThai ? 'ประเภท' : 'Type'}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ประเภท' : 'Type'}</th>
                 <th className="table-header" scope="col">{t('customer.title')}</th>
-                <th className="table-header" scope="col">{t('invoice.date')}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{t('invoice.date')}</th>
                 <th className="table-header text-right" scope="col">{t('common.amount')}</th>
-                <th className="table-header" scope="col">{isThai ? 'ชำระแล้ว' : 'Payment'}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ชำระแล้ว' : 'Payment'}</th>
                 <th className="table-header" scope="col">{t('common.status')}</th>
-                <th className="table-header" scope="col">{isThai ? 'ส่ง RD' : 'RD Submit'}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ส่ง RD' : 'RD Submit'}</th>
                 <th className="table-header" scope="col">{t('common.actions')}</th>
               </tr>
             </thead>
@@ -384,7 +384,7 @@ export default function InvoiceList() {
                           <div className="text-xs text-gray-400">อ้างอิง: {inv.referenceDocNumber}</div>
                         )}
                       </td>
-                      <td className="table-cell">
+                      <td className="table-cell hidden sm:table-cell">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${typeInfo.color}`}>
                           {isThai ? typeInfo.th : typeInfo.en}
                         </span>
@@ -394,9 +394,9 @@ export default function InvoiceList() {
                           ? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'
                           : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ?? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'}
                       </td>
-                      <td className="table-cell text-gray-500">{formatDate(inv.invoiceDate)}</td>
+                      <td className="table-cell text-gray-500 hidden sm:table-cell">{formatDate(inv.invoiceDate)}</td>
                       <td className="table-cell text-right font-semibold">{formatCurrency(inv.total)}</td>
-                      <td className="table-cell">
+                      <td className="table-cell hidden sm:table-cell">
                         {inv.isPaid ? (
                           <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
                             <CheckCircle className="w-3.5 h-3.5" />
@@ -414,7 +414,7 @@ export default function InvoiceList() {
                           {t(`invoice.status.${inv.status}`)}
                         </span>
                       </td>
-                      <td className="table-cell">
+                      <td className="table-cell hidden sm:table-cell">
                         <div className="flex flex-col gap-1">
                           {inv.rdSubmissionStatus ? (
                             <span className={`badge-${
@@ -458,7 +458,7 @@ export default function InvoiceList() {
                             title={isThai ? 'ดูตัวอย่าง' : 'Preview'}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {isThai ? 'ดู' : 'View'}
+                            <span className="hidden sm:inline">{isThai ? 'ดู' : 'View'}</span>
                           </button>
                           {canIssueReceipt(inv) && (
                             <button
@@ -467,7 +467,7 @@ export default function InvoiceList() {
                               title={isThai ? 'ออกใบเสร็จรับเงิน' : 'Issue Receipt'}
                             >
                               <Receipt className="w-3.5 h-3.5" />
-                              {isThai ? 'ออกใบเสร็จ' : 'Receipt'}
+                              <span className="hidden sm:inline">{isThai ? 'ออกใบเสร็จ' : 'Receipt'}</span>
                             </button>
                           )}
                           {canRecordPayment(inv) && inv.type !== 'tax_invoice_receipt' && (
@@ -477,7 +477,7 @@ export default function InvoiceList() {
                               title={isThai ? 'บันทึกการรับชำระ' : 'Record Payment'}
                             >
                               <CreditCard className="w-3.5 h-3.5" />
-                              {isThai ? 'รับชำระ' : 'Pay'}
+                              <span className="hidden sm:inline">{isThai ? 'รับชำระ' : 'Pay'}</span>
                             </button>
                           )}
                           {inv.pdfUrl && (
@@ -488,7 +488,7 @@ export default function InvoiceList() {
                               className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
                             >
                               <Download className="w-3.5 h-3.5" />
-                              PDF
+                              <span className="hidden sm:inline">PDF</span>
                             </a>
                           )}
                         </div>

@@ -279,7 +279,7 @@ export default function Dashboard() {
               className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
             >
               <div className={`w-2 h-2 rounded-full ${action.color}`} />
-              <span className="text-sm font-medium text-gray-700">{action.label}</span>
+              <span className="text-sm font-medium text-gray-700 truncate">{action.label}</span>
             </Link>
           ))}
         </div>
@@ -364,7 +364,7 @@ export default function Dashboard() {
 
                 {/* By document type */}
                 {m.byType.length > 0 && (
-                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5">
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-1.5">
                     {m.byType.map((t) => (
                       <div
                         key={t.type}
@@ -407,7 +407,7 @@ export default function Dashboard() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="table-header" scope="col">{isThai ? 'เลขที่' : 'Number'}</th>
-                <th className="table-header" scope="col">{t('customer.title')}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{t('customer.title')}</th>
                 <th className="table-header" scope="col">{t('common.date')}</th>
                 <th className="table-header text-right" scope="col">{t('common.amount')}</th>
                 <th className="table-header" scope="col">{t('common.status')}</th>
@@ -435,7 +435,7 @@ export default function Dashboard() {
                   return (
                     <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="table-cell font-mono text-xs">{inv.invoiceNumber}</td>
-                      <td className="table-cell">{buyerName}</td>
+                      <td className="table-cell hidden sm:table-cell">{buyerName}</td>
                       <td className="table-cell text-gray-500">{formatDate(inv.invoiceDate)}</td>
                       <td className="table-cell text-right font-medium">{formatCurrency(inv.total)}</td>
                       <td className="table-cell">
