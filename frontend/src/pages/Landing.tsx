@@ -274,10 +274,29 @@ export default function Landing() {
     taxId: form.taxId.length > 0 && !isThirteenDigitId(form.taxId),
     addressTh: form.addressTh.trim().length > 0 && !isThaiText(form.addressTh, true),
   };
+  const formErrors = {
+    companyNameTh: form.companyNameTh.trim().length === 0
+      ? (isThai ? 'กรุณากรอกชื่อบริษัทภาษาไทย' : 'Thai company name is required')
+      : formValidation.companyNameTh ? (isThai ? 'ใช้ตัวอักษรไทยเท่านั้น' : 'Thai characters only') : '',
+    taxId: form.taxId.length === 0
+      ? (isThai ? 'กรุณากรอกเลขผู้เสียภาษี 13 หลัก' : '13-digit tax ID is required')
+      : formValidation.taxId ? (isThai ? `ยังกรอกไม่ครบ (${form.taxId.length}/13 หลัก)` : `Incomplete (${form.taxId.length}/13 digits)`) : '',
+    addressTh: form.addressTh.trim().length === 0
+      ? (isThai ? 'กรุณากรอกที่อยู่บริษัทภาษาไทย' : 'Thai address is required')
+      : form.addressTh.trim().length < 10 ? (isThai ? 'ที่อยู่สั้นเกินไป กรอกให้ครบถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Address too short — include street, district, province, postcode')
+      : formValidation.addressTh ? (isThai ? 'ใช้ตัวอักษรไทยเท่านั้น' : 'Thai characters only') : '',
+    adminEmail: !isGoogleBoundFreeSignup && form.adminEmail.trim().length === 0
+      ? (isThai ? 'กรุณากรอกอีเมล Google' : 'Google email is required') : '',
+  };
+  const hasFormErrors = Object.values(formErrors).some(Boolean) || Object.values(formValidation).some(Boolean);
 
   async function handleCheckout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
+    if (hasFormErrors) {
+      setError(isThai ? 'กรุณากรอกข้อมูลให้ครบและถูกต้องก่อนดำเนินการ' : 'Please fill in all required fields correctly.');
+      return;
+    }
     setSubmitting(true);
     setCheckoutResult(null);
 
@@ -965,9 +984,10 @@ export default function Landing() {
                     <div>
                       <label className="label">{isThai ? 'ชื่อบริษัท (ไทย)' : 'Company Name (Thai)'}</label>
                       <input className={guardedInputClass(formValidation.companyNameTh)} value={form.companyNameTh} onChange={(e) => setForm((prev) => ({ ...prev, companyNameTh: thaiTextOnly(e.target.value) }))} required />
-                      <p className={inputGuide(formValidation.companyNameTh)}>
-                        {isThai ? 'ใช้ตัวอักษรไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Use Thai characters, e.g. บริษัท ตัวอย่าง จำกัด'}
-                      </p>
+                      {formErrors.companyNameTh
+                        ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.companyNameTh}</p>
+                        : <p className={inputGuide(formValidation.companyNameTh)}>{isThai ? 'ใช้ตัวอักษรไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Use Thai characters, e.g. บริษัท ตัวอย่าง จำกัด'}</p>
+                      }
                     </div>
                     <div>
                       <label className="label">{isThai ? 'ชื่อบริษัท (อังกฤษ)' : 'Company Name (English)'}</label>
@@ -979,9 +999,10 @@ export default function Landing() {
                     <div>
                       <label className="label">{isThai ? 'เลขประจำตัวผู้เสียภาษี 13 หลัก' : '13-digit Tax ID'}</label>
                       <input className={guardedInputClass(formValidation.taxId, 'font-mono')} value={form.taxId} onChange={(e) => setForm((prev) => ({ ...prev, taxId: digitsOnly(e.target.value, 13) }))} inputMode="numeric" maxLength={13} required />
-                      <p className={inputGuide(formValidation.taxId)}>
-                        {isThai ? `กรอกตัวเลข ${form.taxId.length}/13 หลัก` : `Enter ${form.taxId.length}/13 digits`}
-                      </p>
+                      {formErrors.taxId
+                        ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.taxId}</p>
+                        : <p className={inputGuide(false)}>{isThai ? `กรอกตัวเลข ${form.taxId.length}/13 หลัก` : `Enter ${form.taxId.length}/13 digits`}</p>
+                      }
                     </div>
                     <div>
                       <label className="label">{isThai ? 'เบอร์โทรติดต่อ' : 'Phone Number'}</label>
@@ -1030,9 +1051,10 @@ export default function Landing() {
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'ที่อยู่บริษัท (ไทย)' : 'Company Address (Thai)'}</label>
                       <textarea className={guardedInputClass(formValidation.addressTh, 'min-h-[96px]')} value={form.addressTh} onChange={(e) => setForm((prev) => ({ ...prev, addressTh: thaiTextOnly(e.target.value) }))} required />
-                      <p className={inputGuide(formValidation.addressTh)}>
-                        {isThai ? 'ที่อยู่ภาษาไทย เช่น เลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Use Thai address text: street, district, province, postal code.'}
-                      </p>
+                      {formErrors.addressTh
+                        ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.addressTh}</p>
+                        : <p className={inputGuide(false)}>{isThai ? 'ที่อยู่ภาษาไทย เช่น เลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Use Thai address text: street, district, province, postal code.'}</p>
+                      }
                     </div>
                     </div>
                   </div>
@@ -1084,7 +1106,7 @@ export default function Landing() {
 
                   <button
                     type="submit"
-                    disabled={submitting || !!signupComplete || (selectedPlan !== 'free' && (configLoading || !config?.enabled))}
+                    disabled={submitting || !!signupComplete || hasFormErrors || (selectedPlan !== 'free' && (configLoading || !config?.enabled))}
                     className="btn-primary lg w-full justify-center"
                   >
                     {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : selectedPlan === 'free' ? <ArrowRight className="w-5 h-5" /> : paymentMethod === 'stripe' ? <CreditCard className="w-5 h-5" /> : <QrCode className="w-5 h-5" />}
