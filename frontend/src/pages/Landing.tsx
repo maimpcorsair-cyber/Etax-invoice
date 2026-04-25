@@ -126,7 +126,7 @@ export default function Landing() {
     {
       labelTh: 'หลายผู้ใช้ในบริษัทเดียวกัน',
       labelEn: 'Multi-user access in one company',
-      values: { free: false, starter: false, business: 'สูงสุด 5', enterprise: 'ตามสัญญา' },
+      values: { free: false, starter: false, business: { th: 'สูงสุด 5', en: 'Up to 5' }, enterprise: { th: 'ตามสัญญา', en: 'By contract' } },
     },
     {
       labelTh: 'Export และ Audit Logs',
@@ -631,6 +631,7 @@ export default function Landing() {
                       {value === true && <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-green-700"><Check className="w-3.5 h-3.5" />{isThai ? 'มี' : 'Included'}</span>}
                       {value === false && <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-gray-500"><Lock className="w-3.5 h-3.5" />{isThai ? 'ไม่มี' : 'Not included'}</span>}
                       {typeof value === 'string' && <span className="inline-flex rounded-full bg-primary-50 px-2.5 py-1 text-primary-700">{value}</span>}
+                      {typeof value === 'object' && value !== null && 'th' in value && <span className="inline-flex rounded-full bg-primary-50 px-2.5 py-1 text-primary-700">{isThai ? (value as {th:string;en:string}).th : (value as {th:string;en:string}).en}</span>}
                     </div>
                   );
                 })}

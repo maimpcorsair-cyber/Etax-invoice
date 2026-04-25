@@ -302,9 +302,10 @@ export default function InvoiceList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">{t('invoice.list')}</h1>
-        <Link to="/app/invoices/new" className={`btn-primary ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
+        <Link to="/app/invoices/new" className={`btn-primary shrink-0 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
           <Plus className="w-4 h-4" />
-          {t('invoice.create')}
+          <span className="hidden sm:inline">{t('invoice.create')}</span>
+          <span className="sm:hidden">{isThai ? 'สร้าง' : 'New'}</span>
         </Link>
       </div>
 

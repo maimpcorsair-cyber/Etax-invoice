@@ -107,20 +107,32 @@ async function queueRdSubmission(invoiceId: string) {
 
 async function enqueueInvoicePdf(invoiceId: string, language: string) {
   try {
-    await invoiceQueue.add('generate-pdf', { invoiceId, language }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    // Timeout after 5 s — if Redis is unreachable we must not block the HTTP response
+    await Promise.race([
+      invoiceQueue.add('generate-pdf', { invoiceId, language }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+      }),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error('PDF queue timeout')), 5000),
+      ),
+    ]);
   } catch (err) {
-    console.error('Failed to enqueue invoice PDF job:', err);
+    console.error('Failed to enqueue invoice PDF job (best-effort):', err);
   }
 }
 
 async function queueRdSubmissionBestEffort(invoiceId: string) {
   try {
-    await queueRdSubmission(invoiceId);
+    // Timeout after 5 s — if Redis is unreachable we must not block the HTTP response
+    await Promise.race([
+      queueRdSubmission(invoiceId),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error('RD queue timeout')), 5000),
+      ),
+    ]);
   } catch (err) {
-    console.error('Failed to enqueue RD submission job:', err);
+    console.error('Failed to enqueue RD submission job (best-effort):', err);
   }
 }
 
