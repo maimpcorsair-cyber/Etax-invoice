@@ -174,7 +174,7 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    if (!checkoutOpen || selectedPlan !== 'free' || !googleConfig?.enabled || !googleConfig.clientId || !googleSignupRef.current) {
+    if (!checkoutOpen || !googleConfig?.enabled || !googleConfig.clientId || !googleSignupRef.current) {
       return undefined;
     }
 
@@ -233,7 +233,7 @@ export default function Landing() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [checkoutOpen, googleConfig, selectedPlan]);
+  }, [checkoutOpen, googleConfig]);
 
   useEffect(() => {
     if (!checkoutOpen) return undefined;
@@ -267,7 +267,7 @@ export default function Landing() {
     return `฿${isThai ? plan.price : plan.priceEn ?? plan.price}`;
   };
   const showMonthlyPrice = (plan?: PricingPlan) => plan?.key === 'starter' || plan?.key === 'business';
-  const isGoogleBoundFreeSignup = selectedPlan === 'free' && googleSignupReady;
+  const isGoogleBoundSignup = googleSignupReady;
   const formValidation = {
     companyNameTh: form.companyNameTh.trim().length > 0 && !isThaiText(form.companyNameTh, true),
     companyNameEn: form.companyNameEn.trim().length > 0 && !isEnglishText(form.companyNameEn),
@@ -285,7 +285,7 @@ export default function Landing() {
       ? (isThai ? 'กรุณากรอกที่อยู่บริษัทภาษาไทย' : 'Thai address is required')
       : form.addressTh.trim().length < 10 ? (isThai ? 'ที่อยู่สั้นเกินไป กรอกให้ครบถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Address too short — include street, district, province, postcode')
       : formValidation.addressTh ? (isThai ? 'ใช้ตัวอักษรไทยเท่านั้น' : 'Thai characters only') : '',
-    adminEmail: !isGoogleBoundFreeSignup && form.adminEmail.trim().length === 0
+    adminEmail: !isGoogleBoundSignup && form.adminEmail.trim().length === 0
       ? (isThai ? 'กรุณากรอกอีเมล Google' : 'Google email is required') : '',
   };
   const hasFormErrors = Object.values(formErrors).some(Boolean) || Object.values(formValidation).some(Boolean);
@@ -882,7 +882,7 @@ export default function Landing() {
                 </div>
 
                 <form className="space-y-4" onSubmit={handleCheckout}>
-                  {selectedPlan === 'free' && (
+                  {selectedPlan !== 'enterprise' && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                         <div>
@@ -890,7 +890,9 @@ export default function Landing() {
                             {isThai ? 'สมัครด้วย Google หรือกรอกเอง' : 'Sign up with Google or enter details manually'}
                           </p>
                           <p className="text-xs leading-5 text-slate-600">
-                            {isThai ? 'แนะนำให้ใช้ Google เพื่อยืนยันอีเมลและเข้าใช้งานต่อได้ทันที' : 'Recommended for verified email and immediate access after signup.'}
+                            {selectedPlan === 'free'
+                              ? (isThai ? 'แนะนำให้ใช้ Google เพื่อยืนยันอีเมลและเข้าใช้งานต่อได้ทันที' : 'Recommended for verified email and immediate access after signup.')
+                              : (isThai ? 'ใช้ Google เพื่อดึงข้อมูลอีเมลผู้ดูแลอัตโนมัติ' : 'Use Google to auto-fill your admin email for checkout.')}
                           </p>
                         </div>
                         {googleSignupReady && (
@@ -1020,7 +1022,7 @@ export default function Landing() {
                       <label className="label">{isThai ? 'เบอร์โทรติดต่อ' : 'Phone Number'}</label>
                       <input className="input-field" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
                     </div>
-                    {isGoogleBoundFreeSignup ? (
+                    {isGoogleBoundSignup ? (
                       <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
                         <div className="flex items-start gap-3">
                           <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-200">
