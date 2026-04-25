@@ -15,10 +15,10 @@ RUN npm ci --omit=dev
 FROM base AS builder
 COPY backend/package*.json ./
 RUN npm ci
-# Copy prisma schema from project root (source of truth)
-COPY prisma/ ./prisma/
-# Copy backend source
+# Copy backend source first
 COPY backend/ .
+# Overwrite prisma/ with root schema (source of truth) — must come AFTER backend copy
+COPY prisma/ ./prisma/
 RUN npx prisma generate
 RUN npm run build
 

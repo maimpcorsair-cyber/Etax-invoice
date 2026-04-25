@@ -88,9 +88,11 @@ model Company {
   website       String?
   logoUrl       String?
 
+  // Serialized certificate (encrypted)
   certificatePath     String?
   certificatePassword String?
 
+  // RD Config
   rdClientId     String?
   rdClientSecret String?
   rdEnvironment  String  @default("sandbox")
@@ -98,11 +100,11 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users               User[]
-  customers           Customer[]
-  products            Product[]
-  invoices            Invoice[]
-  subscription        CompanySubscription?
+  users     User[]
+  customers Customer[]
+  products  Product[]
+  invoices  Invoice[]
+  subscription CompanySubscription?
   billingTransactions BillingTransaction[]
 
   @@map("companies")
@@ -125,8 +127,13 @@ model User {
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices  Invoice[]  @relation("CreatedBy")
   auditLogs AuditLog[]
+  fcmTokens FcmToken[]
 
   @@index([companyId])
+  // List active users per company (user management page)
+  @@index([companyId, isActive])
+  // Role-based filtering within a tenant (e.g., list all accountants)
+  @@index([companyId, role])
   @@map("users")
 }
 
@@ -144,7 +151,7 @@ model Customer {
   email         String?
   phone         String?
   contactPerson String?
-  personalId    String?
+  personalId    String?  // เลขบัตรประชาชน 13 หลัก (สำหรับ Easy e-Receipt)
   isActive      Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -155,6 +162,8 @@ model Customer {
 
   @@unique([companyId, taxId, branchCode])
   @@index([companyId])
+  // Customer list page always filters by isActive within a company
+  @@index([companyId, isActive])
   @@map("customers")
 }
 
@@ -204,18 +213,22 @@ model Invoice {
   notes         String?
   paymentMethod String?
 
+  // RD submission
   rdSubmissionStatus RDSubmissionStatus?
   rdDocId            String?
   rdSubmittedAt      DateTime?
   rdResponseXml      String?
 
+  // Storage
   pdfUrl String?
   xmlUrl String?
 
-  referenceDocNumber String?
-  referenceInvoiceId String?
+  // Reference (for credit/debit notes and receipts linked to a tax invoice)
+  referenceDocNumber  String?
+  referenceInvoiceId  String?   // FK → Invoice (ใบอ้างอิงสำหรับ receipt/credit/debit)
 
-  isPaid     Boolean @default(false)
+  // Payment tracking
+  isPaid     Boolean   @default(false)
   paidAt     DateTime?
   paidAmount Float?
 
@@ -223,18 +236,26 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company          Company    @relation(fields: [companyId], references: [id])
-  buyer            Customer   @relation(fields: [buyerId], references: [id])
-  creator          User       @relation("CreatedBy", fields: [createdBy], references: [id])
+  company          Company       @relation(fields: [companyId], references: [id])
+  buyer            Customer      @relation(fields: [buyerId], references: [id])
+  creator          User          @relation("CreatedBy", fields: [createdBy], references: [id])
   items            InvoiceItem[]
-  referenceInvoice Invoice?   @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
-  relatedDocuments Invoice[]  @relation("InvoiceReference")
+  referenceInvoice Invoice?      @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
+  relatedDocuments Invoice[]     @relation("InvoiceReference")
   payments         Payment[]
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
   @@index([companyId, status])
   @@index([companyId, invoiceDate])
+  // Compound index for dashboard: "issued invoices in date range" — covers status + date together
+  @@index([companyId, status, invoiceDate])
+  // RD submission queue filters on rdSubmissionStatus per company
+  @@index([companyId, rdSubmissionStatus])
+  // FK indexes — Postgres does not create these automatically
+  @@index([buyerId])
+  @@index([createdBy])
+  @@index([referenceInvoiceId])
   @@map("invoices")
 }
 
@@ -280,19 +301,22 @@ model AuditLog {
   @@index([companyId])
   @@index([companyId, createdAt])
   @@index([companyId, action])
+  // "All actions by this user in this company" — common admin view
+  @@index([companyId, userId])
+  @@index([userId, createdAt])
   @@map("audit_logs")
 }
 
 model Payment {
-  id         String   @id @default(cuid())
-  invoiceId  String
-  amount     Float
-  method     String
-  reference  String?
-  paidAt     DateTime @default(now())
-  note       String?
-  createdBy  String
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  invoiceId     String
+  amount        Float
+  method        String   // cash, transfer, cheque, credit_card, other
+  reference     String?  // เลขอ้างอิงการชำระ / slip ref
+  paidAt        DateTime @default(now())
+  note          String?
+  createdBy     String
+  createdAt     DateTime @default(now())
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -301,14 +325,14 @@ model Payment {
 }
 
 model DocumentTemplate {
-  id        String  @id @default(cuid())
+  id       String @id @default(cuid())
   companyId String
-  type      String
-  language  String
-  name      String
-  htmlTh    String  @db.Text
-  htmlEn    String  @db.Text
-  isActive  Boolean @default(true)
+  type     String
+  language String
+  name     String
+  htmlTh   String @db.Text
+  htmlEn   String @db.Text
+  isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -318,22 +342,22 @@ model DocumentTemplate {
 }
 
 model CompanySubscription {
-  id                      String        @id @default(cuid())
-  companyId               String        @unique
-  plan                    BillingPlan
-  status                  BillingStatus @default(pending)
-  billingInterval         String        @default("month")
-  docLimit                Int?
-  stripeCustomerId        String?       @unique
-  stripeSubscriptionId    String?       @unique
-  stripePriceId           String?
-  stripeCheckoutSessionId String?       @unique
-  currentPeriodStart      DateTime?
-  currentPeriodEnd        DateTime?
-  cancelAtPeriodEnd       Boolean       @default(false)
-  activatedAt             DateTime?
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  companyId             String        @unique
+  plan                  BillingPlan
+  status                BillingStatus @default(pending)
+  billingInterval       String        @default("month")
+  docLimit              Int?
+  stripeCustomerId      String?       @unique
+  stripeSubscriptionId  String?       @unique
+  stripePriceId         String?
+  stripeCheckoutSessionId String?     @unique
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean       @default(false)
+  activatedAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -343,23 +367,23 @@ model CompanySubscription {
 }
 
 model Coupon {
-  id                    String   @id @default(cuid())
-  code                  String   @unique
-  name                  String
-  description           String?
-  discountType          String
-  discountValue         Float
-  minSubtotalAmount     Float?
-  maxDiscountAmount     Float?
-  maxRedemptions        Int?
-  redeemedCount         Int      @default(0)
-  stripePromotionCodeId String?  @unique
-  active                Boolean  @default(true)
-  startsAt              DateTime?
-  endsAt                DateTime?
-  metadata              Json?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  name               String
+  description        String?
+  discountType       String
+  discountValue      Float
+  minSubtotalAmount  Float?
+  maxDiscountAmount  Float?
+  maxRedemptions     Int?
+  redeemedCount      Int      @default(0)
+  stripePromotionCodeId String? @unique
+  active             Boolean  @default(true)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   transactions BillingTransaction[]
 
@@ -402,32 +426,46 @@ model BillingTransaction {
   @@map("billing_transactions")
 }
 
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // "android" | "ios" | "web"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+}
+
 model PendingSignup {
-  id                      String       @id @default(cuid())
-  companyNameTh           String
-  companyNameEn           String?
-  taxId                   String
-  addressTh               String
-  adminName               String
-  adminEmail              String
-  phone                   String?
-  plan                    BillingPlan
-  paymentMethod           String       @default("stripe")
-  couponCode              String?
-  subtotalAmount          Float?
-  discountAmount          Float        @default(0)
-  totalAmount             Float?
-  status                  SignupStatus @default(pending)
-  locale                  String       @default("th")
-  stripeCheckoutSessionId String?      @unique
-  stripeCustomerId        String?
-  stripeSubscriptionId    String?
-  stripePriceId           String?
-  companyId               String?
-  userId                  String?
-  activatedAt             DateTime?
-  createdAt               DateTime     @default(now())
-  updatedAt               DateTime     @updatedAt
+  id                     String       @id @default(cuid())
+  companyNameTh          String
+  companyNameEn          String?
+  taxId                  String
+  addressTh              String
+  adminName              String
+  adminEmail             String
+  phone                  String?
+  plan                   BillingPlan
+  paymentMethod          String       @default("stripe")
+  couponCode             String?
+  subtotalAmount         Float?
+  discountAmount         Float        @default(0)
+  totalAmount            Float?
+  status                 SignupStatus @default(pending)
+  locale                 String       @default("th")
+  stripeCheckoutSessionId String?     @unique
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  companyId              String?
+  userId                 String?
+  activatedAt            DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 
   transactions BillingTransaction[]
 
