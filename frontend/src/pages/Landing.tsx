@@ -882,8 +882,7 @@ export default function Landing() {
                 </div>
 
                 <form className="space-y-4" onSubmit={handleCheckout}>
-                  {selectedPlan !== 'enterprise' && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-950">
@@ -908,8 +907,7 @@ export default function Landing() {
                           {isThai ? 'Google Sign-In ยังไม่พร้อมใช้งาน สามารถกรอกข้อมูลเองได้' : 'Google Sign-In is not available yet. You can still enter details manually.'}
                         </div>
                       )}
-                    </div>
-                  )}
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {(['free', 'starter', 'business'] as const).map((planKey) => {
