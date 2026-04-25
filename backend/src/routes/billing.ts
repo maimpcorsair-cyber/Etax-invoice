@@ -790,7 +790,7 @@ billingRouter.post('/checkout-session', async (req, res) => {
     const body = checkoutSchema.parse(req.body);
     const planConfig = getBillingPlanConfig(body.plan);
     const paymentMethod = body.paymentMethod as BillingPaymentMethod;
-    const stripe = paymentMethod === 'stripe' ? getStripeClient() : null;
+    const stripe = (paymentMethod === 'stripe' || paymentMethod === 'stripe_promptpay') ? getStripeClient() : null;
     const priceId = paymentMethod === 'stripe' ? getPlanPriceId(body.plan) : null;
 
     if ((paymentMethod === 'stripe' || paymentMethod === 'stripe_promptpay') && (!stripe || !planConfig.purchasable)) {
