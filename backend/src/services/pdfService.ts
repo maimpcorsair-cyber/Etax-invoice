@@ -515,11 +515,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-weight: 700;
     margin-bottom: 12px;
   }
-  .party-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
+  .party-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
   .party-column {
     padding: 14px 14px 12px;
     border-radius: 16px;
@@ -839,17 +835,8 @@ function buildHtml(data: PdfInvoiceData): string {
 
       <div class="overview-grid">
         <div class="party-card">
-          <div class="section-label">Business Parties</div>
+          <div class="section-label">${isTh ? 'ผู้ซื้อ' : isEn ? 'Buyer' : 'ผู้ซื้อ / Buyer'}</div>
           <div class="party-grid">
-            <div class="party-column">
-              <div class="party-title">${labels.seller}</div>
-              <div class="party-name">${sellerName}</div>
-              <div class="party-detail">
-                <div>${labels.taxId}: <strong>${data.seller.taxId}</strong></div>
-                <div>${labels.branch}: <strong>${sellerBranch}</strong></div>
-                <div>${sellerAddr}</div>
-              </div>
-            </div>
             <div class="party-column">
               <div class="party-title">${labels.buyer}</div>
               <div class="party-name">${buyerName}</div>
@@ -924,18 +911,20 @@ function buildHtml(data: PdfInvoiceData): string {
         </div>
       </div>
 
-      <div class="signature-grid">
-        <div class="sig-card">
-          <div class="sig-space"></div>
-          <div class="sig-line"></div>
-          <div class="sig-title">${labels.preparedBy}</div>
+      ${!isElectronicDocument ? `
+        <div class="signature-grid">
+          <div class="sig-card">
+            <div class="sig-space"></div>
+            <div class="sig-line"></div>
+            <div class="sig-title">${labels.preparedBy}</div>
+          </div>
+          <div class="sig-card">
+            <div class="sig-space"></div>
+            <div class="sig-line"></div>
+            <div class="sig-title">${labels.receivedBy}</div>
+          </div>
         </div>
-        <div class="sig-card">
-          <div class="sig-space"></div>
-          <div class="sig-line"></div>
-          <div class="sig-title">${labels.receivedBy}</div>
-        </div>
-      </div>
+      ` : ''}
 
       ${(data.bankPaymentInfo || isElectronicDocument) ? `
         <div class="document-support">
@@ -965,7 +954,7 @@ function buildHtml(data: PdfInvoiceData): string {
 
       <div class="footer">
         <div>
-          <div>${labels.electronicDoc}</div>
+          <div>${isElectronicDocument ? labels.electronicDoc : labels.ordinaryDoc}</div>
           <div>e-Tax Invoice System</div>
         </div>
         <div class="footer-right">
