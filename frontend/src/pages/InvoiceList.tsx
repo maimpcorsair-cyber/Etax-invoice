@@ -9,6 +9,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus, InvoiceType, Payment } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
+import { isNative, savePdfNative, sharePdfNative } from '../hooks/useNative';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -179,12 +180,25 @@ export default function InvoiceList() {
       });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${previewModal.invoiceNumber}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const filename = `${previewModal.invoiceNumber}.pdf`;
+
+      if (isNative()) {
+        // On Android/iOS: try to share first (user can save from share sheet)
+        const shared = await sharePdfNative(blob, filename, previewModal.invoiceNumber);
+        if (!shared) {
+          // Fallback: save directly to Documents folder
+          await savePdfNative(blob, filename);
+          alert(isThai ? `บันทึก PDF แล้ว: ${filename}` : `PDF saved: ${filename}`);
+        }
+      } else {
+        // Web: standard anchor download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     } catch (e) {
       alert(isThai ? `ดาวน์โหลดไม่สำเร็จ: ${(e as Error).message}` : `Download failed: ${(e as Error).message}`);
     } finally {
