@@ -1,0 +1,39 @@
+name: Apply Production DB Migration
+
+# Run this manually from GitHub Actions UI when you need to apply migrations
+# Requires DATABASE_URL secret set in GitHub → Settings → Secrets
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: 'Migration folder name (e.g. 20260425_add_scale_indexes)'
+        required: true
+        default: '20260425_add_scale_indexes'
+      confirm:
+        description: 'Type YES to confirm running on production'
+        required: true
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'YES' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Run migration SQL
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          MIGRATION="prisma/migrations/${{ github.event.inputs.migration }}/migration.sql"
+          if [ ! -f "$MIGRATION" ]; then
+            echo "❌ Migration file not found: $MIGRATION"
+            exit 1
+          fi
+          echo "📦 Running: $MIGRATION"
+          psql "$DATABASE_URL" -f "$MIGRATION"
+          echo "✅ Migration applied"

@@ -46,3 +46,9 @@ backend/node_modules/.prisma/
 # Render / Vercel local state
 .vercel/
 .render/
+
+# Playwright MCP dev tool artifacts
+.playwright-mcp/
+
+# Mobile dev screenshots (local only)
+mobile-*.png
