@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Eye, Save } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -333,6 +334,30 @@ export default function InvoiceBuilder() {
           onPaymentMethodChange={form.setPaymentMethod}
         />
       </div>
+      {/* Sticky bottom action bar — mobile only */}
+      <div className="sm:hidden fixed bottom-16 left-0 right-0 z-30 bg-white border-t border-gray-200 px-4 py-3 flex gap-2">
+        <button
+          className="btn-secondary flex-1 justify-center"
+          onClick={handlePreviewClick}
+          disabled={preview.previewLoading}
+        >
+          <Eye className="w-4 h-4" />
+          {isThai ? 'ตัวอย่าง' : 'Preview'}
+        </button>
+        <button
+          className="btn-primary flex-1 justify-center"
+          onClick={() => form.handleSave(true, customer.selectedCustomerId, id)}
+          disabled={form.saving}
+        >
+          {form.saving ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {isThai ? 'บันทึก' : 'Save'}
+        </button>
+      </div>
+
       <PreviewModal
         show={preview.showPreviewModal}
         previewLoading={preview.previewLoading}

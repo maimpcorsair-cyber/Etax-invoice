@@ -1,0 +1,92 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e8]
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - button "Switch to Thai" [ref=e13] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e14] [cursor=pointer]: EN
+        - button "User menu" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: ผ
+          - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - heading "Settings" [level=1] [ref=e22]
+      - generic [ref=e23]:
+        - heading "Language" [level=2] [ref=e24]
+        - paragraph [ref=e25]: Select the display language for the system
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - button "Switch to Thai" [ref=e28] [cursor=pointer]: TH
+            - button "Switch to English" [ref=e29] [cursor=pointer]: EN
+          - generic [ref=e30]: "Current language: English"
+      - generic [ref=e31]:
+        - heading "Notifications" [level=2] [ref=e32]
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: When RD submission succeeds
+            - checkbox [checked] [ref=e37]
+          - generic [ref=e39]:
+            - generic [ref=e40]: When RD submission fails
+            - checkbox [checked] [ref=e42]
+          - generic [ref=e44]:
+            - generic [ref=e45]: When invoice is approved
+            - checkbox [checked] [ref=e47]
+          - generic [ref=e49]:
+            - generic [ref=e50]: Daily summary
+            - checkbox [checked] [ref=e52]
+      - generic [ref=e54]:
+        - heading "API Keys" [level=2] [ref=e55]
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - generic [ref=e58]: API Key (Read-only)
+            - generic [ref=e59]:
+              - textbox [ref=e60]: etax_sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+              - button "Copy" [ref=e61] [cursor=pointer]
+          - button "Regenerate API Key" [ref=e62] [cursor=pointer]
+      - button "Save Settings" [ref=e63] [cursor=pointer]
+  - navigation [ref=e64]:
+    - link "Dashboard" [ref=e65] [cursor=pointer]:
+      - /url: /app/dashboard
+      - img [ref=e66]
+      - generic [ref=e71]: Dashboard
+    - link "Invoices" [ref=e72] [cursor=pointer]:
+      - /url: /app/invoices
+      - img [ref=e73]
+      - generic [ref=e76]: Invoices
+    - link "Customers" [ref=e77] [cursor=pointer]:
+      - /url: /app/customers
+      - img [ref=e78]
+      - generic [ref=e83]: Customers
+    - link "Products / Services" [ref=e84] [cursor=pointer]:
+      - /url: /app/products
+      - img [ref=e85]
+      - generic [ref=e89]: Products / Services
+    - button "More options" [ref=e90] [cursor=pointer]:
+      - img [ref=e91]
+      - generic [ref=e95]: More
+  - generic [ref=e96]:
+    - button "Close" [ref=e99] [cursor=pointer]:
+      - img [ref=e100]
+    - generic [ref=e103]:
+      - link "Audit Logs" [ref=e104] [cursor=pointer]:
+        - /url: /app/audit
+        - img [ref=e105]
+        - text: Audit Logs
+      - link "Settings" [ref=e108] [cursor=pointer]:
+        - /url: /app/settings
+        - img [ref=e109]
+        - text: Settings
+      - link "Admin Panel" [ref=e112] [cursor=pointer]:
+        - /url: /app/admin
+        - img [ref=e113]
+        - text: Admin Panel
+      - link "Owner Plane" [ref=e115] [cursor=pointer]:
+        - /url: /ops/overview
+        - img [ref=e116]
+        - text: Owner Plane
+  - link "สร้างใบกำกับภาษี / Create Invoice" [ref=e118] [cursor=pointer]:
+    - /url: /app/invoices/new
+    - img [ref=e119]

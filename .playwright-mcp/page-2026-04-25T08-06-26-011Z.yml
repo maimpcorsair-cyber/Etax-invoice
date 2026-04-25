@@ -1,0 +1,42 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - generic [ref=e11]: Owner Control Plane
+          - generic [ref=e12]: admin@siamtech.co.th
+      - generic [ref=e13]:
+        - link "Owner Overview" [ref=e14] [cursor=pointer]:
+          - /url: /ops/overview
+          - img [ref=e15]
+          - text: Owner Overview
+        - link "Tenants" [ref=e17] [cursor=pointer]:
+          - /url: /ops/tenants
+          - img [ref=e18]
+          - text: Tenants
+        - link "Transactions" [ref=e22] [cursor=pointer]:
+          - /url: /ops/transactions
+          - img [ref=e23]
+          - text: Transactions
+        - link "Coupons" [ref=e26] [cursor=pointer]:
+          - /url: /ops/coupons
+          - img [ref=e27]
+          - text: Coupons
+        - link "Renewals" [ref=e30] [cursor=pointer]:
+          - /url: /ops/renewals
+          - img [ref=e31]
+          - text: Renewals
+        - link "Tenant App" [ref=e36] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/app/dashboard?authHandoff=eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUoxYzJWeVNXUWlPaUoxYzJWeUxXRmtiV2x1TFRBd01TSXNJbU52YlhCaGJubEpaQ0k2SW1OdmJYQmhibmt0WkdWdGJ5MHdNREVpTENKeWIyeGxJam9pYzNWd1pYSmZZV1J0YVc0aUxDSmxiV0ZwYkNJNkltRmtiV2x1UUhOcFlXMTBaV05vTG1OdkxuUm9JaXdpYVdGMElqb3hOemMzTVRBME16ZzBMQ0psZUhBaU9qRTNOemMzTURreE9EUjkuSDNuQXRNanQwRXltdlZmQ1JHWU1jcjE3aldERjhteXJ1LUp6Tnd2Wmk0OCIsInVzZXIiOnsiaWQiOiJ1c2VyLWFkbWluLTAwMSIsImVtYWlsIjoiYWRtaW5Ac2lhbXRlY2guY28udGgiLCJuYW1lIjoi4Lic4Li54LmJ4LiU4Li54LmB4Lil4Lij4Liw4Lia4LiaIiwicm9sZSI6InN1cGVyX2FkbWluIiwiY29tcGFueUlkIjoiY29tcGFueS1kZW1vLTAwMSIsImF1dGgiOnsiaGFzUGFzc3dvcmQiOnRydWUsImhhc0dvb2dsZSI6dHJ1ZX0sImNvbXBhbnkiOnsibmFtZVRoIjoi4Lia4Lij4Li04Lip4Lix4LiXIOC4quC4ouC4suC4oSDguYDguJfguITguYLguJnguYLguKXguKLguLUg4LiI4Liz4LiB4Lix4LiUIiwibmFtZUVuIjoiU2lhbSBUZWNobm9sb2d5IENvLiwgTHRkLiIsInRheElkIjoiMDEwNTU2MDEyMzQ1NiJ9fX0%3D
+          - img [ref=e37]
+          - text: Tenant App
+        - link "Switch To Tenant" [ref=e41] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/app/dashboard?authHandoff=eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUoxYzJWeVNXUWlPaUoxYzJWeUxXRmtiV2x1TFRBd01TSXNJbU52YlhCaGJubEpaQ0k2SW1OdmJYQmhibmt0WkdWdGJ5MHdNREVpTENKeWIyeGxJam9pYzNWd1pYSmZZV1J0YVc0aUxDSmxiV0ZwYkNJNkltRmtiV2x1UUhOcFlXMTBaV05vTG1OdkxuUm9JaXdpYVdGMElqb3hOemMzTVRBME16ZzBMQ0psZUhBaU9qRTNOemMzTURreE9EUjkuSDNuQXRNanQwRXltdlZmQ1JHWU1jcjE3aldERjhteXJ1LUp6Tnd2Wmk0OCIsInVzZXIiOnsiaWQiOiJ1c2VyLWFkbWluLTAwMSIsImVtYWlsIjoiYWRtaW5Ac2lhbXRlY2guY28udGgiLCJuYW1lIjoi4Lic4Li54LmJ4LiU4Li54LmB4Lil4Lij4Liw4Lia4LiaIiwicm9sZSI6InN1cGVyX2FkbWluIiwiY29tcGFueUlkIjoiY29tcGFueS1kZW1vLTAwMSIsImF1dGgiOnsiaGFzUGFzc3dvcmQiOnRydWUsImhhc0dvb2dsZSI6dHJ1ZX0sImNvbXBhbnkiOnsibmFtZVRoIjoi4Lia4Lij4Li04Lip4Lix4LiXIOC4quC4ouC4suC4oSDguYDguJfguITguYLguJnguYLguKXguKLguLUg4LiI4Liz4LiB4Lix4LiUIiwibmFtZUVuIjoiU2lhbSBUZWNobm9sb2d5IENvLiwgTHRkLiIsInRheElkIjoiMDEwNTU2MDEyMzQ1NiJ9fX0%3D
+          - img [ref=e42]
+          - text: Switch To Tenant
+        - button "Logout" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+          - text: Logout
+  - main [ref=e49]:
+    - img [ref=e51]

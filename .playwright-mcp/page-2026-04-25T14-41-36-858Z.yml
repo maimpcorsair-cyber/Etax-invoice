@@ -1,0 +1,289 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e8]
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - button "Switch to Thai" [ref=e13] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e14] [cursor=pointer]: EN
+        - button "User menu" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: ผ
+          - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e23]:
+        - heading "Dashboard" [level=1] [ref=e24]
+        - paragraph [ref=e25]: Welcome, ผู้ดูแลระบบ
+      - generic [ref=e26]:
+        - img [ref=e27]
+        - generic [ref=e29]:
+          - paragraph [ref=e30]: Pending RD submissions for 2026-04
+          - paragraph [ref=e31]: "6 documents pending · Deadline: 15th (20 days left)"
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - paragraph [ref=e34]: Total Invoices
+          - paragraph [ref=e35]: "254"
+        - generic [ref=e36]:
+          - paragraph [ref=e37]: Total Revenue
+          - paragraph [ref=e38]: THB 38,590,978.00
+        - generic [ref=e39]:
+          - paragraph [ref=e40]: Pending Approval
+          - paragraph [ref=e41]: "50"
+        - generic [ref=e42]:
+          - paragraph [ref=e43]: Submitted to RD
+          - paragraph [ref=e44]: "3"
+      - generic [ref=e45]:
+        - generic [ref=e47]:
+          - heading "Accounts Receivable Overview" [level=2] [ref=e48]
+          - paragraph [ref=e49]: Company-wide outstanding balances and aging buckets.
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - paragraph [ref=e52]: Total outstanding
+            - paragraph [ref=e53]: THB 25,740,268.50
+          - generic [ref=e54]:
+            - paragraph [ref=e55]: Overdue outstanding
+            - paragraph [ref=e56]: THB 25,740,268.50
+          - generic [ref=e57]:
+            - paragraph [ref=e58]: Current outstanding
+            - paragraph [ref=e59]: THB 0.00
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - paragraph [ref=e62]: Current
+            - paragraph [ref=e63]: THB 0.00
+          - generic [ref=e64]:
+            - paragraph [ref=e65]: 1-30
+            - paragraph [ref=e66]: THB 1,703,538.50
+          - generic [ref=e67]:
+            - paragraph [ref=e68]: 31-60
+            - paragraph [ref=e69]: THB 0.00
+          - generic [ref=e70]:
+            - paragraph [ref=e71]: 61-90
+            - paragraph [ref=e72]: THB 0.00
+          - generic [ref=e73]:
+            - paragraph [ref=e74]: 90+
+            - paragraph [ref=e75]: THB 24,036,730.00
+      - generic [ref=e76]:
+        - heading "Quick Actions" [level=2] [ref=e77]
+        - generic [ref=e78]:
+          - link "Tax Invoice" [ref=e79] [cursor=pointer]:
+            - /url: /app/invoices/new
+            - generic [ref=e81]: Tax Invoice
+          - link "Receipt" [ref=e82] [cursor=pointer]:
+            - /url: /app/invoices/new?type=receipt
+            - generic [ref=e84]: Receipt
+          - link "Credit Note" [ref=e85] [cursor=pointer]:
+            - /url: /app/invoices/new?type=credit_note
+            - generic [ref=e87]: Credit Note
+          - link "Export Excel" [ref=e88] [cursor=pointer]:
+            - /url: /app/dashboard
+            - generic [ref=e90]: Export Excel
+      - generic [ref=e91]:
+        - generic [ref=e93]:
+          - heading "RD e-Tax Submission Status" [level=2] [ref=e94]
+          - paragraph [ref=e95]: "Per Revenue Code §86/6 · Deadline: 15th of following month"
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - generic [ref=e100]: 2026-01
+                - generic [ref=e101]: (past deadline)
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - img [ref=e104]
+                  - text: "0"
+                - generic [ref=e107]:
+                  - img [ref=e108]
+                  - text: "9"
+            - generic [ref=e112]: 0%
+            - generic [ref=e113]:
+              - generic [ref=e114]:
+                - text: T01·
+                - generic [ref=e115]: 0/5
+              - generic [ref=e116]:
+                - text: T03·
+                - generic [ref=e117]: 0/4
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - generic [ref=e120]:
+                - generic [ref=e121]: 2026-02
+                - generic [ref=e122]: (past deadline)
+              - generic [ref=e123]:
+                - generic [ref=e124]:
+                  - img [ref=e125]
+                  - text: "0"
+                - generic [ref=e128]:
+                  - img [ref=e129]
+                  - text: "8"
+            - generic [ref=e133]: 0%
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - text: T03·
+                - generic [ref=e136]: 0/6
+              - generic [ref=e137]:
+                - text: T04·
+                - generic [ref=e138]: 0/2
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - generic [ref=e141]:
+                - generic [ref=e142]: 2026-03
+                - generic [ref=e143]: (past deadline)
+              - generic [ref=e144]:
+                - generic [ref=e145]:
+                  - img [ref=e146]
+                  - text: "0"
+                - generic [ref=e149]:
+                  - img [ref=e150]
+                  - text: "10"
+            - generic [ref=e154]: 0%
+            - generic [ref=e155]:
+              - generic [ref=e156]:
+                - text: T04·
+                - generic [ref=e157]: 0/8
+              - generic [ref=e158]:
+                - text: T05·
+                - generic [ref=e159]: 0/2
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - generic [ref=e162]:
+                - generic [ref=e163]: 2026-04
+                - generic [ref=e164]: 20d left
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - img [ref=e167]
+                  - text: "3"
+                - generic [ref=e170]:
+                  - img [ref=e171]
+                  - text: "1"
+                - generic [ref=e175]:
+                  - img [ref=e176]
+                  - text: "5"
+            - generic [ref=e181]: 33%
+            - generic [ref=e182]:
+              - generic [ref=e183]:
+                - text: T02·
+                - generic [ref=e184]: 1/2
+              - generic [ref=e185]:
+                - text: T03·
+                - generic [ref=e186]: 2/2
+              - generic [ref=e187]:
+                - text: T05·
+                - generic [ref=e188]: 0/5
+          - generic [ref=e189]:
+            - generic [ref=e190]:
+              - img [ref=e191]
+              - text: Submitted
+            - generic [ref=e194]:
+              - img [ref=e195]
+              - text: In progress
+            - generic [ref=e198]:
+              - img [ref=e199]
+              - text: Failed
+            - generic [ref=e203]:
+              - img [ref=e204]
+              - text: Not submitted
+      - generic [ref=e206]:
+        - generic [ref=e207]:
+          - heading "Recent Invoices" [level=2] [ref=e208]
+          - link "View All" [ref=e209] [cursor=pointer]:
+            - /url: /app/invoices
+            - text: View All
+            - img [ref=e210]
+        - table [ref=e213]:
+          - rowgroup [ref=e214]:
+            - row "Number Date Amount Status" [ref=e215]:
+              - columnheader "Number" [ref=e216]
+              - columnheader "Date" [ref=e217]
+              - columnheader "Amount" [ref=e218]
+              - columnheader "Status" [ref=e219]
+              - columnheader [ref=e220]
+          - rowgroup [ref=e221]:
+            - row "INV-202604-000002 24/04/2026 THB 107.00 Approved View" [ref=e222]:
+              - cell "INV-202604-000002" [ref=e223]
+              - cell "24/04/2026" [ref=e224]
+              - cell "THB 107.00" [ref=e225]
+              - cell "Approved" [ref=e226]:
+                - generic [ref=e227]: Approved
+              - cell "View" [ref=e228]:
+                - link "View" [ref=e229] [cursor=pointer]:
+                  - /url: /app/invoices/cmobsisll0023d7qp1zl0ekpx/edit
+            - row "DN-202604-000008 23/04/2026 THB 1,070.00 Cancelled View" [ref=e230]:
+              - cell "DN-202604-000008" [ref=e231]
+              - cell "23/04/2026" [ref=e232]
+              - cell "THB 1,070.00" [ref=e233]
+              - cell "Cancelled" [ref=e234]:
+                - generic [ref=e235]: Cancelled
+              - cell "View" [ref=e236]:
+                - link "View" [ref=e237] [cursor=pointer]:
+                  - /url: /app/invoices/cmobmk98f0007yskl0fzloebp/edit
+            - row "RCT-202604-000002 22/04/2026 THB 462,453.00 Submitted View" [ref=e238]:
+              - cell "RCT-202604-000002" [ref=e239]
+              - cell "22/04/2026" [ref=e240]
+              - cell "THB 462,453.00" [ref=e241]
+              - cell "Submitted" [ref=e242]:
+                - generic [ref=e243]: Submitted
+              - cell "View" [ref=e244]:
+                - link "View" [ref=e245] [cursor=pointer]:
+                  - /url: /app/invoices/cmoae69820005dp5nr0xkrb8z/edit
+            - row "T05-202605-000300 28/05/2024 THB 25,000.00 Draft View" [ref=e246]:
+              - cell "T05-202605-000300" [ref=e247]
+              - cell "28/05/2024" [ref=e248]
+              - cell "THB 25,000.00" [ref=e249]
+              - cell "Draft" [ref=e250]:
+                - generic [ref=e251]: Draft
+              - cell "View" [ref=e252]:
+                - link "View" [ref=e253] [cursor=pointer]:
+                  - /url: /app/invoices/cmoae42ms012zvs1g5z72hc7k/edit
+            - row "T04-202604-000299 25/04/2024 THB 1,285,312.00 Cancelled View" [ref=e254]:
+              - cell "T04-202604-000299" [ref=e255]
+              - cell "25/04/2024" [ref=e256]
+              - cell "THB 1,285,312.00" [ref=e257]
+              - cell "Cancelled" [ref=e258]:
+                - generic [ref=e259]: Cancelled
+              - cell "View" [ref=e260]:
+                - link "View" [ref=e261] [cursor=pointer]:
+                  - /url: /app/invoices/cmoae42mq012uvs1gd8tp927q/edit
+  - navigation [ref=e262]:
+    - link "Dashboard" [ref=e263] [cursor=pointer]:
+      - /url: /app/dashboard
+      - img [ref=e264]
+      - generic [ref=e269]: Dashboard
+    - link "Invoices" [ref=e270] [cursor=pointer]:
+      - /url: /app/invoices
+      - img [ref=e271]
+      - generic [ref=e274]: Invoices
+    - link "Customers" [ref=e275] [cursor=pointer]:
+      - /url: /app/customers
+      - img [ref=e276]
+      - generic [ref=e281]: Customers
+    - link "Products / Services" [ref=e282] [cursor=pointer]:
+      - /url: /app/products
+      - img [ref=e283]
+      - generic [ref=e287]: Products / Services
+    - button "More options" [ref=e288] [cursor=pointer]:
+      - img [ref=e289]
+      - generic [ref=e293]: More
+  - generic [ref=e294]:
+    - button "Close" [ref=e297] [cursor=pointer]:
+      - img [ref=e298]
+    - generic [ref=e301]:
+      - link "Audit Logs" [ref=e302] [cursor=pointer]:
+        - /url: /app/audit
+        - img [ref=e303]
+        - text: Audit Logs
+      - link "Settings" [ref=e306] [cursor=pointer]:
+        - /url: /app/settings
+        - img [ref=e307]
+        - text: Settings
+      - link "Admin Panel" [ref=e310] [cursor=pointer]:
+        - /url: /app/admin
+        - img [ref=e311]
+        - text: Admin Panel
+      - link "Owner Plane" [ref=e313] [cursor=pointer]:
+        - /url: /ops/overview
+        - img [ref=e314]
+        - text: Owner Plane
+  - link "สร้างใบกำกับภาษี / Create Invoice" [ref=e316] [cursor=pointer]:
+    - /url: /app/invoices/new
+    - img [ref=e317]

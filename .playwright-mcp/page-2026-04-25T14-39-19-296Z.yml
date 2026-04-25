@@ -1,0 +1,76 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e8]
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - button "Switch to Thai" [ref=e13] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e14] [cursor=pointer]: EN
+        - button "User menu" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: ผ
+          - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - heading "Customer" [level=1] [ref=e23]
+        - button "Add Customer" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+          - text: Add Customer
+      - generic [ref=e27]:
+        - img [ref=e28]
+        - textbox "Search customers" [ref=e31]
+      - table [ref=e34]:
+        - rowgroup [ref=e35]:
+          - row "Name Status Actions" [ref=e36]:
+            - columnheader "Name" [ref=e37]
+            - columnheader "Status" [ref=e38]
+            - columnheader "Actions" [ref=e39]
+        - rowgroup [ref=e40]:
+          - row [ref=e41]:
+            - cell [ref=e42]:
+              - img [ref=e43]
+  - navigation [ref=e45]:
+    - link "Dashboard" [ref=e46] [cursor=pointer]:
+      - /url: /app/dashboard
+      - img [ref=e47]
+      - generic [ref=e52]: Dashboard
+    - link "Invoices" [ref=e53] [cursor=pointer]:
+      - /url: /app/invoices
+      - img [ref=e54]
+      - generic [ref=e57]: Invoices
+    - link "Customers" [ref=e58] [cursor=pointer]:
+      - /url: /app/customers
+      - img [ref=e59]
+      - generic [ref=e64]: Customers
+    - link "Products / Services" [ref=e65] [cursor=pointer]:
+      - /url: /app/products
+      - img [ref=e66]
+      - generic [ref=e70]: Products / Services
+    - button "More options" [ref=e71] [cursor=pointer]:
+      - img [ref=e72]
+      - generic [ref=e76]: More
+  - generic [ref=e77]:
+    - button "Close" [ref=e80] [cursor=pointer]:
+      - img [ref=e81]
+    - generic [ref=e84]:
+      - link "Audit Logs" [ref=e85] [cursor=pointer]:
+        - /url: /app/audit
+        - img [ref=e86]
+        - text: Audit Logs
+      - link "Settings" [ref=e89] [cursor=pointer]:
+        - /url: /app/settings
+        - img [ref=e90]
+        - text: Settings
+      - link "Admin Panel" [ref=e93] [cursor=pointer]:
+        - /url: /app/admin
+        - img [ref=e94]
+        - text: Admin Panel
+      - link "Owner Plane" [ref=e96] [cursor=pointer]:
+        - /url: /ops/overview
+        - img [ref=e97]
+        - text: Owner Plane
+  - link "สร้างใบกำกับภาษี / Create Invoice" [ref=e99] [cursor=pointer]:
+    - /url: /app/invoices/new
+    - img [ref=e100]

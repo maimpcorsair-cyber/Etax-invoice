@@ -171,12 +171,12 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {t('dashboard.welcome')}, {user?.name}
           </p>
         </div>
-        <Link to="/app/invoices/new" className="btn-primary">
+        <Link to="/app/invoices/new" className="btn-primary hidden lg:inline-flex">
           <Plus className="w-4 h-4" />
           {t('dashboard.createNew')}
         </Link>
@@ -207,15 +207,15 @@ export default function Dashboard() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
           : statCards.map((stat) => (
-              <div key={stat.key} className="card">
+              <div key={stat.key} className="card p-3 sm:p-6">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   {t(`dashboard.summary.${stat.key}`)}
                 </p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stat.value}</p>
               </div>
             ))}
       </div>

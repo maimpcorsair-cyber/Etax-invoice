@@ -1,0 +1,405 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "e-Tax Invoice" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e8]
+        - generic [ref=e11]: e-Tax Invoice
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - button "Switch to Thai" [ref=e14] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e15] [cursor=pointer]: EN
+        - link "Sign In" [ref=e16] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/login
+        - link "Owner Login" [ref=e17] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/login
+        - button "Get Started Free" [active] [ref=e18] [cursor=pointer]
+  - generic [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - img [ref=e25]
+        - generic [ref=e29]: 🇹🇭 e-Tax Invoice v2.0 Compliant
+      - heading "e-Tax Invoice System" [level=1] [ref=e30]
+      - paragraph [ref=e31]: Complete, Fast, and Compliant with Thailand Revenue Department Standards
+      - generic [ref=e32]:
+        - button "Get Started Free" [ref=e33] [cursor=pointer]:
+          - text: Get Started Free
+          - img [ref=e34]
+        - link "View plans and payment options" [ref=e36] [cursor=pointer]:
+          - /url: "#pricing-checkout"
+          - text: View plans and payment options
+          - img [ref=e37]
+      - paragraph [ref=e39]: Trusted by 500+ companies
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: Best for
+          - generic [ref=e43]: Accounting teams and SME operators
+        - generic [ref=e44]:
+          - generic [ref=e45]: Supports
+          - generic [ref=e46]: RD submit, PDF, XML, and audit logs
+        - generic [ref=e47]:
+          - generic [ref=e48]: Payments
+          - generic [ref=e49]: Card, Stripe PromptPay, and QR
+    - complementary [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - paragraph [ref=e53]: Operational Snapshot
+          - heading "Built for real operations" [level=2] [ref=e54]
+        - img [ref=e56]
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - generic [ref=e61]: Owner Control Plane
+          - paragraph [ref=e62]: Owners can monitor revenue, subscriptions, coupons, renewals, and transactions from one control surface.
+        - generic [ref=e63]:
+          - generic [ref=e64]: Tenant Isolation
+          - paragraph [ref=e65]: Each company is isolated with role checks, domain split, and PostgreSQL RLS.
+        - generic [ref=e66]:
+          - generic [ref=e67]: Workflow
+          - paragraph [ref=e68]: Create documents, sign XML, timestamp, submit to RD, and track status end-to-end.
+  - generic [ref=e69]:
+    - generic [ref=e70]:
+      - heading "Key Features" [level=2] [ref=e71]
+      - paragraph [ref=e72]: Everything you need for seamless e-Invoice management
+    - generic [ref=e73]:
+      - generic [ref=e74]:
+        - img [ref=e76]
+        - heading "RD Compliant" [level=3] [ref=e80]
+        - paragraph [ref=e81]: Generate XML following Revenue Department schema with digital signature
+      - generic [ref=e82]:
+        - img [ref=e84]
+        - heading "Bilingual TH/EN" [level=3] [ref=e87]
+        - paragraph [ref=e88]: Create documents in Thai, English, or both languages simultaneously
+      - generic [ref=e89]:
+        - img [ref=e91]
+        - heading "PDF/A-3 Standard" [level=3] [ref=e94]
+        - paragraph [ref=e95]: Generate PDF with Thai font support and embedded XML
+      - generic [ref=e96]:
+        - img [ref=e98]
+        - heading "Automated Queue" [level=3] [ref=e100]
+        - paragraph [ref=e101]: Process documents in batch with BullMQ and automatic retry
+  - generic [ref=e103]:
+    - generic [ref=e104]:
+      - heading "Simple, Transparent Pricing" [level=2] [ref=e105]
+      - paragraph [ref=e106]: Choose the perfect plan for your business
+    - generic [ref=e107]:
+      - generic [ref=e108]:
+        - generic [ref=e109]:
+          - heading "free" [level=3] [ref=e110]
+          - generic [ref=e112]: Free
+          - paragraph [ref=e113]: Try 10 docs/month
+          - paragraph [ref=e114]: Best for evaluating the workflow before going live.
+        - list [ref=e116]:
+          - listitem [ref=e117]:
+            - img [ref=e119]
+            - generic [ref=e122]: Preview, PDF, and XML draft
+          - listitem [ref=e123]:
+            - img [ref=e125]
+            - generic [ref=e129]: Up to 10 documents per month
+          - listitem [ref=e130]:
+            - img [ref=e132]
+            - generic [ref=e137]: No multi-user access yet
+          - listitem [ref=e138]:
+            - img [ref=e140]
+            - generic [ref=e143]: RD submission is not included
+        - button "Start free" [ref=e144] [cursor=pointer]
+      - generic [ref=e145]:
+        - generic [ref=e146]:
+          - heading "starter" [level=3] [ref=e147]
+          - generic [ref=e148]:
+            - generic [ref=e149]: ฿990
+            - generic [ref=e150]: /month
+          - paragraph [ref=e151]: Up to 100 docs/month
+          - paragraph [ref=e152]: Best for solo operators running real invoices.
+        - list [ref=e154]:
+          - listitem [ref=e155]:
+            - img [ref=e157]
+            - generic [ref=e160]: Real RD submission included
+          - listitem [ref=e161]:
+            - img [ref=e163]
+            - generic [ref=e166]: Certificate and email sending included
+          - listitem [ref=e167]:
+            - img [ref=e169]
+            - generic [ref=e174]: Single primary user only
+          - listitem [ref=e175]:
+            - img [ref=e177]
+            - generic [ref=e180]: No audit logs or custom templates yet
+        - button "Pay & Start" [ref=e181] [cursor=pointer]
+      - generic [ref=e182]:
+        - generic [ref=e184]: ⭐ MOST POPULAR
+        - generic [ref=e185]:
+          - heading "business" [level=3] [ref=e186]
+          - generic [ref=e187]:
+            - generic [ref=e188]: ฿2,490
+            - generic [ref=e189]: /month
+          - paragraph [ref=e190]: Up to 500 docs/month
+          - paragraph [ref=e191]: Best for teams that need shared access and controls.
+        - list [ref=e193]:
+          - listitem [ref=e194]:
+            - img [ref=e196]
+            - generic [ref=e201]: Multi-user access with internal roles
+          - listitem [ref=e202]:
+            - img [ref=e204]
+            - generic [ref=e207]: Audit logs and document templates
+          - listitem [ref=e208]:
+            - img [ref=e210]
+            - generic [ref=e213]: Excel and Google Sheets export
+          - listitem [ref=e214]:
+            - img [ref=e216]
+            - generic [ref=e219]: Production-ready for day-to-day operations
+        - button "Pay & Start" [ref=e220] [cursor=pointer]
+      - generic [ref=e221]:
+        - generic [ref=e222]:
+          - heading "enterprise" [level=3] [ref=e223]
+          - generic [ref=e225]: Contact us
+          - paragraph [ref=e226]: Unlimited
+          - paragraph [ref=e227]: Best for higher-volume companies with custom requirements.
+        - list [ref=e229]:
+          - listitem [ref=e230]:
+            - img [ref=e232]
+            - generic [ref=e236]: Custom document and user limits
+          - listitem [ref=e237]:
+            - img [ref=e239]
+            - generic [ref=e242]: Custom onboarding and branding support
+          - listitem [ref=e243]:
+            - img [ref=e245]
+            - generic [ref=e250]: Suitable for larger and more complex teams
+          - listitem [ref=e251]:
+            - img [ref=e253]
+            - generic [ref=e255]: Commercial terms tailored to your requirements
+        - button "Contact Sales" [ref=e256] [cursor=pointer]
+    - generic [ref=e257]:
+      - generic [ref=e258]:
+        - generic [ref=e259]: Feature comparison
+        - generic [ref=e260]: free
+        - generic [ref=e261]: starter
+        - generic [ref=e262]: business
+        - generic [ref=e263]: enterprise
+      - generic [ref=e264]:
+        - generic [ref=e265]: Create invoices and preview
+        - generic [ref=e267]:
+          - img [ref=e268]
+          - text: Included
+        - generic [ref=e271]:
+          - img [ref=e272]
+          - text: Included
+        - generic [ref=e275]:
+          - img [ref=e276]
+          - text: Included
+        - generic [ref=e279]:
+          - img [ref=e280]
+          - text: Included
+      - generic [ref=e282]:
+        - generic [ref=e283]: Submit to Revenue Department
+        - generic [ref=e285]:
+          - img [ref=e286]
+          - text: Not included
+        - generic [ref=e290]:
+          - img [ref=e291]
+          - text: Included
+        - generic [ref=e294]:
+          - img [ref=e295]
+          - text: Included
+        - generic [ref=e298]:
+          - img [ref=e299]
+          - text: Included
+      - generic [ref=e301]:
+        - generic [ref=e302]: Multi-user access in one company
+        - generic [ref=e304]:
+          - img [ref=e305]
+          - text: Not included
+        - generic [ref=e309]:
+          - img [ref=e310]
+          - text: Not included
+        - generic [ref=e314]: สูงสุด 5
+        - generic [ref=e316]: ตามสัญญา
+      - generic [ref=e317]:
+        - generic [ref=e318]: Export and audit logs
+        - generic [ref=e320]:
+          - img [ref=e321]
+          - text: Not included
+        - generic [ref=e325]:
+          - img [ref=e326]
+          - text: Not included
+        - generic [ref=e330]:
+          - img [ref=e331]
+          - text: Included
+        - generic [ref=e334]:
+          - img [ref=e335]
+          - text: Included
+      - generic [ref=e337]:
+        - generic [ref=e338]: Custom document templates
+        - generic [ref=e340]:
+          - img [ref=e341]
+          - text: Not included
+        - generic [ref=e345]:
+          - img [ref=e346]
+          - text: Not included
+        - generic [ref=e350]:
+          - img [ref=e351]
+          - text: Included
+        - generic [ref=e354]:
+          - img [ref=e355]
+          - text: Included
+  - generic [ref=e358]:
+    - heading "Ready to get started?" [level=2] [ref=e359]
+    - paragraph [ref=e360]: Join thousands of businesses using our secure and reliable e-Invoice system
+    - button "Get Started Free" [ref=e361] [cursor=pointer]:
+      - text: Get Started Free
+      - img [ref=e362]
+  - contentinfo [ref=e364]:
+    - generic [ref=e365]:
+      - generic [ref=e366]:
+        - generic [ref=e367]:
+          - generic [ref=e368]:
+            - img [ref=e369]
+            - generic [ref=e372]: e-Tax Invoice
+          - paragraph [ref=e373]: Secure and reliable e-Tax Invoice system
+        - generic [ref=e374]:
+          - heading "Product" [level=4] [ref=e375]
+          - list [ref=e376]:
+            - listitem [ref=e377]:
+              - link "Features" [ref=e378] [cursor=pointer]:
+                - /url: "#features"
+            - listitem [ref=e379]:
+              - link "Pricing" [ref=e380] [cursor=pointer]:
+                - /url: "#pricing-checkout"
+            - listitem [ref=e381]:
+              - link "Privacy" [ref=e382] [cursor=pointer]:
+                - /url: /privacy
+        - generic [ref=e383]:
+          - heading "Company" [level=4] [ref=e384]
+          - list [ref=e385]:
+            - listitem [ref=e386]:
+              - link "Terms of Service" [ref=e387] [cursor=pointer]:
+                - /url: /terms
+            - listitem [ref=e388]:
+              - link "Contact" [ref=e389] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e390]:
+              - link "Privacy Policy" [ref=e391] [cursor=pointer]:
+                - /url: /privacy
+        - generic [ref=e392]:
+          - heading "Legal" [level=4] [ref=e393]
+          - list [ref=e394]:
+            - listitem [ref=e395]:
+              - link "Privacy" [ref=e396] [cursor=pointer]:
+                - /url: /privacy
+            - listitem [ref=e397]:
+              - link "Terms" [ref=e398] [cursor=pointer]:
+                - /url: /terms
+            - listitem [ref=e399]:
+              - link "Contact" [ref=e400] [cursor=pointer]:
+                - /url: /contact
+      - paragraph [ref=e402]: © 2026 e-Tax Invoice System • ✓ Thailand Revenue Department Compliant
+  - generic [ref=e405]:
+    - generic [ref=e406]:
+      - generic [ref=e407]:
+        - generic [ref=e408]:
+          - generic [ref=e409]:
+            - img [ref=e410]
+            - text: Google verified
+          - generic [ref=e413]: Tenant isolated
+        - paragraph [ref=e414]: Start your free workspace
+        - heading "Create your company and start operating" [level=3] [ref=e415]
+        - paragraph [ref=e416]: We will create a Free workspace and admin account immediately. Then sign in with the same Google email.
+      - button "Close dialog" [ref=e417] [cursor=pointer]:
+        - img [ref=e418]
+    - generic [ref=e421]:
+      - generic [ref=e422]:
+        - generic [ref=e423]:
+          - generic [ref=e424]:
+            - generic [ref=e425]: "1"
+            - generic [ref=e426]: Choose plan
+          - generic [ref=e427]:
+            - generic [ref=e428]: "2"
+            - generic [ref=e429]: Verify admin
+          - generic [ref=e430]:
+            - generic [ref=e431]: "3"
+            - generic [ref=e432]: Company profile
+        - generic [ref=e433]:
+          - generic [ref=e434]:
+            - generic [ref=e436]:
+              - paragraph [ref=e437]: Sign up with Google or enter details manually
+              - paragraph [ref=e438]: Recommended for verified email and immediate access after signup.
+            - iframe [ref=e441]:
+              - button "ลงชื่อสมัครใช้ด้วย Googleเปิดในแท็บใหม่" [ref=f1e3] [cursor=pointer]:
+                - generic [ref=f1e5]:
+                  - img [ref=f1e7]
+                  - generic [ref=f1e14]: ลงชื่อสมัครใช้ด้วย Google
+          - generic [ref=e442]:
+            - button "free Free Try 10 docs/month" [ref=e443] [cursor=pointer]:
+              - generic [ref=e445]: free
+              - generic [ref=e446]: Free
+              - paragraph [ref=e447]: Try 10 docs/month
+            - button "starter ฿990/month Up to 100 docs/month" [disabled] [ref=e448]:
+              - generic [ref=e450]: starter
+              - generic [ref=e451]:
+                - text: ฿990
+                - generic [ref=e452]: /month
+              - paragraph [ref=e453]: Up to 100 docs/month
+            - button "business Popular ฿2,490/month Up to 500 docs/month" [disabled] [ref=e454]:
+              - generic [ref=e455]:
+                - generic [ref=e456]: business
+                - generic [ref=e457]: Popular
+              - generic [ref=e458]:
+                - text: ฿2,490
+                - generic [ref=e459]: /month
+              - paragraph [ref=e460]: Up to 500 docs/month
+          - generic [ref=e461]:
+            - generic [ref=e462]:
+              - paragraph [ref=e463]: Company details
+              - paragraph [ref=e464]: Used for document setup and tenant isolation.
+            - generic [ref=e465]:
+              - generic [ref=e466]:
+                - generic [ref=e467]: Company Name (Thai)
+                - textbox [ref=e468]
+                - paragraph [ref=e469]: Use Thai characters, e.g. บริษัท ตัวอย่าง จำกัด
+              - generic [ref=e470]:
+                - generic [ref=e471]: Company Name (English)
+                - textbox [ref=e472]
+                - paragraph [ref=e473]: Use English characters, e.g. Example Co., Ltd.
+              - generic [ref=e474]:
+                - generic [ref=e475]: 13-digit Tax ID
+                - textbox [ref=e476]
+                - paragraph [ref=e477]: Enter 0/13 digits
+              - generic [ref=e478]:
+                - generic [ref=e479]: Phone Number
+                - textbox [ref=e480]
+              - generic [ref=e481]:
+                - generic [ref=e482]: Admin Name
+                - textbox [ref=e483]
+              - generic [ref=e484]:
+                - generic [ref=e485]: Admin Google Email
+                - textbox [ref=e486]
+              - generic [ref=e487]:
+                - generic [ref=e488]: Company Address (Thai)
+                - textbox [ref=e489]
+                - paragraph [ref=e490]: "Use Thai address text: street, district, province, postal code."
+          - button "Create free account" [ref=e491] [cursor=pointer]:
+            - img [ref=e492]
+            - text: Create free account
+      - generic [ref=e494]:
+        - paragraph [ref=e495]: What happens next
+        - generic [ref=e496]:
+          - generic [ref=e497]:
+            - generic [ref=e498]:
+              - paragraph [ref=e499]: Selected plan
+              - paragraph [ref=e500]: free
+            - paragraph [ref=e502]: Free
+          - paragraph [ref=e503]: Best for evaluating the workflow before going live.
+        - list [ref=e504]:
+          - listitem [ref=e505]:
+            - img [ref=e507]
+            - generic [ref=e509]: Automatically creates your company profile
+          - listitem [ref=e510]:
+            - img [ref=e512]
+            - generic [ref=e514]: Creates your admin account from the Google email used during signup
+          - listitem [ref=e515]:
+            - img [ref=e517]
+            - generic [ref=e519]: Free access with 10 documents per month
+          - listitem [ref=e520]:
+            - img [ref=e522]
+            - generic [ref=e524]: Lets you continue with Google right away
+        - generic [ref=e525]:
+          - paragraph [ref=e526]: Secure by design
+          - paragraph [ref=e527]: New workspaces are isolated by company and verified with Google identity.

@@ -1,0 +1,62 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - link "e-Tax Invoice" [ref=e5] [cursor=pointer]:
+      - /url: https://etax-invoice.vercel.app
+      - img [ref=e6]
+      - generic [ref=e9]: e-Tax Invoice
+    - generic [ref=e10]:
+      - link "Customer Login" [ref=e11] [cursor=pointer]:
+        - /url: https://etax-invoice.vercel.app/login
+      - generic [ref=e12]:
+        - button "Switch to Thai" [ref=e13] [cursor=pointer]: TH
+        - button "Switch to English" [ref=e14] [cursor=pointer]: EN
+  - generic [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - img [ref=e20]
+          - generic [ref=e23]: Owner Plane Access
+        - heading "Owner sign in" [level=1] [ref=e24]
+        - paragraph [ref=e25]: Dedicated entry for Owner Plane and system-wide operations.
+      - generic [ref=e27]:
+        - img [ref=e28]
+        - generic [ref=e31]:
+          - paragraph [ref=e32]: Use only with owner accounts
+          - paragraph [ref=e33]: Only super admin accounts can continue from this entry into Owner Plane.
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - paragraph [ref=e36]: Continue with Google
+          - paragraph [ref=e37]: Your Google email must already be added by an administrator.
+        - button "Google Sign-In is not configured" [disabled] [ref=e39]
+      - generic [ref=e44]: or
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]: Email
+          - textbox "admin@siamtech.co.th" [ref=e48]
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - generic [ref=e51]: Password
+            - generic [ref=e52]: Available for password-enabled accounts
+          - generic [ref=e53]:
+            - textbox "••••••••" [ref=e54]
+            - button [ref=e55] [cursor=pointer]:
+              - img [ref=e56]
+        - generic [ref=e59] [cursor=pointer]:
+          - checkbox "Remember me" [checked] [ref=e60]
+          - generic [ref=e61]: Remember me
+        - button "Sign In" [ref=e62] [cursor=pointer]:
+          - text: Sign In
+          - img [ref=e63]
+      - generic [ref=e66]:
+        - paragraph [ref=e67]: How access works
+        - generic [ref=e68]:
+          - paragraph [ref=e69]: 1. Admin adds the user email in Admin > User Management
+          - paragraph [ref=e70]: 2. User signs in with the same Google email
+          - paragraph [ref=e71]: 3. If the account has a password, password login still works too
+    - generic [ref=e72]:
+      - paragraph [ref=e73]: If you are a regular user, go back to Customer Login.
+      - link "Go to Customer Login" [ref=e75] [cursor=pointer]:
+        - /url: https://etax-invoice.vercel.app/login
+  - generic [ref=e77]:
+    - img [ref=e78]
+    - text: Secure connection • SSL Encrypted

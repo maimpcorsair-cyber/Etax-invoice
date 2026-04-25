@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, X, Save, Loader2, Users, ReceiptText } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -178,8 +178,73 @@ export default function Customers() {
         </div>
       </div>
 
+      {/* Mobile card list */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+          </div>
+        ) : customers.length === 0 ? (
+          <div className="flex flex-col items-center py-12 text-gray-500">
+            <Users className="w-10 h-10 mb-2 text-gray-300" />
+            {t('common.noData')}
+          </div>
+        ) : (
+          customers.map((c) => (
+            <div key={c.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-1">
+              {/* Row 1: name + status badge */}
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold text-gray-900 leading-snug">
+                  {isThai ? c.nameTh : (c.nameEn ?? c.nameTh)}
+                </p>
+                <span className={`shrink-0 ${c.isActive ? 'badge-success' : 'badge-error'}`}>
+                  {c.isActive ? t('common.active') : t('common.inactive')}
+                </span>
+              </div>
+              {/* Row 2: subtitle name */}
+              {isThai && c.nameEn && c.nameEn !== c.nameTh && (
+                <p className="text-sm text-gray-500">{c.nameEn}</p>
+              )}
+              {!isThai && c.nameTh && (
+                <p className="text-sm text-gray-500">{c.nameTh}</p>
+              )}
+              {/* Row 3: tax ID */}
+              {c.taxId && (
+                <p className="text-xs text-gray-400 font-mono">ID: {c.taxId}</p>
+              )}
+              {/* Row 4: actions */}
+              <div className="flex items-center gap-2 pt-2">
+                <Link
+                  to={`/app/customers/${c.id}/statement`}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  {isThai ? 'เอกสาร' : 'Invoices'}
+                </Link>
+                <button
+                  onClick={() => openEdit(c)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  {t('common.edit')}
+                </button>
+                {c.isActive && (
+                  <button
+                    onClick={() => handleDeactivate(c.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    {isThai ? 'ปิดใช้งาน' : 'Deactivate'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Table */}
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden hidden sm:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">

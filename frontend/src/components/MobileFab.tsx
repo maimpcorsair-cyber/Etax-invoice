@@ -1,10 +1,15 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 
 export default function MobileFab() {
   const { policy } = useCompanyAccessPolicy();
+  const location = useLocation();
   const disabled = policy?.canCreateInvoice === false;
+
+  if (location.pathname.includes('/invoices/new') || location.pathname.includes('/edit')) {
+    return null;
+  }
 
   if (disabled) {
     return (

@@ -1,0 +1,248 @@
+- generic [ref=e413]:
+  - navigation [ref=e414]:
+    - generic [ref=e416]:
+      - link "e-Tax Invoice" [ref=e417] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e418]
+        - generic [ref=e421]: e-Tax Invoice
+      - generic [ref=e422]:
+        - link "Owner Plane" [ref=e423] [cursor=pointer]:
+          - /url: /ops/overview
+          - img [ref=e424]
+          - text: Owner Plane
+        - link "Dashboard" [ref=e426] [cursor=pointer]:
+          - /url: /app/dashboard
+          - img [ref=e427]
+          - text: Dashboard
+        - link "Invoices" [ref=e432] [cursor=pointer]:
+          - /url: /app/invoices
+          - img [ref=e433]
+          - text: Invoices
+        - link "Customers" [ref=e436] [cursor=pointer]:
+          - /url: /app/customers
+          - img [ref=e437]
+          - text: Customers
+        - link "Products / Services" [ref=e442] [cursor=pointer]:
+          - /url: /app/products
+          - img [ref=e443]
+          - text: Products / Services
+        - link "Admin Panel" [ref=e447] [cursor=pointer]:
+          - /url: /app/admin
+          - img [ref=e448]
+          - text: Admin Panel
+        - link "Audit Logs" [ref=e450] [cursor=pointer]:
+          - /url: /app/audit
+          - img [ref=e451]
+          - text: Audit Logs
+        - link "Settings" [ref=e454] [cursor=pointer]:
+          - /url: /app/settings
+          - img [ref=e455]
+          - text: Settings
+      - generic [ref=e458]:
+        - generic [ref=e459]:
+          - button "Switch to Thai" [ref=e460] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e461] [cursor=pointer]: EN
+        - link "Create Invoice" [ref=e462] [cursor=pointer]:
+          - /url: /app/invoices/new
+          - img [ref=e463]
+          - text: Create Invoice
+        - button "User menu" [ref=e467] [cursor=pointer]:
+          - generic [ref=e468]: ผ
+          - generic [ref=e469]: ผู้ดูแลระบบ
+          - img [ref=e470]
+  - main [ref=e472]:
+    - generic [ref=e473]:
+      - generic [ref=e474]:
+        - generic [ref=e475]:
+          - heading "Dashboard" [level=1] [ref=e476]
+          - paragraph [ref=e477]: Welcome, ผู้ดูแลระบบ
+        - link "Create New Invoice" [ref=e478] [cursor=pointer]:
+          - /url: /app/invoices/new
+          - img [ref=e479]
+          - text: Create New Invoice
+      - generic [ref=e480]:
+        - img [ref=e481]
+        - generic [ref=e483]:
+          - paragraph [ref=e484]: Pending RD submissions for 2026-04
+          - paragraph [ref=e485]: "6 documents pending · Deadline: 15th (20 days left)"
+      - generic [ref=e486]:
+        - generic [ref=e487]:
+          - paragraph [ref=e488]: Total Invoices
+          - paragraph [ref=e489]: "16"
+        - generic [ref=e490]:
+          - paragraph [ref=e491]: Total Revenue
+          - paragraph [ref=e492]: THB 3,136,171.50
+        - generic [ref=e493]:
+          - paragraph [ref=e494]: Pending Approval
+          - paragraph [ref=e495]: "2"
+        - generic [ref=e496]:
+          - paragraph [ref=e497]: Submitted to RD
+          - paragraph [ref=e498]: "0"
+      - generic [ref=e499]:
+        - generic [ref=e501]:
+          - heading "Accounts Receivable Overview" [level=2] [ref=e502]
+          - paragraph [ref=e503]: Company-wide outstanding balances and aging buckets.
+        - generic [ref=e504]:
+          - generic [ref=e505]:
+            - paragraph [ref=e506]: Total outstanding
+            - paragraph [ref=e507]: THB 920,404.50
+          - generic [ref=e508]:
+            - paragraph [ref=e509]: Overdue outstanding
+            - paragraph [ref=e510]: THB 920,404.50
+          - generic [ref=e511]:
+            - paragraph [ref=e512]: Current outstanding
+            - paragraph [ref=e513]: THB 0.00
+        - generic [ref=e514]:
+          - generic [ref=e515]:
+            - paragraph [ref=e516]: Current
+            - paragraph [ref=e517]: THB 0.00
+          - generic [ref=e518]:
+            - paragraph [ref=e519]: 1-30
+            - paragraph [ref=e520]: THB 2,782.00
+          - generic [ref=e521]:
+            - paragraph [ref=e522]: 31-60
+            - paragraph [ref=e523]: THB 0.00
+          - generic [ref=e524]:
+            - paragraph [ref=e525]: 61-90
+            - paragraph [ref=e526]: THB 0.00
+          - generic [ref=e527]:
+            - paragraph [ref=e528]: 90+
+            - paragraph [ref=e529]: THB 917,622.50
+      - generic [ref=e530]:
+        - heading "Quick Actions" [level=2] [ref=e531]
+        - generic [ref=e532]:
+          - link "Tax Invoice" [ref=e533] [cursor=pointer]:
+            - /url: /app/invoices/new
+            - generic [ref=e535]: Tax Invoice
+          - link "Receipt" [ref=e536] [cursor=pointer]:
+            - /url: /app/invoices/new?type=receipt
+            - generic [ref=e538]: Receipt
+          - link "Credit Note" [ref=e539] [cursor=pointer]:
+            - /url: /app/invoices/new?type=credit_note
+            - generic [ref=e541]: Credit Note
+          - link "Export Excel" [ref=e542] [cursor=pointer]:
+            - /url: /app/dashboard
+            - generic [ref=e544]: Export Excel
+      - generic [ref=e545]:
+        - generic [ref=e547]:
+          - heading "RD e-Tax Submission Status" [level=2] [ref=e548]
+          - paragraph [ref=e549]: "Per Revenue Code §86/6 · Deadline: 15th of following month"
+        - generic [ref=e550]:
+          - generic [ref=e552]:
+            - generic [ref=e554]: 2026-01
+            - generic [ref=e555]: No documents
+          - generic [ref=e557]:
+            - generic [ref=e559]: 2026-02
+            - generic [ref=e560]: No documents
+          - generic [ref=e562]:
+            - generic [ref=e564]: 2026-03
+            - generic [ref=e565]: No documents
+          - generic [ref=e566]:
+            - generic [ref=e567]:
+              - generic [ref=e568]:
+                - generic [ref=e569]: 2026-04
+                - generic [ref=e570]: 20d left
+              - generic [ref=e571]:
+                - generic [ref=e572]:
+                  - img [ref=e573]
+                  - text: "0"
+                - generic [ref=e576]:
+                  - img [ref=e577]
+                  - text: "6"
+            - generic [ref=e581]: 0%
+            - generic [ref=e582]:
+              - generic [ref=e583]:
+                - text: T02·
+                - generic [ref=e584]: 0/1
+              - generic [ref=e585]:
+                - text: T01·
+                - generic [ref=e586]: 0/1
+              - generic [ref=e587]:
+                - text: T03·
+                - generic [ref=e588]: 0/2
+              - generic [ref=e589]:
+                - text: T04·
+                - generic [ref=e590]: 0/1
+              - generic [ref=e591]:
+                - text: T05·
+                - generic [ref=e592]: 0/1
+          - generic [ref=e593]:
+            - generic [ref=e594]:
+              - img [ref=e595]
+              - text: Submitted
+            - generic [ref=e598]:
+              - img [ref=e599]
+              - text: In progress
+            - generic [ref=e602]:
+              - img [ref=e603]
+              - text: Failed
+            - generic [ref=e607]:
+              - img [ref=e608]
+              - text: Not submitted
+      - generic [ref=e610]:
+        - generic [ref=e611]:
+          - heading "Recent Invoices" [level=2] [ref=e612]
+          - link "View All" [ref=e613] [cursor=pointer]:
+            - /url: /app/invoices
+            - text: View All
+            - img [ref=e614]
+        - table [ref=e617]:
+          - rowgroup [ref=e618]:
+            - row "Number Customer Date Amount Status" [ref=e619]:
+              - columnheader "Number" [ref=e620]
+              - columnheader "Customer" [ref=e621]
+              - columnheader "Date" [ref=e622]
+              - columnheader "Amount" [ref=e623]
+              - columnheader "Status" [ref=e624]
+              - columnheader [ref=e625]
+          - rowgroup [ref=e626]:
+            - row "RCT-202604-000002 Post Deploy Test Co Ltd codex-20260424223357 24/04/2026 THB 21.40 Draft View" [ref=e627]:
+              - cell "RCT-202604-000002" [ref=e628]
+              - cell "Post Deploy Test Co Ltd codex-20260424223357" [ref=e629]
+              - cell "24/04/2026" [ref=e630]
+              - cell "THB 21.40" [ref=e631]
+              - cell "Draft" [ref=e632]:
+                - generic [ref=e633]: Draft
+              - cell "View" [ref=e634]:
+                - link "View" [ref=e635] [cursor=pointer]:
+                  - /url: /app/invoices/cmod3dn6r000e13a6zia5kw1q/edit
+            - row "DOC-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 428.00 Draft View" [ref=e636]:
+              - cell "DOC-202604-000001" [ref=e637]
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e638]
+              - cell "24/04/2026" [ref=e639]
+              - cell "THB 428.00" [ref=e640]
+              - cell "Draft" [ref=e641]:
+                - generic [ref=e642]: Draft
+              - cell "View" [ref=e643]:
+                - link "View" [ref=e644] [cursor=pointer]:
+                  - /url: /app/invoices/cmod2qs0500a9iymgx0yveuvd/edit
+            - row "DN-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 107.00 Draft View" [ref=e645]:
+              - cell "DN-202604-000001" [ref=e646]
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e647]
+              - cell "24/04/2026" [ref=e648]
+              - cell "THB 107.00" [ref=e649]
+              - cell "Draft" [ref=e650]:
+                - generic [ref=e651]: Draft
+              - cell "View" [ref=e652]:
+                - link "View" [ref=e653] [cursor=pointer]:
+                  - /url: /app/invoices/cmod2qrof00a1iymgywu2q8xy/edit
+            - row "RCT-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 107.00 Draft View" [ref=e654]:
+              - cell "RCT-202604-000001" [ref=e655]
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e656]
+              - cell "24/04/2026" [ref=e657]
+              - cell "THB 107.00" [ref=e658]
+              - cell "Draft" [ref=e659]:
+                - generic [ref=e660]: Draft
+              - cell "View" [ref=e661]:
+                - link "View" [ref=e662] [cursor=pointer]:
+                  - /url: /app/invoices/cmod2qr8q009tiymg3a8h4xep/edit
+            - row "INV-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 2,675.00 Draft View" [ref=e663]:
+              - cell "INV-202604-000001" [ref=e664]
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e665]
+              - cell "24/04/2026" [ref=e666]
+              - cell "THB 2,675.00" [ref=e667]
+              - cell "Draft" [ref=e668]:
+                - generic [ref=e669]: Draft
+              - cell "View" [ref=e670]:
+                - link "View" [ref=e671] [cursor=pointer]:
+                  - /url: /app/invoices/cmod2q8ko009giymgc0704gba/edit

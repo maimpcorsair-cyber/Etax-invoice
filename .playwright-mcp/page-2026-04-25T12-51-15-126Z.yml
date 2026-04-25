@@ -1,0 +1,290 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "e-Tax Invoice" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e8]
+        - generic [ref=e11]: e-Tax Invoice
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - button "Switch to Thai" [ref=e14] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e15] [cursor=pointer]: EN
+        - link "Sign In" [ref=e16] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/login
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - img [ref=e23]
+        - generic [ref=e27]: 🇹🇭 e-Tax Invoice v2.0 Compliant
+      - heading "e-Tax Invoice System" [level=1] [ref=e28]
+      - paragraph [ref=e29]: Complete, Fast, and Compliant with Thailand Revenue Department Standards
+      - generic [ref=e30]:
+        - button "Get Started Free" [ref=e31] [cursor=pointer]:
+          - text: Get Started Free
+          - img [ref=e32]
+        - link "View plans and payment options" [ref=e34] [cursor=pointer]:
+          - /url: "#pricing-checkout"
+          - text: View plans and payment options
+          - img [ref=e35]
+      - paragraph [ref=e37]: Trusted by 500+ companies
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]: Best for
+          - generic [ref=e41]: Accounting teams and SME operators
+        - generic [ref=e42]:
+          - generic [ref=e43]: Supports
+          - generic [ref=e44]: RD submit, PDF, XML, and audit logs
+        - generic [ref=e45]:
+          - generic [ref=e46]: Payments
+          - generic [ref=e47]: Card, Stripe PromptPay, and QR
+    - complementary [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - paragraph [ref=e51]: Operational Snapshot
+          - heading "Built for real operations" [level=2] [ref=e52]
+        - img [ref=e54]
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - generic [ref=e59]: Owner Control Plane
+          - paragraph [ref=e60]: Owners can monitor revenue, subscriptions, coupons, renewals, and transactions from one control surface.
+        - generic [ref=e61]:
+          - generic [ref=e62]: Tenant Isolation
+          - paragraph [ref=e63]: Each company is isolated with role checks, domain split, and PostgreSQL RLS.
+        - generic [ref=e64]:
+          - generic [ref=e65]: Workflow
+          - paragraph [ref=e66]: Create documents, sign XML, timestamp, submit to RD, and track status end-to-end.
+  - generic [ref=e67]:
+    - generic [ref=e68]:
+      - heading "Key Features" [level=2] [ref=e69]
+      - paragraph [ref=e70]: Everything you need for seamless e-Invoice management
+    - generic [ref=e71]:
+      - generic [ref=e72]:
+        - img [ref=e74]
+        - heading "RD Compliant" [level=3] [ref=e78]
+        - paragraph [ref=e79]: Generate XML following Revenue Department schema with digital signature
+      - generic [ref=e80]:
+        - img [ref=e82]
+        - heading "Bilingual TH/EN" [level=3] [ref=e85]
+        - paragraph [ref=e86]: Create documents in Thai, English, or both languages simultaneously
+      - generic [ref=e87]:
+        - img [ref=e89]
+        - heading "PDF/A-3 Standard" [level=3] [ref=e92]
+        - paragraph [ref=e93]: Generate PDF with Thai font support and embedded XML
+      - generic [ref=e94]:
+        - img [ref=e96]
+        - heading "Automated Queue" [level=3] [ref=e98]
+        - paragraph [ref=e99]: Process documents in batch with BullMQ and automatic retry
+  - generic [ref=e101]:
+    - generic [ref=e102]:
+      - heading "Simple, Transparent Pricing" [level=2] [ref=e103]
+      - paragraph [ref=e104]: Choose the perfect plan for your business
+    - generic [ref=e105]:
+      - generic [ref=e106]:
+        - generic [ref=e107]:
+          - heading "free" [level=3] [ref=e108]
+          - generic [ref=e110]: Free
+          - paragraph [ref=e111]: Try 10 docs/month
+          - paragraph [ref=e112]: Best for evaluating the workflow before going live.
+        - list [ref=e114]:
+          - listitem [ref=e115]:
+            - img [ref=e117]
+            - generic [ref=e120]: Preview, PDF, and XML draft
+          - listitem [ref=e121]:
+            - img [ref=e123]
+            - generic [ref=e127]: Up to 10 documents per month
+          - listitem [ref=e128]:
+            - img [ref=e130]
+            - generic [ref=e135]: No multi-user access yet
+          - listitem [ref=e136]:
+            - img [ref=e138]
+            - generic [ref=e141]: RD submission is not included
+        - button "Start free" [ref=e142] [cursor=pointer]
+      - generic [ref=e143]:
+        - generic [ref=e144]:
+          - heading "starter" [level=3] [ref=e145]
+          - generic [ref=e146]:
+            - generic [ref=e147]: ฿990
+            - generic [ref=e148]: /month
+          - paragraph [ref=e149]: Up to 100 docs/month
+          - paragraph [ref=e150]: Best for solo operators running real invoices.
+        - list [ref=e152]:
+          - listitem [ref=e153]:
+            - img [ref=e155]
+            - generic [ref=e158]: Real RD submission included
+          - listitem [ref=e159]:
+            - img [ref=e161]
+            - generic [ref=e164]: Certificate and email sending included
+          - listitem [ref=e165]:
+            - img [ref=e167]
+            - generic [ref=e172]: Single primary user only
+          - listitem [ref=e173]:
+            - img [ref=e175]
+            - generic [ref=e178]: No audit logs or custom templates yet
+        - button "Pay & Start" [ref=e179] [cursor=pointer]
+      - generic [ref=e180]:
+        - generic [ref=e182]: ⭐ MOST POPULAR
+        - generic [ref=e183]:
+          - heading "business" [level=3] [ref=e184]
+          - generic [ref=e185]:
+            - generic [ref=e186]: ฿2,490
+            - generic [ref=e187]: /month
+          - paragraph [ref=e188]: Up to 500 docs/month
+          - paragraph [ref=e189]: Best for teams that need shared access and controls.
+        - list [ref=e191]:
+          - listitem [ref=e192]:
+            - img [ref=e194]
+            - generic [ref=e199]: Multi-user access with internal roles
+          - listitem [ref=e200]:
+            - img [ref=e202]
+            - generic [ref=e205]: Audit logs and document templates
+          - listitem [ref=e206]:
+            - img [ref=e208]
+            - generic [ref=e211]: Excel and Google Sheets export
+          - listitem [ref=e212]:
+            - img [ref=e214]
+            - generic [ref=e217]: Production-ready for day-to-day operations
+        - button "Pay & Start" [ref=e218] [cursor=pointer]
+      - generic [ref=e219]:
+        - generic [ref=e220]:
+          - heading "enterprise" [level=3] [ref=e221]
+          - generic [ref=e223]: Contact us
+          - paragraph [ref=e224]: Unlimited
+          - paragraph [ref=e225]: Best for higher-volume companies with custom requirements.
+        - list [ref=e227]:
+          - listitem [ref=e228]:
+            - img [ref=e230]
+            - generic [ref=e234]: Custom document and user limits
+          - listitem [ref=e235]:
+            - img [ref=e237]
+            - generic [ref=e240]: Custom onboarding and branding support
+          - listitem [ref=e241]:
+            - img [ref=e243]
+            - generic [ref=e248]: Suitable for larger and more complex teams
+          - listitem [ref=e249]:
+            - img [ref=e251]
+            - generic [ref=e253]: Commercial terms tailored to your requirements
+        - button "Contact Sales" [ref=e254] [cursor=pointer]
+    - generic [ref=e255]:
+      - generic [ref=e256]:
+        - generic [ref=e257]: Feature comparison
+        - generic [ref=e258]: free
+        - generic [ref=e259]: starter
+        - generic [ref=e260]: business
+        - generic [ref=e261]: enterprise
+      - generic [ref=e262]:
+        - generic [ref=e263]: Create invoices and preview
+        - generic [ref=e265]:
+          - img [ref=e266]
+          - text: Included
+        - generic [ref=e269]:
+          - img [ref=e270]
+          - text: Included
+        - generic [ref=e273]:
+          - img [ref=e274]
+          - text: Included
+        - generic [ref=e277]:
+          - img [ref=e278]
+          - text: Included
+      - generic [ref=e280]:
+        - generic [ref=e281]: Submit to Revenue Department
+        - generic [ref=e283]:
+          - img [ref=e284]
+          - text: Not included
+        - generic [ref=e288]:
+          - img [ref=e289]
+          - text: Included
+        - generic [ref=e292]:
+          - img [ref=e293]
+          - text: Included
+        - generic [ref=e296]:
+          - img [ref=e297]
+          - text: Included
+      - generic [ref=e299]:
+        - generic [ref=e300]: Multi-user access in one company
+        - generic [ref=e302]:
+          - img [ref=e303]
+          - text: Not included
+        - generic [ref=e307]:
+          - img [ref=e308]
+          - text: Not included
+        - generic [ref=e312]: สูงสุด 5
+        - generic [ref=e314]: ตามสัญญา
+      - generic [ref=e315]:
+        - generic [ref=e316]: Export and audit logs
+        - generic [ref=e318]:
+          - img [ref=e319]
+          - text: Not included
+        - generic [ref=e323]:
+          - img [ref=e324]
+          - text: Not included
+        - generic [ref=e328]:
+          - img [ref=e329]
+          - text: Included
+        - generic [ref=e332]:
+          - img [ref=e333]
+          - text: Included
+      - generic [ref=e335]:
+        - generic [ref=e336]: Custom document templates
+        - generic [ref=e338]:
+          - img [ref=e339]
+          - text: Not included
+        - generic [ref=e343]:
+          - img [ref=e344]
+          - text: Not included
+        - generic [ref=e348]:
+          - img [ref=e349]
+          - text: Included
+        - generic [ref=e352]:
+          - img [ref=e353]
+          - text: Included
+  - generic [ref=e356]:
+    - heading "Ready to get started?" [level=2] [ref=e357]
+    - paragraph [ref=e358]: Join thousands of businesses using our secure and reliable e-Invoice system
+    - button "Get Started Free" [ref=e359] [cursor=pointer]:
+      - text: Get Started Free
+      - img [ref=e360]
+  - contentinfo [ref=e362]:
+    - generic [ref=e363]:
+      - generic [ref=e364]:
+        - generic [ref=e365]:
+          - generic [ref=e366]:
+            - img [ref=e367]
+            - generic [ref=e370]: e-Tax Invoice
+          - paragraph [ref=e371]: Secure and reliable e-Tax Invoice system
+        - generic [ref=e372]:
+          - heading "Product" [level=4] [ref=e373]
+          - list [ref=e374]:
+            - listitem [ref=e375]:
+              - link "Features" [ref=e376] [cursor=pointer]:
+                - /url: "#features"
+            - listitem [ref=e377]:
+              - link "Pricing" [ref=e378] [cursor=pointer]:
+                - /url: "#pricing-checkout"
+            - listitem [ref=e379]:
+              - link "Privacy" [ref=e380] [cursor=pointer]:
+                - /url: /privacy
+        - generic [ref=e381]:
+          - heading "Company" [level=4] [ref=e382]
+          - list [ref=e383]:
+            - listitem [ref=e384]:
+              - link "Terms of Service" [ref=e385] [cursor=pointer]:
+                - /url: /terms
+            - listitem [ref=e386]:
+              - link "Contact" [ref=e387] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e388]:
+              - link "Privacy Policy" [ref=e389] [cursor=pointer]:
+                - /url: /privacy
+        - generic [ref=e390]:
+          - heading "Legal" [level=4] [ref=e391]
+          - list [ref=e392]:
+            - listitem [ref=e393]:
+              - link "Privacy" [ref=e394] [cursor=pointer]:
+                - /url: /privacy
+            - listitem [ref=e395]:
+              - link "Terms" [ref=e396] [cursor=pointer]:
+                - /url: /terms
+            - listitem [ref=e397]:
+              - link "Contact" [ref=e398] [cursor=pointer]:
+                - /url: /contact
+      - paragraph [ref=e400]: © 2026 e-Tax Invoice System • ✓ Thailand Revenue Department Compliant

@@ -1,0 +1,67 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e8]
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - button "Switch to Thai" [ref=e13] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e14] [cursor=pointer]: EN
+        - button "User menu" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: ผ
+          - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - heading "Customer" [level=1] [ref=e23]
+        - button "Add Customer" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+          - text: Add Customer
+      - generic [ref=e27]:
+        - img [ref=e28]
+        - textbox "Search customers" [ref=e31]
+      - img [ref=e34]
+  - navigation [ref=e36]:
+    - link "Dashboard" [ref=e37] [cursor=pointer]:
+      - /url: /app/dashboard
+      - img [ref=e38]
+      - generic [ref=e43]: Dashboard
+    - link "Invoices" [ref=e44] [cursor=pointer]:
+      - /url: /app/invoices
+      - img [ref=e45]
+      - generic [ref=e48]: Invoices
+    - link "Customers" [ref=e49] [cursor=pointer]:
+      - /url: /app/customers
+      - img [ref=e50]
+      - generic [ref=e55]: Customers
+    - link "Products / Services" [ref=e56] [cursor=pointer]:
+      - /url: /app/products
+      - img [ref=e57]
+      - generic [ref=e61]: Products / Services
+    - button "More options" [ref=e62] [cursor=pointer]:
+      - img [ref=e63]
+      - generic [ref=e67]: More
+  - generic [ref=e68]:
+    - button "Close" [ref=e71] [cursor=pointer]:
+      - img [ref=e72]
+    - generic [ref=e75]:
+      - link "Audit Logs" [ref=e76] [cursor=pointer]:
+        - /url: /app/audit
+        - img [ref=e77]
+        - text: Audit Logs
+      - link "Settings" [ref=e80] [cursor=pointer]:
+        - /url: /app/settings
+        - img [ref=e81]
+        - text: Settings
+      - link "Admin Panel" [ref=e84] [cursor=pointer]:
+        - /url: /app/admin
+        - img [ref=e85]
+        - text: Admin Panel
+      - link "Owner Plane" [ref=e87] [cursor=pointer]:
+        - /url: /ops/overview
+        - img [ref=e88]
+        - text: Owner Plane
+  - link "สร้างใบกำกับภาษี / Create Invoice" [ref=e90] [cursor=pointer]:
+    - /url: /app/invoices/new
+    - img [ref=e91]

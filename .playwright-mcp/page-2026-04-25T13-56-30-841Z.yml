@@ -1,0 +1,329 @@
+- generic [ref=e5]:
+  - navigation [ref=e6]:
+    - generic [ref=e8]:
+      - link [ref=e1283] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e10]
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - button "Switch to Thai" [ref=e52] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e53] [cursor=pointer]: EN
+        - button "User menu" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: ผ
+          - img [ref=e62]
+        - button "Open menu" [ref=e1284] [cursor=pointer]:
+          - img [ref=e1285]
+  - main [ref=e64]:
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - heading "Invoice List" [level=1] [ref=e67]
+        - link "Create Invoice" [ref=e68] [cursor=pointer]:
+          - /url: /app/invoices/new
+          - img [ref=e69]
+          - text: Create Invoice
+      - generic [ref=e70]: "Current plan: Business • Documents this month: 18 / 500"
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - img [ref=e74]
+          - textbox "Search invoices" [ref=e77]
+        - combobox [ref=e78]:
+          - option "All Types" [selected]
+          - option "Tax Invoice"
+          - option "Tax Inv/Receipt"
+          - option "Receipt"
+          - option "Credit Note"
+          - option "Debit Note"
+        - combobox [ref=e79]:
+          - option "All" [selected]
+          - option "Draft"
+          - option "Pending"
+          - option "Approved"
+          - option "Submitted"
+          - option "Rejected"
+          - option "Cancelled"
+        - button "Export" [ref=e81] [cursor=pointer]:
+          - img [ref=e82]
+          - text: Export
+          - img [ref=e85]
+      - generic [ref=e87]:
+        - table [ref=e89]:
+          - rowgroup [ref=e90]:
+            - row "Number Customer Amount Status Actions" [ref=e1286]:
+              - columnheader "Number" [ref=e92]
+              - columnheader "Customer" [ref=e94]
+              - columnheader "Amount" [ref=e96]
+              - columnheader "Status" [ref=e98]
+              - columnheader "Actions" [ref=e100]
+          - rowgroup [ref=e101]:
+            - row "RCT-202604-000002 Post Deploy Test Co Ltd codex-20260424223357 THB 21.40 Draft Edit" [ref=e1287]:
+              - cell "RCT-202604-000002" [ref=e747]:
+                - generic [ref=e748]: RCT-202604-000002
+              - cell "Post Deploy Test Co Ltd codex-20260424223357" [ref=e751]
+              - cell "THB 21.40" [ref=e753]
+              - cell "Draft" [ref=e759]:
+                - generic [ref=e760]: Draft
+              - cell "Edit" [ref=e1288]:
+                - generic [ref=e765]:
+                  - link "Edit" [ref=e766] [cursor=pointer]:
+                    - /url: /app/invoices/cmod3dn6r000e13a6zia5kw1q/edit
+                  - button "Preview" [ref=e1289] [cursor=pointer]:
+                    - img [ref=e768]
+                  - button "Record Payment" [ref=e1290] [cursor=pointer]:
+                    - img [ref=e773]
+            - row "DOC-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 THB 428.00 Draft Edit" [ref=e1291]:
+              - cell "DOC-202604-000001" [ref=e777]:
+                - generic [ref=e778]: DOC-202604-000001
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e781]
+              - cell "THB 428.00" [ref=e783]
+              - cell "Draft" [ref=e789]:
+                - generic [ref=e790]: Draft
+              - cell "Edit" [ref=e1292]:
+                - generic [ref=e795]:
+                  - link "Edit" [ref=e796] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2qs0500a9iymgx0yveuvd/edit
+                  - button "Preview" [ref=e1293] [cursor=pointer]:
+                    - img [ref=e798]
+            - row "DN-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 THB 107.00 Draft Edit" [ref=e1294]:
+              - cell "DN-202604-000001" [ref=e803]:
+                - generic [ref=e804]: DN-202604-000001
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e807]
+              - cell "THB 107.00" [ref=e809]
+              - cell "Draft" [ref=e815]:
+                - generic [ref=e816]: Draft
+              - cell "Edit" [ref=e1295]:
+                - generic [ref=e821]:
+                  - link "Edit" [ref=e822] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2qrof00a1iymgywu2q8xy/edit
+                  - button "Preview" [ref=e1296] [cursor=pointer]:
+                    - img [ref=e824]
+                  - button "Record Payment" [ref=e1297] [cursor=pointer]:
+                    - img [ref=e829]
+            - row "RCT-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 THB 107.00 Draft Edit" [ref=e1298]:
+              - cell "RCT-202604-000001" [ref=e833]:
+                - generic [ref=e834]: RCT-202604-000001
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e837]
+              - cell "THB 107.00" [ref=e839]
+              - cell "Draft" [ref=e845]:
+                - generic [ref=e846]: Draft
+              - cell "Edit" [ref=e1299]:
+                - generic [ref=e851]:
+                  - link "Edit" [ref=e852] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2qr8q009tiymg3a8h4xep/edit
+                  - button "Preview" [ref=e1300] [cursor=pointer]:
+                    - img [ref=e854]
+                  - button "Record Payment" [ref=e1301] [cursor=pointer]:
+                    - img [ref=e859]
+            - row "INV-202604-000001 Invoice Flow Test Co Ltd codex-20260424223639 THB 2,675.00 Draft Edit" [ref=e1302]:
+              - cell "INV-202604-000001" [ref=e863]:
+                - generic [ref=e864]: INV-202604-000001
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e867]
+              - cell "THB 2,675.00" [ref=e869]
+              - cell "Draft" [ref=e875]:
+                - generic [ref=e876]: Draft
+              - cell "Edit" [ref=e1303]:
+                - generic [ref=e881]:
+                  - link "Edit" [ref=e882] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2q8ko009giymgc0704gba/edit
+                  - button "Preview" [ref=e1304] [cursor=pointer]:
+                    - img [ref=e884]
+                  - button "Issue Receipt" [ref=e1305] [cursor=pointer]:
+                    - img [ref=e889]
+                  - button "Record Payment" [ref=e1306] [cursor=pointer]:
+                    - img [ref=e894]
+            - row "CN-202604-000001 Post Deploy Test Co Ltd codex-20260424223357 THB 3,210.00 Draft Edit" [ref=e1307]:
+              - cell "CN-202604-000001" [ref=e898]:
+                - generic [ref=e899]: CN-202604-000001
+              - cell "Post Deploy Test Co Ltd codex-20260424223357" [ref=e902]
+              - cell "THB 3,210.00" [ref=e904]
+              - cell "Draft" [ref=e910]:
+                - generic [ref=e911]: Draft
+              - cell "Edit" [ref=e1308]:
+                - generic [ref=e916]:
+                  - link "Edit" [ref=e917] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2msbt008giymgkofs8vng/edit
+                  - button "Preview" [ref=e1309] [cursor=pointer]:
+                    - img [ref=e919]
+                  - button "Record Payment" [ref=e1310] [cursor=pointer]:
+                    - img [ref=e924]
+            - row "T01-202608-000012 เอเชียซอฟต์ Co., Ltd. THB 75,000.00 Draft Edit" [ref=e1311]:
+              - cell "T01-202608-000012" [ref=e928]:
+                - generic [ref=e929]: T01-202608-000012
+              - cell "เอเชียซอฟต์ Co., Ltd." [ref=e932]
+              - cell "THB 75,000.00" [ref=e934]
+              - cell "Draft" [ref=e940]:
+                - generic [ref=e941]: Draft
+              - cell "Edit" [ref=e1312]:
+                - generic [ref=e946]:
+                  - link "Edit" [ref=e947] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi3lb001zl6uofkmvcvfs/edit
+                  - button "Preview" [ref=e1313] [cursor=pointer]:
+                    - img [ref=e949]
+            - row "T02-202607-000011 ไทยโปรเซสซิ่ง Co., Ltd. THB 664,938.00 Cancelled Edit" [ref=e1314]:
+              - cell "T02-202607-000011" [ref=e954]:
+                - generic [ref=e955]: T02-202607-000011
+              - cell "ไทยโปรเซสซิ่ง Co., Ltd." [ref=e958]
+              - cell "THB 664,938.00" [ref=e960]
+              - cell "Cancelled" [ref=e966]:
+                - generic [ref=e967]: Cancelled
+              - cell "Edit" [ref=e1315]:
+                - generic [ref=e972]:
+                  - link "Edit" [ref=e973] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi2qz001tl6uoqb7ma9j2/edit
+                  - button "Preview" [ref=e1316] [cursor=pointer]:
+                    - img [ref=e975]
+            - 'row "T05-202605-000010 อ้างอิง: REF-000010 กรุงเทพดิจิทัล Co., Ltd. THB 571,247.50 Rejected Edit" [ref=e1317]':
+              - 'cell "T05-202605-000010 อ้างอิง: REF-000010" [ref=e980]':
+                - generic [ref=e981]: T05-202605-000010
+                - generic [ref=e982]: "อ้างอิง: REF-000010"
+              - cell "กรุงเทพดิจิทัล Co., Ltd." [ref=e985]
+              - cell "THB 571,247.50" [ref=e987]
+              - cell "Rejected" [ref=e993]:
+                - generic [ref=e994]: Rejected
+              - cell "Edit" [ref=e1318]:
+                - generic [ref=e999]:
+                  - link "Edit" [ref=e1000] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi1y5001ol6uoci1peba8/edit
+                  - button "Preview" [ref=e1319] [cursor=pointer]:
+                    - img [ref=e1002]
+                  - button "Record Payment" [ref=e1320] [cursor=pointer]:
+                    - img [ref=e1007]
+            - 'row "T04-202604-000009 อ้างอิง: REF-000009 สยามเทคโนโลยี Co., Ltd. THB 656,997.50 Submitted Edit" [ref=e1321]':
+              - 'cell "T04-202604-000009 อ้างอิง: REF-000009" [ref=e1011]':
+                - generic [ref=e1012]: T04-202604-000009
+                - generic [ref=e1013]: "อ้างอิง: REF-000009"
+              - cell "สยามเทคโนโลยี Co., Ltd." [ref=e1016]
+              - cell "THB 656,997.50" [ref=e1018]
+              - cell "Submitted" [ref=e1024]:
+                - generic [ref=e1025]: Submitted
+              - cell "Edit" [ref=e1322]:
+                - generic [ref=e1030]:
+                  - link "Edit" [ref=e1031] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi158001kl6uogw0eak8o/edit
+                  - button "Preview" [ref=e1323] [cursor=pointer]:
+                    - img [ref=e1033]
+                  - button "Record Payment" [ref=e1324] [cursor=pointer]:
+                    - img [ref=e1038]
+            - 'row "T03-202603-000008 อ้างอิง: REF-000008 วีไอพี เทรดดิ้ง Co., Ltd. THB 9,630.00 Approved Edit" [ref=e1325]':
+              - 'cell "T03-202603-000008 อ้างอิง: REF-000008" [ref=e1042]':
+                - generic [ref=e1043]: T03-202603-000008
+                - generic [ref=e1044]: "อ้างอิง: REF-000008"
+              - cell "วีไอพี เทรดดิ้ง Co., Ltd." [ref=e1047]
+              - cell "THB 9,630.00" [ref=e1049]
+              - cell "Approved" [ref=e1055]:
+                - generic [ref=e1056]: Approved
+              - cell "Edit" [ref=e1326]:
+                - generic [ref=e1065]:
+                  - link "Edit" [ref=e1066] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi0hy001hl6uovvzofnam/edit
+                  - button "Preview" [ref=e1327] [cursor=pointer]:
+                    - img [ref=e1068]
+            - row "T01-202602-000007 เมกะซัพพลาย Co., Ltd. THB 700,327.50 Pending Edit" [ref=e1328]:
+              - cell "T01-202602-000007" [ref=e1073]:
+                - generic [ref=e1074]: T01-202602-000007
+              - cell "เมกะซัพพลาย Co., Ltd." [ref=e1077]
+              - cell "THB 700,327.50" [ref=e1079]
+              - cell "Pending" [ref=e1085]:
+                - generic [ref=e1086]: Pending
+              - cell "Edit" [ref=e1329]:
+                - generic [ref=e1091]:
+                  - link "Edit" [ref=e1092] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhzoh001bl6uo5c6mqqjv/edit
+                  - button "Preview" [ref=e1330] [cursor=pointer]:
+                    - img [ref=e1094]
+            - row "T02-202601-000006 ภูมิพัฒน์ Co., Ltd. THB 59,330.00 Draft Edit" [ref=e1331]:
+              - cell "T02-202601-000006" [ref=e1099]:
+                - generic [ref=e1100]: T02-202601-000006
+              - cell "ภูมิพัฒน์ Co., Ltd." [ref=e1103]
+              - cell "THB 59,330.00" [ref=e1105]
+              - cell "Draft" [ref=e1111]:
+                - generic [ref=e1112]: Draft
+              - cell "Edit" [ref=e1332]:
+                - generic [ref=e1117]:
+                  - link "Edit" [ref=e1118] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhyv80016l6uofa5ivf20/edit
+                  - button "Preview" [ref=e1333] [cursor=pointer]:
+                    - img [ref=e1120]
+                  - button "Issue Receipt" [ref=e1334] [cursor=pointer]:
+                    - img [ref=e1125]
+                  - button "Record Payment" [ref=e1335] [cursor=pointer]:
+                    - img [ref=e1130]
+            - 'row "T05-202612-000005 อ้างอิง: REF-000005 อีโคซัพพลาย Co., Ltd. THB 33,084.00 Cancelled Edit" [ref=e1336]':
+              - 'cell "T05-202612-000005 อ้างอิง: REF-000005" [ref=e1134]':
+                - generic [ref=e1135]: T05-202612-000005
+                - generic [ref=e1136]: "อ้างอิง: REF-000005"
+              - cell "อีโคซัพพลาย Co., Ltd." [ref=e1139]
+              - cell "THB 33,084.00" [ref=e1141]
+              - cell "Cancelled" [ref=e1147]:
+                - generic [ref=e1148]: Cancelled
+              - cell "Edit" [ref=e1337]:
+                - generic [ref=e1153]:
+                  - link "Edit" [ref=e1154] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhy2e0012l6uo8gickc91/edit
+                  - button "Preview" [ref=e1338] [cursor=pointer]:
+                    - img [ref=e1156]
+            - 'row "T04-202611-000004 อ้างอิง: REF-000004 เอเชียซอฟต์ Co., Ltd. THB 127,062.50 Rejected Edit" [ref=e1339]':
+              - 'cell "T04-202611-000004 อ้างอิง: REF-000004" [ref=e1161]':
+                - generic [ref=e1162]: T04-202611-000004
+                - generic [ref=e1163]: "อ้างอิง: REF-000004"
+              - cell "เอเชียซอฟต์ Co., Ltd." [ref=e1166]
+              - cell "THB 127,062.50" [ref=e1168]
+              - cell "Rejected" [ref=e1174]:
+                - generic [ref=e1175]: Rejected
+              - cell "Edit" [ref=e1340]:
+                - generic [ref=e1180]:
+                  - link "Edit" [ref=e1181] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhx9m000zl6uoetjx8utx/edit
+                  - button "Preview" [ref=e1341] [cursor=pointer]:
+                    - img [ref=e1183]
+                  - button "Record Payment" [ref=e1342] [cursor=pointer]:
+                    - img [ref=e1188]
+            - 'row "T03-202610-000003 อ้างอิง: REF-000003 ไทยโปรเซสซิ่ง Co., Ltd. THB 1,229,646.50 Submitted Edit" [ref=e1343]':
+              - 'cell "T03-202610-000003 อ้างอิง: REF-000003" [ref=e1192]':
+                - generic [ref=e1193]: T03-202610-000003
+                - generic [ref=e1194]: "อ้างอิง: REF-000003"
+              - cell "ไทยโปรเซสซิ่ง Co., Ltd." [ref=e1197]
+              - cell "THB 1,229,646.50" [ref=e1199]
+              - cell "Submitted" [ref=e1205]:
+                - generic [ref=e1206]: Submitted
+              - cell "Edit" [ref=e1344]:
+                - generic [ref=e1211]:
+                  - link "Edit" [ref=e1212] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhwgt000tl6uo7zi0ybsx/edit
+                  - button "Preview" [ref=e1345] [cursor=pointer]:
+                    - img [ref=e1214]
+            - row "T01-202609-000002 กรุงเทพดิจิทัล Co., Ltd. THB 1,239,897.50 Approved Edit" [ref=e1346]:
+              - cell "T01-202609-000002" [ref=e1219]:
+                - generic [ref=e1220]: T01-202609-000002
+              - cell "กรุงเทพดิจิทัล Co., Ltd." [ref=e1223]
+              - cell "THB 1,239,897.50" [ref=e1225]
+              - cell "Approved" [ref=e1231]:
+                - generic [ref=e1232]: Approved
+              - cell "Edit" [ref=e1347]:
+                - generic [ref=e1241]:
+                  - link "Edit" [ref=e1242] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhvnu000ol6uowgqqwiju/edit
+                  - button "Preview" [ref=e1348] [cursor=pointer]:
+                    - img [ref=e1244]
+            - row "T02-202608-000001 สยามเทคโนโลยี Co., Ltd. THB 287,045.00 Pending Edit" [ref=e1349]:
+              - cell "T02-202608-000001" [ref=e1249]:
+                - generic [ref=e1250]: T02-202608-000001
+              - cell "สยามเทคโนโลยี Co., Ltd." [ref=e1253]
+              - cell "THB 287,045.00" [ref=e1255]
+              - cell "Pending" [ref=e1261]:
+                - generic [ref=e1262]: Pending
+              - cell "Edit" [ref=e1350]:
+                - generic [ref=e1267]:
+                  - link "Edit" [ref=e1268] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhubp000kl6uoux2sa4gx/edit
+                  - button "Preview" [ref=e1351] [cursor=pointer]:
+                    - img [ref=e1270]
+                  - button "Issue Receipt" [ref=e1352] [cursor=pointer]:
+                    - img [ref=e1275]
+                  - button "Record Payment" [ref=e1353] [cursor=pointer]:
+                    - img [ref=e1280]
+        - generic [ref=e639]:
+          - generic [ref=e640]: Showing 18 of 18 entries
+          - generic [ref=e641]:
+            - button "Previous" [disabled] [ref=e642]
+            - button "1" [ref=e643] [cursor=pointer]
+            - button "Next" [disabled] [ref=e644]

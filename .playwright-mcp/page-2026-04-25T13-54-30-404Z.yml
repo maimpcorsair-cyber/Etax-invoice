@@ -1,0 +1,688 @@
+- generic [ref=e5]:
+  - navigation [ref=e6]:
+    - generic [ref=e8]:
+      - link "e-Tax Invoice" [ref=e9] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e10]
+        - generic [ref=e13]: e-Tax Invoice
+      - generic [ref=e14]:
+        - link "Owner Plane" [ref=e15] [cursor=pointer]:
+          - /url: /ops/overview
+          - img [ref=e16]
+          - text: Owner Plane
+        - link "Dashboard" [ref=e18] [cursor=pointer]:
+          - /url: /app/dashboard
+          - img [ref=e19]
+          - text: Dashboard
+        - link "Invoices" [ref=e24] [cursor=pointer]:
+          - /url: /app/invoices
+          - img [ref=e25]
+          - text: Invoices
+        - link "Customers" [ref=e28] [cursor=pointer]:
+          - /url: /app/customers
+          - img [ref=e29]
+          - text: Customers
+        - link "Products / Services" [ref=e34] [cursor=pointer]:
+          - /url: /app/products
+          - img [ref=e35]
+          - text: Products / Services
+        - link "Admin Panel" [ref=e39] [cursor=pointer]:
+          - /url: /app/admin
+          - img [ref=e40]
+          - text: Admin Panel
+        - link "Audit Logs" [ref=e42] [cursor=pointer]:
+          - /url: /app/audit
+          - img [ref=e43]
+          - text: Audit Logs
+        - link "Settings" [ref=e46] [cursor=pointer]:
+          - /url: /app/settings
+          - img [ref=e47]
+          - text: Settings
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - button "Switch to Thai" [ref=e52] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e53] [cursor=pointer]: EN
+        - link "Create Invoice" [ref=e54] [cursor=pointer]:
+          - /url: /app/invoices/new
+          - img [ref=e55]
+          - text: Create Invoice
+        - button "User menu" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: ผ
+          - generic [ref=e61]: ผู้ดูแลระบบ
+          - img [ref=e62]
+  - main [ref=e64]:
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - heading "Invoice List" [level=1] [ref=e67]
+        - link "Create Invoice" [ref=e68] [cursor=pointer]:
+          - /url: /app/invoices/new
+          - img [ref=e69]
+          - text: Create Invoice
+      - generic [ref=e70]: "Current plan: Business • Documents this month: 18 / 500"
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - img [ref=e74]
+          - textbox "Search invoices" [ref=e77]
+        - combobox [ref=e78]:
+          - option "All Types" [selected]
+          - option "Tax Invoice"
+          - option "Tax Inv/Receipt"
+          - option "Receipt"
+          - option "Credit Note"
+          - option "Debit Note"
+        - combobox [ref=e79]:
+          - option "All" [selected]
+          - option "Draft"
+          - option "Pending"
+          - option "Approved"
+          - option "Submitted"
+          - option "Rejected"
+          - option "Cancelled"
+        - button "Export" [ref=e81] [cursor=pointer]:
+          - img [ref=e82]
+          - text: Export
+          - img [ref=e85]
+      - generic [ref=e87]:
+        - table [ref=e89]:
+          - rowgroup [ref=e90]:
+            - row "Number Type Customer Date Amount Payment Status RD Submit Actions" [ref=e91]:
+              - columnheader "Number" [ref=e92]
+              - columnheader "Type" [ref=e93]
+              - columnheader "Customer" [ref=e94]
+              - columnheader "Date" [ref=e95]
+              - columnheader "Amount" [ref=e96]
+              - columnheader "Payment" [ref=e97]
+              - columnheader "Status" [ref=e98]
+              - columnheader "RD Submit" [ref=e99]
+              - columnheader "Actions" [ref=e100]
+          - rowgroup [ref=e101]:
+            - row "RCT-202604-000002 Receipt Post Deploy Test Co Ltd codex-20260424223357 24/04/2026 THB 21.40 Unpaid Draft Not sent Edit View Pay" [ref=e102]:
+              - cell "RCT-202604-000002" [ref=e103]:
+                - generic [ref=e104]: RCT-202604-000002
+              - cell "Receipt" [ref=e105]:
+                - generic [ref=e106]: Receipt
+              - cell "Post Deploy Test Co Ltd codex-20260424223357" [ref=e107]
+              - cell "24/04/2026" [ref=e108]
+              - cell "THB 21.40" [ref=e109]
+              - cell "Unpaid" [ref=e110]:
+                - generic [ref=e111]:
+                  - img [ref=e112]
+                  - text: Unpaid
+              - cell "Draft" [ref=e115]:
+                - generic [ref=e116]: Draft
+              - cell "Not sent" [ref=e117]:
+                - generic [ref=e119]: Not sent
+              - cell "Edit View Pay" [ref=e120]:
+                - generic [ref=e121]:
+                  - link "Edit" [ref=e122] [cursor=pointer]:
+                    - /url: /app/invoices/cmod3dn6r000e13a6zia5kw1q/edit
+                  - button "View" [active] [ref=e123] [cursor=pointer]:
+                    - img [ref=e124]
+                    - generic [ref=e127]: View
+                  - button "Pay" [ref=e128] [cursor=pointer]:
+                    - img [ref=e129]
+                    - generic [ref=e131]: Pay
+            - row "DOC-202604-000001 Tax Inv/Receipt Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 428.00 Paid Draft Not sent Edit View" [ref=e132]:
+              - cell "DOC-202604-000001" [ref=e133]:
+                - generic [ref=e134]: DOC-202604-000001
+              - cell "Tax Inv/Receipt" [ref=e135]:
+                - generic [ref=e136]: Tax Inv/Receipt
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e137]
+              - cell "24/04/2026" [ref=e138]
+              - cell "THB 428.00" [ref=e139]
+              - cell "Paid" [ref=e140]:
+                - generic [ref=e141]:
+                  - img [ref=e142]
+                  - text: Paid
+              - cell "Draft" [ref=e145]:
+                - generic [ref=e146]: Draft
+              - cell "Not sent" [ref=e147]:
+                - generic [ref=e149]: Not sent
+              - cell "Edit View" [ref=e150]:
+                - generic [ref=e151]:
+                  - link "Edit" [ref=e152] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2qs0500a9iymgx0yveuvd/edit
+                  - button "View" [ref=e153] [cursor=pointer]:
+                    - img [ref=e154]
+                    - generic [ref=e157]: View
+            - row "DN-202604-000001 Debit Note Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 107.00 Unpaid Draft Not sent Edit View Pay" [ref=e158]:
+              - cell "DN-202604-000001" [ref=e159]:
+                - generic [ref=e160]: DN-202604-000001
+              - cell "Debit Note" [ref=e161]:
+                - generic [ref=e162]: Debit Note
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e163]
+              - cell "24/04/2026" [ref=e164]
+              - cell "THB 107.00" [ref=e165]
+              - cell "Unpaid" [ref=e166]:
+                - generic [ref=e167]:
+                  - img [ref=e168]
+                  - text: Unpaid
+              - cell "Draft" [ref=e171]:
+                - generic [ref=e172]: Draft
+              - cell "Not sent" [ref=e173]:
+                - generic [ref=e175]: Not sent
+              - cell "Edit View Pay" [ref=e176]:
+                - generic [ref=e177]:
+                  - link "Edit" [ref=e178] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2qrof00a1iymgywu2q8xy/edit
+                  - button "View" [ref=e179] [cursor=pointer]:
+                    - img [ref=e180]
+                    - generic [ref=e183]: View
+                  - button "Pay" [ref=e184] [cursor=pointer]:
+                    - img [ref=e185]
+                    - generic [ref=e187]: Pay
+            - row "RCT-202604-000001 Receipt Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 107.00 Unpaid Draft Not sent Edit View Pay" [ref=e188]:
+              - cell "RCT-202604-000001" [ref=e189]:
+                - generic [ref=e190]: RCT-202604-000001
+              - cell "Receipt" [ref=e191]:
+                - generic [ref=e192]: Receipt
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e193]
+              - cell "24/04/2026" [ref=e194]
+              - cell "THB 107.00" [ref=e195]
+              - cell "Unpaid" [ref=e196]:
+                - generic [ref=e197]:
+                  - img [ref=e198]
+                  - text: Unpaid
+              - cell "Draft" [ref=e201]:
+                - generic [ref=e202]: Draft
+              - cell "Not sent" [ref=e203]:
+                - generic [ref=e205]: Not sent
+              - cell "Edit View Pay" [ref=e206]:
+                - generic [ref=e207]:
+                  - link "Edit" [ref=e208] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2qr8q009tiymg3a8h4xep/edit
+                  - button "View" [ref=e209] [cursor=pointer]:
+                    - img [ref=e210]
+                    - generic [ref=e213]: View
+                  - button "Pay" [ref=e214] [cursor=pointer]:
+                    - img [ref=e215]
+                    - generic [ref=e217]: Pay
+            - row "INV-202604-000001 Tax Invoice Invoice Flow Test Co Ltd codex-20260424223639 24/04/2026 THB 2,675.00 Unpaid Draft Not sent Edit View Receipt Pay" [ref=e218]:
+              - cell "INV-202604-000001" [ref=e219]:
+                - generic [ref=e220]: INV-202604-000001
+              - cell "Tax Invoice" [ref=e221]:
+                - generic [ref=e222]: Tax Invoice
+              - cell "Invoice Flow Test Co Ltd codex-20260424223639" [ref=e223]
+              - cell "24/04/2026" [ref=e224]
+              - cell "THB 2,675.00" [ref=e225]
+              - cell "Unpaid" [ref=e226]:
+                - generic [ref=e227]:
+                  - img [ref=e228]
+                  - text: Unpaid
+              - cell "Draft" [ref=e231]:
+                - generic [ref=e232]: Draft
+              - cell "Not sent" [ref=e233]:
+                - generic [ref=e235]: Not sent
+              - cell "Edit View Receipt Pay" [ref=e236]:
+                - generic [ref=e237]:
+                  - link "Edit" [ref=e238] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2q8ko009giymgc0704gba/edit
+                  - button "View" [ref=e239] [cursor=pointer]:
+                    - img [ref=e240]
+                    - generic [ref=e243]: View
+                  - button "Receipt" [ref=e244] [cursor=pointer]:
+                    - img [ref=e245]
+                    - generic [ref=e248]: Receipt
+                  - button "Pay" [ref=e249] [cursor=pointer]:
+                    - img [ref=e250]
+                    - generic [ref=e252]: Pay
+            - row "CN-202604-000001 Credit Note Post Deploy Test Co Ltd codex-20260424223357 24/04/2026 THB 3,210.00 Unpaid Draft Not sent Edit View Pay" [ref=e253]:
+              - cell "CN-202604-000001" [ref=e254]:
+                - generic [ref=e255]: CN-202604-000001
+              - cell "Credit Note" [ref=e256]:
+                - generic [ref=e257]: Credit Note
+              - cell "Post Deploy Test Co Ltd codex-20260424223357" [ref=e258]
+              - cell "24/04/2026" [ref=e259]
+              - cell "THB 3,210.00" [ref=e260]
+              - cell "Unpaid" [ref=e261]:
+                - generic [ref=e262]:
+                  - img [ref=e263]
+                  - text: Unpaid
+              - cell "Draft" [ref=e266]:
+                - generic [ref=e267]: Draft
+              - cell "Not sent" [ref=e268]:
+                - generic [ref=e270]: Not sent
+              - cell "Edit View Pay" [ref=e271]:
+                - generic [ref=e272]:
+                  - link "Edit" [ref=e273] [cursor=pointer]:
+                    - /url: /app/invoices/cmod2msbt008giymgkofs8vng/edit
+                  - button "View" [ref=e274] [cursor=pointer]:
+                    - img [ref=e275]
+                    - generic [ref=e278]: View
+                  - button "Pay" [ref=e279] [cursor=pointer]:
+                    - img [ref=e280]
+                    - generic [ref=e282]: Pay
+            - row "T01-202608-000012 Tax Inv/Receipt เอเชียซอฟต์ Co., Ltd. 03/08/2025 THB 75,000.00 Paid Draft Not sent Edit View" [ref=e283]:
+              - cell "T01-202608-000012" [ref=e284]:
+                - generic [ref=e285]: T01-202608-000012
+              - cell "Tax Inv/Receipt" [ref=e286]:
+                - generic [ref=e287]: Tax Inv/Receipt
+              - cell "เอเชียซอฟต์ Co., Ltd." [ref=e288]
+              - cell "03/08/2025" [ref=e289]
+              - cell "THB 75,000.00" [ref=e290]
+              - cell "Paid" [ref=e291]:
+                - generic [ref=e292]:
+                  - img [ref=e293]
+                  - text: Paid
+              - cell "Draft" [ref=e296]:
+                - generic [ref=e297]: Draft
+              - cell "Not sent" [ref=e298]:
+                - generic [ref=e300]: Not sent
+              - cell "Edit View" [ref=e301]:
+                - generic [ref=e302]:
+                  - link "Edit" [ref=e303] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi3lb001zl6uofkmvcvfs/edit
+                  - button "View" [ref=e304] [cursor=pointer]:
+                    - img [ref=e305]
+                    - generic [ref=e308]: View
+            - row "T02-202607-000011 Tax Invoice ไทยโปรเซสซิ่ง Co., Ltd. 01/07/2025 THB 664,938.00 Unpaid Cancelled Not sent Edit View" [ref=e309]:
+              - cell "T02-202607-000011" [ref=e310]:
+                - generic [ref=e311]: T02-202607-000011
+              - cell "Tax Invoice" [ref=e312]:
+                - generic [ref=e313]: Tax Invoice
+              - cell "ไทยโปรเซสซิ่ง Co., Ltd." [ref=e314]
+              - cell "01/07/2025" [ref=e315]
+              - cell "THB 664,938.00" [ref=e316]
+              - cell "Unpaid" [ref=e317]:
+                - generic [ref=e318]:
+                  - img [ref=e319]
+                  - text: Unpaid
+              - cell "Cancelled" [ref=e322]:
+                - generic [ref=e323]: Cancelled
+              - cell "Not sent" [ref=e324]:
+                - generic [ref=e326]: Not sent
+              - cell "Edit View" [ref=e327]:
+                - generic [ref=e328]:
+                  - link "Edit" [ref=e329] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi2qz001tl6uoqb7ma9j2/edit
+                  - button "View" [ref=e330] [cursor=pointer]:
+                    - img [ref=e331]
+                    - generic [ref=e334]: View
+            - 'row "T05-202605-000010 อ้างอิง: REF-000010 Debit Note กรุงเทพดิจิทัล Co., Ltd. 29/05/2025 THB 571,247.50 Unpaid Rejected Not sent Edit View Pay" [ref=e335]':
+              - 'cell "T05-202605-000010 อ้างอิง: REF-000010" [ref=e336]':
+                - generic [ref=e337]: T05-202605-000010
+                - generic [ref=e338]: "อ้างอิง: REF-000010"
+              - cell "Debit Note" [ref=e339]:
+                - generic [ref=e340]: Debit Note
+              - cell "กรุงเทพดิจิทัล Co., Ltd." [ref=e341]
+              - cell "29/05/2025" [ref=e342]
+              - cell "THB 571,247.50" [ref=e343]
+              - cell "Unpaid" [ref=e344]:
+                - generic [ref=e345]:
+                  - img [ref=e346]
+                  - text: Unpaid
+              - cell "Rejected" [ref=e349]:
+                - generic [ref=e350]: Rejected
+              - cell "Not sent" [ref=e351]:
+                - generic [ref=e353]: Not sent
+              - cell "Edit View Pay" [ref=e354]:
+                - generic [ref=e355]:
+                  - link "Edit" [ref=e356] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi1y5001ol6uoci1peba8/edit
+                  - button "View" [ref=e357] [cursor=pointer]:
+                    - img [ref=e358]
+                    - generic [ref=e361]: View
+                  - button "Pay" [ref=e362] [cursor=pointer]:
+                    - img [ref=e363]
+                    - generic [ref=e365]: Pay
+            - 'row "T04-202604-000009 อ้างอิง: REF-000009 Credit Note สยามเทคโนโลยี Co., Ltd. 25/04/2025 THB 656,997.50 Unpaid Submitted Not sent Edit View Pay" [ref=e366]':
+              - 'cell "T04-202604-000009 อ้างอิง: REF-000009" [ref=e367]':
+                - generic [ref=e368]: T04-202604-000009
+                - generic [ref=e369]: "อ้างอิง: REF-000009"
+              - cell "Credit Note" [ref=e370]:
+                - generic [ref=e371]: Credit Note
+              - cell "สยามเทคโนโลยี Co., Ltd." [ref=e372]
+              - cell "25/04/2025" [ref=e373]
+              - cell "THB 656,997.50" [ref=e374]
+              - cell "Unpaid" [ref=e375]:
+                - generic [ref=e376]:
+                  - img [ref=e377]
+                  - text: Unpaid
+              - cell "Submitted" [ref=e380]:
+                - generic [ref=e381]: Submitted
+              - cell "Not sent" [ref=e382]:
+                - generic [ref=e384]: Not sent
+              - cell "Edit View Pay" [ref=e385]:
+                - generic [ref=e386]:
+                  - link "Edit" [ref=e387] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi158001kl6uogw0eak8o/edit
+                  - button "View" [ref=e388] [cursor=pointer]:
+                    - img [ref=e389]
+                    - generic [ref=e392]: View
+                  - button "Pay" [ref=e393] [cursor=pointer]:
+                    - img [ref=e394]
+                    - generic [ref=e396]: Pay
+            - 'row "T03-202603-000008 อ้างอิง: REF-000008 Receipt วีไอพี เทรดดิ้ง Co., Ltd. 23/03/2025 THB 9,630.00 Paid Approved Not sent Submit RD Edit View" [ref=e397]':
+              - 'cell "T03-202603-000008 อ้างอิง: REF-000008" [ref=e398]':
+                - generic [ref=e399]: T03-202603-000008
+                - generic [ref=e400]: "อ้างอิง: REF-000008"
+              - cell "Receipt" [ref=e401]:
+                - generic [ref=e402]: Receipt
+              - cell "วีไอพี เทรดดิ้ง Co., Ltd." [ref=e403]
+              - cell "23/03/2025" [ref=e404]
+              - cell "THB 9,630.00" [ref=e405]
+              - cell "Paid" [ref=e406]:
+                - generic [ref=e407]:
+                  - img [ref=e408]
+                  - text: Paid
+              - cell "Approved" [ref=e411]:
+                - generic [ref=e412]: Approved
+              - cell "Not sent Submit RD" [ref=e413]:
+                - generic [ref=e414]:
+                  - generic [ref=e415]: Not sent
+                  - button "Submit RD" [ref=e416] [cursor=pointer]:
+                    - img [ref=e417]
+                    - text: Submit RD
+              - cell "Edit View" [ref=e420]:
+                - generic [ref=e421]:
+                  - link "Edit" [ref=e422] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczi0hy001hl6uovvzofnam/edit
+                  - button "View" [ref=e423] [cursor=pointer]:
+                    - img [ref=e424]
+                    - generic [ref=e427]: View
+            - row "T01-202602-000007 Tax Inv/Receipt เมกะซัพพลาย Co., Ltd. 18/02/2025 THB 700,327.50 Paid Pending Not sent Edit View" [ref=e428]:
+              - cell "T01-202602-000007" [ref=e429]:
+                - generic [ref=e430]: T01-202602-000007
+              - cell "Tax Inv/Receipt" [ref=e431]:
+                - generic [ref=e432]: Tax Inv/Receipt
+              - cell "เมกะซัพพลาย Co., Ltd." [ref=e433]
+              - cell "18/02/2025" [ref=e434]
+              - cell "THB 700,327.50" [ref=e435]
+              - cell "Paid" [ref=e436]:
+                - generic [ref=e437]:
+                  - img [ref=e438]
+                  - text: Paid
+              - cell "Pending" [ref=e441]:
+                - generic [ref=e442]: Pending
+              - cell "Not sent" [ref=e443]:
+                - generic [ref=e445]: Not sent
+              - cell "Edit View" [ref=e446]:
+                - generic [ref=e447]:
+                  - link "Edit" [ref=e448] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhzoh001bl6uo5c6mqqjv/edit
+                  - button "View" [ref=e449] [cursor=pointer]:
+                    - img [ref=e450]
+                    - generic [ref=e453]: View
+            - row "T02-202601-000006 Tax Invoice ภูมิพัฒน์ Co., Ltd. 15/01/2025 THB 59,330.00 Unpaid Draft Not sent Edit View Receipt Pay" [ref=e454]:
+              - cell "T02-202601-000006" [ref=e455]:
+                - generic [ref=e456]: T02-202601-000006
+              - cell "Tax Invoice" [ref=e457]:
+                - generic [ref=e458]: Tax Invoice
+              - cell "ภูมิพัฒน์ Co., Ltd." [ref=e459]
+              - cell "15/01/2025" [ref=e460]
+              - cell "THB 59,330.00" [ref=e461]
+              - cell "Unpaid" [ref=e462]:
+                - generic [ref=e463]:
+                  - img [ref=e464]
+                  - text: Unpaid
+              - cell "Draft" [ref=e467]:
+                - generic [ref=e468]: Draft
+              - cell "Not sent" [ref=e469]:
+                - generic [ref=e471]: Not sent
+              - cell "Edit View Receipt Pay" [ref=e472]:
+                - generic [ref=e473]:
+                  - link "Edit" [ref=e474] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhyv80016l6uofa5ivf20/edit
+                  - button "View" [ref=e475] [cursor=pointer]:
+                    - img [ref=e476]
+                    - generic [ref=e479]: View
+                  - button "Receipt" [ref=e480] [cursor=pointer]:
+                    - img [ref=e481]
+                    - generic [ref=e484]: Receipt
+                  - button "Pay" [ref=e485] [cursor=pointer]:
+                    - img [ref=e486]
+                    - generic [ref=e488]: Pay
+            - 'row "T05-202612-000005 อ้างอิง: REF-000005 Debit Note อีโคซัพพลาย Co., Ltd. 13/12/2024 THB 33,084.00 Unpaid Cancelled Not sent Edit View" [ref=e489]':
+              - 'cell "T05-202612-000005 อ้างอิง: REF-000005" [ref=e490]':
+                - generic [ref=e491]: T05-202612-000005
+                - generic [ref=e492]: "อ้างอิง: REF-000005"
+              - cell "Debit Note" [ref=e493]:
+                - generic [ref=e494]: Debit Note
+              - cell "อีโคซัพพลาย Co., Ltd." [ref=e495]
+              - cell "13/12/2024" [ref=e496]
+              - cell "THB 33,084.00" [ref=e497]
+              - cell "Unpaid" [ref=e498]:
+                - generic [ref=e499]:
+                  - img [ref=e500]
+                  - text: Unpaid
+              - cell "Cancelled" [ref=e503]:
+                - generic [ref=e504]: Cancelled
+              - cell "Not sent" [ref=e505]:
+                - generic [ref=e507]: Not sent
+              - cell "Edit View" [ref=e508]:
+                - generic [ref=e509]:
+                  - link "Edit" [ref=e510] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhy2e0012l6uo8gickc91/edit
+                  - button "View" [ref=e511] [cursor=pointer]:
+                    - img [ref=e512]
+                    - generic [ref=e515]: View
+            - 'row "T04-202611-000004 อ้างอิง: REF-000004 Credit Note เอเชียซอฟต์ Co., Ltd. 10/11/2024 THB 127,062.50 Unpaid Rejected Not sent Edit View Pay" [ref=e516]':
+              - 'cell "T04-202611-000004 อ้างอิง: REF-000004" [ref=e517]':
+                - generic [ref=e518]: T04-202611-000004
+                - generic [ref=e519]: "อ้างอิง: REF-000004"
+              - cell "Credit Note" [ref=e520]:
+                - generic [ref=e521]: Credit Note
+              - cell "เอเชียซอฟต์ Co., Ltd." [ref=e522]
+              - cell "10/11/2024" [ref=e523]
+              - cell "THB 127,062.50" [ref=e524]
+              - cell "Unpaid" [ref=e525]:
+                - generic [ref=e526]:
+                  - img [ref=e527]
+                  - text: Unpaid
+              - cell "Rejected" [ref=e530]:
+                - generic [ref=e531]: Rejected
+              - cell "Not sent" [ref=e532]:
+                - generic [ref=e534]: Not sent
+              - cell "Edit View Pay" [ref=e535]:
+                - generic [ref=e536]:
+                  - link "Edit" [ref=e537] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhx9m000zl6uoetjx8utx/edit
+                  - button "View" [ref=e538] [cursor=pointer]:
+                    - img [ref=e539]
+                    - generic [ref=e542]: View
+                  - button "Pay" [ref=e543] [cursor=pointer]:
+                    - img [ref=e544]
+                    - generic [ref=e546]: Pay
+            - 'row "T03-202610-000003 อ้างอิง: REF-000003 Receipt ไทยโปรเซสซิ่ง Co., Ltd. 07/10/2024 THB 1,229,646.50 Paid Submitted Not sent Edit View" [ref=e547]':
+              - 'cell "T03-202610-000003 อ้างอิง: REF-000003" [ref=e548]':
+                - generic [ref=e549]: T03-202610-000003
+                - generic [ref=e550]: "อ้างอิง: REF-000003"
+              - cell "Receipt" [ref=e551]:
+                - generic [ref=e552]: Receipt
+              - cell "ไทยโปรเซสซิ่ง Co., Ltd." [ref=e553]
+              - cell "07/10/2024" [ref=e554]
+              - cell "THB 1,229,646.50" [ref=e555]
+              - cell "Paid" [ref=e556]:
+                - generic [ref=e557]:
+                  - img [ref=e558]
+                  - text: Paid
+              - cell "Submitted" [ref=e561]:
+                - generic [ref=e562]: Submitted
+              - cell "Not sent" [ref=e563]:
+                - generic [ref=e565]: Not sent
+              - cell "Edit View" [ref=e566]:
+                - generic [ref=e567]:
+                  - link "Edit" [ref=e568] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhwgt000tl6uo7zi0ybsx/edit
+                  - button "View" [ref=e569] [cursor=pointer]:
+                    - img [ref=e570]
+                    - generic [ref=e573]: View
+            - row "T01-202609-000002 Tax Inv/Receipt กรุงเทพดิจิทัล Co., Ltd. 04/09/2024 THB 1,239,897.50 Paid Approved Not sent Submit RD Edit View" [ref=e574]:
+              - cell "T01-202609-000002" [ref=e575]:
+                - generic [ref=e576]: T01-202609-000002
+              - cell "Tax Inv/Receipt" [ref=e577]:
+                - generic [ref=e578]: Tax Inv/Receipt
+              - cell "กรุงเทพดิจิทัล Co., Ltd." [ref=e579]
+              - cell "04/09/2024" [ref=e580]
+              - cell "THB 1,239,897.50" [ref=e581]
+              - cell "Paid" [ref=e582]:
+                - generic [ref=e583]:
+                  - img [ref=e584]
+                  - text: Paid
+              - cell "Approved" [ref=e587]:
+                - generic [ref=e588]: Approved
+              - cell "Not sent Submit RD" [ref=e589]:
+                - generic [ref=e590]:
+                  - generic [ref=e591]: Not sent
+                  - button "Submit RD" [ref=e592] [cursor=pointer]:
+                    - img [ref=e593]
+                    - text: Submit RD
+              - cell "Edit View" [ref=e596]:
+                - generic [ref=e597]:
+                  - link "Edit" [ref=e598] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhvnu000ol6uowgqqwiju/edit
+                  - button "View" [ref=e599] [cursor=pointer]:
+                    - img [ref=e600]
+                    - generic [ref=e603]: View
+            - row "T02-202608-000001 Tax Invoice สยามเทคโนโลยี Co., Ltd. 02/08/2024 THB 287,045.00 Unpaid Pending Not sent Edit View Receipt Pay" [ref=e604]:
+              - cell "T02-202608-000001" [ref=e605]:
+                - generic [ref=e606]: T02-202608-000001
+              - cell "Tax Invoice" [ref=e607]:
+                - generic [ref=e608]: Tax Invoice
+              - cell "สยามเทคโนโลยี Co., Ltd." [ref=e609]
+              - cell "02/08/2024" [ref=e610]
+              - cell "THB 287,045.00" [ref=e611]
+              - cell "Unpaid" [ref=e612]:
+                - generic [ref=e613]:
+                  - img [ref=e614]
+                  - text: Unpaid
+              - cell "Pending" [ref=e617]:
+                - generic [ref=e618]: Pending
+              - cell "Not sent" [ref=e619]:
+                - generic [ref=e621]: Not sent
+              - cell "Edit View Receipt Pay" [ref=e622]:
+                - generic [ref=e623]:
+                  - link "Edit" [ref=e624] [cursor=pointer]:
+                    - /url: /app/invoices/cmoczhubp000kl6uoux2sa4gx/edit
+                  - button "View" [ref=e625] [cursor=pointer]:
+                    - img [ref=e626]
+                    - generic [ref=e629]: View
+                  - button "Receipt" [ref=e630] [cursor=pointer]:
+                    - img [ref=e631]
+                    - generic [ref=e634]: Receipt
+                  - button "Pay" [ref=e635] [cursor=pointer]:
+                    - img [ref=e636]
+                    - generic [ref=e638]: Pay
+        - generic [ref=e639]:
+          - generic [ref=e640]: Showing 18 of 18 entries
+          - generic [ref=e641]:
+            - button "Previous" [disabled] [ref=e642]
+            - button "1" [ref=e643] [cursor=pointer]
+            - button "Next" [disabled] [ref=e644]
+      - generic [ref=e646]:
+        - generic [ref=e647]:
+          - generic [ref=e648]:
+            - img [ref=e649]
+            - generic [ref=e652]: RCT-202604-000002
+          - generic [ref=e653]:
+            - button "Download PDF" [ref=e654] [cursor=pointer]:
+              - img [ref=e655]
+              - text: Download PDF
+            - button [ref=e658] [cursor=pointer]:
+              - img [ref=e659]
+        - iframe [ref=e663]:
+          - generic [ref=f3e3]:
+            - generic: STANDARD
+            - generic [ref=f3e5]:
+              - generic [ref=f3e6]:
+                - generic [ref=f3e8]:
+                  - generic [ref=f3e9]: บริษัท สยาม เทคโนโลยี จำกัด
+                  - generic [ref=f3e10]:
+                    - generic [ref=f3e11]: "เลขประจำตัวผู้เสียภาษี: 0105560123456"
+                    - generic [ref=f3e12]: "สาขา: สำนักงานใหญ่"
+                    - generic [ref=f3e13]: 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110
+                    - generic [ref=f3e14]: Tel. 02-123-4567 | info@siamtech.co.th
+                - generic [ref=f3e16]:
+                  - generic [ref=f3e17]: Electronic Tax Document
+                  - heading "ใบเสร็จรับเงิน" [level=1] [ref=f3e18]
+                  - generic [ref=f3e19]: ต้นฉบับ
+                  - generic [ref=f3e20]: System Standard
+              - generic [ref=f3e21]:
+                - generic [ref=f3e22]:
+                  - generic [ref=f3e23]: ผู้ซื้อ
+                  - generic [ref=f3e25]:
+                    - generic [ref=f3e26]: ผู้ซื้อ
+                    - generic [ref=f3e27]: บริษัท ทดสอบโพสต์ดีพลอย จำกัด codex-20260424223357
+                    - generic [ref=f3e28]:
+                      - generic [ref=f3e29]:
+                        - text: "เลขประจำตัวผู้เสียภาษี:"
+                        - strong [ref=f3e30]: "0994000158377"
+                      - generic [ref=f3e31]:
+                        - text: "สาขา:"
+                        - strong [ref=f3e32]: สำนักงานใหญ่
+                      - generic [ref=f3e33]: 99/1 ถนนสุขุมวิท แขวงทดสอบ เขตวัฒนา กรุงเทพฯ 10110
+                - generic [ref=f3e34]:
+                  - generic [ref=f3e35]: Document Details
+                  - generic [ref=f3e36]:
+                    - generic [ref=f3e37]:
+                      - generic [ref=f3e38]: เลขที่
+                      - generic [ref=f3e39]: RCT-202604-000002
+                    - generic [ref=f3e40]:
+                      - generic [ref=f3e41]: วันที่
+                      - generic [ref=f3e42]: 24 เมษายน 2569
+                    - generic [ref=f3e43]:
+                      - generic [ref=f3e44]: วิธีชำระเงิน
+                      - generic [ref=f3e45]: cash
+              - generic [ref=f3e46]:
+                - heading "รายการ" [level=2] [ref=f3e48]
+                - table [ref=f3e49]:
+                  - rowgroup [ref=f3e50]:
+                    - row "ลำดับ รายการ จำนวน หน่วย ราคา/หน่วย ส่วนลด VAT ราคา ภาษี รวม" [ref=f3e51]:
+                      - columnheader "ลำดับ" [ref=f3e52]
+                      - columnheader "รายการ" [ref=f3e53]
+                      - columnheader "จำนวน" [ref=f3e54]
+                      - columnheader "หน่วย" [ref=f3e55]
+                      - columnheader "ราคา/หน่วย" [ref=f3e56]
+                      - columnheader "ส่วนลด" [ref=f3e57]
+                      - columnheader "VAT" [ref=f3e58]
+                      - columnheader "ราคา" [ref=f3e59]
+                      - columnheader "ภาษี" [ref=f3e60]
+                      - columnheader "รวม" [ref=f3e61]
+                  - rowgroup [ref=f3e62]:
+                    - row "1 ทดสอบแก้ไขหลัง deploy 2 ครั้ง 10.00 - 7% 20.00 1.40 21.40" [ref=f3e63]:
+                      - cell "1" [ref=f3e64]
+                      - cell "ทดสอบแก้ไขหลัง deploy" [ref=f3e65]
+                      - cell "2" [ref=f3e66]
+                      - cell "ครั้ง" [ref=f3e67]
+                      - cell "10.00" [ref=f3e68]
+                      - cell "-" [ref=f3e69]
+                      - cell "7%" [ref=f3e70]
+                      - cell "20.00" [ref=f3e71]
+                      - cell "1.40" [ref=f3e72]
+                      - cell "21.40" [ref=f3e73]:
+                        - strong [ref=f3e74]: "21.40"
+              - generic [ref=f3e75]:
+                - generic [ref=f3e76]:
+                  - generic [ref=f3e77]:
+                    - generic [ref=f3e78]: จำนวนเงินเป็นตัวอักษร
+                    - strong [ref=f3e80]: ยี่สิบหนึ่งบาทสี่สิบสตางค์
+                  - generic [ref=f3e81]:
+                    - generic [ref=f3e82]: หมายเหตุ
+                    - generic [ref=f3e84]: post-fix edit smoke
+                - generic [ref=f3e85]:
+                  - generic [ref=f3e86]: ยอดรวมสุทธิ
+                  - generic [ref=f3e87]:
+                    - generic [ref=f3e88]: ยอดรวมก่อน VAT
+                    - strong [ref=f3e89]: 20.00 THB
+                  - generic [ref=f3e90]:
+                    - generic [ref=f3e91]: ภาษีมูลค่าเพิ่ม (7%)
+                    - strong [ref=f3e92]: 1.40 THB
+                  - generic [ref=f3e93]:
+                    - generic [ref=f3e94]: ยอดรวมสุทธิ
+                    - strong [ref=f3e95]: 21.40 THB
+              - generic [ref=f3e98]:
+                - img "online document QR" [ref=f3e99]
+                - generic [ref=f3e100]: สแกนเพื่อตรวจสอบ/ดูเอกสารออนไลน์
+                - generic [ref=f3e101]: https://etax-invoice.vercel.app/verify/RCT-202604-000002
+              - generic [ref=f3e102]:
+                - generic [ref=f3e103]:
+                  - text: เอกสารนี้สร้างและจัดเก็บในรูปแบบอิเล็กทรอนิกส์
+                  - text: เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax
+                - generic [ref=f3e104]: ELECTRONIC DOCUMENT
+              - generic [ref=f3e105]:
+                - generic [ref=f3e106]:
+                  - generic [ref=f3e107]: เอกสารนี้สร้างและจัดเก็บในรูปแบบอิเล็กทรอนิกส์
+                  - generic [ref=f3e108]: e-Tax Invoice System
+                - generic [ref=f3e109]:
+                  - generic [ref=f3e110]: "2026"
+                  - generic [ref=f3e111]: ใบเสร็จรับเงิน

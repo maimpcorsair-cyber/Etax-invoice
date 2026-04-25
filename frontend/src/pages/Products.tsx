@@ -137,14 +137,18 @@ export default function Products() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('product.title')}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          <span className="sm:hidden">{isThai ? 'สินค้า' : 'Products'}</span>
+          <span className="hidden sm:inline">{isThai ? 'สินค้าและบริการ' : 'Products / Services'}</span>
+        </h1>
         <button
           onClick={openCreate}
-          className="btn-primary"
+          className="btn-primary shrink-0"
           disabled={!!policy && policy.maxProducts !== null && policy.usage.products >= policy.maxProducts}
         >
           <Plus className="w-4 h-4" />
-          {t('product.add')}
+          <span className="hidden sm:inline">{isThai ? 'เพิ่มสินค้า/บริการ' : 'Add Product / Service'}</span>
+          <span className="sm:hidden">{isThai ? 'เพิ่ม' : 'Add'}</span>
         </button>
       </div>
 
@@ -170,8 +174,58 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card p-0 overflow-hidden">
+      {/* Mobile card list */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <Package className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+            {t('common.noData')}
+          </div>
+        ) : (
+          products.map((p) => (
+            <div key={p.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-2">
+              {/* Row 1: code + VAT badge */}
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
+                  {p.code}
+                </span>
+                <span className={vatBadge(p.vatType)}>{vatLabel(p.vatType)}</span>
+              </div>
+              {/* Row 2: name */}
+              <div>
+                <p className="font-semibold text-gray-900">{p.nameTh}</p>
+                {p.nameEn && <p className="text-sm text-gray-500">{p.nameEn}</p>}
+              </div>
+              {/* Row 3: unit + price */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">{p.unit}</span>
+                <span className="font-bold text-gray-900">{formatCurrency(p.unitPrice)}</span>
+              </div>
+              {/* Row 4: status + edit */}
+              <div className="flex items-center justify-between pt-1">
+                <span className={p.isActive ? 'badge-success' : 'badge-error'}>
+                  {p.isActive ? t('common.active') : t('common.inactive')}
+                </span>
+                <button
+                  onClick={() => openEdit(p)}
+                  className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                  title={t('common.edit')}
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  {t('common.edit')}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">

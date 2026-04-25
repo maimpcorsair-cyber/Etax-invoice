@@ -1,0 +1,350 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e10]:
+          - generic [ref=e11]: Owner Control Plane
+          - generic [ref=e12]: admin@siamtech.co.th
+      - generic [ref=e13]:
+        - link "Owner Overview" [ref=e14] [cursor=pointer]:
+          - /url: /ops/overview
+          - img [ref=e15]
+          - text: Owner Overview
+        - link "Tenants" [ref=e17] [cursor=pointer]:
+          - /url: /ops/tenants
+          - img [ref=e18]
+          - text: Tenants
+        - link "Transactions" [ref=e22] [cursor=pointer]:
+          - /url: /ops/transactions
+          - img [ref=e23]
+          - text: Transactions
+        - link "Coupons" [ref=e26] [cursor=pointer]:
+          - /url: /ops/coupons
+          - img [ref=e27]
+          - text: Coupons
+        - link "Renewals" [ref=e30] [cursor=pointer]:
+          - /url: /ops/renewals
+          - img [ref=e31]
+          - text: Renewals
+        - link "Tenant App" [ref=e36] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/app/dashboard?authHandoff=eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUoxYzJWeVNXUWlPaUoxYzJWeUxXRmtiV2x1TFRBd01TSXNJbU52YlhCaGJubEpaQ0k2SW1OdmJYQmhibmt0WkdWdGJ5MHdNREVpTENKeWIyeGxJam9pYzNWd1pYSmZZV1J0YVc0aUxDSmxiV0ZwYkNJNkltRmtiV2x1UUhOcFlXMTBaV05vTG1OdkxuUm9JaXdpYVdGMElqb3hOemMzTVRBME16ZzBMQ0psZUhBaU9qRTNOemMzTURreE9EUjkuSDNuQXRNanQwRXltdlZmQ1JHWU1jcjE3aldERjhteXJ1LUp6Tnd2Wmk0OCIsInVzZXIiOnsiaWQiOiJ1c2VyLWFkbWluLTAwMSIsImVtYWlsIjoiYWRtaW5Ac2lhbXRlY2guY28udGgiLCJuYW1lIjoi4Lic4Li54LmJ4LiU4Li54LmB4Lil4Lij4Liw4Lia4LiaIiwicm9sZSI6InN1cGVyX2FkbWluIiwiY29tcGFueUlkIjoiY29tcGFueS1kZW1vLTAwMSIsImF1dGgiOnsiaGFzUGFzc3dvcmQiOnRydWUsImhhc0dvb2dsZSI6dHJ1ZX0sImNvbXBhbnkiOnsibmFtZVRoIjoi4Lia4Lij4Li04Lip4Lix4LiXIOC4quC4ouC4suC4oSDguYDguJfguITguYLguJnguYLguKXguKLguLUg4LiI4Liz4LiB4Lix4LiUIiwibmFtZUVuIjoiU2lhbSBUZWNobm9sb2d5IENvLiwgTHRkLiIsInRheElkIjoiMDEwNTU2MDEyMzQ1NiJ9fX0%3D
+          - img [ref=e37]
+          - text: Tenant App
+        - link "Switch To Tenant" [ref=e41] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/app/dashboard?authHandoff=eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUoxYzJWeVNXUWlPaUoxYzJWeUxXRmtiV2x1TFRBd01TSXNJbU52YlhCaGJubEpaQ0k2SW1OdmJYQmhibmt0WkdWdGJ5MHdNREVpTENKeWIyeGxJam9pYzNWd1pYSmZZV1J0YVc0aUxDSmxiV0ZwYkNJNkltRmtiV2x1UUhOcFlXMTBaV05vTG1OdkxuUm9JaXdpYVdGMElqb3hOemMzTVRBME16ZzBMQ0psZUhBaU9qRTNOemMzTURreE9EUjkuSDNuQXRNanQwRXltdlZmQ1JHWU1jcjE3aldERjhteXJ1LUp6Tnd2Wmk0OCIsInVzZXIiOnsiaWQiOiJ1c2VyLWFkbWluLTAwMSIsImVtYWlsIjoiYWRtaW5Ac2lhbXRlY2guY28udGgiLCJuYW1lIjoi4Lic4Li54LmJ4LiU4Li54LmB4Lil4Lij4Liw4Lia4LiaIiwicm9sZSI6InN1cGVyX2FkbWluIiwiY29tcGFueUlkIjoiY29tcGFueS1kZW1vLTAwMSIsImF1dGgiOnsiaGFzUGFzc3dvcmQiOnRydWUsImhhc0dvb2dsZSI6dHJ1ZX0sImNvbXBhbnkiOnsibmFtZVRoIjoi4Lia4Lij4Li04Lip4Lix4LiXIOC4quC4ouC4suC4oSDguYDguJfguITguYLguJnguYLguKXguKLguLUg4LiI4Liz4LiB4Lix4LiUIiwibmFtZUVuIjoiU2lhbSBUZWNobm9sb2d5IENvLiwgTHRkLiIsInRheElkIjoiMDEwNTU2MDEyMzQ1NiJ9fX0%3D
+          - img [ref=e42]
+          - text: Switch To Tenant
+        - button "Logout" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+          - text: Logout
+  - main [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e54]:
+        - img [ref=e56]
+        - generic [ref=e58]:
+          - heading "Owner Control Plane" [level=1] [ref=e59]
+          - paragraph [ref=e60]: "Built for operating the commercial side of the SaaS: revenue, tenants, subscriptions, payment channels, pending PromptPay approvals, and coupon operations. This stays separate from tenant workflows on purpose."
+      - generic [ref=e61]:
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - generic [ref=e64]: MRR
+            - img [ref=e65]
+          - generic [ref=e68]: ฿2,490.00
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - generic [ref=e71]: ARR
+            - img [ref=e72]
+          - generic [ref=e75]: ฿29,880.00
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e78]: Collected
+            - img [ref=e79]
+          - generic [ref=e81]: ฿5,976.00
+        - generic [ref=e82]:
+          - generic [ref=e83]:
+            - generic [ref=e84]: Active Subs
+            - img [ref=e85]
+          - generic [ref=e90]: "1"
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - generic [ref=e93]: Companies
+            - img [ref=e94]
+          - generic [ref=e98]: "6"
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - generic [ref=e101]: PromptPay Pending
+            - img [ref=e102]
+          - generic [ref=e108]: "3"
+        - generic [ref=e109]:
+          - generic [ref=e110]:
+            - generic [ref=e111]: Coupons
+            - img [ref=e112]
+          - generic [ref=e115]: 2/2
+        - generic [ref=e116]:
+          - generic [ref=e117]:
+            - generic [ref=e118]: Users
+            - img [ref=e119]
+          - generic [ref=e124]: "7"
+      - generic [ref=e125]:
+        - generic [ref=e126]:
+          - generic [ref=e127]:
+            - heading "Commercial Snapshot" [level=2] [ref=e128]
+            - paragraph [ref=e129]: Track growth, plan mix, and channel performance from one place.
+          - generic [ref=e130]:
+            - generic [ref=e131]:
+              - generic [ref=e132]: Starter
+              - generic [ref=e133]: "0"
+            - generic [ref=e134]:
+              - generic [ref=e135]: Business
+              - generic [ref=e136]: "1"
+            - generic [ref=e137]:
+              - generic [ref=e138]: Enterprise
+              - generic [ref=e139]: "0"
+          - generic [ref=e140]:
+            - generic [ref=e141]:
+              - generic [ref=e142]: Payment Mix
+              - generic [ref=e143]:
+                - generic [ref=e144]:
+                  - generic [ref=e145]:
+                    - generic [ref=e146]: promptpay_qr
+                    - generic [ref=e147]: 19.7%
+                  - generic [ref=e150]: ฿1,470.00 · 3 transactions
+                - generic [ref=e151]:
+                  - generic [ref=e152]:
+                    - generic [ref=e153]: stripe
+                    - generic [ref=e154]: 80.3%
+                  - generic [ref=e157]: ฿5,976.00 · 3 transactions
+            - generic [ref=e158]:
+              - generic [ref=e159]: Top Revenue Tenants
+              - generic [ref=e160]:
+                - generic [ref=e162]:
+                  - generic [ref=e163]: 1. บริษัท สยาม เทคโนโลยี จำกัด
+                  - generic [ref=e164]: ฿4,962,732.40
+                - generic [ref=e168]:
+                  - generic [ref=e169]: 2. บริษัท ฟรีเทสต์ จำกัด free20260424233728
+                  - generic [ref=e170]: ฿0.00
+                - generic [ref=e174]:
+                  - generic [ref=e175]: 3. บริษัท ฟรีสองทาง จำกัด freeboth20260424234943
+                  - generic [ref=e176]: ฿0.00
+                - generic [ref=e180]:
+                  - generic [ref=e181]: 4. ดม
+                  - generic [ref=e182]: ฿0.00
+                - generic [ref=e186]:
+                  - generic [ref=e187]: 5. หฟกดกหฟหฟก
+                  - generic [ref=e188]: ฿0.00
+        - generic [ref=e191]:
+          - generic [ref=e192]:
+            - heading "Create Coupon" [level=2] [ref=e193]
+            - paragraph [ref=e194]: Support Stripe promotion codes and PromptPay-only discounts from one form.
+          - generic [ref=e195]:
+            - generic [ref=e196]:
+              - textbox "Code" [ref=e197]
+              - textbox "Campaign name" [ref=e198]
+              - combobox [ref=e199]:
+                - option "Percent" [selected]
+                - option "Fixed amount"
+              - spinbutton [ref=e200]: "10"
+              - spinbutton [ref=e201]
+              - spinbutton [ref=e202]
+              - spinbutton [ref=e203]
+              - textbox "Stripe promotion code id (optional)" [ref=e204]
+            - textbox "Description" [ref=e205]
+            - button "Create coupon" [ref=e206] [cursor=pointer]:
+              - img [ref=e207]
+              - text: Create coupon
+      - generic [ref=e210]:
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - heading "Pending Payments & Recent Transactions" [level=2] [ref=e213]
+            - paragraph [ref=e214]: Approve PromptPay signups and monitor payment activity.
+          - generic [ref=e215]:
+            - generic [ref=e216]:
+              - generic [ref=e217]:
+                - generic [ref=e218]:
+                  - generic [ref=e219]: บริษัท บลูสกาย ซัพพลาย จำกัด
+                  - generic [ref=e220]: billing+bluesky@example.com · PP-SEED0001
+                - generic [ref=e221]:
+                  - generic [ref=e222]: ฿490.00
+                  - generic [ref=e223]: promptpay_qr · awaiting_payment
+              - generic [ref=e224]:
+                - generic [ref=e225]: PROMPTPAY500
+                - generic [ref=e226]: promptpay_qr
+              - button "Mark paid and activate tenant" [ref=e227] [cursor=pointer]
+            - generic [ref=e228]:
+              - generic [ref=e229]:
+                - generic [ref=e230]:
+                  - generic [ref=e231]: บริษัท โกลว์ดิจิทัล จำกัด
+                  - generic [ref=e232]: billing+glow@example.com · seed-stripe-1777042355981
+                - generic [ref=e233]:
+                  - generic [ref=e234]: ฿1,992.00
+                  - generic [ref=e235]: stripe · activated
+              - generic [ref=e236]:
+                - generic [ref=e237]: LAUNCH20
+                - generic [ref=e238]: stripe
+            - generic [ref=e239]:
+              - generic [ref=e240]:
+                - generic [ref=e241]:
+                  - generic [ref=e242]: บริษัท บลูสกาย ซัพพลาย จำกัด
+                  - generic [ref=e243]: billing+bluesky@example.com · PP-SEED0001
+                - generic [ref=e244]:
+                  - generic [ref=e245]: ฿490.00
+                  - generic [ref=e246]: promptpay_qr · awaiting_payment
+              - generic [ref=e247]:
+                - generic [ref=e248]: PROMPTPAY500
+                - generic [ref=e249]: promptpay_qr
+              - button "Mark paid and activate tenant" [ref=e250] [cursor=pointer]
+            - generic [ref=e251]:
+              - generic [ref=e252]:
+                - generic [ref=e253]:
+                  - generic [ref=e254]: บริษัท โกลว์ดิจิทัล จำกัด
+                  - generic [ref=e255]: billing+glow@example.com · seed-stripe-1777042273079
+                - generic [ref=e256]:
+                  - generic [ref=e257]: ฿1,992.00
+                  - generic [ref=e258]: stripe · activated
+              - generic [ref=e259]:
+                - generic [ref=e260]: LAUNCH20
+                - generic [ref=e261]: stripe
+            - generic [ref=e262]:
+              - generic [ref=e263]:
+                - generic [ref=e264]:
+                  - generic [ref=e265]: บริษัท บลูสกาย ซัพพลาย จำกัด
+                  - generic [ref=e266]: billing+bluesky@example.com · PP-SEED0001
+                - generic [ref=e267]:
+                  - generic [ref=e268]: ฿490.00
+                  - generic [ref=e269]: promptpay_qr · awaiting_payment
+              - generic [ref=e270]:
+                - generic [ref=e271]: PROMPTPAY500
+                - generic [ref=e272]: promptpay_qr
+              - button "Mark paid and activate tenant" [ref=e273] [cursor=pointer]
+            - generic [ref=e274]:
+              - generic [ref=e275]:
+                - generic [ref=e276]:
+                  - generic [ref=e277]: บริษัท โกลว์ดิจิทัล จำกัด
+                  - generic [ref=e278]: billing+glow@example.com · seed-stripe-1777039613392
+                - generic [ref=e279]:
+                  - generic [ref=e280]: ฿1,992.00
+                  - generic [ref=e281]: stripe · activated
+              - generic [ref=e282]:
+                - generic [ref=e283]: LAUNCH20
+                - generic [ref=e284]: stripe
+        - generic [ref=e285]:
+          - generic [ref=e286]:
+            - heading "Coupon Operations" [level=2] [ref=e287]
+            - paragraph [ref=e288]: See active discounts and watch redemption health.
+          - generic [ref=e289]:
+            - generic [ref=e290]:
+              - generic [ref=e291]:
+                - generic [ref=e292]:
+                  - generic [ref=e293]: PROMPTPAY500
+                  - generic [ref=e294]: PromptPay 500 THB off
+                - generic [ref=e295]: Active
+              - generic [ref=e296]: ฿500.00 off
+              - generic [ref=e297]: Redeemed 0
+            - generic [ref=e298]:
+              - generic [ref=e299]:
+                - generic [ref=e300]:
+                  - generic [ref=e301]: LAUNCH20
+                  - generic [ref=e302]: Launch Campaign 20%
+                - generic [ref=e303]: Active
+              - generic [ref=e304]: 20% off
+              - generic [ref=e305]: Redeemed 0 / 200
+      - generic [ref=e306]:
+        - generic [ref=e307]:
+          - generic [ref=e308]:
+            - heading "Recent Signups" [level=2] [ref=e309]
+            - paragraph [ref=e310]: Track new demand regardless of payment method.
+          - table [ref=e312]:
+            - rowgroup [ref=e313]:
+              - row "Company Plan Payment Status Amount" [ref=e314]:
+                - columnheader "Company" [ref=e315]
+                - columnheader "Plan" [ref=e316]
+                - columnheader "Payment" [ref=e317]
+                - columnheader "Status" [ref=e318]
+                - columnheader "Amount" [ref=e319]
+            - rowgroup [ref=e320]:
+              - row "บริษัท บลูสกาย ซัพพลาย จำกัด billing+bluesky@example.com starter promptpay_qr pending ฿490.00" [ref=e321]:
+                - cell "บริษัท บลูสกาย ซัพพลาย จำกัด billing+bluesky@example.com" [ref=e322]
+                - cell "starter" [ref=e323]
+                - cell "promptpay_qr" [ref=e324]
+                - cell "pending" [ref=e325]
+                - cell "฿490.00" [ref=e326]
+              - row "บริษัท โกลว์ดิจิทัล จำกัด billing+glow@example.com business stripe activated ฿1,992.00" [ref=e327]:
+                - cell "บริษัท โกลว์ดิจิทัล จำกัด billing+glow@example.com" [ref=e328]
+                - cell "business" [ref=e329]
+                - cell "stripe" [ref=e330]
+                - cell "activated" [ref=e331]
+                - cell "฿1,992.00" [ref=e332]
+              - row "บริษัท บลูสกาย ซัพพลาย จำกัด billing+bluesky@example.com starter promptpay_qr pending ฿490.00" [ref=e333]:
+                - cell "บริษัท บลูสกาย ซัพพลาย จำกัด billing+bluesky@example.com" [ref=e334]
+                - cell "starter" [ref=e335]
+                - cell "promptpay_qr" [ref=e336]
+                - cell "pending" [ref=e337]
+                - cell "฿490.00" [ref=e338]
+              - row "บริษัท โกลว์ดิจิทัล จำกัด billing+glow@example.com business stripe activated ฿1,992.00" [ref=e339]:
+                - cell "บริษัท โกลว์ดิจิทัล จำกัด billing+glow@example.com" [ref=e340]
+                - cell "business" [ref=e341]
+                - cell "stripe" [ref=e342]
+                - cell "activated" [ref=e343]
+                - cell "฿1,992.00" [ref=e344]
+              - row "บริษัท บลูสกาย ซัพพลาย จำกัด billing+bluesky@example.com starter promptpay_qr pending ฿490.00" [ref=e345]:
+                - cell "บริษัท บลูสกาย ซัพพลาย จำกัด billing+bluesky@example.com" [ref=e346]
+                - cell "starter" [ref=e347]
+                - cell "promptpay_qr" [ref=e348]
+                - cell "pending" [ref=e349]
+                - cell "฿490.00" [ref=e350]
+              - row "บริษัท โกลว์ดิจิทัล จำกัด billing+glow@example.com business stripe activated ฿1,992.00" [ref=e351]:
+                - cell "บริษัท โกลว์ดิจิทัล จำกัด billing+glow@example.com" [ref=e352]
+                - cell "business" [ref=e353]
+                - cell "stripe" [ref=e354]
+                - cell "activated" [ref=e355]
+                - cell "฿1,992.00" [ref=e356]
+        - generic [ref=e357]:
+          - generic [ref=e358]:
+            - heading "Tenant Revenue Snapshot" [level=2] [ref=e359]
+            - paragraph [ref=e360]: Compare tenant footprint and invoice-side revenue.
+          - table [ref=e362]:
+            - rowgroup [ref=e363]:
+              - row "Company Customers Invoices Users Revenue" [ref=e364]:
+                - columnheader "Company" [ref=e365]
+                - columnheader "Customers" [ref=e366]
+                - columnheader "Invoices" [ref=e367]
+                - columnheader "Users" [ref=e368]
+                - columnheader "Revenue" [ref=e369]
+            - rowgroup [ref=e370]:
+              - row "บริษัท สยาม เทคโนโลยี จำกัด 0105560123456 10 18 2 / 1 admin ฿4,962,732.40" [ref=e371]:
+                - cell "บริษัท สยาม เทคโนโลยี จำกัด 0105560123456" [ref=e372]
+                - cell "10" [ref=e373]
+                - cell "18" [ref=e374]
+                - cell "2 / 1 admin" [ref=e375]
+                - cell "฿4,962,732.40" [ref=e376]
+              - row "บริษัท ฟรีเทสต์ จำกัด free20260424233728 8777048648634 0 0 1 / 1 admin ฿0.00" [ref=e377]:
+                - cell "บริษัท ฟรีเทสต์ จำกัด free20260424233728 8777048648634" [ref=e378]
+                - cell "0" [ref=e379]
+                - cell "0" [ref=e380]
+                - cell "1 / 1 admin" [ref=e381]
+                - cell "฿0.00" [ref=e382]
+              - row "บริษัท ฟรีสองทาง จำกัด freeboth20260424234943 7777049383753 0 0 1 / 1 admin ฿0.00" [ref=e383]:
+                - cell "บริษัท ฟรีสองทาง จำกัด freeboth20260424234943 7777049383753" [ref=e384]
+                - cell "0" [ref=e385]
+                - cell "0" [ref=e386]
+                - cell "1 / 1 admin" [ref=e387]
+                - cell "฿0.00" [ref=e388]
+              - row "ดม 1111111111111 1 2 1 / 1 admin ฿0.00" [ref=e389]:
+                - cell "ดม 1111111111111" [ref=e390]
+                - cell "1" [ref=e391]
+                - cell "2" [ref=e392]
+                - cell "1 / 1 admin" [ref=e393]
+                - cell "฿0.00" [ref=e394]
+              - row "หฟกดกหฟหฟก 1100844499658 0 0 1 / 1 admin ฿0.00" [ref=e395]:
+                - cell "หฟกดกหฟหฟก 1100844499658" [ref=e396]
+                - cell "0" [ref=e397]
+                - cell "0" [ref=e398]
+                - cell "1 / 1 admin" [ref=e399]
+                - cell "฿0.00" [ref=e400]
+              - row "อมดม 1100200489094 0 0 1 / 1 admin ฿0.00" [ref=e401]:
+                - cell "อมดม 1100200489094" [ref=e402]
+                - cell "0" [ref=e403]
+                - cell "0" [ref=e404]
+                - cell "1 / 1 admin" [ref=e405]
+                - cell "฿0.00" [ref=e406]

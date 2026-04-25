@@ -1,0 +1,260 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /app/dashboard
+        - img [ref=e8]
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - button "Switch to Thai" [ref=e13] [cursor=pointer]: TH
+          - button "Switch to English" [ref=e14] [cursor=pointer]: EN
+        - button "User menu" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: ผ
+          - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - heading "Create Invoice" [level=1] [ref=e26]
+            - paragraph [ref=e27]: Fill in details, preview the document, then save or submit to RD.
+          - generic [ref=e28]:
+            - generic [ref=e29]: 1. Fill document details
+            - generic [ref=e30]: 2. Preview
+            - generic [ref=e31]: 3. Save or submit
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: A few details still need attention before you continue.
+          - list [ref=e34]:
+            - listitem [ref=e35]: • Customer is not selected.
+            - listitem [ref=e36]: • Item row 1 is missing a Thai item name.
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - paragraph [ref=e39]: Document setup
+          - heading "Tax Invoice (T02)" [level=2] [ref=e40]
+          - paragraph [ref=e41]: Use for credit sales or when payment has not been received yet.
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e44]: Document Type
+            - combobox [ref=e45]:
+              - option "Tax Invoice" [selected]
+              - option "Tax Inv/Receipt (Cash)"
+              - option "Receipt"
+              - option "Credit Note"
+              - option "Debit Note"
+          - generic [ref=e46]:
+            - generic [ref=e47]: Document Language
+            - combobox [ref=e48]:
+              - option "Thai" [selected]
+              - option "English"
+              - option "Bilingual (TH/EN)"
+            - paragraph [ref=e49]: Choose the language that should appear in the preview and PDF.
+          - generic [ref=e50]:
+            - generic [ref=e51]: Date
+            - textbox [ref=e52]: 2026-04-25
+            - paragraph [ref=e53]: The issue date printed on the tax document.
+          - generic [ref=e54]:
+            - generic [ref=e55]: Due Date
+            - textbox [ref=e56]
+            - paragraph [ref=e57]: Optional. Leave blank if there is no payment due date.
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - heading "Document Appearance" [level=3] [ref=e60]
+          - paragraph [ref=e61]: Choose the document theme and color tone while keeping the same tax-document structure.
+        - generic [ref=e62]:
+          - button "Ordinary document For regular printed/shared documents without online QR verification or e-Tax footer wording." [ref=e63] [cursor=pointer]:
+            - generic [ref=e64]: Ordinary document
+            - paragraph [ref=e65]: For regular printed/shared documents without online QR verification or e-Tax footer wording.
+          - button "Electronic / e-Tax Adds electronic-document footer wording and a QR for online viewing or verification." [ref=e66] [cursor=pointer]:
+            - generic [ref=e67]: Electronic / e-Tax
+            - paragraph [ref=e68]: Adds electronic-document footer wording and a QR for online viewing or verification.
+        - generic [ref=e69]:
+          - generic [ref=e70]: Document theme
+          - combobox [ref=e71]:
+            - option "Use the standard system theme" [selected]
+            - option "Simple Slate - Slate"
+            - option "Official Navy - Navy"
+            - option "Luxury Gold - Gold"
+            - option "Local Friendly - Warm"
+            - option "Accounting Green - Green"
+            - option "Modern Cyan - Cyan"
+          - paragraph [ref=e72]: The default supports every e-Tax document type, or choose a tone below to change the document personality.
+        - generic [ref=e73]:
+          - button "Simple Slate Slate Clean, readable, and professional in a calm slate tone." [ref=e74] [cursor=pointer]:
+            - generic [ref=e75]:
+              - generic [ref=e76]: Simple Slate
+              - generic [ref=e77]: Slate
+            - paragraph [ref=e78]: Clean, readable, and professional in a calm slate tone.
+          - button "Official Navy Navy Formal navy styling for corporate, government, and high-trust documents." [ref=e79] [cursor=pointer]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: Official Navy
+              - generic [ref=e82]: Navy
+            - paragraph [ref=e83]: Formal navy styling for corporate, government, and high-trust documents.
+          - button "Luxury Gold Gold A premium black-and-gold tone for elevated brand documents." [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]:
+              - generic [ref=e86]: Luxury Gold
+              - generic [ref=e87]: Gold
+            - paragraph [ref=e88]: A premium black-and-gold tone for elevated brand documents.
+          - button "Local Friendly Warm Warm, approachable, and easy to read for everyday businesses." [ref=e89] [cursor=pointer]:
+            - generic [ref=e90]:
+              - generic [ref=e91]: Local Friendly
+              - generic [ref=e92]: Warm
+            - paragraph [ref=e93]: Warm, approachable, and easy to read for everyday businesses.
+        - generic [ref=e94]:
+          - checkbox "Show company logo in document header If disabled, the company name and tax identity still show as usual, but the visual company logo will be hidden." [checked] [ref=e95]
+          - generic [ref=e96]:
+            - generic [ref=e97]: Show company logo in document header
+            - generic [ref=e98]: If disabled, the company name and tax identity still show as usual, but the visual company logo will be hidden.
+        - generic [ref=e99]:
+          - generic [ref=e100]: Collector bank account (shown at document bottom)
+          - textbox "e.g. Kasikorn Bank Account name Example Co., Ltd. Account no. 123-4-56789-0" [ref=e101]:
+            - /placeholder: "e.g. Kasikorn Bank\nAccount name Example Co., Ltd.\nAccount no. 123-4-56789-0"
+          - paragraph [ref=e102]: Leave blank to hide the bank transfer box in the PDF.
+        - generic [ref=e103]:
+          - generic [ref=e104]: Document mark or badge (optional)
+          - button "Choose File" [ref=e106]
+          - paragraph [ref=e107]: Useful for a sub-brand seal, campaign mark, or a document-specific badge without changing the main company identity.
+      - generic [ref=e108]:
+        - generic [ref=e109]:
+          - heading "Seller" [level=3] [ref=e110]
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: Thai Name
+              - textbox [ref=e114]: บริษัท สยาม เทคโนโลยี จำกัด
+            - generic [ref=e115]:
+              - generic [ref=e116]: English Name
+              - textbox [ref=e117]: Siam Technology Co., Ltd.
+            - generic [ref=e118]:
+              - generic [ref=e119]: Tax ID (13 digits)
+              - textbox [ref=e120]: "0105560123456"
+            - generic [ref=e121]:
+              - generic [ref=e122]: Thai Address
+              - textbox [ref=e123]: 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110
+        - generic [ref=e124]:
+          - button "Buyer" [ref=e125] [cursor=pointer]:
+            - text: Buyer
+            - img [ref=e126]
+          - generic [ref=e128]:
+            - generic [ref=e129]: The selected customer name, address, and tax ID will be used on this document.
+            - generic [ref=e130]:
+              - generic [ref=e131]: Search & Select Customer *
+              - textbox "Type name or tax ID..." [ref=e132]
+            - paragraph [ref=e133]:
+              - text: Customer not found?
+              - link "Add new customer" [ref=e134] [cursor=pointer]:
+                - /url: /app/customers
+              - text: then return here to select them.
+      - generic [ref=e135]:
+        - generic [ref=e136]:
+          - generic [ref=e137]:
+            - heading "Items / Services" [level=3] [ref=e138]
+            - paragraph [ref=e139]: Add item name, quantity, price, and VAT for each row. Totals are calculated automatically.
+          - button "Add Item" [ref=e140] [cursor=pointer]:
+            - img [ref=e141]
+            - text: Add Item
+        - table [ref=e143]:
+          - rowgroup [ref=e144]:
+            - row "Item Name (TH) Item Name (EN) Quantity Unit Price Discount % VAT Type Amount" [ref=e145]:
+              - columnheader "Item Name (TH)" [ref=e146]
+              - columnheader "Item Name (EN)" [ref=e147]
+              - columnheader "Quantity" [ref=e148]
+              - columnheader "Unit Price" [ref=e149]
+              - columnheader "Discount %" [ref=e150]
+              - columnheader "VAT Type" [ref=e151]
+              - columnheader "Amount" [ref=e152]
+              - columnheader [ref=e153]
+          - rowgroup [ref=e154]:
+            - row "1 0 0 7% THB 0.00" [ref=e155]:
+              - cell [ref=e156]:
+                - textbox "ชื่อสินค้า" [ref=e157]
+              - cell [ref=e158]:
+                - textbox "Item name" [ref=e159]
+              - cell "1" [ref=e160]:
+                - spinbutton [ref=e161]: "1"
+              - cell "0" [ref=e162]:
+                - spinbutton [ref=e163]: "0"
+              - cell "0" [ref=e164]:
+                - spinbutton [ref=e165]: "0"
+              - cell "7%" [ref=e166]:
+                - combobox [ref=e167]:
+                  - option "7%" [selected]
+                  - option "Exempt"
+                  - option "0%"
+              - cell "THB 0.00" [ref=e168]
+              - cell [ref=e169]:
+                - button [disabled] [ref=e170]:
+                  - img [ref=e171]
+        - generic [ref=e175]:
+          - generic [ref=e176]:
+            - generic [ref=e177]: Subtotal (before VAT)
+            - generic [ref=e178]: THB 0.00
+          - generic [ref=e179]:
+            - generic [ref=e180]: VAT (7%)
+            - generic [ref=e181]: THB 0.00
+          - generic [ref=e182]:
+            - generic [ref=e183]: Total
+            - generic [ref=e184]: THB 0.00
+      - generic [ref=e185]:
+        - generic [ref=e186]:
+          - heading "Notes and payment" [level=3] [ref=e187]
+          - paragraph [ref=e188]: Optional details that help make the document clearer, such as payment method or extra notes for the customer.
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - generic [ref=e191]: Payment Method
+            - combobox [ref=e192]:
+              - option "— Not specified —" [selected]
+              - option "Cash"
+              - option "Bank Transfer"
+              - option "Cheque"
+              - option "Credit Card"
+              - option "Other"
+            - paragraph [ref=e193]: Optional. Leave blank if you do not want to show a payment method on the document.
+          - generic [ref=e194]:
+            - generic [ref=e195]: Notes
+            - textbox "Additional notes..." [ref=e196]
+    - generic [ref=e197]:
+      - button "Preview" [ref=e198] [cursor=pointer]:
+        - img [ref=e199]
+        - text: Preview
+      - button "Save" [ref=e202] [cursor=pointer]:
+        - img [ref=e203]
+        - text: Save
+  - navigation [ref=e207]:
+    - link "Dashboard" [ref=e208] [cursor=pointer]:
+      - /url: /app/dashboard
+      - img [ref=e209]
+      - generic [ref=e214]: Dashboard
+    - link "Invoices" [ref=e215] [cursor=pointer]:
+      - /url: /app/invoices
+      - img [ref=e216]
+      - generic [ref=e219]: Invoices
+    - link "Customers" [ref=e220] [cursor=pointer]:
+      - /url: /app/customers
+      - img [ref=e221]
+      - generic [ref=e226]: Customers
+    - link "Products / Services" [ref=e227] [cursor=pointer]:
+      - /url: /app/products
+      - img [ref=e228]
+      - generic [ref=e232]: Products / Services
+    - button "More options" [ref=e233] [cursor=pointer]:
+      - img [ref=e234]
+      - generic [ref=e238]: More
+  - generic [ref=e239]:
+    - button "Close" [ref=e242] [cursor=pointer]:
+      - img [ref=e243]
+    - generic [ref=e246]:
+      - link "Audit Logs" [ref=e247] [cursor=pointer]:
+        - /url: /app/audit
+        - img [ref=e248]
+        - text: Audit Logs
+      - link "Settings" [ref=e251] [cursor=pointer]:
+        - /url: /app/settings
+        - img [ref=e252]
+        - text: Settings
+      - link "Admin Panel" [ref=e255] [cursor=pointer]:
+        - /url: /app/admin
+        - img [ref=e256]
+        - text: Admin Panel
+      - link "Owner Plane" [ref=e258] [cursor=pointer]:
+        - /url: /ops/overview
+        - img [ref=e259]
+        - text: Owner Plane

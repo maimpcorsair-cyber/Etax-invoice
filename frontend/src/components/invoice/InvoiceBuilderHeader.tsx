@@ -57,7 +57,7 @@ export default function InvoiceBuilderHeader({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <div className="hidden sm:flex flex-wrap items-center gap-2 lg:justify-end">
           <button className="btn-secondary" onClick={onPreview} disabled={previewLoading}>
             <Eye className="w-4 h-4" />
             {t('invoice.actions.preview')}

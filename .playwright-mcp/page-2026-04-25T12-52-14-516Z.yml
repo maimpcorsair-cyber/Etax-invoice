@@ -1,0 +1,27 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e8]
+      - generic [ref=e10]:
+        - link [ref=e11] [cursor=pointer]:
+          - /url: /ops/overview
+          - img [ref=e12]
+        - link [ref=e14] [cursor=pointer]:
+          - /url: /ops/tenants
+          - img [ref=e15]
+        - link [ref=e19] [cursor=pointer]:
+          - /url: /ops/transactions
+          - img [ref=e20]
+        - link [ref=e23] [cursor=pointer]:
+          - /url: /ops/coupons
+          - img [ref=e24]
+        - link [ref=e27] [cursor=pointer]:
+          - /url: /ops/renewals
+          - img [ref=e28]
+        - link [ref=e33] [cursor=pointer]:
+          - /url: https://etax-invoice.vercel.app/app/dashboard?authHandoff=eyJ0b2tlbiI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUoxYzJWeVNXUWlPaUoxYzJWeUxXRmtiV2x1TFRBd01TSXNJbU52YlhCaGJubEpaQ0k2SW1OdmJYQmhibmt0WkdWdGJ5MHdNREVpTENKeWIyeGxJam9pYzNWd1pYSmZZV1J0YVc0aUxDSmxiV0ZwYkNJNkltRmtiV2x1UUhOcFlXMTBaV05vTG1OdkxuUm9JaXdpYVdGMElqb3hOemMzTVRJeE5UTXpMQ0psZUhBaU9qRTNOemMzTWpZek16TjkuMDU2aE5wRTN0cmhOeldoRW9HWnJIaFhGT3R5M2RIX3JsaW1CZ0p1ck43RSIsInVzZXIiOnsiaWQiOiJ1c2VyLWFkbWluLTAwMSIsImVtYWlsIjoiYWRtaW5Ac2lhbXRlY2guY28udGgiLCJuYW1lIjoi4Lic4Li54LmJ4LiU4Li54LmB4Lil4Lij4Liw4Lia4LiaIiwicm9sZSI6InN1cGVyX2FkbWluIiwiY29tcGFueUlkIjoiY29tcGFueS1kZW1vLTAwMSIsImF1dGgiOnsiaGFzUGFzc3dvcmQiOnRydWUsImhhc0dvb2dsZSI6dHJ1ZX0sImNvbXBhbnkiOnsibmFtZVRoIjoi4Lia4Lij4Li04Lip4Lix4LiXIOC4quC4ouC4suC4oSDguYDguJfguITguYLguJnguYLguKXguKLguLUg4LiI4Liz4LiB4Lix4LiUIiwibmFtZUVuIjoiU2lhbSBUZWNobm9sb2d5IENvLiwgTHRkLiIsInRheElkIjoiMDEwNTU2MDEyMzQ1NiJ9fX0%3D
+          - img [ref=e34]
+        - button [ref=e38] [cursor=pointer]:
+          - img [ref=e39]
+  - main [ref=e42]:
+    - img [ref=e44]
