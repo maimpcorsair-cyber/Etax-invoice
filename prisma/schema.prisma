@@ -129,6 +129,10 @@ model User {
   auditLogs AuditLog[]
 
   @@index([companyId])
+  // List active users per company (user management page)
+  @@index([companyId, isActive])
+  // Role-based filtering within a tenant (e.g., list all accountants)
+  @@index([companyId, role])
   @@map("users")
 }
 
@@ -157,6 +161,8 @@ model Customer {
 
   @@unique([companyId, taxId, branchCode])
   @@index([companyId])
+  // Customer list page always filters by isActive within a company
+  @@index([companyId, isActive])
   @@map("customers")
 }
 
@@ -241,6 +247,14 @@ model Invoice {
   @@index([companyId])
   @@index([companyId, status])
   @@index([companyId, invoiceDate])
+  // Compound index for dashboard: "issued invoices in date range" — covers status + date together
+  @@index([companyId, status, invoiceDate])
+  // RD submission queue filters on rdSubmissionStatus per company
+  @@index([companyId, rdSubmissionStatus])
+  // FK indexes — Postgres does not create these automatically
+  @@index([buyerId])
+  @@index([createdBy])
+  @@index([referenceInvoiceId])
   @@map("invoices")
 }
 
@@ -286,6 +300,9 @@ model AuditLog {
   @@index([companyId])
   @@index([companyId, createdAt])
   @@index([companyId, action])
+  // "All actions by this user in this company" — common admin view
+  @@index([companyId, userId])
+  @@index([userId, createdAt])
   @@map("audit_logs")
 }
 

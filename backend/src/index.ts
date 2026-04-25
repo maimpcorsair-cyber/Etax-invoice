@@ -55,14 +55,20 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
+// 200 req/min per IP across all API routes
+const limiter = rateLimit({ windowMs: 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
 app.use('/api', limiter);
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+// 10 req/min per IP on auth routes (brute-force protection)
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// Keep-alive endpoint — no auth required, used by UptimeRobot to prevent Render cold starts
+app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
+
 app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/logout', authLimiter);
 app.use('/api/auth/google', authLimiter);
 app.use('/api/auth', authRouter);

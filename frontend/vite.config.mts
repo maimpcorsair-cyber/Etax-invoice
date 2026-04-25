@@ -31,8 +31,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui':    ['lucide-react', 'recharts'],
+          'vendor-store': ['zustand'],
+          'vendor-i18n':  ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
         },
       },
     },
