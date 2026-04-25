@@ -11,8 +11,6 @@ import {
   ScrollText,
   Settings,
   LogOut,
-  Menu,
-  X,
   ChevronDown,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -35,7 +33,6 @@ export default function Navbar() {
   const location = useLocation();
   const { user, clearAuth } = useAuthStore();
   const { policy } = useCompanyAccessPolicy();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const visibleItems = navItems.filter(
@@ -99,7 +96,7 @@ export default function Navbar() {
 
             <Link
               to="/app/invoices/new"
-              className={`btn-primary hidden sm:inline-flex ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}
+              className={`btn-primary hidden lg:inline-flex ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}
             >
               <FileText className="w-4 h-4" />
               {t('invoice.create')}
@@ -148,64 +145,10 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Mobile menu toggle */}
-            <button
-              className="lg:hidden p-2.5 rounded-lg hover:bg-gray-100"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileOpen}
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Nav */}
-      {mobileOpen && (
-        <div className="lg:hidden border-t border-gray-200 bg-white">
-          <div className="px-4 py-3 space-y-1">
-            {user?.role === 'super_admin' && (
-              <Link
-                to="/ops/overview"
-                onClick={() => setMobileOpen(false)}
-                className="mb-1 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-800"
-              >
-                <ShieldAlert className="w-4 h-4" />
-                Owner Plane
-              </Link>
-            )}
-            {visibleItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.key}
-                  to={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={clsx(
-                    'flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg',
-                    isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100',
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {t(item.labelKey)}
-                </Link>
-              );
-            })}
-            <Link
-              to="/app/invoices/new"
-              onClick={() => setMobileOpen(false)}
-              className={`btn-primary w-full justify-center mt-2 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}
-            >
-              <FileText className="w-4 h-4" />
-              {t('invoice.create')}
-            </Link>
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

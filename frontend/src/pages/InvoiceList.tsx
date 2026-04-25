@@ -361,8 +361,123 @@ export default function InvoiceList() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card p-0 overflow-hidden">
+      {/* Mobile card list — shown only below sm breakpoint */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="flex flex-col items-center py-12 text-gray-400">
+            <FileText className="w-10 h-10 mb-2 text-gray-300" />
+            <span className="text-sm">{t('common.noData')}</span>
+          </div>
+        ) : (
+          invoices.map((inv) => {
+            const typeInfo = TYPE_LABELS[inv.type];
+            const typeCode: Record<InvoiceType, string> = {
+              tax_invoice_receipt: 'T01',
+              tax_invoice: 'T02',
+              receipt: 'T03',
+              credit_note: 'T04',
+              debit_note: 'T05',
+            };
+            const customerName = isThai
+              ? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'
+              : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn
+                ?? (inv.buyer as { nameTh?: string })?.nameTh
+                ?? '—';
+
+            return (
+              <div
+                key={inv.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 p-4"
+              >
+                {/* Row 1: type badge + invoice number + status */}
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${typeInfo.color}`}>
+                    {typeCode[inv.type]}
+                  </span>
+                  <span className="font-semibold text-gray-900 font-mono text-sm flex-1 truncate">
+                    {inv.invoiceNumber}
+                  </span>
+                  <span className={`${STATUS_COLORS[inv.status]} shrink-0`}>
+                    {t(`invoice.status.${inv.status}`)}
+                  </span>
+                </div>
+
+                {/* Row 2: customer name */}
+                <p className="text-gray-600 text-sm mb-2 truncate">{customerName}</p>
+
+                {/* Row 3: date + amount */}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-400 text-xs">{formatDate(inv.invoiceDate)}</span>
+                  <span className="font-bold text-primary-700 text-sm">{formatCurrency(inv.total)}</span>
+                </div>
+
+                {/* Row 4: actions */}
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                  {inv.pdfUrl ? (
+                    <a
+                      href={inv.pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 font-medium"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      PDF
+                    </a>
+                  ) : null}
+                  <button
+                    onClick={() => openPreview(inv)}
+                    className="inline-flex items-center gap-1.5 text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg px-3 py-1.5 font-medium"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    {isThai ? 'ดู/View' : 'View'}
+                  </button>
+                  <Link
+                    to={`/app/invoices/${inv.id}/edit`}
+                    className="ml-auto inline-flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium"
+                  >
+                    {t('common.edit')}
+                  </Link>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {/* Mobile pagination */}
+        {!loading && invoices.length > 0 && (
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs text-gray-400">
+              {invoices.length} / {pagination.total} {isThai ? 'รายการ' : 'items'}
+            </span>
+            <div className="flex gap-1">
+              <button
+                className="btn-secondary px-2 py-1 text-xs"
+                disabled={pagination.page <= 1}
+                onClick={() => fetchInvoices(pagination.page - 1)}
+              >
+                {t('common.previous')}
+              </button>
+              <button className="px-2 py-1 text-xs font-medium bg-primary-600 text-white rounded">
+                {pagination.page}
+              </button>
+              <button
+                className="btn-secondary px-2 py-1 text-xs"
+                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => fetchInvoices(pagination.page + 1)}
+              >
+                {t('common.next')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Table — hidden on mobile */}
+      <div className="hidden sm:block card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
