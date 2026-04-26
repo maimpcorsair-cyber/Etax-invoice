@@ -97,6 +97,10 @@ model Company {
   rdClientSecret String?
   rdEnvironment  String  @default("sandbox")
 
+  // Line OA settings
+  lineNotifyEnabled   Boolean @default(false)
+  overdueReminderDays Int     @default(3)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -104,9 +108,9 @@ model Company {
   customers Customer[]
   products  Product[]
   invoices  Invoice[]
-  purchaseInvoices PurchaseInvoice[]
   subscription CompanySubscription?
   billingTransactions BillingTransaction[]
+  purchaseInvoices    PurchaseInvoice[]
 
   @@map("companies")
 }
@@ -127,9 +131,10 @@ model User {
 
   company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices         Invoice[]         @relation("CreatedBy")
-  purchaseInvoices PurchaseInvoice[] @relation("PurchaseInvoiceCreatedBy")
   auditLogs        AuditLog[]
   fcmTokens        FcmToken[]
+  purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
+  lineUserLink     LineUserLink?
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -283,6 +288,55 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@map("invoice_items")
+}
+
+model PurchaseInvoice {
+  id          String   @id @default(cuid())
+  companyId   String
+
+  // Supplier info (snapshot at time of recording)
+  supplierName   String
+  supplierTaxId  String            // required for VAT deduction
+  supplierBranch String?  @default("00000")
+
+  // Document info
+  invoiceNumber String
+  invoiceDate   DateTime
+  dueDate       DateTime?
+
+  // Financial
+  subtotal  Float                  // amount before VAT
+  vatAmount Float   @default(0)    // input VAT amount (may be 0 for non-VAT)
+  total     Float                  // subtotal + vatAmount
+
+  // VAT classification
+  vatType   String  @default("vat7")  // vat7 | vatExempt | vatZero
+
+  // Document details
+  description  String?   // what was purchased
+  category     String?   // e.g. "office supplies", "freight", "services"
+  notes        String?
+
+  // Document storage
+  pdfUrl    String?   // uploaded supplier invoice scan
+
+  // Status
+  isPaid    Boolean  @default(false)
+  paidAt    DateTime?
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  creator   User     @relation("PurchaseCreatedBy", fields: [createdBy], references: [id])
+
+  @@unique([companyId, supplierTaxId, invoiceNumber])
+  @@index([companyId])
+  @@index([companyId, invoiceDate])
+  @@index([companyId, vatType])
+  @@index([createdBy])
+  @@map("purchase_invoices")
 }
 
 model AuditLog {
@@ -477,35 +531,17 @@ model PendingSignup {
   @@map("pending_signups")
 }
 
-model PurchaseInvoice {
-  id              String   @id @default(cuid())
-  companyId       String
-  supplierName    String
-  supplierTaxId   String
-  supplierBranch  String   @default("00000")
-  invoiceNumber   String
-  invoiceDate     DateTime
-  dueDate         DateTime?
-  subtotal        Float
-  vatAmount       Float    @default(0)
-  total           Float
-  vatType         String   @default("vat7")
-  description     String?
-  category        String?
-  notes           String?
-  pdfUrl          String?
-  isPaid          Boolean  @default(false)
-  paidAt          DateTime?
-  createdBy       String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+model LineUserLink {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  lineUserId  String   @unique
+  displayName String?
+  pictureUrl  String?
+  isActive    Boolean  @default(true)
+  linkedAt    DateTime @default(now())
 
-  company  Company @relation(fields: [companyId], references: [id])
-  creator  User    @relation("PurchaseInvoiceCreatedBy", fields: [createdBy], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, supplierTaxId, invoiceNumber])
-  @@index([companyId])
-  @@index([companyId, invoiceDate])
-  @@index([companyId, vatType])
-  @@map("purchase_invoices")
+  @@index([lineUserId])
+  @@map("line_user_links")
 }
