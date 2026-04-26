@@ -546,15 +546,17 @@ export default function InvoiceList() {
                       </td>
                       <td className="table-cell hidden sm:table-cell">
                         <div className="flex flex-col gap-1">
-                          {inv.rdSubmissionStatus ? (
-                            <span className={`badge-${
-                              inv.rdSubmissionStatus === 'success' ? 'success' :
-                              inv.rdSubmissionStatus === 'pending' ? 'warning' :
-                              inv.rdSubmissionStatus === 'failed' ? 'error' : 'info'
-                            }`}>
-                              {t(`invoice.rdSubmission.${inv.rdSubmissionStatus}`)}
-                            </span>
-                          ) : (
+                          {inv.rdSubmissionStatus ? (() => {
+                            const s = inv.rdSubmissionStatus;
+                            const color = s === 'success' ? 'success' : s === 'pending' ? 'warning' : s === 'failed' ? 'error' : 'info';
+                            const label = s === 'success' ? (isThai ? 'ส่งสำเร็จ' : 'Accepted') :
+                                          s === 'pending' ? (isThai ? 'รอส่ง' : 'Pending') :
+                                          s === 'failed' ? (isThai ? 'ส่งไม่สำเร็จ' : 'Failed') :
+                                          s === 'in_progress' ? (isThai ? 'กำลังส่ง' : 'In Progress') :
+                                          s === 'retrying' ? (isThai ? 'กำลังลองใหม่' : 'Retrying') :
+                                          s;
+                            return <span className={`badge-${color}`}>{label}</span>;
+                          })() : (
                             <span className="text-gray-400 text-xs">{isThai ? 'ยังไม่ส่ง' : 'Not sent'}</span>
                           )}
                           {canSubmitRD(inv) && (

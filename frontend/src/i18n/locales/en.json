@@ -136,6 +136,7 @@
       "title": "RD Submission",
       "pending": "Pending",
       "inProgress": "In Progress",
+      "in_progress": "In Progress",
       "success": "Success",
       "failed": "Failed",
       "retrying": "Retrying"
