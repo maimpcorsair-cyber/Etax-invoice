@@ -186,6 +186,71 @@ export interface Invoice {
   createdBy: string;
 }
 
+export interface PurchaseInvoice {
+  id: string;
+  supplierName: string;
+  supplierTaxId: string;
+  supplierBranch?: string | null;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate?: string | null;
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  vatType: 'vat7' | 'vatExempt' | 'vatZero';
+  description?: string | null;
+  category?: string | null;
+  notes?: string | null;
+  pdfUrl?: string | null;
+  isPaid: boolean;
+  paidAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VatSummaryByType {
+  vat7: { totalExclVat: number; vatAmount: number; count: number };
+  vatExempt: { totalExclVat: number; vatAmount: number; count: number };
+  vatZero: { totalExclVat: number; vatAmount: number; count: number };
+}
+
+export interface VatSummaryData {
+  period: { from: string; to: string };
+  sales: {
+    count: number;
+    totalExclVat: number;
+    outputVat: number;
+    totalInclVat: number;
+    byVatType: VatSummaryByType;
+  };
+  purchases: {
+    count: number;
+    totalExclVat: number;
+    inputVat: number;
+    totalInclVat: number;
+    byVatType: VatSummaryByType;
+  };
+  vatPayable: number;
+}
+
+export interface Pp30Data {
+  period: { year: number; month: number; label: string };
+  company: { nameTh: string; nameEn?: string | null; taxId: string; branchCode?: string | null; branchNameTh?: string | null };
+  sales: {
+    byVatType: VatSummaryByType;
+    totalExclVat: number;
+    outputVat: number;
+    totalInclVat: number;
+  };
+  purchases: {
+    byVatType: VatSummaryByType;
+    totalExclVat: number;
+    inputVat: number;
+    totalInclVat: number;
+  };
+  vatPayable: number;
+}
+
 export interface DocumentTemplateOption {
   id: string;
   name: string;

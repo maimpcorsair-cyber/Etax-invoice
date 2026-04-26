@@ -104,6 +104,7 @@ model Company {
   customers Customer[]
   products  Product[]
   invoices  Invoice[]
+  purchaseInvoices PurchaseInvoice[]
   subscription CompanySubscription?
   billingTransactions BillingTransaction[]
 
@@ -124,10 +125,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoices  Invoice[]  @relation("CreatedBy")
-  auditLogs AuditLog[]
-  fcmTokens FcmToken[]
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices         Invoice[]         @relation("CreatedBy")
+  purchaseInvoices PurchaseInvoice[] @relation("PurchaseInvoiceCreatedBy")
+  auditLogs        AuditLog[]
+  fcmTokens        FcmToken[]
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -473,4 +475,37 @@ model PendingSignup {
   @@index([status])
   @@index([plan])
   @@map("pending_signups")
+}
+
+model PurchaseInvoice {
+  id              String   @id @default(cuid())
+  companyId       String
+  supplierName    String
+  supplierTaxId   String
+  supplierBranch  String   @default("00000")
+  invoiceNumber   String
+  invoiceDate     DateTime
+  dueDate         DateTime?
+  subtotal        Float
+  vatAmount       Float    @default(0)
+  total           Float
+  vatType         String   @default("vat7")
+  description     String?
+  category        String?
+  notes           String?
+  pdfUrl          String?
+  isPaid          Boolean  @default(false)
+  paidAt          DateTime?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company  Company @relation(fields: [companyId], references: [id])
+  creator  User    @relation("PurchaseInvoiceCreatedBy", fields: [createdBy], references: [id])
+
+  @@unique([companyId, supplierTaxId, invoiceNumber])
+  @@index([companyId])
+  @@index([companyId, invoiceDate])
+  @@index([companyId, vatType])
+  @@map("purchase_invoices")
 }

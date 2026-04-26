@@ -11,6 +11,8 @@
     "receipts": "Receipts",
     "customers": "Customers",
     "products": "Products / Services",
+    "purchaseInvoices": "Purchase Invoices",
+    "vatSummary": "VAT Summary",
     "admin": "Admin Panel",
     "audit": "Audit Logs",
     "settings": "Settings",

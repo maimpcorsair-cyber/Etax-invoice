@@ -6,6 +6,8 @@ import {
   FileText,
   Users,
   Package,
+  ShoppingCart,
+  Calculator,
   Shield,
   ShieldAlert,
   Settings,
@@ -23,6 +25,8 @@ const navItems = [
   { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
   { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
   { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
+  { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
+  { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
   { key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin', roles: ['super_admin', 'admin'] },
   { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
 ];

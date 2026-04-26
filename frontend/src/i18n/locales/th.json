@@ -11,6 +11,8 @@
     "receipts": "ใบเสร็จรับเงิน",
     "customers": "ลูกค้า",
     "products": "สินค้า/บริการ",
+    "purchaseInvoices": "บันทึกซื้อ",
+    "vatSummary": "สรุปภาษี",
     "admin": "ผู้ดูแลระบบ",
     "audit": "บันทึกการตรวจสอบ",
     "settings": "การตั้งค่า",

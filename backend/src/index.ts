@@ -18,6 +18,9 @@ import { dashboardRouter } from './routes/dashboard';
 import { authenticate } from './middleware/auth';
 import { billingRouter, stripeWebhookRouter } from './routes/billing';
 import { notificationsRouter } from './routes/notifications';
+import { purchaseInvoicesRouter } from './routes/purchaseInvoices';
+import { vatSummaryRouter } from './routes/vatSummary';
+import { pp30Router } from './routes/pp30';
 
 // ─── BullMQ Workers ──────────────────────────────────────────────────────────
 // Workers must be imported to start listening on their queues.
@@ -84,6 +87,9 @@ app.use('/api/system', authenticate, systemRouter);
 app.use('/api/dashboard', authenticate, dashboardRouter);
 app.use('/api/company', authenticate, dashboardRouter);
 app.use('/api/notifications', authenticate, notificationsRouter);
+app.use('/api/purchase-invoices', purchaseInvoicesRouter);
+app.use('/api/vat-summary', vatSummaryRouter);
+app.use('/api/pp30', pp30Router);
 
 app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   void next;

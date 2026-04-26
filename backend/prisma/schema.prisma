@@ -106,6 +106,7 @@ model Company {
   invoices  Invoice[]
   subscription CompanySubscription?
   billingTransactions BillingTransaction[]
+  purchaseInvoices    PurchaseInvoice[]
 
   @@map("companies")
 }
@@ -124,10 +125,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoices  Invoice[]  @relation("CreatedBy")
-  auditLogs AuditLog[]
-  fcmTokens FcmToken[]
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices         Invoice[]         @relation("CreatedBy")
+  auditLogs        AuditLog[]
+  fcmTokens        FcmToken[]
+  purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -281,6 +283,55 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@map("invoice_items")
+}
+
+model PurchaseInvoice {
+  id          String   @id @default(cuid())
+  companyId   String
+
+  // Supplier info (snapshot at time of recording)
+  supplierName   String
+  supplierTaxId  String            // required for VAT deduction
+  supplierBranch String?  @default("00000")
+
+  // Document info
+  invoiceNumber String
+  invoiceDate   DateTime
+  dueDate       DateTime?
+
+  // Financial
+  subtotal  Float                  // amount before VAT
+  vatAmount Float   @default(0)    // input VAT amount (may be 0 for non-VAT)
+  total     Float                  // subtotal + vatAmount
+
+  // VAT classification
+  vatType   String  @default("vat7")  // vat7 | vatExempt | vatZero
+
+  // Document details
+  description  String?   // what was purchased
+  category     String?   // e.g. "office supplies", "freight", "services"
+  notes        String?
+
+  // Document storage
+  pdfUrl    String?   // uploaded supplier invoice scan
+
+  // Status
+  isPaid    Boolean  @default(false)
+  paidAt    DateTime?
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  creator   User     @relation("PurchaseCreatedBy", fields: [createdBy], references: [id])
+
+  @@unique([companyId, supplierTaxId, invoiceNumber])
+  @@index([companyId])
+  @@index([companyId, invoiceDate])
+  @@index([companyId, vatType])
+  @@index([createdBy])
+  @@map("purchase_invoices")
 }
 
 model AuditLog {
