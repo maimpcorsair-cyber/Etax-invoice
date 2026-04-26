@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight } from 'lucide-react';
+import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight, ScrollText, Zap } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
@@ -13,20 +13,23 @@ const baseTabs = [
   { key: 'certificate', icon: Key, labelKey: 'admin.certificate' },
   { key: 'rdConfig', icon: Server, labelKey: 'admin.rdConfig' },
   { key: 'billing', icon: CreditCard, labelKey: 'admin.billing' },
+  { key: 'audit', icon: ScrollText, labelKey: 'admin.auditLog' },
+  { key: 'plan', icon: Zap, labelKey: 'admin.plan' },
 ];
 
 export default function AdminPanel() {
   const { t } = useTranslation();
   const { isThai } = useLanguage();
   const { policy } = useCompanyAccessPolicy();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('company');
   const tabs = baseTabs.filter((tab) => {
-      if (tab.key === 'users') return policy?.canInviteUsers !== false;
-      if (tab.key === 'templates') return policy?.canUseCustomTemplates !== false;
-      if (tab.key === 'certificate') return policy?.canManageCertificate !== false;
-      if (tab.key === 'rdConfig') return policy?.canManageRDConfig !== false;
-      return true;
-    });
+    if (tab.key === 'templates') return policy?.canUseCustomTemplates !== false;
+    if (tab.key === 'certificate') return policy?.canManageCertificate !== false;
+    if (tab.key === 'rdConfig') return policy?.canManageRDConfig !== false;
+    // users, audit, plan, company, billing always shown
+    return true;
+  });
 
   useEffect(() => {
     if (!tabs.some((tab) => tab.key === activeTab)) {
@@ -46,7 +49,10 @@ export default function AdminPanel() {
             {tabs.map(({ key, icon: Icon, labelKey }) => (
               <button
                 key={key}
-                onClick={() => setActiveTab(key)}
+                onClick={() => {
+                  if (key === 'plan') { navigate('/app/plan'); return; }
+                  setActiveTab(key);
+                }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-lg text-left transition-colors ${
                   activeTab === key
                     ? 'bg-primary-50 text-primary-700'
@@ -54,27 +60,88 @@ export default function AdminPanel() {
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
-                {t(labelKey)}
+                {t(labelKey, { defaultValue: key === 'audit' ? 'Audit Log' : key === 'plan' ? 'แผน / Plan' : key })}
+                {key === 'audit' && !policy?.canViewAuditLogs && (
+                  <Lock className="w-3.5 h-3.5 ml-auto text-gray-400 flex-shrink-0" />
+                )}
+                {key === 'users' && !policy?.canInviteUsers && (
+                  <Lock className="w-3.5 h-3.5 ml-auto text-gray-400 flex-shrink-0" />
+                )}
               </button>
             ))}
           </div>
         </nav>
 
         {/* Content */}
-        <div className="flex-1 card">
+        <div className="flex-1 card relative">
           {activeTab === 'company' && <CompanyTab isThai={isThai} t={t} />}
-          {activeTab === 'users' && <UsersTab isThai={isThai} t={t} />}
+          {activeTab === 'users' && (
+            policy?.canInviteUsers === false
+              ? <UpgradePrompt isThai={isThai} messageKey="users" />
+              : <UsersTab isThai={isThai} t={t} />
+          )}
           {activeTab === 'templates' && <TemplatesTab isThai={isThai} t={t} />}
           {activeTab === 'rdConfig' && <RDConfigTab isThai={isThai} t={t} />}
           {activeTab === 'billing' && <BillingTab isThai={isThai} />}
           {activeTab === 'certificate' && <CertificateTab isThai={isThai} t={t} />}
-          {!['company', 'users', 'templates', 'rdConfig', 'billing', 'certificate'].includes(activeTab) && (
-            <div className="text-center py-12 text-gray-400">
-              {isThai ? 'เนื้อหาสำหรับแท็บนี้' : 'Content for this tab'}: {activeTab}
-            </div>
+          {activeTab === 'audit' && (
+            policy?.canViewAuditLogs === false
+              ? <UpgradePrompt isThai={isThai} messageKey="audit" />
+              : <AuditLogTab isThai={isThai} />
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function UpgradePrompt({ isThai, messageKey }: { isThai: boolean; messageKey: 'users' | 'audit' }) {
+  const messages: Record<'users' | 'audit', { th: string; en: string }> = {
+    users: {
+      th: 'อัปเกรดแพ็กเกจเพื่อเพิ่มผู้ใช้งานในบริษัทของคุณ',
+      en: 'Upgrade your plan to invite team members to your company.',
+    },
+    audit: {
+      th: 'อัปเกรดแพ็กเกจ Business ขึ้นไปเพื่อดู Audit Log การเปลี่ยนแปลงในระบบ',
+      en: 'Upgrade to Business or higher to access audit logs.',
+    },
+  };
+  const msg = messages[messageKey];
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+      <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+        <Lock className="w-7 h-7 text-amber-500" />
+      </div>
+      <div>
+        <p className="font-semibold text-gray-800 mb-1">
+          {isThai ? 'ฟีเจอร์นี้ต้องการแพ็กเกจสูงกว่า' : 'Feature requires a higher plan'}
+        </p>
+        <p className="text-sm text-gray-500 max-w-xs mx-auto">{isThai ? msg.th : msg.en}</p>
+      </div>
+      <Link
+        to="/app/plan"
+        className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+      >
+        <Zap className="w-4 h-4" />
+        {isThai ? 'ดูแพ็กเกจทั้งหมด' : 'View plans'}
+      </Link>
+    </div>
+  );
+}
+
+function AuditLogTab({ isThai }: { isThai: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-gray-400">
+      <ScrollText className="w-10 h-10" />
+      <p className="text-sm">
+        {isThai ? 'Audit Log จะแสดงที่นี่' : 'Audit log will be displayed here.'}
+      </p>
+      <Link
+        to="/app/audit"
+        className="text-sm text-indigo-600 hover:underline"
+      >
+        {isThai ? 'ไปยังหน้า Audit Log เต็ม' : 'Go to full Audit Log page'}
+      </Link>
     </div>
   );
 }

@@ -8,7 +8,6 @@ import {
   Package,
   Shield,
   ShieldAlert,
-  ScrollText,
   Settings,
   LogOut,
   ChevronDown,
@@ -25,8 +24,6 @@ const navItems = [
   { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
   { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
   { key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin', roles: ['super_admin', 'admin'] },
-  { key: 'audit', href: '/app/audit', icon: ScrollText, labelKey: 'nav.audit' },
-  { key: 'plan', href: '/app/plan', icon: Zap, labelKey: 'nav.plan', roles: ['super_admin', 'admin'] },
   { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
@@ -45,9 +42,7 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const visibleItems = navItems.filter(
-    (item) =>
-      (!item.roles || item.roles.includes(user?.role ?? '')) &&
-      (item.key !== 'audit' || policy?.canViewAuditLogs !== false),
+    (item) => !item.roles || item.roles.includes(user?.role ?? ''),
   );
 
   const handleLogout = () => {

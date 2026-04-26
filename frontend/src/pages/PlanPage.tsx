@@ -63,7 +63,7 @@ const PLANS: PlanDef[] = [
     headerBg: 'bg-blue-50',
     icon: <Zap className="w-5 h-5 text-blue-600" />,
     docs: '100',
-    users: '5',
+    users: '3',
     customers: 'ไม่จำกัด',
     products: 'ไม่จำกัด',
   },

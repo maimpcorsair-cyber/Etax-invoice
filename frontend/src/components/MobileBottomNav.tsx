@@ -8,14 +8,12 @@ import {
   Package,
   MoreHorizontal,
   Settings,
-  ScrollText,
   Shield,
   ShieldAlert,
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
-import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { isNative } from '../hooks/useNative';
 
 const primaryTabs = [
@@ -29,7 +27,6 @@ export default function MobileBottomNav() {
   const { t } = useTranslation();
   const location = useLocation();
   const { user } = useAuthStore();
-  const { policy } = useCompanyAccessPolicy();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -45,9 +42,6 @@ export default function MobileBottomNav() {
   if (!isMobile) return null;
 
   const moreItems = [
-    ...(policy?.canViewAuditLogs !== false
-      ? [{ key: 'audit', href: '/app/audit', icon: ScrollText, labelKey: 'nav.audit' }]
-      : []),
     { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'
       ? [{ key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin' }]
