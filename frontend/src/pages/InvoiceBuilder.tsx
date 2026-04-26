@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Eye, Save } from 'lucide-react';
+import { Eye, Save, FileCheck } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -8,6 +8,7 @@ import { useCustomerSearch } from '../hooks/useCustomerSearch';
 import { useInvoiceForm } from '../hooks/useInvoiceForm';
 import { useInvoicePreview } from '../hooks/useInvoicePreview';
 import InvoiceBuilderHeader from '../components/invoice/InvoiceBuilderHeader';
+import IssuedSuccessModal from '../components/invoice/IssuedSuccessModal';
 import DocumentSettingsCard from '../components/invoice/DocumentSettingsCard';
 import DocumentAppearanceCard from '../components/invoice/DocumentAppearanceCard';
 import SellerCard from '../components/invoice/SellerCard';
@@ -97,6 +98,8 @@ export default function InvoiceBuilder() {
   const [loadingInvoice, setLoadingInvoice] = useState(isEdit);
   const [loadInvoiceError, setLoadInvoiceError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<DocumentTemplateOption[]>([]);
+  const [issuedInvoiceId, setIssuedInvoiceId] = useState<string | null>(null);
+  const [isDraft, setIsDraft] = useState(false);
   const validationErrors = getInvoiceValidationErrors({
     isThai,
     invoiceDate: form.invoiceDate,
@@ -190,6 +193,7 @@ export default function InvoiceBuilder() {
         form.hydrateFromInvoice(json.data);
         customer.setSelectedCustomerId(json.data.buyer.id);
         customer.setCustomerSearch(isThai ? json.data.buyer.nameTh : (json.data.buyer.nameEn ?? json.data.buyer.nameTh));
+        setIsDraft(json.data.status === 'draft' && (json.data.invoiceNumber?.startsWith('DRAFT-') ?? false));
       } catch (error) {
         if (!active) return;
         form.clearSubmitMessage();
@@ -227,13 +231,16 @@ export default function InvoiceBuilder() {
       <div className="max-w-5xl mx-auto space-y-4">
         <InvoiceBuilderHeader
           isEdit={isEdit}
+          isDraft={isDraft}
           invoiceId={id}
           saving={form.saving}
           previewLoading={preview.previewLoading}
           validationErrors={validationErrors}
-          onSaveDraft={() => form.handleSave(true, customer.selectedCustomerId, id)}
+          onSaveDraft={() => form.handleSaveDraft(customer.selectedCustomerId, id)}
           onPreview={handlePreviewClick}
-          onSubmit={() => form.handleSave(false, customer.selectedCustomerId, id)}
+          onIssue={() => form.handleIssue(customer.selectedCustomerId, id, (issuedId) => {
+            setIssuedInvoiceId(issuedId);
+          })}
         />
 
         {loadingInvoice && (
@@ -339,24 +346,41 @@ export default function InvoiceBuilder() {
         <button
           className="btn-secondary flex-1 justify-center"
           onClick={handlePreviewClick}
-          disabled={preview.previewLoading}
+          disabled={preview.previewLoading || form.saving}
         >
           <Eye className="w-4 h-4" />
-          {isThai ? 'ตัวอย่าง' : 'Preview'}
+          {isThai ? 'ดูตัวอย่าง' : 'Preview'}
         </button>
         <button
-          className="btn-primary flex-1 justify-center"
-          onClick={() => form.handleSave(true, customer.selectedCustomerId, id)}
+          className="btn-secondary flex-1 justify-center"
+          onClick={() => form.handleSaveDraft(customer.selectedCustomerId, id)}
+          disabled={form.saving}
+        >
+          {form.saving ? (
+            <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {isThai ? 'บันทึกร่าง' : 'Draft'}
+        </button>
+        <button
+          className="btn-primary flex-1 justify-center bg-green-600 hover:bg-green-700"
+          onClick={() => form.handleIssue(customer.selectedCustomerId, id, (issuedId) => setIssuedInvoiceId(issuedId))}
           disabled={form.saving}
         >
           {form.saving ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
-            <Save className="w-4 h-4" />
+            <FileCheck className="w-4 h-4" />
           )}
-          {isThai ? 'บันทึก' : 'Save'}
+          {isThai ? 'ออกเอกสาร' : 'Issue'}
         </button>
       </div>
+
+      <IssuedSuccessModal
+        invoiceId={issuedInvoiceId}
+        onClose={() => { setIssuedInvoiceId(null); navigate('/app/invoices'); }}
+      />
 
       <PreviewModal
         show={preview.showPreviewModal}

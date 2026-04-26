@@ -79,119 +79,132 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setSubmitMessageType(null);
   }, []);
 
-  const handleSave = async (_asDraft: boolean, customerId: string, invoiceId?: string) => {
-    setSubmitMessage(null);
-    setSubmitMessageType(null);
-
+  const validate = (customerId: string) => {
     if (!customerId) {
       setSubmitMessage(isThai ? 'กรุณาเลือกลูกค้าก่อนบันทึกเอกสาร' : 'Please select a customer before saving.');
       setSubmitMessageType('err');
-      return;
+      return false;
     }
     if (!invoiceDate) {
-      setSubmitMessage(
-        isThai ? 'กรุณาเลือกวันที่ออกเอกสาร' : 'Please select invoice date',
-      );
+      setSubmitMessage(isThai ? 'กรุณาเลือกวันที่ออกเอกสาร' : 'Please select invoice date');
       setSubmitMessageType('err');
-      return;
+      return false;
     }
     if (items.length === 0 || !items[0].nameTh.trim()) {
-      setSubmitMessage(
-        isThai
-          ? 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ'
-          : 'Please add at least one item',
-      );
+      setSubmitMessage(isThai ? 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ' : 'Please add at least one item');
       setSubmitMessageType('err');
-      return;
+      return false;
     }
-    if (
-      ['receipt', 'credit_note', 'debit_note'].includes(docType) &&
-      !referenceDocNumber.trim()
-    ) {
-      setSubmitMessage(
-        isThai
-          ? 'กรุณาระบุเลขที่เอกสารอ้างอิง (บังคับ)'
-          : 'Reference document number is required',
-      );
+    if (['receipt', 'credit_note', 'debit_note'].includes(docType) && !referenceDocNumber.trim()) {
+      setSubmitMessage(isThai ? 'กรุณาระบุเลขที่เอกสารอ้างอิง (บังคับ)' : 'Reference document number is required');
       setSubmitMessageType('err');
-      return;
+      return false;
     }
+    return true;
+  };
 
+  const buildPayload = (customerId: string, asDraft: boolean) => ({
+    type: docType,
+    language: docLanguage,
+    invoiceDate,
+    dueDate: dueDate || undefined,
+    customerId,
+    asDraft,
+    items: items.map((item) => ({
+      nameTh: item.nameTh,
+      nameEn: item.nameEn || '',
+      descriptionTh: item.descriptionTh || '',
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      discount: item.discount,
+      vatType: item.vatType,
+    })),
+    notes: notes || undefined,
+    paymentMethod: paymentMethod || undefined,
+    templateId: templateId || undefined,
+    documentMode,
+    bankPaymentInfo: bankPaymentInfo || undefined,
+    showCompanyLogo,
+    documentLogoUrl: logoUrl || undefined,
+    referenceDocNumber: referenceDocNumber || undefined,
+  });
+
+  const handleApiError = async (res: Response) => {
+    if (res.status === 401) { clearAuth(); navigate('/login'); return true; }
+    const err = (await res.json()) as { error?: string; details?: { path: (string | number)[]; message: string }[] };
+    const msg = err.details?.map((d) => `${d.path.join('.')}: ${translateZodMessage(d.message)}`).join('\n') ?? err.error ?? 'Save failed';
+    setSubmitMessage(msg);
+    setSubmitMessageType('err');
+    return true;
+  };
+
+  const handleSaveDraft = async (customerId: string, invoiceId?: string) => {
+    setSubmitMessage(null);
+    setSubmitMessageType(null);
+    if (!validate(customerId)) return;
     setSaving(true);
     try {
-      const payload = {
-        type: docType,
-        language: docLanguage,
-        invoiceDate,
-        dueDate: dueDate || undefined,
-        customerId,
-        items: items.map((item) => ({
-          nameTh: item.nameTh,
-          nameEn: item.nameEn || '',
-          descriptionTh: item.descriptionTh || '',
-          quantity: item.quantity,
-          unit: item.unit,
-          unitPrice: item.unitPrice,
-          discount: item.discount,
-          vatType: item.vatType,
-        })),
-        notes: notes || undefined,
-        paymentMethod: paymentMethod || undefined,
-        templateId: templateId || undefined,
-        documentMode,
-        bankPaymentInfo: bankPaymentInfo || undefined,
-        showCompanyLogo,
-        documentLogoUrl: logoUrl || undefined,
-        referenceDocNumber: referenceDocNumber || undefined,
-      };
-
       const res = await fetch(invoiceId ? `/api/invoices/${invoiceId}` : '/api/invoices', {
         method: invoiceId ? 'PATCH' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(buildPayload(customerId, true)),
       });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          clearAuth();
-          navigate('/login');
-          return;
-        }
-        const err = (await res.json()) as {
-          error?: string;
-          details?: { path: (string | number)[]; message: string }[];
-        };
-        const msg =
-          err.details
-            ?.map((d) => `${d.path.join('.')}: ${translateZodMessage(d.message)}`)
-            .join('\n') ??
-          err.error ??
-          'Save failed';
-        setSubmitMessage(msg);
-        setSubmitMessageType('err');
-        return;
-      }
-
-      setSubmitMessage(
-        invoiceId
-          ? (isThai ? 'อัปเดตเอกสารสำเร็จ กำลังกลับไปหน้ารายการเอกสาร...' : 'Document updated. Returning to the invoice list...')
-          : (isThai ? 'บันทึกเอกสารสำเร็จ กำลังกลับไปหน้ารายการเอกสาร...' : 'Document saved. Returning to the invoice list...'),
-      );
+      if (!res.ok) { await handleApiError(res); return; }
+      setSubmitMessage(isThai ? 'บันทึกร่างเรียบร้อย สามารถแก้ไขและออกเอกสารได้ในภายหลัง' : 'Draft saved. You can edit and issue the document later.');
       setSubmitMessageType('ok');
-      navigate('/app/invoices');
+      setTimeout(() => navigate('/app/invoices'), 1200);
     } catch {
-      setSubmitMessage(
-        isThai
-          ? 'เกิดข้อผิดพลาด กรุณาลองใหม่'
-          : 'An error occurred, please try again',
-      );
+      setSubmitMessage(isThai ? 'เกิดข้อผิดพลาด กรุณาลองใหม่' : 'An error occurred, please try again');
       setSubmitMessageType('err');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleIssue = async (customerId: string, invoiceId?: string, onIssued?: (id: string) => void) => {
+    setSubmitMessage(null);
+    setSubmitMessageType(null);
+    if (!validate(customerId)) return;
+    setSaving(true);
+    try {
+      let issuedId: string;
+      if (invoiceId) {
+        // Existing draft → issue via dedicated endpoint
+        const res = await fetch(`/api/invoices/${invoiceId}/issue`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) { await handleApiError(res); return; }
+        issuedId = invoiceId;
+      } else {
+        // New invoice → create + issue immediately (asDraft: false)
+        const res = await fetch('/api/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(buildPayload(customerId, false)),
+        });
+        if (!res.ok) { await handleApiError(res); return; }
+        const json = (await res.json()) as { data: { id: string } };
+        issuedId = json.data.id;
+      }
+      setSubmitMessage(isThai ? 'ออกเอกสารสำเร็จ! กำลังสร้าง PDF...' : 'Document issued! Generating PDF...');
+      setSubmitMessageType('ok');
+      if (onIssued) {
+        onIssued(issuedId);
+      } else {
+        setTimeout(() => navigate('/app/invoices'), 1500);
+      }
+    } catch {
+      setSubmitMessage(isThai ? 'เกิดข้อผิดพลาด กรุณาลองใหม่' : 'An error occurred, please try again');
+      setSubmitMessageType('err');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = async (_asDraft: boolean, customerId: string, invoiceId?: string) => {
+    return handleIssue(customerId, invoiceId);
   };
 
   return {
@@ -235,5 +248,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     total,
     hydrateFromInvoice,
     handleSave,
+    handleSaveDraft,
+    handleIssue,
   };
 }

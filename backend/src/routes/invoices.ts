@@ -50,6 +50,7 @@ const createInvoiceSchema = z.object({
   documentLogoUrl: z.string().optional(),
   referenceInvoiceId: z.string().optional(),
   referenceDocNumber: z.string().optional(),
+  asDraft: z.boolean().optional().default(false),
 });
 const updateInvoiceSchema = createInvoiceSchema;
 
@@ -330,7 +331,16 @@ invoicesRouter.post('/', async (req, res) => {
     if (!customer) { res.status(404).json({ error: 'Customer not found' }); return; }
     if (!company) { res.status(404).json({ error: 'Company not found' }); return; }
 
-    const invoiceNumber = await generateInvoiceNumber(req.user!.companyId, body.type);
+    // Draft save: use a temporary number; skip PDF + RD queue
+    const isDraft = body.asDraft === true;
+    let invoiceNumber: string;
+    if (isDraft) {
+      const draftSeq = Date.now().toString().slice(-6);
+      const ym = new Date().toISOString().slice(0, 7).replace('-', '');
+      invoiceNumber = `DRAFT-${ym}-${draftSeq}`;
+    } else {
+      invoiceNumber = await generateInvoiceNumber(req.user!.companyId, body.type);
+    }
 
     // combined type (ขายสด) → isPaid = true ทันที
     const isCashSale = body.type === 'tax_invoice_receipt';
@@ -402,14 +412,16 @@ invoicesRouter.post('/', async (req, res) => {
     });
     });
 
-    await enqueueInvoicePdf(invoice.id, body.language);
+    if (!isDraft) {
+      await enqueueInvoicePdf(invoice.id, body.language);
 
-    // T01 + T02: auto-approve + auto-submit ไป RD ทันที
-    // T01 (ขายสด): VAT เกิดตอนรับเงิน — submit ทันที
-    // T02 (ขายเงินเชื่อ): VAT เกิดตอนส่งมอบสินค้า ม. 78(1) — submit ทันทีที่ออกใบ
-    // T04/T05: ยัง manual เพราะต้องการ explicit approval
-    if (autoSubmitTypes.includes(body.type) && policy.canSubmitToRD) {
-      await queueRdSubmissionBestEffort(invoice.id);
+      // T01 + T02: auto-approve + auto-submit ไป RD ทันที
+      // T01 (ขายสด): VAT เกิดตอนรับเงิน — submit ทันที
+      // T02 (ขายเงินเชื่อ): VAT เกิดตอนส่งมอบสินค้า ม. 78(1) — submit ทันทีที่ออกใบ
+      // T04/T05: ยัง manual เพราะต้องการ explicit approval
+      if (autoSubmitTypes.includes(body.type) && policy.canSubmitToRD) {
+        await queueRdSubmissionBestEffort(invoice.id);
+      }
     }
 
     await auditLog({
@@ -441,6 +453,39 @@ invoicesRouter.post('/', async (req, res) => {
   }
 });
 
+/* ─── Public invoice verification (QR code) — no auth required ─── */
+invoicesRouter.get('/verify/:id', async (req, res) => {
+  try {
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id },
+      include: { buyer: { select: { nameTh: true, nameEn: true, taxId: true } } },
+    });
+    if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
+
+    const sellerSnap = invoice.seller as {
+      nameTh?: string | null;
+      taxId?: string | null;
+    } | null;
+
+    res.json({
+      data: {
+        invoiceNumber: invoice.invoiceNumber,
+        type: invoice.type,
+        invoiceDate: invoice.invoiceDate,
+        total: invoice.total,
+        status: invoice.status,
+        sellerName: sellerSnap?.nameTh ?? null,
+        sellerTaxId: sellerSnap?.taxId ?? null,
+        buyerName: invoice.buyer.nameTh,
+        issuedAt: invoice.updatedAt,
+        pdfUrl: invoice.pdfUrl,
+      },
+    });
+  } catch {
+    res.status(500).json({ error: 'Failed to verify invoice' });
+  }
+});
+
 invoicesRouter.get('/:id', async (req, res) => {
   try {
     const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
@@ -459,6 +504,7 @@ invoicesRouter.get('/:id', async (req, res) => {
         documentLogoUrl?: string | null;
       };
     } | null;
+    const verificationUrl = `${process.env.APP_ORIGIN ?? 'https://etax-invoice.vercel.app'}/invoices/verify/${invoice.id}`;
     res.json({
       data: {
         ...invoice,
@@ -467,6 +513,7 @@ invoicesRouter.get('/:id', async (req, res) => {
         bankPaymentInfo: sellerSnap?.documentPreferences?.bankPaymentInfo ?? null,
         showCompanyLogo: sellerSnap?.documentPreferences?.showCompanyLogo ?? true,
         documentLogoUrl: sellerSnap?.documentPreferences?.documentLogoUrl ?? null,
+        verificationUrl,
       },
     });
   } catch {
@@ -594,6 +641,77 @@ invoicesRouter.patch('/:id', async (req, res) => {
   } catch (err) {
     if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
     res.status(500).json({ error: 'Failed to update invoice' });
+  }
+});
+
+/* ─── Officially issue a draft invoice (ออกเอกสาร) ─── */
+invoicesRouter.post('/:id/issue', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const policy = await resolveCompanyAccessPolicy(req.user!.companyId);
+    if (!hasFeatureAccess(policy, 'create_invoice')) {
+      res.status(403).json({ error: 'Your current plan cannot issue invoices' });
+      return;
+    }
+
+    const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.invoice.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        include: { items: true, buyer: true },
+      });
+    });
+    if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
+    if (invoice.status !== 'draft') {
+      res.status(400).json({ error: 'Only draft invoices can be issued', status: invoice.status });
+      return;
+    }
+    if (!invoice.invoiceNumber.startsWith('DRAFT-')) {
+      res.status(409).json({ error: 'Invoice has already been issued' });
+      return;
+    }
+
+    // Replace the temporary draft number with a real sequential invoice number
+    const realInvoiceNumber = await generateInvoiceNumber(req.user!.companyId, invoice.type);
+
+    const updatedInvoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.invoice.update({
+        where: { id: invoice.id },
+        data: { invoiceNumber: realInvoiceNumber },
+        include: { items: true, buyer: true },
+      });
+    });
+
+    // Queue PDF generation
+    await enqueueInvoicePdf(updatedInvoice.id, updatedInvoice.language);
+
+    // Auto-submit to RD for T01 and T02 if policy allows
+    const autoSubmitTypes = ['tax_invoice_receipt', 'tax_invoice'];
+    if (autoSubmitTypes.includes(updatedInvoice.type) && policy.canSubmitToRD) {
+      await queueRdSubmissionBestEffort(updatedInvoice.id);
+    }
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'invoice.issue',
+      resourceType: 'invoice',
+      resourceId: updatedInvoice.id,
+      details: {
+        invoiceNumber: realInvoiceNumber,
+        previousDraftNumber: invoice.invoiceNumber,
+        type: updatedInvoice.type,
+        total: updatedInvoice.total,
+        autoSubmitRd: autoSubmitTypes.includes(updatedInvoice.type) && policy.canSubmitToRD,
+      },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: (updatedInvoice.language === 'both' ? 'th' : updatedInvoice.language) as 'th' | 'en',
+    });
+
+    res.json({ data: updatedInvoice, message: 'Invoice issued successfully' });
+  } catch (err) {
+    console.error('Issue invoice error:', err);
+    res.status(500).json({ error: 'Failed to issue invoice' });
   }
 });
 
