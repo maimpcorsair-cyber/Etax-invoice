@@ -1795,22 +1795,25 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                 {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน Line Official Account พี่ไหม' : 'Step 1 — Add Line Official Account Pimai'}
               </p>
               <div className="flex items-start gap-4">
-                <div className="w-28 h-28 flex-shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-center p-2">
-                  <MessageCircle className="w-7 h-7 text-green-500 mb-1" />
-                  <span className="text-xs text-gray-500 leading-tight">QR Code พี่ไหม</span>
-                </div>
+                <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="flex-shrink-0">
+                  <img
+                    src="https://qr-official.line.me/g/M/566fvjbg.png"
+                    alt="QR Code พี่ไหม"
+                    className="w-28 h-28 rounded-lg border border-gray-200 shadow-sm"
+                  />
+                </a>
                 <div className="space-y-1">
                   <p className="text-sm text-gray-600">
                     {isThai ? 'สแกน QR หรือค้นหา' : 'Scan QR or search for'}
                   </p>
                   <a
-                    href="https://line.me/R/ti/p/@pimai"
+                    href="https://line.me/R/ti/p/@566fvjbg"
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700"
                   >
                     <Link2 className="w-3.5 h-3.5" />
-                    {isThai ? 'เพิ่มเพื่อน @pimai' : 'Add friend @pimai'}
+                    {isThai ? 'เพิ่มเพื่อน @566fvjbg' : 'Add friend @566fvjbg'}
                   </a>
                 </div>
               </div>
