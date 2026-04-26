@@ -1,8 +1,19 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { InvoiceItem } from '../../types';
-import { englishTextOnly, guardedInputClass, isEnglishText, isThaiText, thaiTextOnly } from '../../lib/inputGuards';
+import { englishTextOnly, guardedInputClass, isEnglishText, isThaiText } from '../../lib/inputGuards';
+
+interface Product {
+  id: string;
+  code: string;
+  nameTh: string;
+  nameEn?: string | null;
+  unit: string;
+  unitPrice: number;
+  vatType: string;
+}
 
 interface Props {
   items: InvoiceItem[];
@@ -12,6 +23,142 @@ interface Props {
   onAddItem: () => void;
   onRemoveItem: (i: number) => void;
   onUpdateItem: (i: number, field: keyof InvoiceItem, value: string | number) => void;
+}
+
+function useProductSearch() {
+  const [cache, setCache] = useState<Product[]>([]);
+
+  const search = useCallback(async (q: string): Promise<Product[]> => {
+    try {
+      const url = q.trim() ? `/api/products?search=${encodeURIComponent(q)}` : '/api/products';
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return [];
+      const json = await res.json() as { data: Product[] };
+      setCache(json.data ?? []);
+      return json.data ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  return { search, cache };
+}
+
+function ProductSearchCell({
+  item,
+  index,
+  onUpdateItem,
+}: {
+  item: InvoiceItem;
+  index: number;
+  onUpdateItem: (i: number, field: keyof InvoiceItem, value: string | number) => void;
+}) {
+  const { isThai } = useLanguage();
+  const { search } = useProductSearch();
+  const [query, setQuery] = useState(item.nameTh);
+  const [results, setResults] = useState<Product[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // sync if item changes from outside (edit mode)
+  useEffect(() => {
+    setQuery(item.nameTh);
+  }, [item.nameTh]);
+
+  // close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleInput = (value: string) => {
+    setQuery(value);
+    onUpdateItem(index, 'nameTh', value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      const r = await search(value);
+      setResults(r);
+      setLoading(false);
+      setOpen(r.length > 0);
+    }, 250);
+  };
+
+  const handleFocus = async () => {
+    if (results.length === 0) {
+      setLoading(true);
+      const r = await search('');
+      setResults(r);
+      setLoading(false);
+    }
+    setOpen(true);
+  };
+
+  const selectProduct = (p: Product) => {
+    setQuery(p.nameTh);
+    setOpen(false);
+    onUpdateItem(index, 'nameTh', p.nameTh);
+    onUpdateItem(index, 'nameEn', p.nameEn ?? '');
+    onUpdateItem(index, 'unit', p.unit);
+    onUpdateItem(index, 'unitPrice', p.unitPrice);
+    onUpdateItem(index, 'vatType', p.vatType);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          value={query}
+          onChange={(e) => handleInput(e.target.value)}
+          onFocus={handleFocus}
+          className={guardedInputClass(query.trim().length > 0 && !isThaiText(query, true), 'text-xs pr-6')}
+          placeholder="ชื่อสินค้า"
+        />
+        <Search className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+      </div>
+
+      {open && (
+        <div className="absolute z-50 left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+          {loading && (
+            <div className="px-3 py-2 text-xs text-gray-400">
+              {isThai ? 'กำลังค้นหา...' : 'Searching...'}
+            </div>
+          )}
+          {!loading && results.length === 0 && (
+            <div className="px-3 py-2 text-xs text-gray-400">
+              {isThai ? 'ไม่พบสินค้า' : 'No products found'}
+            </div>
+          )}
+          {!loading && results.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); selectProduct(p); }}
+              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-50 last:border-0"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-gray-900 truncate">{p.nameTh}</div>
+                  {p.nameEn && <div className="text-xs text-gray-500 truncate">{p.nameEn}</div>}
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-xs font-semibold text-blue-700">
+                    {new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2 }).format(p.unitPrice)}
+                  </div>
+                  <div className="text-xs text-gray-400">{p.unit}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ItemsTable({
@@ -33,8 +180,8 @@ export default function ItemsTable({
           <h3 className="font-semibold text-gray-900">{t('invoice.items')}</h3>
           <p className="mt-1 text-xs text-gray-500">
             {isThai
-              ? 'กรอกชื่อสินค้า จำนวน ราคา และ VAT ของแต่ละรายการ ระบบจะคำนวณยอดรวมให้อัตโนมัติ'
-              : 'Add item name, quantity, price, and VAT for each row. Totals are calculated automatically.'}
+              ? 'พิมพ์ชื่อสินค้าเพื่อค้นหาจากคลัง หรือกรอกเองได้'
+              : 'Type to search from your product catalog, or enter manually.'}
           </p>
         </div>
         <button onClick={onAddItem} className="btn-secondary text-xs py-1.5">
@@ -61,12 +208,7 @@ export default function ItemsTable({
             {items.map((item, i) => (
               <tr key={i}>
                 <td className="py-2 pr-2">
-                  <input
-                    value={item.nameTh}
-                    onChange={(e) => onUpdateItem(i, 'nameTh', thaiTextOnly(e.target.value))}
-                    className={guardedInputClass(item.nameTh.trim().length > 0 && !isThaiText(item.nameTh, true), 'text-xs')}
-                    placeholder="ชื่อสินค้า"
-                  />
+                  <ProductSearchCell item={item} index={i} onUpdateItem={onUpdateItem} />
                 </td>
                 <td className="py-2 pr-2">
                   <input
@@ -80,9 +222,7 @@ export default function ItemsTable({
                   <input
                     type="number"
                     value={item.quantity}
-                    onChange={(e) =>
-                      onUpdateItem(i, 'quantity', parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => onUpdateItem(i, 'quantity', parseFloat(e.target.value) || 0)}
                     className="input-field text-xs text-right"
                     min={0}
                   />
@@ -91,9 +231,7 @@ export default function ItemsTable({
                   <input
                     type="number"
                     value={item.unitPrice}
-                    onChange={(e) =>
-                      onUpdateItem(i, 'unitPrice', parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => onUpdateItem(i, 'unitPrice', parseFloat(e.target.value) || 0)}
                     className="input-field text-xs text-right"
                     min={0}
                   />
@@ -102,9 +240,7 @@ export default function ItemsTable({
                   <input
                     type="number"
                     value={item.discount}
-                    onChange={(e) =>
-                      onUpdateItem(i, 'discount', parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => onUpdateItem(i, 'discount', parseFloat(e.target.value) || 0)}
                     className="input-field text-xs text-right"
                     min={0}
                     max={100}
