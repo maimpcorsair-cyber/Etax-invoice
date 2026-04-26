@@ -21,6 +21,7 @@ import { notificationsRouter } from './routes/notifications';
 import { purchaseInvoicesRouter } from './routes/purchaseInvoices';
 import { vatSummaryRouter } from './routes/vatSummary';
 import { pp30Router } from './routes/pp30';
+import { lineRouter, lineWebhookHandler } from './routes/line';
 
 // ─── BullMQ Workers ──────────────────────────────────────────────────────────
 // Workers must be imported to start listening on their queues.
@@ -29,6 +30,7 @@ import './queues/workers/pdfWorker';
 import './queues/workers/rdSubmitWorker';
 import './queues/workers/rdComplianceWorker'; // cron: runs on 10th of each month
 import './queues/workers/billingRenewalWorker'; // cron: runs daily for renewal reminders
+import './queues/workers/overdueReminderWorker'; // cron: runs daily at 08:00 for overdue Line notifications
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -55,6 +57,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use('/api/billing/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookRouter);
+app.post('/api/webhook/line', express.raw({ type: '*/*' }), lineWebhookHandler);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
@@ -90,6 +93,7 @@ app.use('/api/notifications', authenticate, notificationsRouter);
 app.use('/api/purchase-invoices', purchaseInvoicesRouter);
 app.use('/api/vat-summary', vatSummaryRouter);
 app.use('/api/pp30', pp30Router);
+app.use('/api/line', lineRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   void next;

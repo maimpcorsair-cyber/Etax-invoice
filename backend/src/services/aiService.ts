@@ -1,0 +1,257 @@
+import prisma from '../config/database';
+import { logger } from '../config/logger';
+
+const apiKey = process.env.OPENROUTER_API_KEY ?? '';
+const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
+const chatModel = process.env.OPENROUTER_CHAT_MODEL ?? 'google/gemini-2.0-flash-exp:free';
+const visionModel = process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.0-flash';
+
+export interface OcrResult {
+  supplierName: string;
+  supplierTaxId: string;
+  supplierBranch: string;
+  invoiceNumber: string;
+  invoiceDate: string; // YYYY-MM-DD
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  confidence: 'high' | 'medium' | 'low';
+  rawText?: string;
+}
+
+interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}
+
+async function callOpenRouter(
+  model: string,
+  messages: OpenRouterMessage[],
+  maxTokens = 1000,
+): Promise<string> {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://etax-invoice.vercel.app',
+      'X-Title': 'e-Tax Invoice พี่ไหม',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`OpenRouter error ${response.status}: ${text}`);
+  }
+
+  const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+  return data.choices[0]?.message?.content ?? '';
+}
+
+export async function buildCompanyContext(companyId: string): Promise<string> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [company, salesAgg, purchaseAgg, overdueInvoices, recentInvoices] = await Promise.all([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { nameTh: true, taxId: true },
+    }),
+    prisma.invoice.aggregate({
+      where: { companyId, invoiceDate: { gte: monthStart } },
+      _count: { id: true },
+      _sum: { total: true, vatAmount: true },
+    }),
+    prisma.purchaseInvoice.aggregate({
+      where: { companyId, invoiceDate: { gte: monthStart } },
+      _count: { id: true },
+      _sum: { total: true, vatAmount: true },
+    }),
+    prisma.invoice.findMany({
+      where: {
+        companyId,
+        isPaid: false,
+        status: 'approved',
+        dueDate: { lt: now },
+      },
+      select: { id: true, total: true },
+    }),
+    prisma.invoice.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        invoiceNumber: true,
+        total: true,
+        isPaid: true,
+        dueDate: true,
+        buyer: { select: { nameTh: true } },
+      },
+    }),
+  ]);
+
+  const outputVat = salesAgg._sum.vatAmount ?? 0;
+  const inputVat = purchaseAgg._sum.vatAmount ?? 0;
+  const vatPayable = outputVat - inputVat;
+
+  const context = {
+    company: { name: company?.nameTh ?? '', taxId: company?.taxId ?? '' },
+    salesThisMonth: {
+      count: salesAgg._count.id,
+      total: salesAgg._sum.total ?? 0,
+      outputVat,
+    },
+    purchasesThisMonth: {
+      count: purchaseAgg._count.id,
+      total: purchaseAgg._sum.total ?? 0,
+      inputVat,
+    },
+    vatPayable,
+    overdueInvoices: {
+      count: overdueInvoices.length,
+      totalAmount: overdueInvoices.reduce((sum, inv) => sum + inv.total, 0),
+    },
+    recentInvoices: recentInvoices.map((inv) => ({
+      invoiceNumber: inv.invoiceNumber,
+      customer: inv.buyer.nameTh,
+      total: inv.total,
+      isPaid: inv.isPaid,
+      dueDate: inv.dueDate?.toISOString().split('T')[0] ?? null,
+    })),
+  };
+
+  return JSON.stringify(context, null, 2);
+}
+
+export async function askPimai(
+  companyId: string,
+  companyName: string,
+  taxId: string,
+  userQuestion: string,
+): Promise<string> {
+  if (!apiKey) {
+    return '⚠️ AI ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแล';
+  }
+
+  try {
+    const context = await buildCompanyContext(companyId);
+
+    const messages: OpenRouterMessage[] = [
+      {
+        role: 'system',
+        content: `คุณคือ "พี่ไหม" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
+คุณช่วยเหลือพนักงานบัญชีในการตอบคำถามเกี่ยวกับภาษีมูลค่าเพิ่ม ใบกำกับภาษี และข้อมูลทางการเงิน
+ตอบเป็นภาษาไทยเสมอ กระชับและเข้าใจง่าย
+
+บริษัท: ${companyName} (เลขผู้เสียภาษี: ${taxId})
+
+ข้อมูลบริษัทปัจจุบัน:
+${context}`,
+      },
+      {
+        role: 'user',
+        content: userQuestion,
+      },
+    ];
+
+    const answer = await callOpenRouter(chatModel, messages, 1000);
+    return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
+  } catch (err) {
+    logger.error('askPimai failed', { err, companyId });
+    return 'ขอโทษ เกิดข้อผิดพลาดในการตอบคำถาม กรุณาลองใหม่อีกครั้ง';
+  }
+}
+
+export async function ocrSupplierInvoice(
+  imageBase64: string,
+  mimeType: string,
+): Promise<OcrResult> {
+  if (!apiKey) {
+    return {
+      supplierName: '',
+      supplierTaxId: '',
+      supplierBranch: '00000',
+      invoiceNumber: '',
+      invoiceDate: '',
+      subtotal: 0,
+      vatAmount: 0,
+      total: 0,
+      confidence: 'low',
+    };
+  }
+
+  const emptyResult: OcrResult = {
+    supplierName: '',
+    supplierTaxId: '',
+    supplierBranch: '00000',
+    invoiceNumber: '',
+    invoiceDate: '',
+    subtotal: 0,
+    vatAmount: 0,
+    total: 0,
+    confidence: 'low',
+  };
+
+  try {
+    const messages: OpenRouterMessage[] = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+          },
+          {
+            type: 'text',
+            text: `กรุณาอ่านข้อมูลจากใบแจ้งหนี้/ใบกำกับภาษีนี้และส่งคืนเป็น JSON เท่านั้น (ไม่ต้องมีข้อความอื่น):
+{
+  "supplierName": "ชื่อผู้ขาย/ผู้ออกใบกำกับ",
+  "supplierTaxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก",
+  "supplierBranch": "รหัสสาขา เช่น 00000",
+  "invoiceNumber": "เลขที่เอกสาร",
+  "invoiceDate": "วันที่ในรูปแบบ YYYY-MM-DD",
+  "subtotal": ยอดก่อนภาษี (ตัวเลข),
+  "vatAmount": ยอดภาษีมูลค่าเพิ่ม (ตัวเลข),
+  "total": ยอดรวมทั้งสิ้น (ตัวเลข),
+  "confidence": "high|medium|low",
+  "rawText": "ข้อความทั้งหมดที่อ่านได้"
+}
+หากข้อมูลไม่ครบหรืออ่านไม่ชัด ให้ตั้ง confidence เป็น "low"`,
+          },
+        ],
+      },
+    ];
+
+    const raw = await callOpenRouter(visionModel, messages, 2000);
+
+    // Extract JSON from response
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      logger.warn('OCR: no JSON found in response', { raw: raw.slice(0, 200) });
+      return emptyResult;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
+    return {
+      supplierName: parsed.supplierName ?? '',
+      supplierTaxId: parsed.supplierTaxId ?? '',
+      supplierBranch: parsed.supplierBranch ?? '00000',
+      invoiceNumber: parsed.invoiceNumber ?? '',
+      invoiceDate: parsed.invoiceDate ?? '',
+      subtotal: Number(parsed.subtotal ?? 0),
+      vatAmount: Number(parsed.vatAmount ?? 0),
+      total: Number(parsed.total ?? 0),
+      confidence: parsed.confidence ?? 'low',
+      rawText: parsed.rawText,
+    };
+  } catch (err) {
+    logger.error('ocrSupplierInvoice failed', { err });
+    return emptyResult;
+  }
+}

@@ -312,6 +312,7 @@ export interface CompanyAccessPolicy {
   canInviteUsers: boolean;
   canSendInvoiceEmail: boolean;
   canUseBillingPortal: boolean;
+  canUseLineOa: boolean;
   maxUsers: number | null;
   maxDocumentsPerMonth: number | null;
   maxCustomers: number | null;

@@ -187,7 +187,8 @@
     "company": "Company Information",
     "certificate": "Digital Certificate",
     "rdConfig": "RD API Configuration",
-    "billing": "Billing & Plans"
+    "billing": "Billing & Plans",
+    "line": "Line AI Assistant"
   },
   "audit": {
     "title": "Audit Logs",

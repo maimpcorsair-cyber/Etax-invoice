@@ -97,6 +97,10 @@ model Company {
   rdClientSecret String?
   rdEnvironment  String  @default("sandbox")
 
+  // Line OA settings
+  lineNotifyEnabled   Boolean @default(false)
+  overdueReminderDays Int     @default(3)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -130,6 +134,7 @@ model User {
   auditLogs        AuditLog[]
   fcmTokens        FcmToken[]
   purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
+  lineUserLink     LineUserLink?
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -524,4 +529,19 @@ model PendingSignup {
   @@index([status])
   @@index([plan])
   @@map("pending_signups")
+}
+
+model LineUserLink {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  lineUserId  String   @unique
+  displayName String?
+  pictureUrl  String?
+  isActive    Boolean  @default(true)
+  linkedAt    DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lineUserId])
+  @@map("line_user_links")
 }

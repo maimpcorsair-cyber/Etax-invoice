@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight, ScrollText, Zap } from 'lucide-react';
+import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight, ScrollText, Zap, MessageCircle, Link2, Unlink2, Copy, Check, Bell } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
+import type { CompanyAccessPolicy } from '../types';
 
 const baseTabs = [
   { key: 'company', icon: Building, labelKey: 'admin.company' },
@@ -12,6 +13,7 @@ const baseTabs = [
   { key: 'templates', icon: FileText, labelKey: 'admin.templates' },
   { key: 'certificate', icon: Key, labelKey: 'admin.certificate' },
   { key: 'rdConfig', icon: Server, labelKey: 'admin.rdConfig' },
+  { key: 'line', icon: MessageCircle, labelKey: 'admin.line' },
   { key: 'billing', icon: CreditCard, labelKey: 'admin.billing' },
   { key: 'audit', icon: ScrollText, labelKey: 'admin.auditLog' },
   { key: 'plan', icon: Zap, labelKey: 'admin.plan' },
@@ -67,6 +69,9 @@ export default function AdminPanel() {
                 {key === 'users' && !policy?.canInviteUsers && (
                   <Lock className="w-3.5 h-3.5 ml-auto text-gray-400 flex-shrink-0" />
                 )}
+                {key === 'line' && !policy?.canUseLineOa && (
+                  <Lock className="w-3.5 h-3.5 ml-auto text-gray-400 flex-shrink-0" />
+                )}
               </button>
             ))}
           </div>
@@ -82,6 +87,7 @@ export default function AdminPanel() {
           )}
           {activeTab === 'templates' && <TemplatesTab isThai={isThai} t={t} />}
           {activeTab === 'rdConfig' && <RDConfigTab isThai={isThai} t={t} />}
+          {activeTab === 'line' && <LineTab policy={policy} isThai={isThai} />}
           {activeTab === 'billing' && <BillingTab isThai={isThai} />}
           {activeTab === 'certificate' && <CertificateTab isThai={isThai} t={t} />}
           {activeTab === 'audit' && (
@@ -1622,6 +1628,294 @@ function CertificateTab({ isThai }: { isThai: boolean; t: (k: string) => string 
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isThai: boolean }) {
+  const { token } = useAuthStore();
+  const [lineStatus, setLineStatus] = useState<{
+    linked: boolean;
+    displayName?: string;
+    lineNotifyEnabled: boolean;
+    overdueReminderDays: number;
+  } | null>(null);
+  const [otp, setOtp] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [localNotifyEnabled, setLocalNotifyEnabled] = useState(false);
+  const [localReminderDays, setLocalReminderDays] = useState(3);
+  const [copied, setCopied] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!policy?.canUseLineOa) { setLoading(false); return; }
+    fetch('/api/line/status', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(j => {
+        const d = (j as { data?: { linked: boolean; displayName?: string; lineNotifyEnabled: boolean; overdueReminderDays: number } }).data ?? null;
+        setLineStatus(d);
+        if (d) {
+          setLocalNotifyEnabled(d.lineNotifyEnabled);
+          setLocalReminderDays(d.overdueReminderDays);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token, policy?.canUseLineOa]);
+
+  async function handleLinkStart() {
+    try {
+      const res = await fetch('/api/line/link-start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await res.json() as { data?: { otp: string } };
+      setOtp(j.data?.otp ?? null);
+    } catch {
+      setMsg({ type: 'err', text: isThai ? 'เกิดข้อผิดพลาด กรุณาลองใหม่' : 'An error occurred, please try again' });
+    }
+  }
+
+  async function handleUnlink() {
+    if (!confirm(isThai ? 'ยืนยันยกเลิกการเชื่อมต่อ Line?' : 'Confirm unlink from Line?')) return;
+    try {
+      await fetch('/api/line/unlink', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      setLineStatus(null);
+      setOtp(null);
+    } catch {
+      setMsg({ type: 'err', text: isThai ? 'ยกเลิกการเชื่อมต่อไม่สำเร็จ' : 'Failed to unlink' });
+    }
+  }
+
+  async function handleSaveSettings() {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await fetch('/api/line/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ lineNotifyEnabled: localNotifyEnabled, overdueReminderDays: localReminderDays }),
+      });
+      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'Failed');
+      setMsg({ type: 'ok', text: isThai ? 'บันทึกการตั้งค่าสำเร็จ' : 'Settings saved successfully' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally { setSaving(false); }
+  }
+
+  function handleCopyOtp() {
+    if (!otp) return;
+    navigator.clipboard.writeText(otp).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  if (!policy?.canUseLineOa) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+          <Lock className="w-7 h-7 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800 mb-1">
+            {isThai ? 'ฟีเจอร์นี้ต้องการแพ็กเกจสูงกว่า' : 'Feature requires a higher plan'}
+          </p>
+          <p className="text-sm text-gray-500 max-w-xs mx-auto">
+            {isThai
+              ? 'อัปเกรดแพ็กเกจเพื่อใช้งาน Line AI Assistant พี่ไหม'
+              : 'Upgrade your plan to use the Line AI Assistant (Pimai).'}
+          </p>
+        </div>
+        <Link to="/app/plan" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+          <Zap className="w-4 h-4" />
+          {isThai ? 'ดูแพ็กเกจทั้งหมด' : 'View plans'}
+        </Link>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400" /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <h2 className="font-semibold text-lg text-gray-900">
+        {isThai ? 'Line พี่ไหม' : 'Line AI Assistant (Pimai)'}
+      </h2>
+
+      {/* Features card — always shown */}
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-3">
+        <p className="font-semibold text-indigo-900 text-sm">
+          {isThai ? 'พี่ไหมทำอะไรได้บ้าง?' : 'What can Pimai do?'}
+        </p>
+        <ul className="space-y-2 text-sm text-indigo-800">
+          <li>🤖 {isThai ? 'ถามตอบข้อมูลบัญชีและใบกำกับภาษีด้วย AI' : 'Ask accounting and tax invoice questions via AI'}</li>
+          <li>📸 {isThai ? 'ส่งรูปใบแจ้งหนี้ supplier → บันทึกภาษีซื้ออัตโนมัติ (OCR)' : 'Send supplier invoice photo → Auto-record input VAT (OCR)'}</li>
+          <li>⚠️ {isThai ? 'แจ้งเตือน Invoice เกินกำหนดชำระรายวัน' : 'Daily overdue invoice reminders'}</li>
+          <li>📊 {isThai ? 'สรุปยอด VAT และข้อมูลบัญชีได้ทันที' : 'Instant VAT summary and accounting data'}</li>
+          <li>💬 {isThai ? 'พิมพ์คำถามภาษาไทยได้เลย' : 'Ask questions in Thai naturally'}</li>
+        </ul>
+      </div>
+
+      {/* Connection Status card */}
+      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-gray-800">
+            {isThai ? 'เชื่อมต่อ Line พี่ไหม' : 'Connect Line Pimai'}
+          </h3>
+          {lineStatus?.linked && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+              <CheckCircle className="w-3.5 h-3.5" />
+              {isThai ? 'เชื่อมต่อแล้ว ✅' : 'Connected ✅'}
+            </span>
+          )}
+        </div>
+
+        {lineStatus?.linked ? (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              {isThai ? 'บัญชี Line: ' : 'Line account: '}
+              <span className="font-medium text-gray-900">{lineStatus.displayName ?? '—'}</span>
+            </p>
+            <button
+              className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium"
+              onClick={handleUnlink}
+            >
+              <Unlink2 className="w-4 h-4" />
+              {isThai ? 'ยกเลิกการเชื่อมต่อ' : 'Unlink'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Step 1 */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">
+                {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน Line Official Account พี่ไหม' : 'Step 1 — Add Line Official Account Pimai'}
+              </p>
+              <div className="flex items-start gap-4">
+                <div className="w-28 h-28 flex-shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-center p-2">
+                  <MessageCircle className="w-7 h-7 text-green-500 mb-1" />
+                  <span className="text-xs text-gray-500 leading-tight">QR Code พี่ไหม</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">
+                    {isThai ? 'สแกน QR หรือค้นหา' : 'Scan QR or search for'}
+                  </p>
+                  <a
+                    href="https://line.me/R/ti/p/@pimai"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    {isThai ? 'เพิ่มเพื่อน @pimai' : 'Add friend @pimai'}
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">
+                {isThai ? 'ขั้นตอนที่ 2 — รับรหัส OTP เพื่อเชื่อมต่อบัญชี' : 'Step 2 — Generate OTP to link your account'}
+              </p>
+              {otp ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-3xl font-bold tracking-[0.3em] text-indigo-700 select-all">
+                      {otp}
+                    </span>
+                    <button
+                      onClick={handleCopyOtp}
+                      className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {isThai ? 'ส่งรหัสนี้ให้พี่ไหมใน Line โดยพิมพ์: ' : 'Send this code to Pimai in Line by typing: '}
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">/link {otp}</code>
+                  </p>
+                </div>
+              ) : (
+                <button className="btn-primary" onClick={handleLinkStart}>
+                  <Link2 className="w-4 h-4" />
+                  {isThai ? 'สร้างรหัสเชื่อมต่อ' : 'Generate link code'}
+                </button>
+              )}
+            </div>
+
+            {/* Step 3 */}
+            {otp && (
+              <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  {isThai
+                    ? 'ขั้นตอนที่ 3 — รอพี่ไหมยืนยัน... รหัสนี้หมดอายุใน 10 นาที'
+                    : 'Step 3 — Waiting for Pimai to confirm... This code expires in 10 minutes'}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Notification Settings card — show only when linked */}
+      {lineStatus?.linked && (
+        <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Bell className="w-4 h-4 text-indigo-600" />
+            <h3 className="font-medium text-gray-800">
+              {isThai ? 'การตั้งค่าการแจ้งเตือน' : 'Notification Settings'}
+            </h3>
+          </div>
+
+          <div className="space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 accent-indigo-600"
+                checked={localNotifyEnabled}
+                onChange={e => setLocalNotifyEnabled(e.target.checked)}
+              />
+              <span className="text-sm text-gray-700">
+                {isThai ? 'เปิดการแจ้งเตือน Invoice เกินกำหนด' : 'Enable overdue invoice notifications'}
+              </span>
+            </label>
+
+            <div>
+              <label className="label">
+                {isThai ? 'แจ้งเตือนล่วงหน้า / Reminder before due' : 'Reminder before due date'}
+              </label>
+              <select
+                className="input-field w-48"
+                value={localReminderDays}
+                onChange={e => setLocalReminderDays(Number(e.target.value))}
+                disabled={!localNotifyEnabled}
+              >
+                <option value={1}>{isThai ? '1 วัน' : '1 day'}</option>
+                <option value={3}>{isThai ? '3 วัน' : '3 days'}</option>
+                <option value={7}>{isThai ? '7 วัน' : '7 days'}</option>
+              </select>
+            </div>
+          </div>
+
+          {msg && (
+            <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {msg.type === 'ok' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+              {msg.text}
+            </div>
+          )}
+
+          <button className="btn-primary" onClick={handleSaveSettings} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {isThai ? 'บันทึกการตั้งค่า' : 'Save settings'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

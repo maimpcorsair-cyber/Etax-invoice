@@ -19,6 +19,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1035.0",
     "@aws-sdk/s3-request-presigner": "^3.1035.0",
+    "@line/bot-sdk": "^11.0.0",
     "@prisma/client": "^5.12.1",
     "@types/qrcode": "^1.5.6",
     "bcryptjs": "^2.4.3",

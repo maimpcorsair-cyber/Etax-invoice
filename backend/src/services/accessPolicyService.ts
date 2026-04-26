@@ -34,6 +34,7 @@ export interface CompanyAccessPolicy {
   canInviteUsers: boolean;
   canSendInvoiceEmail: boolean;
   canUseBillingPortal: boolean;
+  canUseLineOa: boolean;
   maxUsers: number | null;
   maxDocumentsPerMonth: number | null;
   maxCustomers: number | null;
@@ -64,6 +65,7 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canInviteUsers: false,
     canSendInvoiceEmail: false,
     canUseBillingPortal: false,
+    canUseLineOa: false,
     maxUsers: 1,
     maxDocumentsPerMonth: 10,
     maxCustomers: 20,
@@ -84,6 +86,7 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canInviteUsers: true,
     canSendInvoiceEmail: true,
     canUseBillingPortal: true,
+    canUseLineOa: true,
     maxUsers: 3,
     maxDocumentsPerMonth: 100,
     maxCustomers: 300,
@@ -104,6 +107,7 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canInviteUsers: true,
     canSendInvoiceEmail: true,
     canUseBillingPortal: true,
+    canUseLineOa: true,
     maxUsers: 5,
     maxDocumentsPerMonth: 500,
     maxCustomers: 2000,
@@ -124,6 +128,7 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canInviteUsers: true,
     canSendInvoiceEmail: true,
     canUseBillingPortal: true,
+    canUseLineOa: true,
     maxUsers: null,
     maxDocumentsPerMonth: null,
     maxCustomers: null,
