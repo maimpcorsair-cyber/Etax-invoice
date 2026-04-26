@@ -1665,15 +1665,24 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   }, [token, policy?.canUseLineOa]);
 
   async function handleLinkStart() {
+    setMsg(null);
     try {
       const res = await fetch('/api/line/link-start', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const j = await res.json() as { data?: { otp: string } };
-      setOtp(j.data?.otp ?? null);
-    } catch {
-      setMsg({ type: 'err', text: isThai ? 'เกิดข้อผิดพลาด กรุณาลองใหม่' : 'An error occurred, please try again' });
+      const j = await res.json() as { data?: { otp: string }; error?: string };
+      if (!res.ok) {
+        setMsg({ type: 'err', text: j.error ?? 'เกิดข้อผิดพลาด' });
+        return;
+      }
+      if (j.data?.otp) {
+        setOtp(j.data.otp);
+      } else {
+        setMsg({ type: 'err', text: 'ไม่ได้รับรหัส OTP กรุณาลองใหม่' });
+      }
+    } catch (e) {
+      setMsg({ type: 'err', text: isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}` });
     }
   }
 

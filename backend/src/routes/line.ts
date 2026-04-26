@@ -56,10 +56,7 @@ lineRouter.post('/link-start', authenticate, async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await redis.setex(`line:otp:${otp}`, OTP_TTL, JSON.stringify({ userId, companyId }));
 
-    res.json({
-      otp,
-      instructions: `ส่ง OTP นี้ให้พี่ไหมใน Line: ${otp}`,
-    });
+    res.json({ data: { otp } });
   } catch (err) {
     logger.error('[Line] POST /link-start failed', { err });
     res.status(500).json({ error: 'Failed to generate OTP' });
