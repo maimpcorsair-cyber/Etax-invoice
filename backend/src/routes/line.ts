@@ -431,16 +431,22 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 export async function lineWebhookHandler(req: Request, res: Response): Promise<void> {
   const sig = req.headers['x-line-signature'] as string | undefined;
 
-  if (!sig || !verifyLineSignature(req.body as Buffer, sig)) {
-    res.status(401).json({ error: 'Invalid signature' });
-    return;
-  }
-
   let body: LineWebhookBody;
   try {
     body = JSON.parse((req.body as Buffer).toString()) as LineWebhookBody;
   } catch {
     res.json({ ok: true });
+    return;
+  }
+
+  // Line sends an empty-events probe when verifying the webhook URL — respond 200 without signature check
+  if (!body.events || body.events.length === 0) {
+    res.json({ ok: true });
+    return;
+  }
+
+  if (!sig || !verifyLineSignature(req.body as Buffer, sig)) {
+    res.status(401).json({ error: 'Invalid signature' });
     return;
   }
 
