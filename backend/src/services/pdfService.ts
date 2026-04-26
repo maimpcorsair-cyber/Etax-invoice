@@ -515,7 +515,7 @@ function buildHtml(data: PdfInvoiceData): string {
     font-weight: 700;
     margin-bottom: 12px;
   }
-  .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .party-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
   .party-column {
     padding: 14px 14px 12px;
     border-radius: 16px;
@@ -835,19 +835,9 @@ function buildHtml(data: PdfInvoiceData): string {
 
       <div class="overview-grid">
         <div class="party-card">
+          <div class="section-label">${labels.buyer}</div>
           <div class="party-grid">
             <div class="party-column">
-              <div class="party-title">${labels.seller}</div>
-              <div class="party-name">${sellerName}</div>
-              <div class="party-detail">
-                <div>${labels.taxId}: <strong>${data.seller.taxId}</strong></div>
-                <div>${labels.branch}: <strong>${sellerBranch}</strong></div>
-                <div>${sellerAddr}</div>
-                ${data.seller.phone || data.seller.email ? `<div style="margin-top:4px">${[data.seller.phone ? `Tel. ${data.seller.phone}` : '', data.seller.email ?? ''].filter(Boolean).join(' | ')}</div>` : ''}
-              </div>
-            </div>
-            <div class="party-column">
-              <div class="party-title">${labels.buyer}</div>
               <div class="party-name">${buyerName}</div>
               <div class="party-detail">
                 <div>${labels.taxId}: <strong>${data.buyer.taxId}</strong></div>
