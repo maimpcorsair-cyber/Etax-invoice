@@ -2,6 +2,7 @@ import { Plus, Trash2, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLanguage } from '../../hooks/useLanguage';
+import { useAuthStore } from '../../store/authStore';
 import type { InvoiceItem } from '../../types';
 import { englishTextOnly, guardedInputClass, isEnglishText, isThaiText } from '../../lib/inputGuards';
 
@@ -26,22 +27,21 @@ interface Props {
 }
 
 function useProductSearch() {
-  const [cache, setCache] = useState<Product[]>([]);
+  const { token } = useAuthStore();
 
   const search = useCallback(async (q: string): Promise<Product[]> => {
     try {
       const url = q.trim() ? `/api/products?search=${encodeURIComponent(q)}` : '/api/products';
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return [];
       const json = await res.json() as { data: Product[] };
-      setCache(json.data ?? []);
       return json.data ?? [];
     } catch {
       return [];
     }
-  }, []);
+  }, [token]);
 
-  return { search, cache };
+  return { search };
 }
 
 function ProductSearchCell({
