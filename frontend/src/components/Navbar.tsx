@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  Zap,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -25,8 +26,16 @@ const navItems = [
   { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
   { key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin', roles: ['super_admin', 'admin'] },
   { key: 'audit', href: '/app/audit', icon: ScrollText, labelKey: 'nav.audit' },
+  { key: 'plan', href: '/app/plan', icon: Zap, labelKey: 'nav.plan', roles: ['super_admin', 'admin'] },
   { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
+
+const PLAN_BADGE: Record<string, string> = {
+  free: 'bg-gray-100 text-gray-600',
+  starter: 'bg-blue-100 text-blue-700',
+  business: 'bg-purple-100 text-purple-700',
+  enterprise: 'bg-amber-100 text-amber-700',
+};
 
 export default function Navbar() {
   const { t } = useTranslation();
@@ -121,11 +130,29 @@ export default function Navbar() {
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                   <div className="px-3 py-2 border-b border-gray-100">
                     <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
                     <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    {policy && (
+                      <span
+                        className={`mt-1.5 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_BADGE[policy.plan] ?? PLAN_BADGE.free}`}
+                      >
+                        <Zap className="w-3 h-3" />
+                        {policy.planLabel}
+                      </span>
+                    )}
                   </div>
+                  {(user?.role === 'super_admin' || user?.role === 'admin') && (
+                    <Link
+                      to="/app/plan"
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Zap className="w-4 h-4" />
+                      {t('nav.plan', { defaultValue: 'แผน / Plan' })}
+                    </Link>
+                  )}
                   <Link
                     to="/app/settings"
                     className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"

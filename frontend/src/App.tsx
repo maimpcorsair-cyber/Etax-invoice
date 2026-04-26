@@ -26,6 +26,7 @@ const OwnerTenants      = React.lazy(() => import('./pages/OwnerTenants'));
 const OwnerTransactions = React.lazy(() => import('./pages/OwnerTransactions'));
 const OwnerCoupons      = React.lazy(() => import('./pages/OwnerCoupons'));
 const OwnerRenewals     = React.lazy(() => import('./pages/OwnerRenewals'));
+const PlanPage          = React.lazy(() => import('./pages/PlanPage'));
 import { useAuthStore } from './store/authStore';
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
 import { usePushNotifications } from './hooks/usePushNotifications';
@@ -152,6 +153,7 @@ export default function App() {
           <Route path="admin" element={<AdminPanel />} />
           <Route path="audit" element={<AuditLogs />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="plan" element={<PlanPage />} />
         </Route>
         <Route
           path="/ops"
