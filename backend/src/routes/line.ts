@@ -357,9 +357,9 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { PDFParse } = require('pdf-parse');
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
-        pdfText = (textResult.text ?? '').trim();
-        logger.info('[Line] PDF text extracted', { chars: pdfText.length });
+        const textResult = await parser.getText({ first: 1 }); // first page only — invoice data is always here
+        pdfText = (textResult.text ?? '').trim().slice(0, 3000);
+        logger.info('[Line] PDF text extracted', { chars: pdfText.length, pages: textResult.total });
       } catch (pdfErr) {
         logger.warn('[Line] pdf-parse failed', { error: String(pdfErr) });
       }
