@@ -366,9 +366,9 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
         logger.warn('[Line] PDF text extract failed', { error: String(pdfErr) });
       }
 
-      // Try 2: send PDF directly to vision model (Gemini supports application/pdf natively)
-      if (!result || (result.confidence === 'low' && !result.supplierName)) {
-        logger.info('[Line] Trying PDF direct vision OCR');
+      // Try 2: send PDF directly to Gemini (supports application/pdf natively)
+      if (!result || (result.confidence === 'low' && !result.supplierName && !result.total)) {
+        logger.info('[Line] Trying PDF direct Gemini OCR');
         result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
       }
     } else {
@@ -379,8 +379,9 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
 
     logger.info('[Line] OCR result', { confidence: result.confidence, supplierName: result.supplierName, total: result.total });
 
-    if (result.confidence === 'low' && !result.supplierName && !result.total) {
-      await sendLineText(lineUserId, '❌ ไม่สามารถอ่านเอกสารได้ กรุณาส่งรูปที่ชัดขึ้น');
+    const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount;
+    if (!hasAnyData) {
+      await sendLineText(lineUserId, '❌ ไม่สามารถอ่านเอกสารได้ กรุณาส่งเป็นรูปภาพ (.jpg/.png) หรือ PDF ที่ไม่ใช่รูปสแกน');
       return;
     }
 

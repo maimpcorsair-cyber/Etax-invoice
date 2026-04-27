@@ -10,6 +10,14 @@ const FREE_VISION_MODELS = [
   'google/gemma-4-26b-a4b-it:free',
 ].filter(Boolean) as string[];
 
+// Models that natively support PDF documents (not just images)
+const FREE_PDF_MODELS = [
+  'google/gemini-2.0-flash-lite-001:free',
+  'google/gemini-2.5-flash-preview:free',
+  'google/gemini-2.0-flash-exp:free',
+  ...FREE_CHAT_MODELS,
+].filter(Boolean) as string[];
+
 const FREE_CHAT_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   process.env.OPENROUTER_CHAT_MODEL,
@@ -242,7 +250,8 @@ Rules:
         ];
 
     const messages: OpenRouterMessage[] = [{ role: 'user', content: userContent }];
-    const models = isText ? FREE_CHAT_MODELS : FREE_VISION_MODELS;
+    const isPdf = mimeType === 'application/pdf';
+    const models = isText ? FREE_CHAT_MODELS : isPdf ? FREE_PDF_MODELS : FREE_VISION_MODELS;
     const raw = await callOpenRouter(models, messages, 2000);
 
     // Extract JSON from response
