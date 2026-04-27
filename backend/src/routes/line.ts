@@ -9,6 +9,7 @@ import {
   sendLineFlexMessage,
   buildOverdueFlexCard,
   buildOcrConfirmFlexCard,
+  buildInvoiceFlexCard,
   verifyLineSignature,
   OverdueInvoice,
 } from '../services/lineService';
@@ -374,8 +375,8 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
     return;
   }
 
-  // Send invoice by number: "ส่งใบ INV-2026-001" or "ขอใบ TAX-001"
-  const invoiceReqMatch = trimmed.match(/(?:ส่งใบ|ขอใบ|ดูใบ|หาใบ)\s+(\S+)/i);
+  // Send invoice by number: "ส่งใบ INV-2026-001" / "ขอใบ TAX-001" / "PDF INV-001"
+  const invoiceReqMatch = trimmed.match(/(?:ส่งใบ|ขอใบ|ดูใบ|หาใบ|pdf)\s+(\S+)/i);
   if (invoiceReqMatch) {
     const invoiceNumber = invoiceReqMatch[1];
     try {
@@ -386,15 +387,21 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
       if (!invoice) {
         await sendLineText(lineUserId, `❌ ไม่พบเอกสารเลขที่ "${invoiceNumber}" ในระบบ`);
       } else {
-        const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
-        const statusLabel: Record<string, string> = { draft: 'ร่าง', pending: 'รอดำเนินการ', approved: 'อนุมัติแล้ว', submitted: 'ส่ง RD แล้ว', cancelled: 'ยกเลิก' };
-        let msg = `📄 เลขที่: ${invoice.invoiceNumber}\n👤 ลูกค้า: ${invoice.buyer.nameTh}\n💰 ยอดรวม: ${fmt(invoice.total)}\n📅 วันที่: ${new Date(invoice.invoiceDate).toLocaleDateString('th-TH')}\n🔖 สถานะ: ${statusLabel[invoice.status] ?? invoice.status}`;
-        if (invoice.pdfUrl) {
-          msg += `\n\n📎 ดาวน์โหลด PDF:\n${invoice.pdfUrl}`;
-        } else {
-          msg += '\n\n⏳ PDF ยังไม่พร้อม กรุณาลองใหม่ในอีกสักครู่';
+        const card = buildInvoiceFlexCard({
+          invoiceNumber: invoice.invoiceNumber,
+          buyerName: invoice.buyer.nameTh,
+          total: invoice.total,
+          vatAmount: invoice.vatAmount,
+          invoiceDate: invoice.invoiceDate,
+          dueDate: invoice.dueDate,
+          status: invoice.status,
+          isPaid: invoice.isPaid,
+          pdfUrl: invoice.pdfUrl,
+        });
+        if (!invoice.pdfUrl) {
+          await sendLineText(lineUserId, '⏳ PDF ยังไม่พร้อม แสดงข้อมูลเอกสารได้เลย:');
         }
-        await sendLineText(lineUserId, msg);
+        await sendLineFlexMessage(lineUserId, `ใบกำกับภาษี ${invoice.invoiceNumber}`, card);
       }
     } catch (err) {
       logger.error('[Line] invoice lookup failed', { err });

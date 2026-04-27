@@ -155,6 +155,80 @@ export function buildOverdueFlexCard(invoices: OverdueInvoice[]): object {
   };
 }
 
+export interface InvoiceSummary {
+  invoiceNumber: string;
+  buyerName: string;
+  total: number;
+  vatAmount: number;
+  invoiceDate: Date;
+  dueDate: Date | null;
+  status: string;
+  isPaid: boolean;
+  pdfUrl: string | null;
+}
+
+export function buildInvoiceFlexCard(inv: InvoiceSummary): object {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+
+  const statusLabel: Record<string, string> = {
+    draft: '📝 ร่าง', pending: '⏳ รอดำเนินการ', approved: '✅ อนุมัติ',
+    submitted: '📤 ส่ง RD แล้ว', cancelled: '❌ ยกเลิก',
+  };
+
+  const headerColor = inv.isPaid ? '#16a34a' : inv.status === 'cancelled' ? '#6b7280' : '#2563eb';
+
+  const row = (label: string, value: string) => ({
+    type: 'box', layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'sm', color: '#888888', flex: 3 },
+      { type: 'text', text: value, size: 'sm', color: '#333333', flex: 4, align: 'end', wrap: true },
+    ],
+  });
+
+  const footerButtons: object[] = [];
+  if (inv.pdfUrl) {
+    footerButtons.push({
+      type: 'button', style: 'primary', color: headerColor, flex: 1,
+      action: { type: 'uri', label: '📄 เปิด PDF', uri: inv.pdfUrl },
+    });
+  }
+  footerButtons.push({
+    type: 'button', style: 'secondary', flex: 1,
+    action: {
+      type: 'uri', label: '🌐 ดูในระบบ',
+      uri: `https://etax-invoice.vercel.app/app/invoices`,
+    },
+  });
+
+  return {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: headerColor,
+      contents: [
+        { type: 'text', text: '📄 ใบกำกับภาษี', color: '#ffffff', size: 'sm' },
+        { type: 'text', text: inv.invoiceNumber, color: '#ffffff', size: 'lg', weight: 'bold' },
+        { type: 'text', text: inv.isPaid ? '✅ ชำระแล้ว' : (statusLabel[inv.status] ?? inv.status), color: '#dbeafe', size: 'xs' },
+      ],
+    },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        row('ลูกค้า', inv.buyerName),
+        row('วันที่', new Date(inv.invoiceDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })),
+        inv.dueDate ? row('ครบกำหนด', new Date(inv.dueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })) : null,
+        { type: 'separator', margin: 'sm' },
+        row('ภาษีมูลค่าเพิ่ม', fmt(inv.vatAmount)),
+        row('ยอดรวม', fmt(inv.total)),
+      ].filter(Boolean),
+    },
+    footer: {
+      type: 'box', layout: 'horizontal', spacing: 'sm',
+      contents: footerButtons,
+    },
+  };
+}
+
 export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): object {
   const fmt = (n: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
