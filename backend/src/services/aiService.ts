@@ -6,14 +6,10 @@ const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1
 const visionModel = process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.0-flash';
 
 const FREE_CHAT_MODELS = [
+  'nvidia/nemotron-3-super-120b-a12b:free',
   process.env.OPENROUTER_CHAT_MODEL,
   'meta-llama/llama-3.3-70b-instruct:free',
   'google/gemma-3-27b-it:free',
-  'google/gemma-4-31b-it:free',
-  'google/gemma-3-12b-it:free',
-  'nousresearch/hermes-3-llama-3.1-405b:free',
-  'nvidia/nemotron-3-super-120b-a12b:free',
-  'meta-llama/llama-3.2-3b-instruct:free',
   'liquid/lfm-2.5-1.2b-instruct:free',
 ].filter(Boolean) as string[];
 
