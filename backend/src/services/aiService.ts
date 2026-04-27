@@ -3,6 +3,8 @@ import { logger } from '../config/logger';
 
 const apiKey = process.env.OPENROUTER_API_KEY ?? '';
 const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
+const googleAiKey = process.env.GOOGLE_AI_API_KEY ?? '';
+
 const FREE_VISION_MODELS = [
   process.env.OPENROUTER_VISION_MODEL,
   'nvidia/nemotron-nano-12b-v2-vl:free',
@@ -24,6 +26,32 @@ const FREE_PDF_MODELS = [
   'google/gemini-2.0-flash-exp:free',
   ...FREE_CHAT_MODELS,
 ].filter(Boolean) as string[];
+
+// Call Google Gemini API directly — supports image/jpeg, application/pdf inline
+async function callGemini(mimeType: string, base64Data: string, prompt: string): Promise<string> {
+  const model = 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleAiKey}`;
+  const body = {
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: mimeType, data: base64Data } },
+        { text: prompt },
+      ],
+    }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Gemini ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  const data = await res.json() as { candidates?: Array<{ content: { parts: Array<{ text?: string }> } }> };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+}
 
 export interface OcrResult {
   supplierName: string;
@@ -239,19 +267,26 @@ Rules:
 }`;
 
   try {
-    // For text/plain (PDF extracted text), send as text message; otherwise send as image
-    const isText = mimeType === 'text/plain';
-    const userContent: OpenRouterMessage['content'] = isText
-      ? `${ocrPrompt}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
-      : [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-          { type: 'text', text: ocrPrompt },
-        ];
+    let raw: string;
 
-    const messages: OpenRouterMessage[] = [{ role: 'user', content: userContent }];
-    const isPdf = mimeType === 'application/pdf';
-    const models = isText ? FREE_CHAT_MODELS : isPdf ? FREE_PDF_MODELS : FREE_VISION_MODELS;
-    const raw = await callOpenRouter(models, messages, 2000);
+    if (googleAiKey && mimeType !== 'text/plain') {
+      // Gemini handles image/jpeg and application/pdf natively — best quality for Thai invoices
+      logger.info('[OCR] Using Gemini API', { mimeType });
+      raw = await callGemini(mimeType, imageBase64, ocrPrompt);
+    } else {
+      // Fallback: OpenRouter free models
+      const isText = mimeType === 'text/plain';
+      const userContent: OpenRouterMessage['content'] = isText
+        ? `${ocrPrompt}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
+        : [
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            { type: 'text', text: ocrPrompt },
+          ];
+      const messages: OpenRouterMessage[] = [{ role: 'user', content: userContent }];
+      const isPdf = mimeType === 'application/pdf';
+      const models = isText ? FREE_CHAT_MODELS : isPdf ? FREE_PDF_MODELS : FREE_VISION_MODELS;
+      raw = await callOpenRouter(models, messages, 2000);
+    }
 
     // Extract JSON from response
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
