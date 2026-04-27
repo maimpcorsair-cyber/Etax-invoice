@@ -1,4 +1,3 @@
-import { messagingApi } from '@line/bot-sdk';
 import crypto from 'crypto';
 import { logger } from '../config/logger';
 import { OcrResult } from './aiService';
@@ -14,32 +13,35 @@ export interface OverdueInvoice {
   daysOverdue: number;
 }
 
-let _lineClient: messagingApi.MessagingApiClient | null = null;
-
-function getLineClient(): messagingApi.MessagingApiClient | null {
+async function linePush(lineUserId: string, messages: object[]): Promise<boolean> {
   if (!channelAccessToken) {
     logger.warn('[Line] LINE_CHANNEL_ACCESS_TOKEN not set — Line messaging disabled');
-    return null;
+    return false;
   }
-  if (!_lineClient) {
-    _lineClient = new messagingApi.MessagingApiClient({ channelAccessToken });
+  try {
+    const body = JSON.stringify({ to: lineUserId, messages });
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${channelAccessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      logger.error('[Line] push failed', { status: res.status, body: txt, lineUserId });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.error('[Line] push error', { error: String(err), lineUserId });
+    return false;
   }
-  return _lineClient;
 }
 
 export async function sendLineText(lineUserId: string, text: string): Promise<boolean> {
-  const client = getLineClient();
-  if (!client) return false;
-  try {
-    await client.pushMessage({
-      to: lineUserId,
-      messages: [{ type: 'text', text }],
-    });
-    return true;
-  } catch (err) {
-    logger.error('[Line] sendLineText failed', { err, lineUserId });
-    return false;
-  }
+  return linePush(lineUserId, [{ type: 'text', text }]);
 }
 
 export async function sendLineFlexMessage(
@@ -47,24 +49,7 @@ export async function sendLineFlexMessage(
   altText: string,
   flex: object,
 ): Promise<boolean> {
-  const client = getLineClient();
-  if (!client) return false;
-  try {
-    await client.pushMessage({
-      to: lineUserId,
-      messages: [
-        {
-          type: 'flex',
-          altText,
-          contents: flex as messagingApi.FlexContainer,
-        },
-      ],
-    });
-    return true;
-  } catch (err) {
-    logger.error('[Line] sendLineFlexMessage failed', { err, lineUserId });
-    return false;
-  }
+  return linePush(lineUserId, [{ type: 'flex', altText, contents: flex }]);
 }
 
 export function buildOverdueFlexCard(invoices: OverdueInvoice[]): object {
