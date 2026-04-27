@@ -353,15 +353,17 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     if (isPdf) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
+        const pdfMod = require('pdf-parse');
+        const pdfParse: (buf: Buffer) => Promise<{ text: string }> = pdfMod.default ?? pdfMod;
         const pdfData = await pdfParse(buffer);
         const text = pdfData.text?.trim();
         logger.info('[Line] PDF text extracted', { chars: text?.length ?? 0, preview: text?.slice(0, 100) });
         if (!text) throw new Error('no text extracted');
         result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
       } catch (pdfErr) {
-        logger.warn('[Line] PDF text extract failed, trying as image', { error: String(pdfErr) });
-        result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
+        logger.warn('[Line] PDF text extract failed (scanned PDF?)', { error: String(pdfErr) });
+        await sendLineText(lineUserId, '⚠️ PDF นี้เป็นสแกน/รูปภาพ ไม่สามารถอ่านข้อความได้\nกรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
+        return;
       }
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
