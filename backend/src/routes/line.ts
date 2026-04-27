@@ -348,22 +348,26 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     const isPdf = contentType.includes('pdf') || buffer.slice(0, 4).toString() === '%PDF';
 
     let result;
+    logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
+
     if (isPdf) {
-      // Extract text from PDF then OCR via text
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
         const pdfData = await pdfParse(buffer);
         const text = pdfData.text?.trim();
+        logger.info('[Line] PDF text extracted', { chars: text?.length ?? 0, preview: text?.slice(0, 100) });
         if (!text) throw new Error('no text extracted');
         result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
       } catch (pdfErr) {
-        logger.warn('[Line] PDF text extract failed, trying as image', { pdfErr });
+        logger.warn('[Line] PDF text extract failed, trying as image', { error: String(pdfErr) });
         result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
       }
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
     }
+
+    logger.info('[Line] OCR result', { confidence: result.confidence, supplierName: result.supplierName, total: result.total });
 
     if (result.confidence === 'low' && !result.supplierName && !result.total) {
       await sendLineText(
