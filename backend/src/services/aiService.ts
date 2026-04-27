@@ -29,7 +29,7 @@ const FREE_PDF_MODELS = [
 
 // Call Google Gemini API directly — supports image/jpeg, application/pdf inline
 async function callGemini(mimeType: string, base64Data: string, prompt: string): Promise<string> {
-  const model = 'gemini-2.0-flash';
+  const model = 'gemini-2.5-flash-lite';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleAiKey}`;
   const body = {
     contents: [{
