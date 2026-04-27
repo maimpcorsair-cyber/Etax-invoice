@@ -3,7 +3,12 @@ import { logger } from '../config/logger';
 
 const apiKey = process.env.OPENROUTER_API_KEY ?? '';
 const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
-const visionModel = process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.0-flash';
+const FREE_VISION_MODELS = [
+  process.env.OPENROUTER_VISION_MODEL,
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'baidu/qianfan-ocr-fast:free',
+  'google/gemma-4-26b-a4b-it:free',
+].filter(Boolean) as string[];
 
 const FREE_CHAT_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
@@ -234,7 +239,7 @@ export async function ocrSupplierInvoice(
       },
     ];
 
-    const raw = await callOpenRouter([visionModel], messages, 2000);
+    const raw = await callOpenRouter(FREE_VISION_MODELS, messages, 2000);
 
     // Extract JSON from response
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
