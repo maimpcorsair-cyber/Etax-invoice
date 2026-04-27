@@ -10,20 +10,19 @@ const FREE_VISION_MODELS = [
   'google/gemma-4-26b-a4b-it:free',
 ].filter(Boolean) as string[];
 
-// Models that natively support PDF documents (not just images)
-const FREE_PDF_MODELS = [
-  'google/gemini-2.0-flash-lite-001:free',
-  'google/gemini-2.5-flash-preview:free',
-  'google/gemini-2.0-flash-exp:free',
-  ...FREE_CHAT_MODELS,
-].filter(Boolean) as string[];
-
 const FREE_CHAT_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   process.env.OPENROUTER_CHAT_MODEL,
   'meta-llama/llama-3.3-70b-instruct:free',
   'google/gemma-3-27b-it:free',
   'liquid/lfm-2.5-1.2b-instruct:free',
+].filter(Boolean) as string[];
+
+const FREE_PDF_MODELS = [
+  'google/gemini-2.0-flash-lite-001:free',
+  'google/gemini-2.5-flash-preview:free',
+  'google/gemini-2.0-flash-exp:free',
+  ...FREE_CHAT_MODELS,
 ].filter(Boolean) as string[];
 
 export interface OcrResult {
