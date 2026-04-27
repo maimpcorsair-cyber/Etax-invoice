@@ -35,7 +35,7 @@ async function callOpenRouter(
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://etax-invoice.vercel.app',
-      'X-Title': 'e-Tax Invoice พี่นุช',
+      'X-Title': 'e-Tax Invoice Pinuch',
     },
     body: JSON.stringify({
       model,
