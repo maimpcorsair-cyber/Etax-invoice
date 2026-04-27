@@ -431,11 +431,14 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 
 export async function lineWebhookHandler(req: Request, res: Response): Promise<void> {
   const sig = req.headers['x-line-signature'] as string | undefined;
+  logger.info('[Line] Webhook received', { hasSignature: !!sig, bodyLength: (req.body as Buffer)?.length });
 
   let body: LineWebhookBody;
   try {
     body = JSON.parse((req.body as Buffer).toString()) as LineWebhookBody;
-  } catch {
+    logger.info('[Line] Webhook parsed', { eventCount: body.events?.length ?? 0 });
+  } catch (e) {
+    logger.error('[Line] Webhook body parse failed', { error: String(e) });
     res.json({ ok: true });
     return;
   }
