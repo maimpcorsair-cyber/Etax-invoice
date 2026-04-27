@@ -3,8 +3,15 @@ import { logger } from '../config/logger';
 
 const apiKey = process.env.OPENROUTER_API_KEY ?? '';
 const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
-const chatModel = process.env.OPENROUTER_CHAT_MODEL ?? 'google/gemini-2.0-flash-exp:free';
 const visionModel = process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.0-flash';
+
+const FREE_CHAT_MODELS = [
+  process.env.OPENROUTER_CHAT_MODEL,
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'qwen/qwen-2.5-72b-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+  'google/gemini-2.0-flash-lite:free',
+].filter(Boolean) as string[];
 
 export interface OcrResult {
   supplierName: string;
@@ -25,33 +32,31 @@ interface OpenRouterMessage {
 }
 
 async function callOpenRouter(
-  model: string,
+  models: string[],
   messages: OpenRouterMessage[],
   maxTokens = 1000,
 ): Promise<string> {
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://etax-invoice.vercel.app',
-      'X-Title': 'e-Tax Invoice Pinuch',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: maxTokens,
-      temperature: 0.3,
-    }),
-  });
-
-  if (!response.ok) {
+  let lastError = '';
+  for (const model of models) {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://etax-invoice.vercel.app',
+        'X-Title': 'e-Tax Invoice Pinuch',
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0.3 }),
+    });
+    if (response.ok) {
+      const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+      return data.choices[0]?.message?.content ?? '';
+    }
     const text = await response.text();
-    throw new Error(`OpenRouter error ${response.status}: ${text}`);
+    lastError = `${model}: ${response.status} ${text}`;
+    logger.warn('[AI] Model unavailable, trying next', { model, status: response.status });
   }
-
-  const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content ?? '';
+  throw new Error(`All models failed. Last error: ${lastError}`);
 }
 
 export async function buildCompanyContext(companyId: string): Promise<string> {
@@ -160,7 +165,7 @@ ${context}`,
       },
     ];
 
-    const answer = await callOpenRouter(chatModel, messages, 1000);
+    const answer = await callOpenRouter(FREE_CHAT_MODELS, messages, 1000);
     return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -229,7 +234,7 @@ export async function ocrSupplierInvoice(
       },
     ];
 
-    const raw = await callOpenRouter(visionModel, messages, 2000);
+    const raw = await callOpenRouter([visionModel], messages, 2000);
 
     // Extract JSON from response
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
