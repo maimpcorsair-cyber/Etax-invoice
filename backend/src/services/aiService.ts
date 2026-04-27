@@ -209,18 +209,7 @@ export async function ocrSupplierInvoice(
     confidence: 'low',
   };
 
-  try {
-    const messages: OpenRouterMessage[] = [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
-          },
-          {
-            type: 'text',
-            text: `You are an OCR assistant for Thai tax invoices. Extract all available information from this document and return ONLY a JSON object, no other text.
+  const ocrPrompt = `You are an OCR assistant for Thai tax invoices. Extract all available information from this document and return ONLY a JSON object, no other text.
 
 Rules:
 - Extract whatever is visible, even if partial
@@ -240,13 +229,21 @@ Rules:
   "total": 0,
   "confidence": "high|medium|low",
   "rawText": "all text found in document"
-}`,
-          },
-        ],
-      },
-    ];
+}`;
 
-    const raw = await callOpenRouter(FREE_VISION_MODELS, messages, 2000);
+  try {
+    // For text/plain (PDF extracted text), send as text message; otherwise send as image
+    const isText = mimeType === 'text/plain';
+    const userContent: OpenRouterMessage['content'] = isText
+      ? `${ocrPrompt}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
+      : [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+          { type: 'text', text: ocrPrompt },
+        ];
+
+    const messages: OpenRouterMessage[] = [{ role: 'user', content: userContent }];
+    const models = isText ? FREE_CHAT_MODELS : FREE_VISION_MODELS;
+    const raw = await callOpenRouter(models, messages, 2000);
 
     // Extract JSON from response
     const jsonMatch = raw.match(/\{[\s\S]*\}/);

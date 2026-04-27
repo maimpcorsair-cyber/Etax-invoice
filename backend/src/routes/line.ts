@@ -326,7 +326,6 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
 
 async function handleImageMessage(lineUserId: string, messageId: string): Promise<void> {
   try {
-    // Download image from Line CDN
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
     if (!token) {
       await sendLineText(lineUserId, 'ขอโทษ ระบบ Line ยังไม่ได้ตั้งค่า');
@@ -339,15 +338,32 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     );
 
     if (!contentResponse.ok) {
-      logger.error('[Line] Failed to download image', { status: contentResponse.status, messageId });
-      await sendLineText(lineUserId, 'ขอโทษ ไม่สามารถดาวน์โหลดรูปภาพได้');
+      logger.error('[Line] Failed to download file', { status: contentResponse.status, messageId });
+      await sendLineText(lineUserId, 'ขอโทษ ไม่สามารถดาวน์โหลดไฟล์ได้');
       return;
     }
 
-    const buffer = await contentResponse.arrayBuffer();
-    const imageBase64 = Buffer.from(buffer).toString('base64');
+    const buffer = Buffer.from(await contentResponse.arrayBuffer());
+    const contentType = contentResponse.headers.get('content-type') ?? 'image/jpeg';
+    const isPdf = contentType.includes('pdf') || buffer.slice(0, 4).toString() === '%PDF';
 
-    const result = await ocrSupplierInvoice(imageBase64, 'image/jpeg');
+    let result;
+    if (isPdf) {
+      // Extract text from PDF then OCR via text
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
+        const pdfData = await pdfParse(buffer);
+        const text = pdfData.text?.trim();
+        if (!text) throw new Error('no text extracted');
+        result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
+      } catch (pdfErr) {
+        logger.warn('[Line] PDF text extract failed, trying as image', { pdfErr });
+        result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
+      }
+    } else {
+      result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
+    }
 
     if (result.confidence === 'low' && !result.supplierName && !result.total) {
       await sendLineText(
