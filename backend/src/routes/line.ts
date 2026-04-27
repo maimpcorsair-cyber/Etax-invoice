@@ -351,8 +351,7 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
 
     if (isPdf) {
-      // Try text extraction first (fast, works for text-based PDFs)
-      let textExtracted = false;
+      // Try 1: extract text (fast, works for digital PDFs)
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const pdfMod = require('pdf-parse');
@@ -361,46 +360,16 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
         const text = pdfData.text?.trim();
         logger.info('[Line] PDF text extracted', { chars: text?.length ?? 0 });
         if (text && text.length > 20) {
-          textExtracted = true;
           result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
         }
       } catch (pdfErr) {
         logger.warn('[Line] PDF text extract failed', { error: String(pdfErr) });
       }
 
-      // Fallback: render PDF first page to image via Puppeteer
-      if (!textExtracted) {
-        try {
-          const os = await import('os');
-          const fs = await import('fs');
-          const path = await import('path');
-          const puppeteer = await import('puppeteer');
-
-          const tmpPdf = path.join(os.tmpdir(), `line-ocr-${Date.now()}.pdf`);
-          const tmpPng = tmpPdf.replace('.pdf', '.png');
-          fs.writeFileSync(tmpPdf, buffer);
-
-          const browser = await puppeteer.default.launch({
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? '/usr/bin/chromium-browser',
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-          });
-          const page = await browser.newPage();
-          await page.goto(`file://${tmpPdf}`, { waitUntil: 'networkidle0' });
-          await page.setViewport({ width: 1240, height: 1754 });
-          await page.screenshot({ path: tmpPng as `${string}.png`, fullPage: false });
-          await browser.close();
-
-          const imgBuffer = fs.readFileSync(tmpPng);
-          fs.unlinkSync(tmpPdf);
-          fs.unlinkSync(tmpPng);
-
-          logger.info('[Line] PDF rendered to image via Puppeteer', { size: imgBuffer.length });
-          result = await ocrSupplierInvoice(imgBuffer.toString('base64'), 'image/png');
-        } catch (puppeteerErr) {
-          logger.error('[Line] PDF Puppeteer render failed', { error: String(puppeteerErr) });
-          await sendLineText(lineUserId, '⚠️ ไม่สามารถอ่าน PDF นี้ได้ กรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
-          return;
-        }
+      // Try 2: send PDF directly to vision model (Gemini supports application/pdf natively)
+      if (!result || (result.confidence === 'low' && !result.supplierName)) {
+        logger.info('[Line] Trying PDF direct vision OCR');
+        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
       }
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
