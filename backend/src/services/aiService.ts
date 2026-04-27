@@ -266,7 +266,7 @@ Rules:
       rawText: parsed.rawText,
     };
   } catch (err) {
-    logger.error('ocrSupplierInvoice failed', { err });
+    logger.error('ocrSupplierInvoice failed', { error: err instanceof Error ? err.message : String(err) });
     return emptyResult;
   }
 }
