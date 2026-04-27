@@ -304,8 +304,18 @@ export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): obje
           flex: 1,
           action: {
             type: 'postback',
-            label: '✅ บันทึกภาษีซื้อ',
+            label: '✅ บันทึก',
             data: `confirm_purchase:${tempId}`,
+          },
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          flex: 1,
+          action: {
+            type: 'postback',
+            label: '✏️ แก้ไข',
+            data: `edit_before_save:${tempId}`,
           },
         },
         {

@@ -15,6 +15,7 @@ import {
   OverdueInvoice,
 } from '../services/lineService';
 import { askPinuch, buildCompanyContext, ocrSupplierInvoice, OcrResult } from '../services/aiService';
+import { setupRichMenu } from '../services/richMenuService';
 
 export const lineRouter = Router();
 
@@ -137,6 +138,21 @@ lineRouter.put('/settings', authenticate, requireRole('admin', 'super_admin'), a
   }
 });
 
+// POST /api/line/admin/setup-richmenu
+lineRouter.post('/admin/setup-richmenu', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const result = await setupRichMenu();
+    if (!result.ok) {
+      res.status(500).json({ error: result.error });
+      return;
+    }
+    res.json({ data: { richMenuId: result.richMenuId } });
+  } catch (err) {
+    logger.error('[Line] setup-richmenu failed', { err });
+    res.status(500).json({ error: 'Failed to setup rich menu' });
+  }
+});
+
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 interface LineSource {
@@ -238,7 +254,6 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
   const fullData = session.data as OcrResult & { companyId?: string };
   const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(fullData));
-  await sendLineText(lineUserId, `✅ ได้รับข้อมูลครบถ้วนแล้ว กรุณายืนยันการบันทึก`);
   await sendLineFlexMessage(
     lineUserId,
     'ตรวจพบใบแจ้งหนี้ — กรุณายืนยัน',
@@ -386,7 +401,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   if (!link) {
     await sendLineText(
       lineUserId,
-      'ยังไม่ได้เชื่อมบัญชี กรุณาเข้าระบบ e-Tax Invoice แล้วไปที่การตั้งค่า Line เพื่อรับ OTP',
+      'ยังไม่ได้เชื่อมบัญชีครับ 🔗\n\nกรุณาเข้าระบบ e-Tax Invoice → ตั้งค่า → Line แล้วกด "สร้างรหัส OTP"\nจากนั้นส่งรหัส 6 หลักมาที่นี่ครับ\n\n👉 https://etax-invoice.vercel.app',
     );
     return;
   }
@@ -399,8 +414,29 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   if (['สวัสดี', 'help', 'ช่วยเหลือ'].includes(lower)) {
     await sendLineText(
       lineUserId,
-      `สวัสดีครับ! ผมพี่นุช ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\nสิ่งที่ผมช่วยได้:\n• ถามคำถามทั่วไปเกี่ยวกับบัญชีและภาษี\n• พิมพ์ "สรุปภาษี" เพื่อดูยอด VAT เดือนนี้\n• พิมพ์ "ใบเกินกำหนด" เพื่อดูใบแจ้งหนี้ที่ค้างชำระ\n• ส่งรูปใบแจ้งหนี้ เพื่อให้ผม OCR และบันทึกภาษีซื้อ`,
+      `สวัสดีครับ! ผมพี่นุช ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\n` +
+      `📥 บันทึกภาษีซื้อ:\n` +
+      `• ส่งรูป .jpg/.png หรือ PDF ใบกำกับภาษีผู้ขาย\n\n` +
+      `📊 ดูข้อมูลบัญชี:\n` +
+      `• "สรุปภาษี" — ยอด VAT เดือนนี้\n` +
+      `• "ใบเกินกำหนด" — ใบแจ้งหนี้ค้างชำระ\n\n` +
+      `📄 จัดการใบกำกับภาษีขาย:\n` +
+      `• "ส่งใบ INV-001" — รับ Flex Card + ปุ่มเปิด PDF\n` +
+      `• "ขอใบ / ดูใบ / หาใบ / pdf [เลขที่]" — ค้นหาเอกสาร\n\n` +
+      `💬 ถามพี่นุชได้เลย เช่น "ภาษีซื้อเดือนนี้เท่าไร"\n\n` +
+      `❌ พิมพ์ "ยกเลิก" เพื่อหยุดการกรอกข้อมูลกลางคัน`,
     );
+    return;
+  }
+
+  if (lower === 'วิธีค้นหาใบ' || lower === 'ค้นหาใบ') {
+    await sendLineText(lineUserId,
+      '🔍 วิธีค้นหาใบกำกับภาษี\n\nพิมพ์คำสั่งตามนี้:\n• "ส่งใบ INV-2026-001"\n• "ขอใบ TAX-001"\n• "ดูใบ [เลขที่]"\n• "pdf [เลขที่]"\n\nระบบจะส่ง Flex Card พร้อมปุ่มเปิด PDF ให้ทันที');
+    return;
+  }
+  if (lower === 'วิธีอัพโหลดเอกสาร' || lower === 'อัพโหลดเอกสาร') {
+    await sendLineText(lineUserId,
+      '📁 วิธีอัพโหลดใบกำกับภาษีซื้อ\n\n1️⃣ ส่งรูปภาพ (.jpg .png) หรือไฟล์ PDF ใบกำกับภาษีผู้ขาย\n2️⃣ พี่นุชจะ OCR อ่านข้อมูลอัตโนมัติ\n3️⃣ ถ้าข้อมูลไม่ครบ พี่นุชจะถามเพิ่ม\n4️⃣ กดยืนยันเพื่อบันทึกภาษีซื้อ\n\n💡 รองรับทั้ง PDF ดิจิทัลและ PDF สแกน');
     return;
   }
 
@@ -683,9 +719,10 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       const fmt = (n: number) =>
         new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
 
+      const vatLine = ocrData.vatAmount > 0 ? `\n💰 ภาษีซื้อ ${fmt(ocrData.vatAmount)}` : '';
       await sendLineTextWithQuickReply(
         lineUserId,
-        `✅ บันทึกภาษีซื้อเรียบร้อย!\n📋 ${ocrData.supplierName}\n💰 ภาษีซื้อ ${fmt(ocrData.vatAmount)}`,
+        `✅ บันทึกภาษีซื้อเรียบร้อย!\n📋 ${ocrData.supplierName}${vatLine}\n💵 ยอดรวม ${fmt(ocrData.total)}`,
         [
           { label: '✏️ แก้ไขข้อมูล', data: `edit_purchase:${saved.id}`, displayText: 'แก้ไขข้อมูล' },
           { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
@@ -706,6 +743,32 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       logger.error('[Line] reject_purchase redis del failed', { err });
     }
     await sendLineText(lineUserId, 'ยกเลิกแล้ว');
+  }
+
+  if (data.startsWith('edit_before_save:')) {
+    const tempId = data.slice('edit_before_save:'.length);
+    const stored = await redis.get(`ocr:temp:${tempId}`);
+    if (!stored) {
+      await sendLineText(lineUserId, '⏱ ข้อมูลหมดอายุแล้ว กรุณาส่งรูปใหม่');
+      return;
+    }
+    const ocrData = JSON.parse(stored) as OcrResult & { companyId?: string };
+    // Start a pre-save edit session — reuse LineSession
+    const allFields = REQUIRED_OCR_FIELDS.map(f => f.key);
+    const session: LineSession = {
+      state: 'awaiting_field',
+      currentField: allFields[0],
+      pendingFields: allFields.slice(1),
+      data: { ...ocrData },
+    };
+    // We keep the ocr:temp entry alive so we can re-show confirm card after edits
+    await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify({ ...session, tempId }));
+    await sendLineTextWithQuickReply(
+      lineUserId,
+      `✏️ แก้ไขข้อมูลก่อนบันทึก\n\nปัจจุบัน: ${ocrData.supplierName || '-'}\n📌 ชื่อผู้ขาย (พิมพ์ค่าใหม่ หรือ "-" เพื่อข้าม)`,
+      [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
+    );
+    return;
   }
 
   if (data.startsWith('edit_purchase:')) {
@@ -782,7 +845,15 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       if (event.type === 'follow') {
         await sendLineText(
           lineUserId,
-          'สวัสดีครับ/ค่ะ! ผมพี่นุช ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\nส่ง OTP ที่ได้จากระบบมาหาผมเพื่อเชื่อมบัญชีของคุณ',
+          'สวัสดีครับ! ผมพี่นุช ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\n' +
+          'ส่ง OTP 6 หลักจากระบบ e-Tax Invoice เพื่อเชื่อมบัญชีก่อนเริ่มใช้งานนะครับ\n\n' +
+          '📋 สิ่งที่ทำได้หลังเชื่อมบัญชี:\n' +
+          '• ส่งรูป/PDF ใบกำกับภาษี → บันทึกภาษีซื้ออัตโนมัติ\n' +
+          '• พิมพ์ "สรุปภาษี" → ดูยอด VAT เดือนนี้\n' +
+          '• พิมพ์ "ใบเกินกำหนด" → ใบแจ้งหนี้ค้างชำระ\n' +
+          '• พิมพ์ "ส่งใบ [เลขที่]" → รับ PDF ใบกำกับภาษี\n' +
+          '• พิมพ์ "ช่วยเหลือ" → ดูคำสั่งทั้งหมด\n\n' +
+          '💡 หรือใช้เมนูด้านล่างได้เลยครับ',
         );
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;
