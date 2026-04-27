@@ -20,11 +20,11 @@ const FREE_CHAT_MODELS = [
   'liquid/lfm-2.5-1.2b-instruct:free',
 ].filter(Boolean) as string[];
 
-const FREE_PDF_MODELS = [
-  'google/gemini-2.0-flash-lite-001:free',
-  'google/gemini-2.5-flash-preview:free',
-  'google/gemini-2.0-flash-exp:free',
-  ...FREE_CHAT_MODELS,
+// PDF-capable models — Gemini on OpenRouter accepts application/pdf via image_url
+const PDF_MODELS = [
+  'google/gemini-2.0-flash-lite-001',
+  'google/gemini-2.5-flash-lite',
+  'google/gemini-2.0-flash-001',
 ].filter(Boolean) as string[];
 
 // Call Google Gemini API directly — supports image/jpeg, application/pdf inline
@@ -291,7 +291,7 @@ Rules:
           ];
       const messages: OpenRouterMessage[] = [{ role: 'user', content: userContent }];
       const isPdf = mimeType === 'application/pdf';
-      const models = isText ? FREE_CHAT_MODELS : isPdf ? FREE_PDF_MODELS : FREE_VISION_MODELS;
+      const models = isText ? FREE_CHAT_MODELS : isPdf ? PDF_MODELS : FREE_VISION_MODELS;
       raw = await callOpenRouter(models, messages, 2000);
     }
 

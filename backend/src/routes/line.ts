@@ -351,32 +351,9 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
 
     if (isPdf) {
-      const hasGemini = !!process.env.GOOGLE_AI_API_KEY;
-      if (hasGemini) {
-        // Gemini reads PDF natively — works for both digital and scanned PDFs
-        logger.info('[Line] Sending PDF to Gemini', { bytes: buffer.length });
-        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
-      } else {
-        // Fallback: extract text via pdf-parse v2 then send to chat model
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { PDFParse } = require('pdf-parse');
-          const parser = new PDFParse({ data: new Uint8Array(buffer) });
-          const textResult = await parser.getText();
-          const text = (textResult.text ?? '').trim();
-          logger.info('[Line] PDF text extracted', { chars: text.length });
-          if (text.length > 20) {
-            result = await ocrSupplierInvoice(Buffer.from(text, 'utf-8').toString('base64'), 'text/plain');
-          } else {
-            await sendLineText(lineUserId, '⚠️ PDF นี้อาจเป็นไฟล์รูปสแกน กรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
-            return;
-          }
-        } catch (pdfErr) {
-          logger.warn('[Line] PDF text extract failed', { error: String(pdfErr) });
-          await sendLineText(lineUserId, '⚠️ ไม่สามารถอ่าน PDF นี้ได้ กรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
-          return;
-        }
-      }
+      // Send PDF directly to Gemini via OpenRouter — supports both digital and scanned PDFs
+      logger.info('[Line] Sending PDF to Gemini via OpenRouter', { bytes: buffer.length });
+      result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
     }
