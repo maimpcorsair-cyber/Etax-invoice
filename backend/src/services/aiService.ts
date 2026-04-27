@@ -267,14 +267,21 @@ Rules:
 }`;
 
   try {
-    let raw: string;
+    let raw = '';
 
+    // Try Gemini first (handles image + PDF natively, best Thai OCR)
     if (googleAiKey && mimeType !== 'text/plain') {
-      // Gemini handles image/jpeg and application/pdf natively — best quality for Thai invoices
-      logger.info('[OCR] Using Gemini API', { mimeType });
-      raw = await callGemini(mimeType, imageBase64, ocrPrompt);
-    } else {
-      // Fallback: OpenRouter free models
+      try {
+        logger.info('[OCR] Trying Gemini API', { mimeType });
+        raw = await callGemini(mimeType, imageBase64, ocrPrompt);
+        logger.info('[OCR] Gemini responded', { chars: raw.length });
+      } catch (geminiErr) {
+        logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
+      }
+    }
+
+    // Fallback: OpenRouter free models
+    if (!raw) {
       const isText = mimeType === 'text/plain';
       const userContent: OpenRouterMessage['content'] = isText
         ? `${ocrPrompt}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
