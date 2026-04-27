@@ -1,4 +1,5 @@
-import { messagingApi, validateSignature } from '@line/bot-sdk';
+import { messagingApi } from '@line/bot-sdk';
+import crypto from 'crypto';
 import { logger } from '../config/logger';
 import { OcrResult } from './aiService';
 
@@ -255,9 +256,12 @@ export function verifyLineSignature(body: Buffer, signature: string): boolean {
     return false;
   }
   try {
-    return validateSignature(body, channelSecret, signature);
+    const hmac = crypto.createHmac('sha256', channelSecret);
+    hmac.update(body);
+    const digest = hmac.digest('base64');
+    return digest === signature;
   } catch (err) {
-    logger.error('[Line] verifyLineSignature error', { err });
+    logger.error('[Line] verifyLineSignature error', { error: String(err) });
     return false;
   }
 }
