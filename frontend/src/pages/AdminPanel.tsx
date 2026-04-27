@@ -1664,6 +1664,30 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       .finally(() => setLoading(false));
   }, [token, policy?.canUseLineOa]);
 
+  const [richMenuLoading, setRichMenuLoading] = useState(false);
+  const [richMenuMsg, setRichMenuMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  async function handleSetupRichMenu() {
+    setRichMenuLoading(true);
+    setRichMenuMsg(null);
+    try {
+      const res = await fetch('/api/line/admin/setup-richmenu', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await res.json() as { data?: { richMenuId: string }; error?: string };
+      if (!res.ok) {
+        setRichMenuMsg({ type: 'err', text: j.error ?? 'เกิดข้อผิดพลาด' });
+      } else {
+        setRichMenuMsg({ type: 'ok', text: `✅ ติดตั้ง Rich Menu สำเร็จ (ID: ${j.data?.richMenuId ?? ''})` });
+      }
+    } catch {
+      setRichMenuMsg({ type: 'err', text: 'ไม่สามารถเชื่อมต่อได้' });
+    } finally {
+      setRichMenuLoading(false);
+    }
+  }
+
   async function handleLinkStart() {
     setMsg(null);
     try {
@@ -1873,6 +1897,27 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             )}
           </div>
         )}
+      </div>
+
+      {/* Rich Menu Setup card — admin only */}
+      <div className="border border-gray-200 rounded-xl p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📋</span>
+          <h3 className="font-medium text-gray-800">Rich Menu (เมนูด้านล่าง Chat)</h3>
+        </div>
+        <p className="text-sm text-gray-500">
+          ติดตั้งปุ่มเมนูถาวรในแชท LINE ให้ผู้ใช้กดได้โดยไม่ต้องจำคำสั่ง ทำครั้งเดียวก็พอครับ
+        </p>
+        {richMenuMsg && (
+          <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${richMenuMsg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {richMenuMsg.type === 'ok' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+            {richMenuMsg.text}
+          </div>
+        )}
+        <button className="btn-primary" onClick={handleSetupRichMenu} disabled={richMenuLoading}>
+          {richMenuLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>🚀</span>}
+          {richMenuLoading ? 'กำลังติดตั้ง...' : 'ติดตั้ง Rich Menu'}
+        </button>
       </div>
 
       {/* Notification Settings card — show only when linked */}
