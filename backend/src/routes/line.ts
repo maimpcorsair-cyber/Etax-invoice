@@ -351,25 +351,24 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
 
     if (isPdf) {
-      // Try 1: extract text (fast, works for digital PDFs)
+      // Extract text via pdf-parse v2 (PDFParse class API)
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const pdfMod = require('pdf-parse');
-        const pdfParse: (buf: Buffer) => Promise<{ text: string }> = pdfMod.default ?? pdfMod;
-        const pdfData = await pdfParse(buffer);
-        const text = pdfData.text?.trim();
-        logger.info('[Line] PDF text extracted', { chars: text?.length ?? 0 });
-        if (text && text.length > 20) {
-          result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
+        const { PDFParse } = require('pdf-parse');
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        const textResult = await parser.getText();
+        const text = (textResult.text ?? '').trim();
+        logger.info('[Line] PDF text extracted', { chars: text.length, pages: textResult.total });
+        if (text.length > 20) {
+          result = await ocrSupplierInvoice(Buffer.from(text, 'utf-8').toString('base64'), 'text/plain');
+        } else {
+          await sendLineText(lineUserId, '⚠️ PDF นี้อาจเป็นไฟล์รูปสแกน (ไม่มีข้อความให้อ่าน) กรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
+          return;
         }
       } catch (pdfErr) {
         logger.warn('[Line] PDF text extract failed', { error: String(pdfErr) });
-      }
-
-      // Try 2: send PDF directly to Gemini (supports application/pdf natively)
-      if (!result || (result.confidence === 'low' && !result.supplierName && !result.total)) {
-        logger.info('[Line] Trying PDF direct Gemini OCR');
-        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
+        await sendLineText(lineUserId, '⚠️ ไม่สามารถอ่าน PDF นี้ได้ กรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
+        return;
       }
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
