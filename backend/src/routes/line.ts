@@ -347,35 +347,71 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     const contentType = contentResponse.headers.get('content-type') ?? 'image/jpeg';
     const isPdf = contentType.includes('pdf') || buffer.slice(0, 4).toString() === '%PDF';
 
-    let result;
+    let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
 
     if (isPdf) {
+      // Try text extraction first (fast, works for text-based PDFs)
+      let textExtracted = false;
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const pdfMod = require('pdf-parse');
         const pdfParse: (buf: Buffer) => Promise<{ text: string }> = pdfMod.default ?? pdfMod;
         const pdfData = await pdfParse(buffer);
         const text = pdfData.text?.trim();
-        logger.info('[Line] PDF text extracted', { chars: text?.length ?? 0, preview: text?.slice(0, 100) });
-        if (!text) throw new Error('no text extracted');
-        result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
+        logger.info('[Line] PDF text extracted', { chars: text?.length ?? 0 });
+        if (text && text.length > 20) {
+          textExtracted = true;
+          result = await ocrSupplierInvoice(Buffer.from(text).toString('base64'), 'text/plain');
+        }
       } catch (pdfErr) {
-        logger.warn('[Line] PDF text extract failed (scanned PDF?)', { error: String(pdfErr) });
-        await sendLineText(lineUserId, '⚠️ PDF นี้เป็นสแกน/รูปภาพ ไม่สามารถอ่านข้อความได้\nกรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
-        return;
+        logger.warn('[Line] PDF text extract failed', { error: String(pdfErr) });
+      }
+
+      // Fallback: render PDF first page to image via Puppeteer
+      if (!textExtracted) {
+        try {
+          const os = await import('os');
+          const fs = await import('fs');
+          const path = await import('path');
+          const puppeteer = await import('puppeteer');
+
+          const tmpPdf = path.join(os.tmpdir(), `line-ocr-${Date.now()}.pdf`);
+          const tmpPng = tmpPdf.replace('.pdf', '.png');
+          fs.writeFileSync(tmpPdf, buffer);
+
+          const browser = await puppeteer.default.launch({
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? '/usr/bin/chromium-browser',
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          });
+          const page = await browser.newPage();
+          await page.goto(`file://${tmpPdf}`, { waitUntil: 'networkidle0' });
+          await page.setViewport({ width: 1240, height: 1754 });
+          await page.screenshot({ path: tmpPng as `${string}.png`, fullPage: false });
+          await browser.close();
+
+          const imgBuffer = fs.readFileSync(tmpPng);
+          fs.unlinkSync(tmpPdf);
+          fs.unlinkSync(tmpPng);
+
+          logger.info('[Line] PDF rendered to image via Puppeteer', { size: imgBuffer.length });
+          result = await ocrSupplierInvoice(imgBuffer.toString('base64'), 'image/png');
+        } catch (puppeteerErr) {
+          logger.error('[Line] PDF Puppeteer render failed', { error: String(puppeteerErr) });
+          await sendLineText(lineUserId, '⚠️ ไม่สามารถอ่าน PDF นี้ได้ กรุณาส่งเป็นรูปภาพ (.jpg/.png) แทนครับ');
+          return;
+        }
       }
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
     }
 
+    if (!result) return;
+
     logger.info('[Line] OCR result', { confidence: result.confidence, supplierName: result.supplierName, total: result.total });
 
     if (result.confidence === 'low' && !result.supplierName && !result.total) {
-      await sendLineText(
-        lineUserId,
-        '❌ ไม่สามารถอ่านเอกสารได้เลย กรุณาส่งรูปที่ชัดขึ้นหรือส่งเป็นไฟล์ PDF',
-      );
+      await sendLineText(lineUserId, '❌ ไม่สามารถอ่านเอกสารได้ กรุณาส่งรูปที่ชัดขึ้น');
       return;
     }
 
