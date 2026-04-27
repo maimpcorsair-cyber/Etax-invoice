@@ -7,6 +7,7 @@ import { logger } from '../config/logger';
 import {
   sendLineText,
   sendLineFlexMessage,
+  sendLineTextWithQuickReply,
   buildOverdueFlexCard,
   buildOcrConfirmFlexCard,
   buildInvoiceFlexCard,
@@ -31,6 +32,12 @@ interface LineSession {
   currentField: string;
   pendingFields: string[];
   data: Partial<OcrResult> & { companyId?: string };
+}
+
+interface LineEditSession {
+  state: 'editing_field';
+  purchaseInvoiceId: string;
+  currentField: string;
 }
 
 function getMissingFields(result: OcrResult): typeof REQUIRED_OCR_FIELDS {
@@ -165,8 +172,16 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
   const raw = await redis.get(`line:session:${lineUserId}`);
   if (!raw) return false;
 
-  const session = JSON.parse(raw) as LineSession;
   const trimmed = text.trim();
+
+  // User can cancel the session at any time
+  if (trimmed === 'ยกเลิก') {
+    await redis.del(`line:session:${lineUserId}`);
+    await sendLineText(lineUserId, '❌ ยกเลิกแล้ว');
+    return true;
+  }
+
+  const session = JSON.parse(raw) as LineSession;
   const field = REQUIRED_OCR_FIELDS.find(f => f.key === session.currentField)!;
 
   // Parse value based on field type
@@ -210,9 +225,10 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
     session.currentField = nextKey;
     session.pendingFields = session.pendingFields.slice(1);
     await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
-    await sendLineText(
+    await sendLineTextWithQuickReply(
       lineUserId,
       `✅ บันทึก ${field.label} แล้ว\n\n📌 กรุณาระบุต่อไป:\n${nextField.label}\n💡 ${nextField.hint}`,
+      [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
     );
     return true;
   }
@@ -231,11 +247,91 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
   return true;
 }
 
+async function handleEditReply(lineUserId: string, trimmed: string): Promise<boolean> {
+  const raw = await redis.get(`line:editsession:${lineUserId}`);
+  if (!raw) return false;
+
+  const session = JSON.parse(raw) as LineEditSession;
+
+  if (trimmed === 'ยกเลิก' || trimmed === 'เสร็จสิ้น') {
+    await redis.del(`line:editsession:${lineUserId}`);
+    await sendLineText(lineUserId, '❌ ยกเลิกการแก้ไข');
+    return true;
+  }
+
+  const fieldDef = REQUIRED_OCR_FIELDS.find(f => f.key === session.currentField) ?? { key: session.currentField, label: session.currentField, hint: '' };
+
+  let parsedValue: string | number | Date = trimmed;
+  if (['total', 'subtotal', 'vatAmount'].includes(session.currentField)) {
+    const num = parseFloat(trimmed.replace(/,/g, ''));
+    if (isNaN(num)) {
+      await sendLineTextWithQuickReply(
+        lineUserId,
+        `⚠️ กรุณาระบุตัวเลข\n💡 ${fieldDef.hint}`,
+        [{ label: '❌ ยกเลิก', text: 'เสร็จสิ้น' }],
+      );
+      return true;
+    }
+    parsedValue = num;
+  } else if (session.currentField === 'invoiceDate') {
+    const thaiMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (thaiMatch) {
+      let year = parseInt(thaiMatch[3]);
+      if (year > 2500) year -= 543;
+      parsedValue = new Date(`${year}-${thaiMatch[2].padStart(2, '0')}-${thaiMatch[1].padStart(2, '0')}`);
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      parsedValue = new Date(trimmed);
+    } else {
+      await sendLineTextWithQuickReply(
+        lineUserId,
+        `⚠️ รูปแบบวันที่ไม่ถูกต้อง\n💡 ${fieldDef.hint}`,
+        [{ label: '❌ ยกเลิก', text: 'เสร็จสิ้น' }],
+      );
+      return true;
+    }
+  } else if (session.currentField === 'supplierTaxId') {
+    const digits = trimmed.replace(/[-\s]/g, '');
+    if (digits.length !== 13 || !/^\d+$/.test(digits)) {
+      await sendLineTextWithQuickReply(
+        lineUserId,
+        `⚠️ เลขผู้เสียภาษีต้องมี 13 หลัก\n💡 ${fieldDef.hint}`,
+        [{ label: '❌ ยกเลิก', text: 'เสร็จสิ้น' }],
+      );
+      return true;
+    }
+    parsedValue = digits;
+  }
+
+  try {
+    await prisma.purchaseInvoice.update({
+      where: { id: session.purchaseInvoiceId },
+      data: { [session.currentField]: parsedValue } as Record<string, unknown>,
+    });
+    await redis.del(`line:editsession:${lineUserId}`);
+    await sendLineTextWithQuickReply(
+      lineUserId,
+      `✅ แก้ไข ${fieldDef.label} เรียบร้อยแล้ว`,
+      [
+        { label: '✏️ แก้ไขต่อ', data: `edit_purchase:${session.purchaseInvoiceId}`, displayText: 'แก้ไขต่อ' },
+        { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
+      ],
+    );
+  } catch (err) {
+    logger.error('[Line] edit purchase field failed', { err, session });
+    await sendLineText(lineUserId, '❌ ไม่สามารถแก้ไขได้ กรุณาลองใหม่');
+  }
+
+  return true;
+}
+
 async function handleTextMessage(lineUserId: string, text: string): Promise<void> {
   const trimmed = text.trim();
 
   // Check if user is in a field-input session
   if (await handleSessionReply(lineUserId, trimmed)) return;
+
+  // Check if user is in an edit session
+  if (await handleEditReply(lineUserId, trimmed)) return;
 
   // OTP link flow — accept bare "723430" or "/link 723430"
   const otpMatch = trimmed.match(/^(?:\/link\s+)?(\d{6})$/);
@@ -507,10 +603,10 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
         data: { ...result, companyId },
       };
       await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
-      await sendLineText(
+      await sendLineTextWithQuickReply(
         lineUserId,
-        `📝 ข้อมูลบางส่วนไม่ครบ กรุณาระบุ:\n\n` +
-        `📌 ${firstField.label}\n💡 ${firstField.hint}`,
+        `📝 ข้อมูลบางส่วนไม่ครบ กรุณาระบุ:\n\n📌 ${firstField.label}\n💡 ${firstField.hint}`,
+        [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
       );
       return;
     }
@@ -563,7 +659,7 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         ? new Date(ocrData.invoiceDate)
         : new Date();
 
-      await prisma.purchaseInvoice.create({
+      const saved = await prisma.purchaseInvoice.create({
         data: {
           companyId,
           supplierName: ocrData.supplierName || 'ไม่ระบุ',
@@ -581,12 +677,19 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 
       await redis.del(`ocr:temp:${tempId}`);
 
+      // Store edit reference
+      await redis.setex(`line:lastedit:${lineUserId}`, 300, saved.id);
+
       const fmt = (n: number) =>
         new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
 
-      await sendLineText(
+      await sendLineTextWithQuickReply(
         lineUserId,
         `✅ บันทึกภาษีซื้อเรียบร้อย!\n📋 ${ocrData.supplierName}\n💰 ภาษีซื้อ ${fmt(ocrData.vatAmount)}`,
+        [
+          { label: '✏️ แก้ไขข้อมูล', data: `edit_purchase:${saved.id}`, displayText: 'แก้ไขข้อมูล' },
+          { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
+        ],
       );
     } catch (err) {
       logger.error('[Line] confirm_purchase failed', { err, tempId });
@@ -603,6 +706,44 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       logger.error('[Line] reject_purchase redis del failed', { err });
     }
     await sendLineText(lineUserId, 'ยกเลิกแล้ว');
+  }
+
+  if (data.startsWith('edit_purchase:')) {
+    const purchaseId = data.slice('edit_purchase:'.length);
+    await sendLineTextWithQuickReply(
+      lineUserId,
+      '✏️ ต้องการแก้ไขช่องไหน?',
+      [
+        { label: 'ชื่อผู้ขาย',       data: `editfield:${purchaseId}:supplierName`,  displayText: 'แก้ไขชื่อผู้ขาย' },
+        { label: 'เลขผู้เสียภาษี',   data: `editfield:${purchaseId}:supplierTaxId`, displayText: 'แก้ไขเลขผู้เสียภาษี' },
+        { label: 'เลขที่ใบกำกับ',    data: `editfield:${purchaseId}:invoiceNumber`, displayText: 'แก้ไขเลขที่ใบกำกับ' },
+        { label: 'วันที่',            data: `editfield:${purchaseId}:invoiceDate`,   displayText: 'แก้ไขวันที่' },
+        { label: 'ยอดรวม',           data: `editfield:${purchaseId}:total`,         displayText: 'แก้ไขยอดรวม' },
+        { label: '❌ ยกเลิก',        text: 'เสร็จสิ้น' },
+      ],
+    );
+    return;
+  }
+
+  if (data.startsWith('editfield:')) {
+    const parts = data.split(':');
+    const purchaseId = parts[1];
+    const fieldKey = parts[2];
+    const fieldDef = REQUIRED_OCR_FIELDS.find(f => f.key === fieldKey) ?? { label: fieldKey, hint: '' };
+
+    const editSession: LineEditSession = {
+      state: 'editing_field',
+      purchaseInvoiceId: purchaseId,
+      currentField: fieldKey,
+    };
+    await redis.setex(`line:editsession:${lineUserId}`, 300, JSON.stringify(editSession));
+
+    await sendLineTextWithQuickReply(
+      lineUserId,
+      `✏️ กรุณาพิมพ์ค่าใหม่สำหรับ:\n📌 ${fieldDef.label}\n💡 ${fieldDef.hint}`,
+      [{ label: '❌ ยกเลิก', text: 'เสร็จสิ้น' }],
+    );
+    return;
   }
 }
 

@@ -52,6 +52,20 @@ export async function sendLineFlexMessage(
   return linePush(lineUserId, [{ type: 'flex', altText, contents: flex }]);
 }
 
+export async function sendLineTextWithQuickReply(
+  lineUserId: string,
+  text: string,
+  buttons: Array<{ label: string; text?: string; data?: string; displayText?: string }>,
+): Promise<boolean> {
+  const items = buttons.map((b) => ({
+    type: 'action',
+    action: b.data
+      ? { type: 'postback', label: b.label, data: b.data, displayText: b.displayText ?? b.label }
+      : { type: 'message', label: b.label, text: b.text ?? b.label },
+  }));
+  return linePush(lineUserId, [{ type: 'text', text, quickReply: { items } }]);
+}
+
 export function buildOverdueFlexCard(invoices: OverdueInvoice[]): object {
   const displayInvoices = invoices.slice(0, 5);
 
