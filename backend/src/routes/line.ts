@@ -18,6 +18,27 @@ export const lineRouter = Router();
 
 const OTP_TTL = 600; // 10 minutes
 
+const REQUIRED_OCR_FIELDS: Array<{ key: keyof OcrResult; label: string; hint: string }> = [
+  { key: 'supplierName',  label: 'ชื่อผู้ขาย',                      hint: 'เช่น บริษัท ABC จำกัด' },
+  { key: 'supplierTaxId', label: 'เลขผู้เสียภาษีผู้ขาย (13 หลัก)', hint: 'เช่น 0105567890123' },
+  { key: 'invoiceDate',   label: 'วันที่ในใบกำกับภาษี',              hint: 'เช่น 27/04/2567 หรือ 2026-04-27' },
+  { key: 'total',         label: 'ยอดรวมทั้งสิ้น (บาท)',            hint: 'เช่น 10700' },
+];
+
+interface LineSession {
+  state: 'awaiting_field';
+  currentField: string;
+  pendingFields: string[];
+  data: Partial<OcrResult> & { companyId?: string };
+}
+
+function getMissingFields(result: OcrResult): typeof REQUIRED_OCR_FIELDS {
+  return REQUIRED_OCR_FIELDS.filter(f => {
+    const val = result[f.key];
+    return !val || val === '' || val === 0;
+  });
+}
+
 // GET /api/line/status
 lineRouter.get('/status', authenticate, async (req, res) => {
   try {
@@ -139,8 +160,81 @@ interface LineWebhookBody {
   events: LineEvent[];
 }
 
+async function handleSessionReply(lineUserId: string, text: string): Promise<boolean> {
+  const raw = await redis.get(`line:session:${lineUserId}`);
+  if (!raw) return false;
+
+  const session = JSON.parse(raw) as LineSession;
+  const trimmed = text.trim();
+  const field = REQUIRED_OCR_FIELDS.find(f => f.key === session.currentField)!;
+
+  // Parse value based on field type
+  let parsedValue: string | number = trimmed;
+  if (session.currentField === 'total' || session.currentField === 'subtotal' || session.currentField === 'vatAmount') {
+    const num = parseFloat(trimmed.replace(/,/g, ''));
+    if (isNaN(num)) {
+      await sendLineText(lineUserId, `⚠️ กรุณาระบุ${field.label}เป็นตัวเลข\n💡 ${field.hint}`);
+      return true;
+    }
+    parsedValue = num;
+  }
+  if (session.currentField === 'invoiceDate') {
+    // Accept DD/MM/YYYY (Buddhist or AD) or YYYY-MM-DD
+    const thaiMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (thaiMatch) {
+      let year = parseInt(thaiMatch[3]);
+      if (year > 2500) year -= 543; // convert Buddhist year
+      parsedValue = `${year}-${thaiMatch[2].padStart(2, '0')}-${thaiMatch[1].padStart(2, '0')}`;
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      await sendLineText(lineUserId, `⚠️ กรุณาระบุวันที่ในรูปแบบที่ถูกต้อง\n💡 ${field.hint}`);
+      return true;
+    }
+  }
+  if (session.currentField === 'supplierTaxId') {
+    const digits = trimmed.replace(/[-\s]/g, '');
+    if (digits.length !== 13 || !/^\d+$/.test(digits)) {
+      await sendLineText(lineUserId, `⚠️ เลขผู้เสียภาษีต้องมี 13 หลัก\n💡 ${field.hint}`);
+      return true;
+    }
+    parsedValue = digits;
+  }
+
+  // Update session data
+  (session.data as Record<string, unknown>)[session.currentField] = parsedValue;
+
+  if (session.pendingFields.length > 0) {
+    // Ask next field
+    const nextKey = session.pendingFields[0];
+    const nextField = REQUIRED_OCR_FIELDS.find(f => f.key === nextKey)!;
+    session.currentField = nextKey;
+    session.pendingFields = session.pendingFields.slice(1);
+    await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
+    await sendLineText(
+      lineUserId,
+      `✅ บันทึก ${field.label} แล้ว\n\n📌 กรุณาระบุต่อไป:\n${nextField.label}\n💡 ${nextField.hint}`,
+    );
+    return true;
+  }
+
+  // All fields collected — show confirm card
+  await redis.del(`line:session:${lineUserId}`);
+  const fullData = session.data as OcrResult & { companyId?: string };
+  const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(fullData));
+  await sendLineText(lineUserId, `✅ ได้รับข้อมูลครบถ้วนแล้ว กรุณายืนยันการบันทึก`);
+  await sendLineFlexMessage(
+    lineUserId,
+    'ตรวจพบใบแจ้งหนี้ — กรุณายืนยัน',
+    buildOcrConfirmFlexCard(fullData as OcrResult, tempId),
+  );
+  return true;
+}
+
 async function handleTextMessage(lineUserId: string, text: string): Promise<void> {
   const trimmed = text.trim();
+
+  // Check if user is in a field-input session
+  if (await handleSessionReply(lineUserId, trimmed)) return;
 
   // OTP link flow — accept bare "723430" or "/link 723430"
   const otpMatch = trimmed.match(/^(?:\/link\s+)?(\d{6})$/);
@@ -386,19 +480,37 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
       return;
     }
 
-    const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
     // Find the linked user's companyId to store with the temp data
-    const link = await prisma.lineUserLink.findUnique({
+    const link2 = await prisma.lineUserLink.findUnique({
       where: { lineUserId },
       select: { user: { select: { companyId: true } } },
     });
+    const companyId = link2?.user.companyId;
 
-    await redis.setex(
-      `ocr:temp:${tempId}`,
-      600,
-      JSON.stringify({ ...result, companyId: link?.user.companyId }),
-    );
+    // Check for missing required fields
+    const missingFields = getMissingFields(result);
+
+    if (missingFields.length > 0) {
+      // Store partial data as session, ask for first missing field
+      const [firstField, ...restFields] = missingFields;
+      const session: LineSession = {
+        state: 'awaiting_field',
+        currentField: firstField.key,
+        pendingFields: restFields.map(f => f.key),
+        data: { ...result, companyId },
+      };
+      await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
+      await sendLineText(
+        lineUserId,
+        `📝 ข้อมูลบางส่วนไม่ครบ กรุณาระบุ:\n\n` +
+        `📌 ${firstField.label}\n💡 ${firstField.hint}`,
+      );
+      return;
+    }
+
+    // All required fields present — proceed to confirm card
+    const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify({ ...result, companyId }));
 
     await sendLineFlexMessage(
       lineUserId,
