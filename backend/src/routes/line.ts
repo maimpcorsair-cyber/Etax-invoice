@@ -36,10 +36,12 @@ lineRouter.get('/status', authenticate, async (req, res) => {
     ]);
 
     res.json({
-      linked: !!(link?.isActive),
-      displayName: link?.displayName ?? undefined,
-      lineNotifyEnabled: company?.lineNotifyEnabled ?? false,
-      overdueReminderDays: company?.overdueReminderDays ?? 3,
+      data: {
+        linked: !!(link?.isActive),
+        displayName: link?.displayName ?? undefined,
+        lineNotifyEnabled: company?.lineNotifyEnabled ?? false,
+        overdueReminderDays: company?.overdueReminderDays ?? 3,
+      },
     });
   } catch (err) {
     logger.error('[Line] GET /status failed', { err });
