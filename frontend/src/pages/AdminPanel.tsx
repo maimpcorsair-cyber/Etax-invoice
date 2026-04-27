@@ -1732,8 +1732,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
           </p>
           <p className="text-sm text-gray-500 max-w-xs mx-auto">
             {isThai
-              ? 'อัปเกรดแพ็กเกจเพื่อใช้งาน Line AI Assistant พี่ไหม'
-              : 'Upgrade your plan to use the Line AI Assistant (Pimai).'}
+              ? 'อัปเกรดแพ็กเกจเพื่อใช้งาน Line AI Assistant พี่นุช'
+              : 'Upgrade your plan to use the Line AI Assistant (Pinuch).'}
           </p>
         </div>
         <Link to="/app/plan" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -1751,13 +1751,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   return (
     <div className="space-y-6">
       <h2 className="font-semibold text-lg text-gray-900">
-        {isThai ? 'Line พี่ไหม' : 'Line AI Assistant (Pimai)'}
+        {isThai ? 'Line พี่นุช' : 'Line AI Assistant (Pinuch)'}
       </h2>
 
       {/* Features card — always shown */}
       <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-3">
         <p className="font-semibold text-indigo-900 text-sm">
-          {isThai ? 'พี่ไหมทำอะไรได้บ้าง?' : 'What can Pimai do?'}
+          {isThai ? 'พี่นุชทำอะไรได้บ้าง?' : 'What can Pinuch do?'}
         </p>
         <ul className="space-y-2 text-sm text-indigo-800">
           <li>🤖 {isThai ? 'ถามตอบข้อมูลบัญชีและใบกำกับภาษีด้วย AI' : 'Ask accounting and tax invoice questions via AI'}</li>
@@ -1772,7 +1772,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       <div className="border border-gray-200 rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-gray-800">
-            {isThai ? 'เชื่อมต่อ Line พี่ไหม' : 'Connect Line Pimai'}
+            {isThai ? 'เชื่อมต่อ Line พี่นุช' : 'Connect Line Pinuch'}
           </h3>
           {lineStatus?.linked && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
@@ -1801,13 +1801,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             {/* Step 1 */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">
-                {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน Line Official Account พี่ไหม' : 'Step 1 — Add Line Official Account Pimai'}
+                {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน Line Official Account พี่นุช' : 'Step 1 — Add Line Official Account Pinuch'}
               </p>
               <div className="flex items-start gap-4">
                 <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="flex-shrink-0">
                   <img
                     src="https://qr-official.line.me/g/M/566fvjbg.png"
-                    alt="QR Code พี่ไหม"
+                    alt="QR Code พี่นุช"
                     className="w-28 h-28 rounded-lg border border-gray-200 shadow-sm"
                   />
                 </a>
@@ -1848,7 +1848,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                     </button>
                   </div>
                   <p className="text-sm text-gray-500">
-                    {isThai ? 'ส่งรหัสนี้ให้พี่ไหมใน Line โดยพิมพ์: ' : 'Send this code to Pimai in Line by typing: '}
+                    {isThai ? 'ส่งรหัสนี้ให้พี่นุชใน Line โดยพิมพ์: ' : 'Send this code to Pinuch in Line by typing: '}
                     <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">/link {otp}</code>
                   </p>
                 </div>
@@ -1866,8 +1866,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>
                   {isThai
-                    ? 'ขั้นตอนที่ 3 — รอพี่ไหมยืนยัน... รหัสนี้หมดอายุใน 10 นาที'
-                    : 'Step 3 — Waiting for Pimai to confirm... This code expires in 10 minutes'}
+                    ? 'ขั้นตอนที่ 3 — รอพี่นุชยืนยัน... รหัสนี้หมดอายุใน 10 นาที'
+                    : 'Step 3 — Waiting for Pinuch to confirm... This code expires in 10 minutes'}
                 </span>
               </div>
             )}

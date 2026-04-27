@@ -12,7 +12,7 @@ import {
   verifyLineSignature,
   OverdueInvoice,
 } from '../services/lineService';
-import { askPimai, buildCompanyContext, ocrSupplierInvoice, OcrResult } from '../services/aiService';
+import { askPinuch, buildCompanyContext, ocrSupplierInvoice, OcrResult } from '../services/aiService';
 
 export const lineRouter = Router();
 
@@ -206,7 +206,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   if (['สวัสดี', 'help', 'ช่วยเหลือ'].includes(lower)) {
     await sendLineText(
       lineUserId,
-      `สวัสดีครับ! ผมพี่ไหม ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\nสิ่งที่ผมช่วยได้:\n• ถามคำถามทั่วไปเกี่ยวกับบัญชีและภาษี\n• พิมพ์ "สรุปภาษี" เพื่อดูยอด VAT เดือนนี้\n• พิมพ์ "ใบเกินกำหนด" เพื่อดูใบแจ้งหนี้ที่ค้างชำระ\n• ส่งรูปใบแจ้งหนี้ เพื่อให้ผม OCR และบันทึกภาษีซื้อ`,
+      `สวัสดีครับ! ผมพี่นุช ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\nสิ่งที่ผมช่วยได้:\n• ถามคำถามทั่วไปเกี่ยวกับบัญชีและภาษี\n• พิมพ์ "สรุปภาษี" เพื่อดูยอด VAT เดือนนี้\n• พิมพ์ "ใบเกินกำหนด" เพื่อดูใบแจ้งหนี้ที่ค้างชำระ\n• ส่งรูปใบแจ้งหนี้ เพื่อให้ผม OCR และบันทึกภาษีซื้อ`,
     );
     return;
   }
@@ -280,7 +280,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
 
   // AI fallback
   try {
-    const answer = await askPimai(
+    const answer = await askPinuch(
       companyId,
       user.company.nameTh,
       user.company.taxId,
@@ -459,7 +459,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       if (event.type === 'follow') {
         await sendLineText(
           lineUserId,
-          'สวัสดีครับ/ค่ะ! ผมพี่ไหม ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\nส่ง OTP ที่ได้จากระบบมาหาผมเพื่อเชื่อมบัญชีของคุณ',
+          'สวัสดีครับ/ค่ะ! ผมพี่นุช ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\nส่ง OTP ที่ได้จากระบบมาหาผมเพื่อเชื่อมบัญชีของคุณ',
         );
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;

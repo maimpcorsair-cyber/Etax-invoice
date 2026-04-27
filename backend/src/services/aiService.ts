@@ -35,7 +35,7 @@ async function callOpenRouter(
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://etax-invoice.vercel.app',
-      'X-Title': 'e-Tax Invoice พี่ไหม',
+      'X-Title': 'e-Tax Invoice พี่นุช',
     },
     body: JSON.stringify({
       model,
@@ -129,7 +129,7 @@ export async function buildCompanyContext(companyId: string): Promise<string> {
   return JSON.stringify(context, null, 2);
 }
 
-export async function askPimai(
+export async function askPinuch(
   companyId: string,
   companyName: string,
   taxId: string,
@@ -145,7 +145,7 @@ export async function askPimai(
     const messages: OpenRouterMessage[] = [
       {
         role: 'system',
-        content: `คุณคือ "พี่ไหม" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
+        content: `คุณคือ "พี่นุช" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
 คุณช่วยเหลือพนักงานบัญชีในการตอบคำถามเกี่ยวกับภาษีมูลค่าเพิ่ม ใบกำกับภาษี และข้อมูลทางการเงิน
 ตอบเป็นภาษาไทยเสมอ กระชับและเข้าใจง่าย
 
@@ -163,7 +163,7 @@ ${context}`,
     const answer = await callOpenRouter(chatModel, messages, 1000);
     return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
   } catch (err) {
-    logger.error('askPimai failed', { err, companyId });
+    logger.error('askPinuch failed', { err, companyId });
     return 'ขอโทษ เกิดข้อผิดพลาดในการตอบคำถาม กรุณาลองใหม่อีกครั้ง';
   }
 }
