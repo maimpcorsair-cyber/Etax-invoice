@@ -280,6 +280,35 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
     return;
   }
 
+  // Send invoice by number: "ส่งใบ INV-2026-001" or "ขอใบ TAX-001"
+  const invoiceReqMatch = trimmed.match(/(?:ส่งใบ|ขอใบ|ดูใบ|หาใบ)\s+(\S+)/i);
+  if (invoiceReqMatch) {
+    const invoiceNumber = invoiceReqMatch[1];
+    try {
+      const invoice = await prisma.invoice.findFirst({
+        where: { companyId, invoiceNumber: { contains: invoiceNumber, mode: 'insensitive' } },
+        include: { buyer: { select: { nameTh: true } } },
+      });
+      if (!invoice) {
+        await sendLineText(lineUserId, `❌ ไม่พบเอกสารเลขที่ "${invoiceNumber}" ในระบบ`);
+      } else {
+        const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+        const statusLabel: Record<string, string> = { draft: 'ร่าง', pending: 'รอดำเนินการ', approved: 'อนุมัติแล้ว', submitted: 'ส่ง RD แล้ว', cancelled: 'ยกเลิก' };
+        let msg = `📄 เลขที่: ${invoice.invoiceNumber}\n👤 ลูกค้า: ${invoice.buyer.nameTh}\n💰 ยอดรวม: ${fmt(invoice.total)}\n📅 วันที่: ${new Date(invoice.invoiceDate).toLocaleDateString('th-TH')}\n🔖 สถานะ: ${statusLabel[invoice.status] ?? invoice.status}`;
+        if (invoice.pdfUrl) {
+          msg += `\n\n📎 ดาวน์โหลด PDF:\n${invoice.pdfUrl}`;
+        } else {
+          msg += '\n\n⏳ PDF ยังไม่พร้อม กรุณาลองใหม่ในอีกสักครู่';
+        }
+        await sendLineText(lineUserId, msg);
+      }
+    } catch (err) {
+      logger.error('[Line] invoice lookup failed', { err });
+      await sendLineText(lineUserId, 'ขอโทษ ไม่สามารถค้นหาเอกสารได้');
+    }
+    return;
+  }
+
   // AI fallback
   try {
     const answer = await askPinuch(
