@@ -220,20 +220,27 @@ export async function ocrSupplierInvoice(
           },
           {
             type: 'text',
-            text: `กรุณาอ่านข้อมูลจากใบแจ้งหนี้/ใบกำกับภาษีนี้และส่งคืนเป็น JSON เท่านั้น (ไม่ต้องมีข้อความอื่น):
+            text: `You are an OCR assistant for Thai tax invoices. Extract all available information from this document and return ONLY a JSON object, no other text.
+
+Rules:
+- Extract whatever is visible, even if partial
+- For missing fields use empty string "" or 0
+- supplierTaxId: 13-digit Thai tax ID (remove dashes/spaces)
+- invoiceDate: convert to YYYY-MM-DD format
+- confidence: "high" if most fields found, "medium" if some fields found, "low" only if document is completely unreadable
+
 {
-  "supplierName": "ชื่อผู้ขาย/ผู้ออกใบกำกับ",
-  "supplierTaxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก",
-  "supplierBranch": "รหัสสาขา เช่น 00000",
-  "invoiceNumber": "เลขที่เอกสาร",
-  "invoiceDate": "วันที่ในรูปแบบ YYYY-MM-DD",
-  "subtotal": ยอดก่อนภาษี (ตัวเลข),
-  "vatAmount": ยอดภาษีมูลค่าเพิ่ม (ตัวเลข),
-  "total": ยอดรวมทั้งสิ้น (ตัวเลข),
+  "supplierName": "company name",
+  "supplierTaxId": "1234567890123",
+  "supplierBranch": "00000",
+  "invoiceNumber": "document number",
+  "invoiceDate": "YYYY-MM-DD",
+  "subtotal": 0,
+  "vatAmount": 0,
+  "total": 0,
   "confidence": "high|medium|low",
-  "rawText": "ข้อความทั้งหมดที่อ่านได้"
-}
-หากข้อมูลไม่ครบหรืออ่านไม่ชัด ให้ตั้ง confidence เป็น "low"`,
+  "rawText": "all text found in document"
+}`,
           },
         ],
       },

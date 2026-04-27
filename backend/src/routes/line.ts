@@ -320,10 +320,10 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
 
     const result = await ocrSupplierInvoice(imageBase64, 'image/jpeg');
 
-    if (result.confidence === 'low') {
+    if (result.confidence === 'low' && !result.supplierName && !result.total) {
       await sendLineText(
         lineUserId,
-        'ขอโทษ ไม่สามารถอ่านใบแจ้งหนี้ได้ชัดเจน กรุณาส่งรูปที่ชัดขึ้น',
+        '❌ ไม่สามารถอ่านเอกสารได้เลย กรุณาส่งรูปที่ชัดขึ้นหรือส่งเป็นไฟล์ PDF',
       );
       return;
     }
@@ -470,7 +470,8 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
         const msg = event.message;
         if (msg.type === 'text') {
           await handleTextMessage(lineUserId, (msg as LineTextMessage).text);
-        } else if (msg.type === 'image') {
+        } else if (msg.type === 'image' || msg.type === 'file') {
+          await sendLineText(lineUserId, '📄 กำลังอ่านเอกสาร รอสักครู่...');
           await handleImageMessage(lineUserId, msg.id);
         }
       } else if (event.type === 'postback' && event.postback) {
