@@ -163,8 +163,9 @@ ${context}`,
     const answer = await callOpenRouter(chatModel, messages, 1000);
     return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
   } catch (err) {
-    logger.error('askPinuch failed', { err, companyId });
-    return 'ขอโทษ เกิดข้อผิดพลาดในการตอบคำถาม กรุณาลองใหม่อีกครั้ง';
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error('askPinuch failed', { error: msg, companyId });
+    return `ขอโทษ เกิดข้อผิดพลาด: ${msg}`;
   }
 }
 
