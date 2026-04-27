@@ -142,10 +142,12 @@ interface LineWebhookBody {
 async function handleTextMessage(lineUserId: string, text: string): Promise<void> {
   const trimmed = text.trim();
 
-  // OTP link flow
-  if (/^\d{6}$/.test(trimmed)) {
+  // OTP link flow — accept bare "723430" or "/link 723430"
+  const otpMatch = trimmed.match(/^(?:\/link\s+)?(\d{6})$/);
+  if (otpMatch) {
+    const otp = otpMatch[1];
     try {
-      const stored = await redis.get(`line:otp:${trimmed}`);
+      const stored = await redis.get(`line:otp:${otp}`);
       if (stored) {
         const { userId } = JSON.parse(stored) as { userId: string; companyId: string };
 
@@ -170,7 +172,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
           },
         });
 
-        await redis.del(`line:otp:${trimmed}`);
+        await redis.del(`line:otp:${otp}`);
         await sendLineText(
           lineUserId,
           `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${existingUser?.name ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,

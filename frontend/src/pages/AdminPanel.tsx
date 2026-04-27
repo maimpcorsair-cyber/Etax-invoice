@@ -1848,8 +1848,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                     </button>
                   </div>
                   <p className="text-sm text-gray-500">
-                    {isThai ? 'ส่งรหัสนี้ให้พี่นุชใน Line โดยพิมพ์: ' : 'Send this code to Pinuch in Line by typing: '}
-                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">/link {otp}</code>
+                    {isThai ? 'พิมพ์รหัส 6 หลักนี้ส่งให้พี่นุชใน Line: ' : 'Type this 6-digit code and send to Pinuch in Line: '}
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">{otp}</code>
                   </p>
                 </div>
               ) : (
