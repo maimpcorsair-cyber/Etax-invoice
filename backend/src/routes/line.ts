@@ -351,9 +351,27 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
 
     if (isPdf) {
-      // Send PDF directly to Gemini via OpenRouter — supports both digital and scanned PDFs
-      logger.info('[Line] Sending PDF to Gemini via OpenRouter', { bytes: buffer.length });
-      result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
+      // Step 1: extract text (fast, cheap — works for digital/typed PDFs)
+      let pdfText = '';
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { PDFParse } = require('pdf-parse');
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        const textResult = await parser.getText();
+        pdfText = (textResult.text ?? '').trim();
+        logger.info('[Line] PDF text extracted', { chars: pdfText.length });
+      } catch (pdfErr) {
+        logger.warn('[Line] pdf-parse failed', { error: String(pdfErr) });
+      }
+
+      if (pdfText.length > 30) {
+        // Step 2a: got text — send to chat model (cheap, no vision needed)
+        result = await ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain');
+      } else {
+        // Step 2b: no text (scanned PDF) — send PDF binary to Gemini via OpenRouter
+        logger.info('[Line] No text found, sending PDF to Gemini', { bytes: buffer.length });
+        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
+      }
     } else {
       result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
     }
