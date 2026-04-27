@@ -8,9 +8,9 @@ const visionModel = process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.0-fl
 const FREE_CHAT_MODELS = [
   process.env.OPENROUTER_CHAT_MODEL,
   'meta-llama/llama-3.3-70b-instruct:free',
-  'qwen/qwen-2.5-72b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
-  'google/gemini-2.0-flash-lite:free',
+  'google/gemma-3-27b-it:free',
+  'google/gemma-4-31b-it:free',
+  'meta-llama/llama-3.2-3b-instruct:free',
 ].filter(Boolean) as string[];
 
 export interface OcrResult {
