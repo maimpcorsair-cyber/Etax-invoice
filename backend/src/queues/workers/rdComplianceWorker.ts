@@ -12,24 +12,16 @@
  * Ref: ประมวลรัษฎากร ม. 86/6, ระเบียบกรมสรรพากร พ.ศ. 2560
  */
 
-import { Worker, Job, Queue } from 'bullmq';
+import { Worker, Job } from 'bullmq';
 import redis from '../../config/redis';
 import prisma from '../../config/database';
 import { withSystemRlsContext } from '../../config/rls';
 import { rdSubmissionQueue } from '../index';
+import { rdComplianceQueue } from '../rdComplianceQueue';
 import { logger } from '../../config/logger';
 import nodemailer from 'nodemailer';
 
 const QUEUE_NAME = 'rd-compliance';
-
-// ─── Compliance Queue (for the cron job itself) ───────────────────────────────
-export const rdComplianceQueue = new Queue(QUEUE_NAME, {
-  connection: redis,
-  defaultJobOptions: {
-    removeOnComplete: { count: 12 },  // keep 12 runs (1 year)
-    removeOnFail: { count: 6 },
-  },
-});
 
 // ─── Register monthly cron: 09:00 on the 10th of every month ──────────────────
 (async () => {

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
-import { rdComplianceQueue } from '../queues/workers/rdComplianceWorker';
+import { rdComplianceQueue } from '../queues/rdComplianceQueue';
 
 export const dashboardRouter = Router();
 

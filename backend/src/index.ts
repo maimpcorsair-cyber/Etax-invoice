@@ -100,8 +100,11 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
 app.listen(PORT, () => {
   logger.info(`e-Tax Invoice API running on port ${PORT}`);
 
-  if (process.env.ENABLE_WORKERS === 'false') {
-    logger.warn('BullMQ workers disabled by ENABLE_WORKERS=false');
+  const shouldLoadWorkers = process.env.ENABLE_WORKERS === 'true'
+    || (process.env.NODE_ENV !== 'production' && process.env.ENABLE_WORKERS !== 'false');
+
+  if (!shouldLoadWorkers) {
+    logger.warn('BullMQ workers disabled for this web process');
     return;
   }
 
