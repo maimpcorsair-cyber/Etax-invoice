@@ -411,3 +411,34 @@ Rules:
     return emptyResult;
   }
 }
+
+export async function testOcrProvider(): Promise<{ ok: boolean; provider: string; error?: string; sample?: OcrResult }> {
+  const sampleText = `ใบกำกับภาษี / TAX INVOICE
+บริษัท ตัวอย่าง จำกัด
+เลขประจำตัวผู้เสียภาษี 0105567000000
+เลขที่ INV-TEST-001
+วันที่ 2026-04-29
+ยอดรวม 1070.00
+ภาษีมูลค่าเพิ่ม 70.00`;
+
+  if (!googleAiKey && !apiKey) {
+    return { ok: false, provider: 'none', error: 'GOOGLE_AI_API_KEY and OPENROUTER_API_KEY are not configured' };
+  }
+
+  try {
+    const sample = await ocrSupplierInvoice(Buffer.from(sampleText, 'utf-8').toString('base64'), 'text/plain');
+    const ok = !!(sample.supplierName || sample.invoiceNumber || sample.total);
+    return {
+      ok,
+      provider: googleAiKey ? 'gemini' : 'openrouter',
+      sample,
+      error: ok ? undefined : 'OCR provider returned no extractable fields',
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      provider: googleAiKey ? 'gemini' : 'openrouter',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}

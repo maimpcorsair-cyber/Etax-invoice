@@ -14,7 +14,7 @@ import {
   verifyLineSignature,
   OverdueInvoice,
 } from '../services/lineService';
-import { askPinuch, buildCompanyContext, ocrSupplierInvoice, OcrResult } from '../services/aiService';
+import { askPinuch, buildCompanyContext, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
 
 export const lineRouter = Router();
@@ -48,12 +48,13 @@ function getMissingFields(result: OcrResult): typeof REQUIRED_OCR_FIELDS {
   });
 }
 
-function detectLineFileMimeType(buffer: Buffer, headerContentType: string): string {
+function detectLineFileMimeType(buffer: Buffer, headerContentType: string, messageType?: string): string {
   const header = headerContentType.toLowerCase();
   if (header.includes('pdf') || buffer.slice(0, 4).toString() === '%PDF') return 'application/pdf';
   if (header.includes('png') || buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (header.includes('webp') || buffer.slice(0, 4).toString() === 'RIFF') return 'image/webp';
   if (header.includes('jpeg') || header.includes('jpg') || (buffer[0] === 0xff && buffer[1] === 0xd8)) return 'image/jpeg';
+  if (messageType === 'image') return 'image/jpeg';
   return headerContentType || 'application/octet-stream';
 }
 
@@ -159,6 +160,16 @@ lineRouter.post('/admin/setup-richmenu', authenticate, requireRole('admin', 'sup
   } catch (err) {
     logger.error('[Line] setup-richmenu failed', { err });
     res.status(500).json({ error: 'Failed to setup rich menu' });
+  }
+});
+
+lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_admin'), async (_req, res) => {
+  try {
+    const result = await testOcrProvider();
+    res.status(result.ok ? 200 : 503).json({ data: result });
+  } catch (err) {
+    logger.error('[Line] OCR health failed', { err });
+    res.status(500).json({ error: 'Failed to test OCR provider' });
   }
 });
 
@@ -577,7 +588,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   }
 }
 
-async function handleImageMessage(lineUserId: string, messageId: string): Promise<void> {
+async function handleImageMessage(lineUserId: string, messageId: string, messageType?: string): Promise<void> {
   try {
     const link = await prisma.lineUserLink.findUnique({
       where: { lineUserId },
@@ -610,11 +621,16 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     }
 
     const buffer = Buffer.from(await contentResponse.arrayBuffer());
-    const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '');
+    const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '', messageType);
     const isPdf = contentType === 'application/pdf';
 
     let result: OcrResult | undefined;
-    logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
+    logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
+
+    if (!['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(contentType)) {
+      await sendLineText(lineUserId, 'ไฟล์ชนิดนี้ยังไม่รองรับครับ กรุณาส่งเป็นรูป JPG/PNG/WebP หรือ PDF');
+      return;
+    }
 
     if (isPdf) {
       // Step 1: extract text (fast, cheap — works for digital/typed PDFs)
@@ -894,7 +910,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
           await handleTextMessage(lineUserId, (msg as LineTextMessage).text);
         } else if (msg.type === 'image' || msg.type === 'file') {
           await sendLineText(lineUserId, '📄 กำลังอ่านเอกสาร รอสักครู่...');
-          await handleImageMessage(lineUserId, msg.id);
+          await handleImageMessage(lineUserId, msg.id, msg.type);
         }
       } else if (event.type === 'postback' && event.postback) {
         await handlePostback(lineUserId, event.postback.data);
