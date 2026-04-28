@@ -9,16 +9,13 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 FROM base AS deps
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm ci --omit=dev
 
 FROM base AS builder
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm ci
-# Copy backend source first
-COPY backend/ .
-# Overwrite prisma/ with root schema (source of truth) — must come AFTER backend copy
-COPY prisma/ ./prisma/
+COPY . .
 RUN npx prisma generate
 RUN npm run build
 
