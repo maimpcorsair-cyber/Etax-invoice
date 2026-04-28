@@ -43,6 +43,16 @@ services:
         value: "12000"
       - key: AI_OCR_TIMEOUT_MS
         value: "30000"
+      - key: AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
+        sync: false
+      - key: AZURE_DOCUMENT_INTELLIGENCE_KEY
+        sync: false
+      - key: AZURE_DOCUMENT_INTELLIGENCE_API_VERSION
+        value: "2024-11-30"
+      - key: AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID
+        value: prebuilt-invoice
+      - key: AZURE_DOCUMENT_INTELLIGENCE_TIMEOUT_MS
+        value: "45000"
       - key: RD_ENVIRONMENT
         value: sandbox
       - key: S3_BUCKET

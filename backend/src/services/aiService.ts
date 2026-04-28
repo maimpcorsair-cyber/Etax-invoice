@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { logger } from '../config/logger';
+import { analyzeAccountingDocumentWithAzure, isAzureDocumentIntelligenceConfigured } from './azureDocumentService';
 
 const apiKey = process.env.OPENROUTER_API_KEY ?? '';
 const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
@@ -86,6 +87,8 @@ export interface OcrResult {
   total: number;
   confidence: 'high' | 'medium' | 'low';
   rawText?: string;
+  validationWarnings?: string[];
+  extractionProvider?: string;
 }
 
 interface OpenRouterMessage {
@@ -127,6 +130,38 @@ async function callOpenRouter(
     }
   }
   throw new Error(`All models failed. Last error: ${lastError}`);
+}
+
+function hasUsefulOcrData(result: OcrResult) {
+  return !!(result.supplierName || result.invoiceNumber || result.total || result.vatAmount || result.rawText);
+}
+
+function isValidThaiTaxId(taxId: string) {
+  const digits = taxId.replace(/\D/g, '');
+  if (digits.length !== 13) return false;
+  const sum = digits.slice(0, 12).split('').reduce((acc, digit, index) => acc + Number(digit) * (13 - index), 0);
+  const check = (11 - (sum % 11)) % 10;
+  return check === Number(digits[12]);
+}
+
+function validateOcrResult(result: OcrResult): string[] {
+  const warnings: string[] = [];
+  if (result.supplierTaxId && !isValidThaiTaxId(result.supplierTaxId)) {
+    warnings.push('เลขผู้เสียภาษีอาจไม่ถูกต้องตาม checksum');
+  }
+  if (result.subtotal > 0 && result.vatAmount > 0) {
+    const expectedVat = Math.round(result.subtotal * 0.07 * 100) / 100;
+    if (Math.abs(expectedVat - result.vatAmount) > 1) {
+      warnings.push('ยอด VAT ไม่ตรงกับ 7% ของยอดก่อนภาษี');
+    }
+  }
+  if (result.subtotal > 0 && result.vatAmount >= 0 && result.total > 0) {
+    const expectedTotal = Math.round((result.subtotal + result.vatAmount) * 100) / 100;
+    if (Math.abs(expectedTotal - result.total) > 1) {
+      warnings.push('ยอดรวมไม่ตรงกับยอดก่อนภาษี + VAT');
+    }
+  }
+  return warnings;
 }
 
 export async function buildCompanyContext(companyId: string): Promise<string> {
@@ -276,7 +311,8 @@ export async function ocrSupplierInvoice(
   imageBase64: string,
   mimeType: string,
 ): Promise<OcrResult> {
-  if (!apiKey && !googleAiKey) {
+  const azureConfigured = isAzureDocumentIntelligenceConfigured();
+  if (!apiKey && !googleAiKey && !azureConfigured) {
     return {
       documentType: 'other',
       documentTypeLabel: 'เอกสารอื่น',
@@ -289,6 +325,7 @@ export async function ocrSupplierInvoice(
       vatAmount: 0,
       total: 0,
       confidence: 'low',
+      extractionProvider: 'none',
     };
   }
 
@@ -304,6 +341,7 @@ export async function ocrSupplierInvoice(
     vatAmount: 0,
     total: 0,
     confidence: 'low',
+    extractionProvider: 'none',
   };
 
   const ocrPrompt = `You are an OCR assistant for Thai and English accounting documents. Classify the document and extract all available information. Return ONLY a JSON object, no other text.
@@ -343,12 +381,29 @@ Rules:
 
   try {
     let raw = '';
+    const azureResult = mimeType !== 'text/plain'
+      ? await analyzeAccountingDocumentWithAzure(imageBase64, mimeType)
+      : null;
 
-    // Try Gemini first (handles text, image, and PDF natively; best default for Thai/English invoice OCR)
+    if (azureResult?.ok) {
+      logger.info('[OCR] Azure Document Intelligence responded', {
+        modelId: azureResult.modelId,
+        chars: azureResult.content.length,
+        confidence: azureResult.confidence,
+      });
+    } else if (azureResult && !azureResult.ok) {
+      logger.warn('[OCR] Azure Document Intelligence failed, falling back', { error: azureResult.error });
+    }
+
+    const azureContext = azureResult?.ok
+      ? `\n\nAzure Document Intelligence result:\nFields:\n${JSON.stringify(azureResult.fields, null, 2)}\n\nOCR text:\n${azureResult.content.slice(0, 6000)}`
+      : '';
+
+    // Try Gemini first (verifies Azure OCR when available; otherwise handles text, image, and PDF directly)
     if (googleAiKey) {
       try {
         logger.info('[OCR] Trying Gemini API', { mimeType });
-        raw = await callGemini(mimeType, imageBase64, ocrPrompt, ocrTimeoutMs);
+        raw = await callGemini(mimeType, imageBase64, `${ocrPrompt}${azureContext}`, ocrTimeoutMs);
         logger.info('[OCR] Gemini responded', { chars: raw.length });
       } catch (geminiErr) {
         logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
@@ -360,6 +415,8 @@ Rules:
       const isText = mimeType === 'text/plain';
       const userContent: OpenRouterMessage['content'] = isText
         ? `${ocrPrompt}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
+        : azureResult?.ok
+          ? `${ocrPrompt}${azureContext}`
         : [
             { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
             { type: 'text', text: ocrPrompt },
@@ -374,6 +431,26 @@ Rules:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       logger.warn('OCR: no JSON found in response', { raw: raw.slice(0, 200) });
+      if (azureResult?.ok) {
+        const fields = azureResult.fields as Record<string, unknown>;
+        const fallback: OcrResult = {
+          ...emptyResult,
+          documentType: 'invoice',
+          documentTypeLabel: 'เอกสารบัญชี',
+          supplierName: String(fields.VendorName ?? fields.MerchantName ?? ''),
+          supplierTaxId: String(fields.VendorTaxId ?? ''),
+          invoiceNumber: String(fields.InvoiceId ?? fields.ReceiptId ?? ''),
+          invoiceDate: String(fields.InvoiceDate ?? fields.TransactionDate ?? ''),
+          subtotal: Number(fields.SubTotal ?? 0),
+          vatAmount: Number(fields.TotalTax ?? 0),
+          total: Number(fields.InvoiceTotal ?? fields.Total ?? fields.AmountDue ?? 0),
+          confidence: azureResult.confidence && azureResult.confidence > 0.7 ? 'medium' : 'low',
+          rawText: azureResult.content,
+          extractionProvider: 'azure',
+        };
+        fallback.validationWarnings = validateOcrResult(fallback);
+        return fallback;
+      }
       return emptyResult;
     }
 
@@ -392,7 +469,7 @@ Rules:
     const documentType = allowedTypes.has(parsed.documentType as OcrResult['documentType'])
       ? parsed.documentType as OcrResult['documentType']
       : 'other';
-    return {
+    const result: OcrResult = {
       documentType,
       documentTypeLabel: parsed.documentTypeLabel ?? 'เอกสารอื่น',
       supplierName: parsed.supplierName ?? '',
@@ -404,8 +481,14 @@ Rules:
       vatAmount: Number(parsed.vatAmount ?? 0),
       total: Number(parsed.total ?? 0),
       confidence: parsed.confidence ?? 'low',
-      rawText: parsed.rawText,
+      rawText: parsed.rawText ?? azureResult?.content,
+      extractionProvider: azureResult?.ok ? 'azure+llm' : googleAiKey ? 'gemini' : 'openrouter',
     };
+    result.validationWarnings = validateOcrResult(result);
+    if (!hasUsefulOcrData(result) && azureResult?.ok) {
+      result.rawText = azureResult.content;
+    }
+    return result;
   } catch (err) {
     logger.error('ocrSupplierInvoice failed', { error: err instanceof Error ? err.message : String(err) });
     return emptyResult;
@@ -430,14 +513,22 @@ export async function testOcrProvider(): Promise<{ ok: boolean; provider: string
     const ok = !!(sample.supplierName || sample.invoiceNumber || sample.total);
     return {
       ok,
-      provider: googleAiKey ? 'gemini' : 'openrouter',
+      provider: [
+        isAzureDocumentIntelligenceConfigured() ? 'azure-ready' : null,
+        googleAiKey ? 'gemini' : null,
+        !googleAiKey && apiKey ? 'openrouter' : null,
+      ].filter(Boolean).join('+') || 'none',
       sample,
       error: ok ? undefined : 'OCR provider returned no extractable fields',
     };
   } catch (err) {
     return {
       ok: false,
-      provider: googleAiKey ? 'gemini' : 'openrouter',
+      provider: [
+        isAzureDocumentIntelligenceConfigured() ? 'azure-ready' : null,
+        googleAiKey ? 'gemini' : null,
+        !googleAiKey && apiKey ? 'openrouter' : null,
+      ].filter(Boolean).join('+') || 'none',
       error: err instanceof Error ? err.message : String(err),
     };
   }

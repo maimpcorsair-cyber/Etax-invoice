@@ -272,7 +272,7 @@ export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): obje
         },
         {
           type: 'text',
-          text: `ความมั่นใจ: ${result.confidence === 'high' ? 'สูง' : result.confidence === 'medium' ? 'ปานกลาง' : 'ต่ำ'}`,
+          text: `ความมั่นใจ: ${result.confidence === 'high' ? 'สูง' : result.confidence === 'medium' ? 'ปานกลาง' : 'ต่ำ'}${result.extractionProvider ? ` • ${result.extractionProvider}` : ''}`,
           color: '#bbf7d0',
           size: 'xs',
         },
@@ -291,6 +291,9 @@ export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): obje
         row('ยอดก่อนภาษี', result.subtotal ? fmt(result.subtotal) : '-'),
         row('ภาษีมูลค่าเพิ่ม', result.vatAmount ? fmt(result.vatAmount) : '-'),
         row('ยอดรวม', result.total ? fmt(result.total) : '-'),
+        ...(result.validationWarnings?.length
+          ? [row('หมายเหตุ', result.validationWarnings.slice(0, 2).join(', '))]
+          : []),
       ],
     },
     footer: {
