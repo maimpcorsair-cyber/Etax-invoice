@@ -23,15 +23,6 @@ import { vatSummaryRouter } from './routes/vatSummary';
 import { pp30Router } from './routes/pp30';
 import { lineRouter, lineWebhookHandler } from './routes/line';
 
-// ─── BullMQ Workers ──────────────────────────────────────────────────────────
-// Workers must be imported to start listening on their queues.
-// Each import triggers `new Worker(...)` which registers the worker with Redis.
-import './queues/workers/pdfWorker';
-import './queues/workers/rdSubmitWorker';
-import './queues/workers/rdComplianceWorker'; // cron: runs on 10th of each month
-import './queues/workers/billingRenewalWorker'; // cron: runs daily for renewal reminders
-import './queues/workers/overdueReminderWorker'; // cron: runs daily at 08:00 for overdue Line notifications
-
 const app = express();
 const PORT = process.env.PORT ?? 4000;
 
@@ -106,6 +97,31 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
   res.status(500).json({ error: 'Internal server error', message: process.env.NODE_ENV === 'development' ? err.message : undefined });
 });
 
-app.listen(PORT, () => logger.info(`e-Tax Invoice API running on port ${PORT}`));
+app.listen(PORT, () => {
+  logger.info(`e-Tax Invoice API running on port ${PORT}`);
+
+  if (process.env.ENABLE_WORKERS === 'false') {
+    logger.warn('BullMQ workers disabled by ENABLE_WORKERS=false');
+    return;
+  }
+
+  void Promise.allSettled([
+    import('./queues/workers/pdfWorker'),
+    import('./queues/workers/rdSubmitWorker'),
+    import('./queues/workers/rdComplianceWorker'), // cron: runs on 10th of each month
+    import('./queues/workers/billingRenewalWorker'), // cron: runs daily for renewal reminders
+    import('./queues/workers/overdueReminderWorker'), // cron: runs daily at 08:00 for overdue Line notifications
+  ]).then((results) => {
+    const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (rejected.length === 0) {
+      logger.info('BullMQ workers loaded');
+      return;
+    }
+
+    rejected.forEach((result) => {
+      logger.error('BullMQ worker failed to load', { error: result.reason });
+    });
+  });
+});
 
 export default app;
