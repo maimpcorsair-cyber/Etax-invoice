@@ -438,6 +438,17 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
     return;
   }
 
+  if (['ลิงก์', 'link', 'เข้าเว็บ', 'เข้าระบบ', 'login', 'เปิดระบบ', 'ดาวน์โหลดเอกสาร', 'ดูเอกสาร'].some((keyword) => lower.includes(keyword))) {
+    await sendLineText(
+      lineUserId,
+      'ได้ค่ะ เข้าระบบ e-Tax Invoice ได้ที่นี่นะคะ\n\n' +
+      '🌐 เข้าระบบ: https://etax-invoice.vercel.app\n' +
+      '📄 รายการเอกสารขาย: https://etax-invoice.vercel.app/app/invoices\n' +
+      '🧾 เอกสารซื้อ/ภาษีซื้อ: https://etax-invoice.vercel.app/app/purchase-invoices',
+    );
+    return;
+  }
+
   if (lower === 'วิธีค้นหาใบ' || lower === 'ค้นหาใบ') {
     await sendLineText(lineUserId,
       '🔍 วิธีค้นหาใบกำกับภาษี\n\nพิมพ์คำสั่งตามนี้:\n• "ส่งใบ INV-2026-001"\n• "ขอใบ TAX-001"\n• "ดูใบ [เลขที่]"\n• "pdf [เลขที่]"\n\nระบบจะส่ง Flex Card พร้อมปุ่มเปิด PDF ให้ทันที');
@@ -724,6 +735,8 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
           vatAmount: ocrData.vatAmount,
           total: ocrData.total,
           vatType: 'vat7',
+          category: ocrData.documentTypeLabel || ocrData.documentType,
+          description: `นำเข้าจาก LINE OCR: ${ocrData.documentTypeLabel || ocrData.documentType || 'เอกสารซื้อ'}`,
           createdBy: link.userId,
         },
       });
@@ -736,10 +749,11 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       const fmt = (n: number) =>
         new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
 
+      const typeLine = ocrData.documentTypeLabel ? `\n🧾 ประเภท: ${ocrData.documentTypeLabel}` : '';
       const vatLine = ocrData.vatAmount > 0 ? `\n💰 ภาษีซื้อ ${fmt(ocrData.vatAmount)}` : '';
       await sendLineTextWithQuickReply(
         lineUserId,
-        `✅ บันทึกภาษีซื้อเรียบร้อย!\n📋 ${ocrData.supplierName}${vatLine}\n💵 ยอดรวม ${fmt(ocrData.total)}`,
+        `✅ บันทึกเอกสารเรียบร้อย!${typeLine}\n📋 ${ocrData.supplierName}${vatLine}\n💵 ยอดรวม ${fmt(ocrData.total)}`,
         [
           { label: '✏️ แก้ไขข้อมูล', data: `edit_purchase:${saved.id}`, displayText: 'แก้ไขข้อมูล' },
           { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },

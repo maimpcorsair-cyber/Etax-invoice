@@ -74,6 +74,8 @@ async function callGemini(mimeType: string, base64Data: string, prompt: string, 
 }
 
 export interface OcrResult {
+  documentType: 'tax_invoice' | 'receipt' | 'invoice' | 'billing_note' | 'withholding_tax' | 'payment_advice' | 'credit_note' | 'debit_note' | 'other';
+  documentTypeLabel: string;
   supplierName: string;
   supplierTaxId: string;
   supplierBranch: string;
@@ -238,6 +240,10 @@ export async function askPinuch(
         content: `คุณคือ "พี่นุช" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
 คุณช่วยเหลือพนักงานบัญชีในการตอบคำถามเกี่ยวกับภาษีมูลค่าเพิ่ม ใบกำกับภาษี และข้อมูลทางการเงิน
 ตอบเป็นภาษาไทยเสมอ กระชับและเข้าใจง่าย
+ถ้าผู้ใช้ถามหาลิงก์, ทางเข้า, login, เปิดระบบ, ดาวน์โหลดเอกสาร หรือดูเอกสาร ให้แนบลิงก์ระบบที่เกี่ยวข้องเสมอ:
+- เข้าระบบ: https://etax-invoice.vercel.app
+- หน้ารายการเอกสาร: https://etax-invoice.vercel.app/app/invoices
+- หน้าภาษีซื้อ/เอกสารซื้อ: https://etax-invoice.vercel.app/app/purchase-invoices
 
 ขอบเขตคำตอบ:
 - ตอบได้เฉพาะข้อมูลของบริษัทนี้จาก context ด้านล่าง, ความรู้ทั่วไปด้านบัญชี/ภาษีไทย, และวิธีใช้งานระบบ e-Tax Invoice นี้
@@ -272,6 +278,8 @@ export async function ocrSupplierInvoice(
 ): Promise<OcrResult> {
   if (!apiKey && !googleAiKey) {
     return {
+      documentType: 'other',
+      documentTypeLabel: 'เอกสารอื่น',
       supplierName: '',
       supplierTaxId: '',
       supplierBranch: '00000',
@@ -285,6 +293,8 @@ export async function ocrSupplierInvoice(
   }
 
   const emptyResult: OcrResult = {
+    documentType: 'other',
+    documentTypeLabel: 'เอกสารอื่น',
     supplierName: '',
     supplierTaxId: '',
     supplierBranch: '00000',
@@ -296,7 +306,7 @@ export async function ocrSupplierInvoice(
     confidence: 'low',
   };
 
-  const ocrPrompt = `You are an OCR assistant for Thai tax invoices. Extract all available information from this document and return ONLY a JSON object, no other text.
+  const ocrPrompt = `You are an OCR assistant for Thai and English accounting documents. Classify the document and extract all available information. Return ONLY a JSON object, no other text.
 
 Rules:
 - Extract whatever is visible, even if partial
@@ -304,8 +314,21 @@ Rules:
 - supplierTaxId: 13-digit Thai tax ID (remove dashes/spaces)
 - invoiceDate: convert to YYYY-MM-DD format
 - confidence: "high" if most fields found, "medium" if some fields found, "low" only if document is completely unreadable
+- documentType must be one of:
+  - "tax_invoice": Thai tax invoice / ใบกำกับภาษี
+  - "receipt": receipt / ใบเสร็จรับเงิน
+  - "invoice": invoice / invoice only / ใบแจ้งหนี้
+  - "billing_note": billing note / ใบวางบิล / ใบเรียกเก็บเงิน
+  - "withholding_tax": withholding tax certificate / หนังสือรับรองหัก ณ ที่จ่าย / 50 ทวิ
+  - "payment_advice": payment advice / remittance advice / หลักฐานแจ้งการชำระเงิน
+  - "credit_note": credit note / ใบลดหนี้
+  - "debit_note": debit note / ใบเพิ่มหนี้
+  - "other": other accounting document
+- documentTypeLabel: short Thai label for the document type
 
 {
+  "documentType": "tax_invoice|receipt|invoice|billing_note|withholding_tax|payment_advice|credit_note|debit_note|other",
+  "documentTypeLabel": "ใบกำกับภาษี",
   "supplierName": "company name",
   "supplierTaxId": "1234567890123",
   "supplierBranch": "00000",
@@ -355,7 +378,23 @@ Rules:
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
+    const allowedTypes = new Set<OcrResult['documentType']>([
+      'tax_invoice',
+      'receipt',
+      'invoice',
+      'billing_note',
+      'withholding_tax',
+      'payment_advice',
+      'credit_note',
+      'debit_note',
+      'other',
+    ]);
+    const documentType = allowedTypes.has(parsed.documentType as OcrResult['documentType'])
+      ? parsed.documentType as OcrResult['documentType']
+      : 'other';
     return {
+      documentType,
+      documentTypeLabel: parsed.documentTypeLabel ?? 'เอกสารอื่น',
       supplierName: parsed.supplierName ?? '',
       supplierTaxId: parsed.supplierTaxId ?? '',
       supplierBranch: parsed.supplierBranch ?? '00000',

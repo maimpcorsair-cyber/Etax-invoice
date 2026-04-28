@@ -265,7 +265,7 @@ export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): obje
       contents: [
         {
           type: 'text',
-          text: '📄 ตรวจพบใบแจ้งหนี้',
+          text: `📄 ตรวจพบ${result.documentTypeLabel || 'เอกสาร'}`,
           color: '#ffffff',
           size: 'md',
           weight: 'bold',
@@ -284,6 +284,7 @@ export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): obje
       spacing: 'sm',
       contents: [
         row('ผู้ขาย', result.supplierName || '-'),
+        row('ประเภท', result.documentTypeLabel || '-'),
         row('เลขผู้เสียภาษี', result.supplierTaxId || '-'),
         row('เลขที่ใบกำกับ', result.invoiceNumber || '-'),
         row('วันที่', result.invoiceDate || '-'),
