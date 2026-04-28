@@ -54,7 +54,7 @@ services:
     name: etax-invoice-worker
     runtime: docker
     rootDir: backend
-    plan: free
+    plan: starter
     dockerCommand: node dist/worker.js
     autoDeploy: true
     envVars:
