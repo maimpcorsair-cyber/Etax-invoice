@@ -69,7 +69,12 @@ app.use('/api', limiter);
 // 10 req/min per IP on auth routes (brute-force protection)
 const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+const healthHandler = (_req: express.Request, res: express.Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+};
+
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // Keep-alive endpoint — no auth required, used by UptimeRobot to prevent Render cold starts
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));

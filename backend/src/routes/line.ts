@@ -143,7 +143,7 @@ lineRouter.post('/admin/setup-richmenu', authenticate, requireRole('admin', 'sup
   try {
     const result = await setupRichMenu();
     if (!result.ok) {
-      res.status(500).json({ error: result.error });
+      res.status(500).json({ error: result.error ?? 'Rich menu setup failed' });
       return;
     }
     res.json({ data: { richMenuId: result.richMenuId } });
@@ -559,6 +559,19 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
 
 async function handleImageMessage(lineUserId: string, messageId: string): Promise<void> {
   try {
+    const link = await prisma.lineUserLink.findUnique({
+      where: { lineUserId },
+      select: { user: { select: { companyId: true } } },
+    });
+
+    if (!link) {
+      await sendLineText(
+        lineUserId,
+        'ยังไม่ได้เชื่อมบัญชีครับ กรุณาเข้าระบบ e-Tax Invoice → ตั้งค่า → Line แล้วสร้างรหัส OTP ก่อนส่งเอกสาร',
+      );
+      return;
+    }
+
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
     if (!token) {
       await sendLineText(lineUserId, 'ขอโทษ ระบบ Line ยังไม่ได้ตั้งค่า');
@@ -619,12 +632,7 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
       return;
     }
 
-    // Find the linked user's companyId to store with the temp data
-    const link2 = await prisma.lineUserLink.findUnique({
-      where: { lineUserId },
-      select: { user: { select: { companyId: true } } },
-    });
-    const companyId = link2?.user.companyId;
+    const companyId = link.user.companyId;
 
     // Check for missing required fields
     const missingFields = getMissingFields(result);
@@ -831,7 +839,9 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
   }
 
   if (!sig || !verifyLineSignature(req.body as Buffer, sig)) {
-    logger.warn('[Line] Signature mismatch — processing anyway (check LINE_CHANNEL_SECRET on server)');
+    logger.warn('[Line] Signature mismatch — rejected');
+    res.status(401).json({ ok: false });
+    return;
   }
 
   // Always respond 200 immediately; process events async
