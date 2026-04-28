@@ -48,6 +48,15 @@ function getMissingFields(result: OcrResult): typeof REQUIRED_OCR_FIELDS {
   });
 }
 
+function detectLineFileMimeType(buffer: Buffer, headerContentType: string): string {
+  const header = headerContentType.toLowerCase();
+  if (header.includes('pdf') || buffer.slice(0, 4).toString() === '%PDF') return 'application/pdf';
+  if (header.includes('png') || buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (header.includes('webp') || buffer.slice(0, 4).toString() === 'RIFF') return 'image/webp';
+  if (header.includes('jpeg') || header.includes('jpg') || (buffer[0] === 0xff && buffer[1] === 0xd8)) return 'image/jpeg';
+  return headerContentType || 'application/octet-stream';
+}
+
 // GET /api/line/status
 lineRouter.get('/status', authenticate, async (req, res) => {
   try {
@@ -590,8 +599,8 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
     }
 
     const buffer = Buffer.from(await contentResponse.arrayBuffer());
-    const contentType = contentResponse.headers.get('content-type') ?? 'image/jpeg';
-    const isPdf = contentType.includes('pdf') || buffer.slice(0, 4).toString() === '%PDF';
+    const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '');
+    const isPdf = contentType === 'application/pdf';
 
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length });
@@ -619,7 +628,7 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
         result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
       }
     } else {
-      result = await ocrSupplierInvoice(buffer.toString('base64'), 'image/jpeg');
+      result = await ocrSupplierInvoice(buffer.toString('base64'), contentType);
     }
 
     if (!result) return;
@@ -628,7 +637,7 @@ async function handleImageMessage(lineUserId: string, messageId: string): Promis
 
     const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount;
     if (!hasAnyData) {
-      await sendLineText(lineUserId, '❌ ไม่สามารถอ่านเอกสารได้ กรุณาส่งเป็นรูปภาพ (.jpg/.png) หรือ PDF ที่ไม่ใช่รูปสแกน');
+      await sendLineText(lineUserId, '❌ ยังอ่านข้อมูลจากเอกสารนี้ไม่ได้\n\nกรุณาลองถ่ายให้ชัดขึ้น เห็นทั้งใบ ไม่เอียง แสงพอ และเห็นเลขผู้เสียภาษี/วันที่/ยอดรวม หรือส่งเป็น PDF ต้นฉบับ');
       return;
     }
 

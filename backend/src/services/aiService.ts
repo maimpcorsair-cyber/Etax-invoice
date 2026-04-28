@@ -43,17 +43,21 @@ function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Pr
   return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-// Call Google Gemini API directly — supports image/jpeg, application/pdf inline
+// Call Google Gemini API directly — supports text, image/jpeg, image/png, and application/pdf inline
 async function callGemini(mimeType: string, base64Data: string, prompt: string, timeoutMs = ocrTimeoutMs): Promise<string> {
-  const model = process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash-lite';
+  const model = process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleAiKey}`;
-  const body = {
-    contents: [{
-      parts: [
+  const parts = mimeType === 'text/plain'
+    ? [
+        { text: prompt },
+        { text: `Document text:\n${Buffer.from(base64Data, 'base64').toString('utf-8')}` },
+      ]
+    : [
         { inline_data: { mime_type: mimeType, data: base64Data } },
         { text: prompt },
-      ],
-    }],
+      ];
+  const body = {
+    contents: [{ parts }],
     generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
   };
   const res = await fetchWithTimeout(url, {
@@ -317,8 +321,8 @@ Rules:
   try {
     let raw = '';
 
-    // Try Gemini first (handles image + PDF natively, best Thai OCR)
-    if (googleAiKey && mimeType !== 'text/plain') {
+    // Try Gemini first (handles text, image, and PDF natively; best default for Thai/English invoice OCR)
+    if (googleAiKey) {
       try {
         logger.info('[OCR] Trying Gemini API', { mimeType });
         raw = await callGemini(mimeType, imageBase64, ocrPrompt, ocrTimeoutMs);
