@@ -1,5 +1,4 @@
 import prisma from '../config/database';
-import redis from '../config/redis';
 import { logger } from '../config/logger';
 
 const apiKey = process.env.OPENROUTER_API_KEY ?? '';
@@ -8,6 +7,7 @@ const googleAiKey = process.env.GOOGLE_AI_API_KEY ?? '';
 const chatTimeoutMs = Number(process.env.AI_CHAT_TIMEOUT_MS ?? 12000);
 const ocrTimeoutMs = Number(process.env.AI_OCR_TIMEOUT_MS ?? 30000);
 const companyContextCacheTtl = Number(process.env.AI_COMPANY_CONTEXT_CACHE_TTL ?? 30);
+const companyContextCache = new Map<string, { expiresAt: number; value: string }>();
 
 const VISION_MODELS = [
   process.env.OPENROUTER_OCR_MODEL,
@@ -126,11 +126,9 @@ async function callOpenRouter(
 export async function buildCompanyContext(companyId: string): Promise<string> {
   const cacheKey = `ai:company-context:${companyId}`;
   if (companyContextCacheTtl > 0) {
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) return cached;
-    } catch (err) {
-      logger.warn('[AI] company context cache read failed', { error: String(err), companyId });
+    const cached = companyContextCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
     }
   }
 
@@ -208,11 +206,10 @@ export async function buildCompanyContext(companyId: string): Promise<string> {
   const serialized = JSON.stringify(context, null, 2);
 
   if (companyContextCacheTtl > 0) {
-    try {
-      await redis.setex(cacheKey, companyContextCacheTtl, serialized);
-    } catch (err) {
-      logger.warn('[AI] company context cache write failed', { error: String(err), companyId });
-    }
+    companyContextCache.set(cacheKey, {
+      expiresAt: Date.now() + companyContextCacheTtl * 1000,
+      value: serialized,
+    });
   }
 
   return serialized;
