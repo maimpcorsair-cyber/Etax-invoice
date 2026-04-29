@@ -7,6 +7,9 @@ const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1
 const googleAiKey = process.env.GOOGLE_AI_API_KEY ?? '';
 const chatTimeoutMs = Number(process.env.AI_CHAT_TIMEOUT_MS ?? 12000);
 const ocrTimeoutMs = Number(process.env.AI_OCR_TIMEOUT_MS ?? 30000);
+const geminiFastModel = process.env.GOOGLE_AI_OCR_FAST_MODEL ?? process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash-lite';
+const geminiScanModel = process.env.GOOGLE_AI_OCR_SCAN_MODEL ?? process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash';
+const geminiProVerifyModel = process.env.GOOGLE_AI_OCR_PRO_VERIFY_MODEL ?? 'gemini-2.5-pro';
 const companyContextCacheTtl = Number(process.env.AI_COMPANY_CONTEXT_CACHE_TTL ?? 30);
 const companyContextCache = new Map<string, { expiresAt: number; value: string }>();
 
@@ -45,8 +48,13 @@ function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Pr
 }
 
 // Call Google Gemini API directly — supports text, image/jpeg, image/png, and application/pdf inline
-async function callGemini(mimeType: string, base64Data: string, prompt: string, timeoutMs = ocrTimeoutMs): Promise<string> {
-  const model = process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash';
+async function callGemini(
+  mimeType: string,
+  base64Data: string,
+  prompt: string,
+  timeoutMs = ocrTimeoutMs,
+  model = geminiScanModel,
+): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleAiKey}`;
   const parts = mimeType === 'text/plain'
     ? [
@@ -89,6 +97,13 @@ export interface OcrResult {
   rawText?: string;
   validationWarnings?: string[];
   extractionProvider?: string;
+  verificationStage?: 'fast' | 'pro' | 'fallback';
+  needsHumanReview?: boolean;
+}
+
+interface OcrOptions {
+  pageCount?: number;
+  source?: 'text_pdf' | 'scan_pdf' | 'image' | 'text' | 'unknown';
 }
 
 interface OpenRouterMessage {
@@ -162,6 +177,84 @@ function validateOcrResult(result: OcrResult): string[] {
     }
   }
   return warnings;
+}
+
+function shouldEscalateOcr(result: OcrResult, options?: OcrOptions) {
+  const warnings = result.validationWarnings ?? [];
+  const missingCritical = !result.supplierName || !result.invoiceNumber || !result.invoiceDate || !result.total;
+  return result.confidence === 'low'
+    || warnings.length > 0
+    || missingCritical
+    || (options?.pageCount ?? 1) > 1;
+}
+
+function shouldHumanReviewOcr(result: OcrResult) {
+  const warnings = result.validationWarnings ?? [];
+  const missingCritical = !result.supplierName || !result.invoiceNumber || !result.invoiceDate || !result.total;
+  return result.confidence === 'low' || warnings.length > 0 || missingCritical;
+}
+
+function buildVerifyPrompt(basePrompt: string, candidate?: OcrResult, pro = false) {
+  const candidateBlock = candidate
+    ? `\n\nCandidate extraction to audit and correct:\n${JSON.stringify(candidate, null, 2)}`
+    : '';
+
+  return `${basePrompt}
+
+Verification mode:
+- Treat deterministic parser/OCR output as evidence, not truth.
+- Recalculate subtotal + VAT = total. If values disagree, correct only when the document clearly supports it; otherwise keep the best visible values and add validationWarnings.
+- Detect swapped seller/buyer names when possible. supplierName must be the seller/vendor on the purchase document.
+- Preserve Thai text exactly when visible.
+- If confidence is not high enough for automatic posting, set confidence to "medium" or "low".
+- Return ONLY the final corrected JSON object.
+${pro ? '- This is the escalation pass. Be stricter about multi-page documents, missing tax IDs, and mismatched totals.' : ''}${candidateBlock}`;
+}
+
+function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string): OcrResult | null {
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    logger.warn('OCR: no JSON found in response', { raw: raw.slice(0, 200) });
+    return null;
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
+  const allowedTypes = new Set<OcrResult['documentType']>([
+    'tax_invoice',
+    'receipt',
+    'invoice',
+    'billing_note',
+    'withholding_tax',
+    'payment_advice',
+    'credit_note',
+    'debit_note',
+    'other',
+  ]);
+  const documentType = allowedTypes.has(parsed.documentType as OcrResult['documentType'])
+    ? parsed.documentType as OcrResult['documentType']
+    : 'other';
+
+  const result: OcrResult = {
+    documentType,
+    documentTypeLabel: parsed.documentTypeLabel ?? 'เอกสารอื่น',
+    supplierName: parsed.supplierName ?? '',
+    supplierTaxId: parsed.supplierTaxId ?? '',
+    supplierBranch: parsed.supplierBranch ?? '00000',
+    invoiceNumber: parsed.invoiceNumber ?? '',
+    invoiceDate: parsed.invoiceDate ?? '',
+    subtotal: Number(parsed.subtotal ?? 0),
+    vatAmount: Number(parsed.vatAmount ?? 0),
+    total: Number(parsed.total ?? 0),
+    confidence: parsed.confidence ?? 'low',
+    rawText: parsed.rawText ?? azureContent,
+    extractionProvider: parsed.extractionProvider ?? emptyResult.extractionProvider,
+  };
+  result.validationWarnings = [
+    ...validateOcrResult(result),
+    ...(parsed.validationWarnings ?? []),
+  ];
+  result.needsHumanReview = parsed.needsHumanReview;
+  return result;
 }
 
 export async function buildCompanyContext(companyId: string): Promise<string> {
@@ -310,6 +403,7 @@ ${context}`,
 export async function ocrSupplierInvoice(
   imageBase64: string,
   mimeType: string,
+  options: OcrOptions = {},
 ): Promise<OcrResult> {
   const azureConfigured = isAzureDocumentIntelligenceConfigured();
   if (!apiKey && !googleAiKey && !azureConfigured) {
@@ -402,8 +496,9 @@ Rules:
     // Try Gemini first (verifies Azure OCR when available; otherwise handles text, image, and PDF directly)
     if (googleAiKey) {
       try {
-        logger.info('[OCR] Trying Gemini API', { mimeType });
-        raw = await callGemini(mimeType, imageBase64, `${ocrPrompt}${azureContext}`, ocrTimeoutMs);
+        const fastModel = mimeType === 'text/plain' ? geminiFastModel : geminiScanModel;
+        logger.info('[OCR] Trying Gemini API', { mimeType, model: fastModel, source: options.source });
+        raw = await callGemini(mimeType, imageBase64, buildVerifyPrompt(`${ocrPrompt}${azureContext}`), ocrTimeoutMs, fastModel);
         logger.info('[OCR] Gemini responded', { chars: raw.length });
       } catch (geminiErr) {
         logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
@@ -427,10 +522,8 @@ Rules:
       raw = await callOpenRouter(models, messages, 2000, ocrTimeoutMs);
     }
 
-    // Extract JSON from response
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      logger.warn('OCR: no JSON found in response', { raw: raw.slice(0, 200) });
+    let result = parseOcrJson(raw, emptyResult, azureResult?.content);
+    if (!result) {
       if (azureResult?.ok) {
         const fields = azureResult.fields as Record<string, unknown>;
         const fallback: OcrResult = {
@@ -447,47 +540,50 @@ Rules:
           confidence: azureResult.confidence && azureResult.confidence > 0.7 ? 'medium' : 'low',
           rawText: azureResult.content,
           extractionProvider: 'azure',
+          verificationStage: 'fallback',
         };
         fallback.validationWarnings = validateOcrResult(fallback);
+        fallback.needsHumanReview = shouldHumanReviewOcr(fallback);
         return fallback;
       }
       return emptyResult;
     }
-
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
-    const allowedTypes = new Set<OcrResult['documentType']>([
-      'tax_invoice',
-      'receipt',
-      'invoice',
-      'billing_note',
-      'withholding_tax',
-      'payment_advice',
-      'credit_note',
-      'debit_note',
-      'other',
-    ]);
-    const documentType = allowedTypes.has(parsed.documentType as OcrResult['documentType'])
-      ? parsed.documentType as OcrResult['documentType']
-      : 'other';
-    const result: OcrResult = {
-      documentType,
-      documentTypeLabel: parsed.documentTypeLabel ?? 'เอกสารอื่น',
-      supplierName: parsed.supplierName ?? '',
-      supplierTaxId: parsed.supplierTaxId ?? '',
-      supplierBranch: parsed.supplierBranch ?? '00000',
-      invoiceNumber: parsed.invoiceNumber ?? '',
-      invoiceDate: parsed.invoiceDate ?? '',
-      subtotal: Number(parsed.subtotal ?? 0),
-      vatAmount: Number(parsed.vatAmount ?? 0),
-      total: Number(parsed.total ?? 0),
-      confidence: parsed.confidence ?? 'low',
-      rawText: parsed.rawText ?? azureResult?.content,
-      extractionProvider: azureResult?.ok ? 'azure+llm' : googleAiKey ? 'gemini' : 'openrouter',
-    };
-    result.validationWarnings = validateOcrResult(result);
+    result.extractionProvider = azureResult?.ok ? 'azure+gemini-verify' : googleAiKey ? 'gemini-verify' : 'openrouter';
+    result.verificationStage = 'fast';
     if (!hasUsefulOcrData(result) && azureResult?.ok) {
       result.rawText = azureResult.content;
     }
+
+    if (googleAiKey && shouldEscalateOcr(result, options)) {
+      try {
+        logger.info('[OCR] Escalating to Gemini Pro verify', {
+          model: geminiProVerifyModel,
+          confidence: result.confidence,
+          warnings: result.validationWarnings?.length ?? 0,
+          pageCount: options.pageCount,
+        });
+        const proRaw = await callGemini(
+          mimeType,
+          imageBase64,
+          buildVerifyPrompt(`${ocrPrompt}${azureContext}`, result, true),
+          ocrTimeoutMs,
+          geminiProVerifyModel,
+        );
+        const proResult = parseOcrJson(proRaw, result, azureResult?.content);
+        if (proResult && hasUsefulOcrData(proResult)) {
+          result = {
+            ...proResult,
+            extractionProvider: azureResult?.ok ? 'azure+gemini-pro-verify' : 'gemini-pro-verify',
+            verificationStage: 'pro',
+          };
+        }
+      } catch (proErr) {
+        logger.warn('[OCR] Gemini Pro verify failed; keeping fast result', { error: String(proErr) });
+      }
+    }
+
+    result.validationWarnings = result.validationWarnings?.length ? result.validationWarnings : validateOcrResult(result);
+    result.needsHumanReview = shouldHumanReviewOcr(result);
     return result;
   } catch (err) {
     logger.error('ocrSupplierInvoice failed', { error: err instanceof Error ? err.message : String(err) });

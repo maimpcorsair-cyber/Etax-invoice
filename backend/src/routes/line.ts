@@ -635,27 +635,35 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     if (isPdf) {
       // Step 1: extract text (fast, cheap — works for digital/typed PDFs)
       let pdfText = '';
+      let pageCount = 1;
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { PDFParse } = require('pdf-parse');
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText({ first: 1 }); // first page only — invoice data is always here
-        pdfText = (textResult.text ?? '').trim().slice(0, 3000);
-        logger.info('[Line] PDF text extracted', { chars: pdfText.length, pages: textResult.total });
+        const textResult = await parser.getText();
+        pageCount = textResult.total ?? 1;
+        pdfText = (textResult.text ?? '').trim().slice(0, 8000);
+        logger.info('[Line] PDF text extracted', { chars: pdfText.length, pages: pageCount });
       } catch (pdfErr) {
         logger.warn('[Line] pdf-parse failed', { error: String(pdfErr) });
       }
 
       if (pdfText.length > 30) {
         // Step 2a: got text — send to chat model (cheap, no vision needed)
-        result = await ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain');
+        result = await ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain', {
+          pageCount,
+          source: 'text_pdf',
+        });
       } else {
         // Step 2b: no text (scanned PDF) — send PDF binary to Gemini via OpenRouter
-        logger.info('[Line] No text found, sending PDF to Gemini', { bytes: buffer.length });
-        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf');
+        logger.info('[Line] No text found, sending PDF through OCR pipeline', { bytes: buffer.length });
+        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf', {
+          pageCount,
+          source: 'scan_pdf',
+        });
       }
     } else {
-      result = await ocrSupplierInvoice(buffer.toString('base64'), contentType);
+      result = await ocrSupplierInvoice(buffer.toString('base64'), contentType, { source: 'image' });
     }
 
     if (!result) return;
