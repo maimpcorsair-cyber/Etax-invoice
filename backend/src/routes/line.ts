@@ -41,6 +41,26 @@ type PaymentMatchResult = {
   warnings?: string[];
 };
 
+type DocumentTemplateField = {
+  key: string;
+  label: string;
+  hint: string;
+  type: 'text' | 'tax_id' | 'date' | 'money';
+};
+
+const PURCHASE_TEMPLATE_FIELDS: DocumentTemplateField[] = [
+  { key: 'supplierName', label: 'ชื่อผู้ขาย', hint: 'เช่น บริษัท ABC จำกัด', type: 'text' },
+  { key: 'supplierTaxId', label: 'เลขผู้เสียภาษีผู้ขาย (13 หลัก)', hint: 'เช่น 0105567890123', type: 'tax_id' },
+  { key: 'invoiceDate', label: 'วันที่เอกสาร', hint: 'เช่น 27/04/2567 หรือ 2026-04-27', type: 'date' },
+  { key: 'total', label: 'ยอดรวมทั้งสิ้น', hint: 'เช่น 10700', type: 'money' },
+];
+
+const BANK_TRANSFER_TEMPLATE_FIELDS: DocumentTemplateField[] = [
+  { key: 'payment.amount', label: 'ยอดโอน', hint: 'เช่น 10700', type: 'money' },
+  { key: 'payment.paidAt', label: 'วันที่โอน', hint: 'เช่น 27/04/2567 หรือ 2026-04-27', type: 'date' },
+  { key: 'payment.reference', label: 'เลขอ้างอิงสลิป', hint: 'เช่น เลข reference/transaction id บนสลิป', type: 'text' },
+];
+
 const PURCHASE_RECORD_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
   'tax_invoice',
   'receipt',
@@ -79,6 +99,65 @@ function getMissingFields(result: OcrResult): typeof REQUIRED_OCR_FIELDS {
     const val = result[f.key];
     return !val || val === '' || val === 0;
   });
+}
+
+function templateFieldsFor(result: OcrResult) {
+  if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
+    return BANK_TRANSFER_TEMPLATE_FIELDS;
+  }
+  if (PURCHASE_RECORD_DOCUMENT_TYPES.has(result.documentType)) {
+    return PURCHASE_TEMPLATE_FIELDS;
+  }
+  return [];
+}
+
+function getTemplateValue(result: OcrResult, key: string): unknown {
+  if (key.startsWith('payment.')) {
+    const paymentKey = key.slice('payment.'.length) as keyof NonNullable<OcrResult['payment']>;
+    return result.payment?.[paymentKey];
+  }
+  return (result as unknown as Record<string, unknown>)[key];
+}
+
+function setTemplateValue(result: OcrResult, key: string, value: string | number) {
+  if (key.startsWith('payment.')) {
+    const paymentKey = key.slice('payment.'.length);
+    result.payment = { ...(result.payment ?? {}), [paymentKey]: value };
+    if (paymentKey === 'amount') result.total = Number(value);
+    if (paymentKey === 'paidAt') result.invoiceDate = String(value);
+    if (paymentKey === 'reference') result.invoiceNumber = String(value);
+    return;
+  }
+  (result as unknown as Record<string, unknown>)[key] = value;
+}
+
+function missingTemplateFields(result: OcrResult) {
+  return templateFieldsFor(result).filter((field) => {
+    const value = getTemplateValue(result, field.key);
+    return value === undefined || value === null || value === '' || value === 0;
+  });
+}
+
+function parseTemplateReply(field: DocumentTemplateField, text: string): string | number | null {
+  const trimmed = text.trim();
+  if (field.type === 'money') {
+    const num = Number(trimmed.replace(/,/g, ''));
+    return Number.isFinite(num) && num > 0 ? num : null;
+  }
+  if (field.type === 'tax_id') {
+    const digits = trimmed.replace(/\D/g, '');
+    return digits.length === 13 ? digits : null;
+  }
+  if (field.type === 'date') {
+    const thaiMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (thaiMatch) {
+      let year = Number(thaiMatch[3]);
+      if (year > 2500) year -= 543;
+      return `${year}-${thaiMatch[2].padStart(2, '0')}-${thaiMatch[1].padStart(2, '0')}`;
+    }
+    return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
+  }
+  return trimmed || null;
 }
 
 function detectLineFileMimeType(buffer: Buffer, headerContentType: string, messageType?: string): string {
@@ -140,6 +219,71 @@ function buildReviewOnlySummary(result: OcrResult) {
     `ภาษี: ${result.taxTreatment || '-'}\n` +
     `ความมั่นใจ: ${result.confidence}\n\n` +
     `เอกสารนี้ยังไม่ถูกบันทึกเป็นภาษีซื้อ/รับชำระอัตโนมัติ กรุณาตรวจในคิวเอกสาร LINE`;
+}
+
+function buildConfirmationSummary(result: OcrResult) {
+  const fmt = (value: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
+  if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
+    return `สรุปสลิปโอนเงินก่อนบันทึก\n\n` +
+      `ยอดโอน: ${fmt(paymentAmount(result))}\n` +
+      `วันที่โอน: ${paymentDate(result)}\n` +
+      `เลขอ้างอิง: ${paymentReference(result) || '-'}\n` +
+      `จาก: ${result.payment?.fromName || '-'}\n` +
+      `ถึง: ${result.payment?.toName || '-'}\n` +
+      `ทิศทาง: ${result.payment?.direction || 'unknown'}\n` +
+      `ความมั่นใจ: ${result.confidence}`;
+  }
+
+  return `สรุปเอกสารก่อนบันทึก\n\n` +
+    `ประเภท: ${result.documentTypeLabel || result.documentType}\n` +
+    `ผู้ขาย: ${result.supplierName || '-'}\n` +
+    `เลขผู้เสียภาษี: ${result.supplierTaxId || '-'}\n` +
+    `เลขที่เอกสาร: ${result.invoiceNumber || '-'}\n` +
+    `วันที่: ${result.invoiceDate || '-'}\n` +
+    `ยอดก่อน VAT: ${fmt(result.subtotal)}\n` +
+    `VAT: ${fmt(result.vatAmount)}\n` +
+    `ยอดรวม: ${fmt(result.total)}\n` +
+    `หมวด: ${result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '-'}\n` +
+    `ภาษี: ${result.taxTreatment || '-'}\n` +
+    `ความมั่นใจ: ${result.confidence}`;
+}
+
+async function askForMissingField(lineUserId: string, intakeId: string, result: OcrResult, field: DocumentTemplateField) {
+  await prisma.documentIntake.update({
+    where: { id: intakeId },
+    data: {
+      status: 'awaiting_input',
+      ocrResult: result as unknown as Prisma.InputJsonValue,
+      warnings: [`missing:${field.key}`] as Prisma.InputJsonValue,
+      error: field.key,
+    },
+  });
+  await sendLineTextWithQuickReply(
+    lineUserId,
+    `อ่านเอกสารได้บางส่วนครับ ต้องการข้อมูลเพิ่มเฉพาะช่องนี้:\n\n📌 ${field.label}\n💡 ${field.hint}`,
+    [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
+  );
+}
+
+async function askForConfirmation(lineUserId: string, intakeId: string, result: OcrResult) {
+  await prisma.documentIntake.update({
+    where: { id: intakeId },
+    data: {
+      status: 'awaiting_confirmation',
+      ocrResult: result as unknown as Prisma.InputJsonValue,
+      warnings: result.validationWarnings as Prisma.InputJsonValue | undefined,
+      error: null,
+    },
+  });
+  await sendLineTextWithQuickReply(
+    lineUserId,
+    buildConfirmationSummary(result),
+    [
+      { label: '✅ ยืนยันบันทึก', data: `confirm_intake:${intakeId}`, displayText: 'ยืนยันบันทึก' },
+      { label: '❌ ยกเลิก', data: `cancel_intake:${intakeId}`, displayText: 'ยกเลิก' },
+    ],
+  );
 }
 
 async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, companyId: string, fallbackId: string) {
@@ -651,6 +795,48 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
   return true;
 }
 
+async function handleDurableIntakeReply(lineUserId: string, text: string): Promise<boolean> {
+  const active = await prisma.documentIntake.findFirst({
+    where: { lineUserId, status: 'awaiting_input' },
+    orderBy: { updatedAt: 'desc' },
+  });
+  if (!active) return false;
+
+  const trimmed = text.trim();
+  if (trimmed === 'ยกเลิก') {
+    await prisma.documentIntake.update({
+      where: { id: active.id },
+      data: { status: 'needs_review', error: 'cancelled_by_user' },
+    });
+    await sendLineText(lineUserId, 'ยกเลิกการกรอกข้อมูลแล้ว เอกสารยังอยู่ในคิวรอตรวจ');
+    return true;
+  }
+
+  const result = active.ocrResult as unknown as OcrResult | null;
+  if (!result) return false;
+  const field = templateFieldsFor(result).find((item) => item.key === active.error) ?? missingTemplateFields(result)[0];
+  if (!field) {
+    await askForConfirmation(lineUserId, active.id, result);
+    return true;
+  }
+
+  const parsed = parseTemplateReply(field, trimmed);
+  if (parsed === null) {
+    await sendLineText(lineUserId, `รูปแบบไม่ถูกต้องครับ\n📌 ${field.label}\n💡 ${field.hint}`);
+    return true;
+  }
+  setTemplateValue(result, field.key, parsed);
+
+  const [nextField] = missingTemplateFields(result);
+  if (nextField) {
+    await askForMissingField(lineUserId, active.id, result, nextField);
+    return true;
+  }
+
+  await askForConfirmation(lineUserId, active.id, result);
+  return true;
+}
+
 async function handleEditReply(lineUserId: string, trimmed: string): Promise<boolean> {
   let raw: string | null = null;
   try {
@@ -739,6 +925,9 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
 
   // Check if user is in a field-input session
   if (await handleSessionReply(lineUserId, trimmed)) return;
+
+  // Check if user is filling a durable document intake template
+  if (await handleDurableIntakeReply(lineUserId, trimmed)) return;
 
   // Check if user is in an edit session
   if (await handleEditReply(lineUserId, trimmed)) return;
@@ -1119,19 +1308,20 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         return;
       }
       stage = 'match_bank_transfer';
-      const match = await handleBankTransferDocument(lineUserId, result, companyId, creator.userId);
-      await updateDocumentIntake(intake?.id, {
-        status: match.status,
-        ocrResult: {
-          ...result,
-          qrText: qrResult.ok ? qrResult.text : undefined,
-        } as OcrResult,
-        warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
-        error: match.ok ? undefined : match.message,
-        targetType: match.targetType,
-        targetId: match.targetId,
-        purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
-      });
+      const enrichedResult = {
+        ...result,
+        qrText: qrResult.ok ? qrResult.text : undefined,
+      } as OcrResult;
+      const [field] = missingTemplateFields(enrichedResult);
+      if (field && intake?.id) {
+        await askForMissingField(lineUserId, intake.id, enrichedResult, field);
+        return;
+      }
+      if (intake?.id) {
+        await askForConfirmation(lineUserId, intake.id, enrichedResult);
+        return;
+      }
+      const match = await handleBankTransferDocument(lineUserId, enrichedResult, companyId, creator.userId);
       await sendLineText(lineUserId, match.message);
       return;
     }
@@ -1152,62 +1342,40 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       return;
     }
 
-    // Check for missing required fields
-    const missingFields = getMissingFields(result);
+    // Check for missing required fields based on the document template
+    const missingFields = missingTemplateFields(result);
 
     if (missingFields.length > 0) {
       const [firstField, ...restFields] = missingFields;
       void restFields;
-      await updateDocumentIntake(intake?.id, {
-        status: 'needs_review',
-        ocrResult: {
-          ...result,
-          qrText: qrResult.ok ? qrResult.text : undefined,
-        } as OcrResult,
-        warnings: [
-          ...(result.validationWarnings ?? []),
-          ...missingFields.map((fieldDef) => `missing:${fieldDef.key}`),
-        ],
-      });
-      await sendLineText(
-        lineUserId,
-        `${buildOcrTextSummary(result, 'อ่านเอกสารได้บางส่วน แต่ยังไม่บันทึกเพราะข้อมูลสำคัญไม่ครบ')}\n\n` +
-        `กรุณาตรวจในหน้า Input VAT หรือส่งไฟล์ที่ชัดขึ้น\nช่องแรกที่ขาด: ${firstField.label}`,
-      );
+      const enrichedResult = {
+        ...result,
+        qrText: qrResult.ok ? qrResult.text : undefined,
+      } as OcrResult;
+      if (intake?.id) {
+        await askForMissingField(lineUserId, intake.id, enrichedResult, firstField);
+      } else {
+        await sendLineText(
+          lineUserId,
+          `${buildOcrTextSummary(result, 'อ่านเอกสารได้บางส่วน แต่ยังไม่บันทึกเพราะข้อมูลสำคัญไม่ครบ')}\n\n` +
+          `ช่องแรกที่ขาด: ${firstField.label}`,
+        );
+      }
       return;
     }
 
-    // All required fields present — save immediately and surface it in the web review queue.
+    // All required fields present — ask for confirmation before writing accounting records.
     const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    stage = 'direct_db_save_purchase';
-    try {
-      const saved = await savePurchaseFromLineOcr(lineUserId, result, companyId, tempId);
-      await updateDocumentIntake(intake?.id, {
-        status: 'saved',
-        ocrResult: {
-          ...result,
-          qrText: qrResult.ok ? qrResult.text : undefined,
-        } as OcrResult,
-        warnings: result.validationWarnings,
-        targetType: 'purchase_invoice',
-        targetId: saved.id,
-        purchaseInvoiceId: saved.id,
-      });
-      await replySavedPurchase(
-        lineUserId,
-        result,
-        saved.id,
-        '✅ อ่านเอกสารและบันทึกเข้าระบบแล้วครับ',
-      );
-    } catch (saveErr) {
-      logger.error('[Line] OCR direct DB save failed', { err: saveErr });
-      await updateDocumentIntake(intake?.id, {
-        status: 'failed',
-        ocrResult: result,
-        warnings: result.validationWarnings,
-        error: saveErr instanceof Error ? saveErr.message : String(saveErr),
-      });
-      await sendLineText(lineUserId, buildOcrTextSummary(result, 'อ่านเอกสารได้แล้ว แต่บันทึกเข้า DB ไม่สำเร็จ'));
+    void tempId;
+    const enrichedResult = {
+      ...result,
+      qrText: qrResult.ok ? qrResult.text : undefined,
+    } as OcrResult;
+    if (intake?.id) {
+      stage = 'await_confirmation';
+      await askForConfirmation(lineUserId, intake.id, enrichedResult);
+    } else {
+      await sendLineText(lineUserId, buildConfirmationSummary(enrichedResult));
     }
   } catch (err) {
     logger.error('[Line] handleImageMessage failed', { err, stage });
@@ -1216,6 +1384,59 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 }
 
 async function handlePostback(lineUserId: string, data: string): Promise<void> {
+  if (data.startsWith('confirm_intake:')) {
+    const intakeId = data.slice('confirm_intake:'.length);
+    try {
+      const intake = await prisma.documentIntake.findFirst({
+        where: { id: intakeId, lineUserId },
+      });
+      const result = intake?.ocrResult as unknown as OcrResult | null;
+      if (!intake || !result) {
+        await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร กรุณาส่งไฟล์ใหม่อีกครั้ง');
+        return;
+      }
+      if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
+        const match = await handleBankTransferDocument(lineUserId, result, intake.companyId, intake.userId);
+        await updateDocumentIntake(intake.id, {
+          status: match.status,
+          ocrResult: result,
+          warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
+          error: match.ok ? undefined : match.message,
+          targetType: match.targetType,
+          targetId: match.targetId,
+          purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
+        });
+        await sendLineText(lineUserId, match.message);
+        return;
+      }
+
+      const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id);
+      await updateDocumentIntake(intake.id, {
+        status: 'saved',
+        ocrResult: result,
+        warnings: result.validationWarnings,
+        targetType: 'purchase_invoice',
+        targetId: saved.id,
+        purchaseInvoiceId: saved.id,
+      });
+      await replySavedPurchase(lineUserId, result, saved.id);
+    } catch (err) {
+      logger.error('[Line] confirm_intake failed', { err, data });
+      await sendLineText(lineUserId, 'ขอโทษ บันทึกเอกสารไม่สำเร็จ กรุณาตรวจในหน้า Input VAT');
+    }
+    return;
+  }
+
+  if (data.startsWith('cancel_intake:')) {
+    const intakeId = data.slice('cancel_intake:'.length);
+    await prisma.documentIntake.updateMany({
+      where: { id: intakeId, lineUserId },
+      data: { status: 'needs_review', error: 'cancelled_by_user' },
+    });
+    await sendLineText(lineUserId, 'ยกเลิกแล้ว เอกสารยังอยู่ในคิวรอตรวจ');
+    return;
+  }
+
   if (data.startsWith('confirm_purchase:')) {
     const tempId = data.slice('confirm_purchase:'.length);
     try {
