@@ -165,8 +165,21 @@ lineRouter.post('/admin/setup-richmenu', authenticate, requireRole('admin', 'sup
 
 lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_admin'), async (_req, res) => {
   try {
-    const result = await testOcrProvider();
-    res.status(result.ok ? 200 : 503).json({ data: result });
+    const [ocrResult, redisResult] = await Promise.allSettled([
+      testOcrProvider(),
+      redis.ping(),
+    ]);
+    const result = ocrResult.status === 'fulfilled'
+      ? ocrResult.value
+      : { ok: false, provider: 'unknown', error: ocrResult.reason instanceof Error ? ocrResult.reason.message : String(ocrResult.reason) };
+    res.status(result.ok ? 200 : 503).json({
+      data: {
+        ...result,
+        redis: redisResult.status === 'fulfilled'
+          ? { ok: true, response: redisResult.value }
+          : { ok: false, error: redisResult.reason instanceof Error ? redisResult.reason.message : String(redisResult.reason) },
+      },
+    });
   } catch (err) {
     logger.error('[Line] OCR health failed', { err });
     res.status(500).json({ error: 'Failed to test OCR provider' });
@@ -690,7 +703,13 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         pendingFields: restFields.map(f => f.key),
         data: { ...result, companyId },
       };
-      await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
+      try {
+        await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
+      } catch (redisErr) {
+        logger.error('[Line] OCR session save failed', { err: redisErr, stage: 'missing_fields' });
+        await sendLineText(lineUserId, 'อ่านเอกสารได้แล้วครับ แต่ระบบบันทึกข้อมูลชั่วคราวไม่ได้ กรุณาแจ้งผู้ดูแลให้ตรวจ REDIS_URL บน Render');
+        return;
+      }
       await sendLineTextWithQuickReply(
         lineUserId,
         `📝 ข้อมูลบางส่วนไม่ครบ กรุณาระบุ:\n\n📌 ${firstField.label}\n💡 ${firstField.hint}`,
@@ -701,7 +720,13 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     // All required fields present — proceed to confirm card
     const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify({ ...result, companyId }));
+    try {
+      await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify({ ...result, companyId }));
+    } catch (redisErr) {
+      logger.error('[Line] OCR temp save failed', { err: redisErr });
+      await sendLineText(lineUserId, 'อ่านเอกสารได้แล้วครับ แต่ระบบบันทึกข้อมูลชั่วคราวไม่ได้ กรุณาแจ้งผู้ดูแลให้ตรวจ REDIS_URL บน Render');
+      return;
+    }
 
     await sendLineFlexMessage(
       lineUserId,
