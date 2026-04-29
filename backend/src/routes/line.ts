@@ -602,7 +602,9 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
 }
 
 async function handleImageMessage(lineUserId: string, messageId: string, messageType?: string): Promise<void> {
+  let stage = 'start';
   try {
+    stage = 'link_lookup';
     const link = await prisma.lineUserLink.findUnique({
       where: { lineUserId },
       select: { user: { select: { companyId: true } } },
@@ -622,6 +624,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       return;
     }
 
+    stage = 'download_line_content';
     const contentResponse = await fetch(
       `https://api-data.line.me/v2/bot/message/${messageId}/content`,
       { headers: { Authorization: `Bearer ${token}` } },
@@ -634,6 +637,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     }
 
     const buffer = Buffer.from(await contentResponse.arrayBuffer());
+    stage = 'detect_file_type';
     const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '', messageType);
     const isPdf = contentType === 'application/pdf';
 
@@ -650,6 +654,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       let pdfText = '';
       let pageCount = 1;
       try {
+        stage = 'pdf_parse';
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { PDFParse } = require('pdf-parse');
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
@@ -663,6 +668,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
       if (pdfText.length > 30) {
         // Step 2a: got text — send to chat model (cheap, no vision needed)
+        stage = 'ocr_text_pdf';
         result = await ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain', {
           pageCount,
           source: 'text_pdf',
@@ -670,12 +676,14 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       } else {
         // Step 2b: no text (scanned PDF) — send PDF binary to Gemini via OpenRouter
         logger.info('[Line] No text found, sending PDF through OCR pipeline', { bytes: buffer.length });
+        stage = 'ocr_scan_pdf';
         result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf', {
           pageCount,
           source: 'scan_pdf',
         });
       }
     } else {
+      stage = 'ocr_image';
       result = await ocrSupplierInvoice(buffer.toString('base64'), contentType, { source: 'image' });
     }
 
@@ -704,12 +712,14 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         data: { ...result, companyId },
       };
       try {
+        stage = 'redis_save_missing_fields';
         await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
       } catch (redisErr) {
         logger.error('[Line] OCR session save failed', { err: redisErr, stage: 'missing_fields' });
         await sendLineText(lineUserId, 'อ่านเอกสารได้แล้วครับ แต่ระบบบันทึกข้อมูลชั่วคราวไม่ได้ กรุณาแจ้งผู้ดูแลให้ตรวจ REDIS_URL บน Render');
         return;
       }
+      stage = 'line_reply_missing_fields';
       await sendLineTextWithQuickReply(
         lineUserId,
         `📝 ข้อมูลบางส่วนไม่ครบ กรุณาระบุ:\n\n📌 ${firstField.label}\n💡 ${firstField.hint}`,
@@ -721,6 +731,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     // All required fields present — proceed to confirm card
     const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
+      stage = 'redis_save_ocr_temp';
       await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify({ ...result, companyId }));
     } catch (redisErr) {
       logger.error('[Line] OCR temp save failed', { err: redisErr });
@@ -728,14 +739,15 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       return;
     }
 
+    stage = 'line_reply_confirm_card';
     await sendLineFlexMessage(
       lineUserId,
       'ตรวจพบใบแจ้งหนี้ — กรุณายืนยัน',
       buildOcrConfirmFlexCard(result, tempId),
     );
   } catch (err) {
-    logger.error('[Line] handleImageMessage failed', { err });
-    await sendLineText(lineUserId, 'ขอโทษ เกิดข้อผิดพลาดในการอ่านรูปภาพ');
+    logger.error('[Line] handleImageMessage failed', { err, stage });
+    await sendLineText(lineUserId, `ขอโทษ เกิดข้อผิดพลาดในการอ่านเอกสาร (ขั้นตอน: ${stage})`);
   }
 }
 
