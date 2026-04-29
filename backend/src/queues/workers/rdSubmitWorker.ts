@@ -16,6 +16,7 @@ import redis from '../../config/redis';
 import prisma from '../../config/database';
 import { withSystemRlsContext } from '../../config/rls';
 import { sendRdSuccessEmail, sendRdFailedEmail } from '../../services/emailService';
+import { sendLineText, sendLineFlexMessage } from '../../services/lineService';
 import { sendRdResultNotification } from '../../services/notificationService';
 import { generateRDXml } from '../../services/xmlService';
 import { signXml }          from '../../services/signatureService';
@@ -172,6 +173,82 @@ export const rdSubmitWorker = new Worker<RDJobData>(
       }).catch((e: Error) => logger.warn(`Email notify failed: ${e.message}`));
     }
 
+    // ─── 9. LINE push notification (success) ───────────────────────────────
+    try {
+      const lineLinks = await withSystemRlsContext(prisma, (tx) => tx.lineUserLink.findMany({
+        where: {
+          isActive: true,
+          user: {
+            companyId: invoice.companyId,
+            role: { in: ['admin', 'super_admin'] },
+          },
+        },
+        select: { lineUserId: true },
+      }), { role: 'worker' });
+
+      if (lineLinks.length > 0) {
+        const fmt = (n: number) =>
+          new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+        const nowTh = new Date().toLocaleString('th-TH', {
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+        const rdRef = rdResult.docId ?? rdResult.rdRefNumber ?? '-';
+
+        const row = (label: string, value: string) => ({
+          type: 'box', layout: 'horizontal',
+          contents: [
+            { type: 'text', text: label, size: 'sm', color: '#888888', flex: 3 },
+            { type: 'text', text: value, size: 'sm', color: '#333333', flex: 4, align: 'end', wrap: true },
+          ],
+        });
+
+        const flexCard = {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#16a34a',
+            contents: [
+              { type: 'text', text: '✅ ส่ง RD สำเร็จ', color: '#ffffff', size: 'md', weight: 'bold' },
+            ],
+          },
+          body: {
+            type: 'box', layout: 'vertical', spacing: 'sm',
+            contents: [
+              row('เลขที่ใบ', invoice.invoiceNumber),
+              row('ลูกค้า', invoice.buyer.nameTh),
+              row('ยอดรวม', fmt(invoice.total)),
+              row('RD Reference', rdRef),
+              row('เวลา', nowTh),
+            ],
+          },
+          footer: {
+            type: 'box', layout: 'vertical',
+            contents: [
+              {
+                type: 'button', style: 'primary', color: '#16a34a',
+                action: {
+                  type: 'uri',
+                  label: '🌐 ดูในระบบ',
+                  uri: 'https://etax-invoice.vercel.app/app/invoices',
+                },
+              },
+            ],
+          },
+        };
+
+        await Promise.all(
+          lineLinks.map(({ lineUserId }) =>
+            sendLineFlexMessage(lineUserId, `✅ ส่ง RD สำเร็จ: ${invoice.invoiceNumber}`, flexCard)
+              .catch((e: Error) => logger.warn('[RD Worker] LINE push (success) failed', { lineUserId, error: e.message })),
+          ),
+        );
+      }
+    } catch (lineErr) {
+      logger.warn('[RD Worker] LINE success notification error', { error: String(lineErr) });
+    }
+
     return { rdDocId: rdResult.docId, isMock: rdResult.isMock };
   },
   { connection: redis, concurrency: 2 },
@@ -217,6 +294,35 @@ rdSubmitWorker.on('failed', async (job, err) => {
           },
           err.message,
         );
+      }
+
+      // LINE push notification (failure)
+      if (invoice) {
+        try {
+          const lineLinks = await withSystemRlsContext(prisma, (tx) => tx.lineUserLink.findMany({
+            where: {
+              isActive: true,
+              user: {
+                companyId: invoice.companyId,
+                role: { in: ['admin', 'super_admin'] },
+              },
+            },
+            select: { lineUserId: true },
+          }), { role: 'worker' });
+
+          if (lineLinks.length > 0) {
+            const reason = err.message.slice(0, 100);
+            const text = `❌ ส่ง RD ไม่สำเร็จ\nใบ: ${invoice.invoiceNumber}\nสาเหตุ: ${reason}\nกรุณาตรวจสอบในระบบ etax-invoice.vercel.app`;
+            await Promise.all(
+              lineLinks.map(({ lineUserId }) =>
+                sendLineText(lineUserId, text)
+                  .catch((e: Error) => logger.warn('[RD Worker] LINE push (failure) failed', { lineUserId, error: e.message })),
+              ),
+            );
+          }
+        } catch (lineErr) {
+          logger.warn('[RD Worker] LINE failure notification error', { error: String(lineErr) });
+        }
       }
     } catch (emailErr) {
       logger.error('Failed to send RD failure notification email', emailErr);
