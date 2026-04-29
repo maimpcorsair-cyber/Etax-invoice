@@ -776,8 +776,20 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
     return true;
   }
 
-  const session = JSON.parse(raw) as LineSession;
-  const field = REQUIRED_OCR_FIELDS.find(f => f.key === session.currentField)!;
+  let session: LineSession;
+  try {
+    session = JSON.parse(raw) as LineSession;
+  } catch (err) {
+    logger.warn('[Line] Corrupted Redis LINE session cleared', { err, lineUserId });
+    await redis.del(`line:session:${lineUserId}`).catch(() => undefined);
+    return false;
+  }
+  const field = REQUIRED_OCR_FIELDS.find(f => f.key === session.currentField);
+  if (!field) {
+    logger.warn('[Line] Unknown Redis LINE session field cleared', { lineUserId, currentField: session.currentField });
+    await redis.del(`line:session:${lineUserId}`).catch(() => undefined);
+    return false;
+  }
 
   // Parse value based on field type
   let parsedValue: string | number = trimmed;
@@ -816,7 +828,13 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
   if (session.pendingFields.length > 0) {
     // Ask next field
     const nextKey = session.pendingFields[0];
-    const nextField = REQUIRED_OCR_FIELDS.find(f => f.key === nextKey)!;
+    const nextField = REQUIRED_OCR_FIELDS.find(f => f.key === nextKey);
+    if (!nextField) {
+      logger.warn('[Line] Unknown pending Redis LINE session field skipped', { lineUserId, nextKey });
+      session.pendingFields = session.pendingFields.slice(1);
+      await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session)).catch(() => undefined);
+      return true;
+    }
     session.currentField = nextKey;
     session.pendingFields = session.pendingFields.slice(1);
     await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
@@ -931,7 +949,14 @@ async function handleEditReply(lineUserId: string, trimmed: string): Promise<boo
   }
   if (!raw) return false;
 
-  const session = JSON.parse(raw) as LineEditSession;
+  let session: LineEditSession;
+  try {
+    session = JSON.parse(raw) as LineEditSession;
+  } catch (err) {
+    logger.warn('[Line] Corrupted Redis edit session cleared', { err, lineUserId });
+    await redis.del(`line:editsession:${lineUserId}`).catch(() => undefined);
+    return false;
+  }
 
   if (trimmed === 'ยกเลิก' || trimmed === 'เสร็จสิ้น') {
     await redis.del(`line:editsession:${lineUserId}`);
