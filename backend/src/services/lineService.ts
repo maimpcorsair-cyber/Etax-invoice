@@ -40,8 +40,39 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
   }
 }
 
+async function lineReply(replyToken: string, messages: object[]): Promise<boolean> {
+  if (!channelAccessToken) {
+    logger.warn('[Line] LINE_CHANNEL_ACCESS_TOKEN not set — Line messaging disabled');
+    return false;
+  }
+  try {
+    const body = JSON.stringify({ replyToken, messages });
+    const res = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${channelAccessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      logger.error('[Line] reply failed', { status: res.status, body: txt });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.error('[Line] reply error', { error: String(err) });
+    return false;
+  }
+}
+
 export async function sendLineText(lineUserId: string, text: string): Promise<boolean> {
   return linePush(lineUserId, [{ type: 'text', text }]);
+}
+
+export async function replyLineText(replyToken: string, text: string): Promise<boolean> {
+  return lineReply(replyToken, [{ type: 'text', text }]);
 }
 
 export async function sendLineFlexMessage(

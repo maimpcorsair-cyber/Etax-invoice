@@ -7,6 +7,7 @@ import redis from '../config/redis';
 import { logger } from '../config/logger';
 import {
   sendLineText,
+  replyLineText,
   sendLineFlexMessage,
   sendLineTextWithQuickReply,
   buildOverdueFlexCard,
@@ -317,7 +318,13 @@ interface LineWebhookBody {
 }
 
 async function handleSessionReply(lineUserId: string, text: string): Promise<boolean> {
-  const raw = await redis.get(`line:session:${lineUserId}`);
+  let raw: string | null = null;
+  try {
+    raw = await redis.get(`line:session:${lineUserId}`);
+  } catch (err) {
+    logger.warn('[Line] Redis session lookup failed; continuing without session', { err });
+    return false;
+  }
   if (!raw) return false;
 
   const trimmed = text.trim();
@@ -395,7 +402,13 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
 }
 
 async function handleEditReply(lineUserId: string, trimmed: string): Promise<boolean> {
-  const raw = await redis.get(`line:editsession:${lineUserId}`);
+  let raw: string | null = null;
+  try {
+    raw = await redis.get(`line:editsession:${lineUserId}`);
+  } catch (err) {
+    logger.warn('[Line] Redis edit session lookup failed; continuing without edit session', { err });
+    return false;
+  }
   if (!raw) return false;
 
   const session = JSON.parse(raw) as LineEditSession;
@@ -920,7 +933,12 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 
   if (data.startsWith('edit_before_save:')) {
     const tempId = data.slice('edit_before_save:'.length);
-    const stored = await redis.get(`ocr:temp:${tempId}`);
+    let stored: string | null = null;
+    try {
+      stored = await redis.get(`ocr:temp:${tempId}`);
+    } catch (err) {
+      logger.warn('[Line] Redis temp lookup failed before edit', { err, tempId });
+    }
     if (!stored) {
       await sendLineText(lineUserId, '⏱ ข้อมูลหมดอายุแล้ว กรุณาส่งรูปใหม่');
       return;
@@ -935,7 +953,13 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       data: { ...ocrData },
     };
     // We keep the ocr:temp entry alive so we can re-show confirm card after edits
-    await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify({ ...session, tempId }));
+    try {
+      await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify({ ...session, tempId }));
+    } catch (err) {
+      logger.warn('[Line] Redis edit-before-save session failed', { err, tempId });
+      await sendLineText(lineUserId, 'ตอนนี้ระบบแก้ไขก่อนบันทึกผ่าน LINE ใช้ไม่ได้ชั่วคราว กรุณาส่งเอกสารใหม่หรือแก้จากหน้า Input VAT ในเว็บครับ');
+      return;
+    }
     await sendLineTextWithQuickReply(
       lineUserId,
       `✏️ แก้ไขข้อมูลก่อนบันทึก\n\nปัจจุบัน: ${ocrData.supplierName || '-'}\n📌 ชื่อผู้ขาย (พิมพ์ค่าใหม่ หรือ "-" เพื่อข้าม)`,
@@ -972,7 +996,13 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       purchaseInvoiceId: purchaseId,
       currentField: fieldKey,
     };
-    await redis.setex(`line:editsession:${lineUserId}`, 300, JSON.stringify(editSession));
+    try {
+      await redis.setex(`line:editsession:${lineUserId}`, 300, JSON.stringify(editSession));
+    } catch (err) {
+      logger.warn('[Line] Redis edit session save failed', { err, purchaseId, fieldKey });
+      await sendLineText(lineUserId, 'ตอนนี้ระบบแก้ไขผ่าน LINE ใช้ไม่ได้ชั่วคราว กรุณาแก้จากหน้า Input VAT ในเว็บครับ');
+      return;
+    }
 
     await sendLineTextWithQuickReply(
       lineUserId,
@@ -1035,7 +1065,12 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
         if (msg.type === 'text') {
           await handleTextMessage(lineUserId, (msg as LineTextMessage).text);
         } else if (msg.type === 'image' || msg.type === 'file') {
-          await sendLineText(lineUserId, '📄 กำลังอ่านเอกสาร รอสักครู่...');
+          const acknowledged = event.replyToken
+            ? await replyLineText(event.replyToken, '📄 กำลังอ่านเอกสาร รอสักครู่...')
+            : false;
+          if (!acknowledged) {
+            await sendLineText(lineUserId, '📄 กำลังอ่านเอกสาร รอสักครู่...');
+          }
           await handleImageMessage(lineUserId, msg.id, msg.type);
         }
       } else if (event.type === 'postback' && event.postback) {
@@ -1043,6 +1078,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       }
     } catch (err) {
       logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, lineUserId });
+      await sendLineText(lineUserId, 'ขอโทษครับ ระบบ LINE สะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง');
     }
   }
 }
