@@ -162,6 +162,10 @@ function hasUsefulOcrData(result: OcrResult) {
   return !!(result.supplierName || result.invoiceNumber || result.total || result.vatAmount || result.rawText);
 }
 
+function paymentAmountFromOcr(result: OcrResult) {
+  return Number(result.payment?.amount ?? result.total ?? 0);
+}
+
 function isValidThaiTaxId(taxId: string) {
   const digits = taxId.replace(/\D/g, '');
   if (digits.length !== 13) return false;
@@ -268,6 +272,118 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
   ];
   result.needsHumanReview = parsed.needsHumanReview;
   return result;
+}
+
+function buildEmptyOcrResult(documentType: OcrResult['documentType'] = 'other', label = 'เอกสารอื่น'): OcrResult {
+  return {
+    documentType,
+    documentTypeLabel: label,
+    supplierName: '',
+    supplierTaxId: '',
+    supplierBranch: '00000',
+    invoiceNumber: '',
+    invoiceDate: '',
+    subtotal: 0,
+    vatAmount: 0,
+    total: 0,
+    confidence: 'low',
+    extractionProvider: 'none',
+  };
+}
+
+function looksLikeUnclassifiedSlip(result: OcrResult) {
+  return result.documentType === 'other'
+    || result.documentType === 'payment_advice'
+    || (!!result.rawText && /โอน|transfer|พร้อมเพย์|promptpay|transaction|reference|บัญชี|ธนาคาร|bank/i.test(result.rawText));
+}
+
+export async function ocrBankTransferSlip(
+  imageBase64: string,
+  mimeType: string,
+): Promise<OcrResult> {
+  const emptyResult = buildEmptyOcrResult('bank_transfer', 'สลิปโอนเงิน');
+  if (!googleAiKey && !apiKey) return emptyResult;
+
+  const prompt = `You are a specialist OCR engine for Thai mobile banking transfer slips and bank payment confirmations.
+The input may be a screenshot/photo/PDF from Thai banks such as KBank, SCB, Bangkok Bank, Krungthai, Krungsri, TTB, GSB, BAAC, CIMB, UOB, or PromptPay.
+
+Classify it as "bank_transfer" if it looks like any money transfer/payment confirmation, even if some fields are missing.
+Return ONLY a JSON object matching this schema:
+
+{
+  "documentType": "bank_transfer",
+  "documentTypeLabel": "สลิปโอนเงิน",
+  "supplierName": "counterparty name, prefer payee for outgoing transfers or payer for incoming transfers",
+  "supplierTaxId": "",
+  "supplierBranch": "00000",
+  "invoiceNumber": "transaction/reference id",
+  "invoiceDate": "YYYY-MM-DD",
+  "subtotal": 0,
+  "vatAmount": 0,
+  "total": 0,
+  "confidence": "high|medium|low",
+  "payment": {
+    "amount": 0,
+    "paidAt": "YYYY-MM-DD",
+    "bankName": "bank/app name",
+    "fromName": "payer/transferor",
+    "fromAccount": "masked account",
+    "toName": "payee/receiver",
+    "toAccount": "masked account",
+    "reference": "transaction id/reference",
+    "direction": "incoming|outgoing|unknown"
+  },
+  "rawText": "all visible text"
+}
+
+Rules:
+- total and payment.amount must be the transferred amount, not balance or fee.
+- invoiceDate and payment.paidAt must be the transfer date.
+- invoiceNumber and payment.reference should use transaction id/reference number if visible.
+- direction is "outgoing" if the slip says money was sent/โอนเงินออก/จากบัญชีเรา to another party; "incoming" if money was received/รับเงิน/เงินเข้า; otherwise "unknown".
+- confidence high requires amount plus date plus either reference or counterparty name.`;
+
+  try {
+    let raw = '';
+    if (googleAiKey) {
+      raw = await callGemini(mimeType, imageBase64, prompt, ocrTimeoutMs, geminiScanModel);
+    }
+    if (!raw && apiKey) {
+      const messages: OpenRouterMessage[] = [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+          { type: 'text', text: prompt },
+        ],
+      }];
+      raw = await callOpenRouter(VISION_MODELS, messages, 1500, ocrTimeoutMs);
+    }
+    const result = parseOcrJson(raw, emptyResult);
+    if (!result) return emptyResult;
+    const amount = Number(result.payment?.amount ?? result.total ?? 0);
+    return {
+      ...result,
+      documentType: 'bank_transfer',
+      documentTypeLabel: result.documentTypeLabel || 'สลิปโอนเงิน',
+      total: amount,
+      subtotal: 0,
+      vatAmount: 0,
+      invoiceDate: result.invoiceDate || result.payment?.paidAt || '',
+      invoiceNumber: result.invoiceNumber || result.payment?.reference || '',
+      supplierName: result.supplierName || result.payment?.toName || result.payment?.fromName || '',
+      extractionProvider: googleAiKey ? 'gemini-slip-specialist' : 'openrouter-slip-specialist',
+      validationWarnings: amount > 0 ? result.validationWarnings : [...(result.validationWarnings ?? []), 'ไม่พบยอดเงินโอนที่ชัดเจน'],
+      payment: {
+        ...result.payment,
+        amount,
+        paidAt: result.payment?.paidAt || result.invoiceDate,
+        reference: result.payment?.reference || result.invoiceNumber,
+      },
+    };
+  } catch (err) {
+    logger.warn('[OCR] Bank transfer specialist failed', { error: err instanceof Error ? err.message : String(err) });
+    return emptyResult;
+  }
 }
 
 export async function buildCompanyContext(companyId: string): Promise<string> {
@@ -436,20 +552,7 @@ export async function ocrSupplierInvoice(
     };
   }
 
-  const emptyResult: OcrResult = {
-    documentType: 'other',
-    documentTypeLabel: 'เอกสารอื่น',
-    supplierName: '',
-    supplierTaxId: '',
-    supplierBranch: '00000',
-    invoiceNumber: '',
-    invoiceDate: '',
-    subtotal: 0,
-    vatAmount: 0,
-    total: 0,
-    confidence: 'low',
-    extractionProvider: 'none',
-  };
+  const emptyResult = buildEmptyOcrResult();
 
   const ocrPrompt = `You are an OCR assistant for Thai and English accounting documents. Classify the document and extract all available information. Return ONLY a JSON object, no other text.
 
@@ -583,6 +686,13 @@ Rules:
     result.verificationStage = 'fast';
     if (!hasUsefulOcrData(result) && azureResult?.ok) {
       result.rawText = azureResult.content;
+    }
+
+    if (mimeType !== 'text/plain' && looksLikeUnclassifiedSlip(result)) {
+      const slipResult = await ocrBankTransferSlip(imageBase64, mimeType);
+      if (paymentAmountFromOcr(slipResult) > 0 || slipResult.invoiceNumber || slipResult.payment?.reference) {
+        return slipResult;
+      }
     }
 
     if (googleAiKey && shouldEscalateOcr(result, options)) {

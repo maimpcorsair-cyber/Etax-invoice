@@ -16,7 +16,7 @@ import {
   verifyLineSignature,
   OverdueInvoice,
 } from '../services/lineService';
-import { askPinuch, buildCompanyContext, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
+import { askPinuch, buildCompanyContext, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 
@@ -1031,6 +1031,14 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     }
 
     if (!result) return;
+
+    if (!isPdf && result.documentType !== 'bank_transfer' && result.documentType !== 'payment_advice' && !paymentAmount(result)) {
+      stage = 'ocr_bank_slip_specialist';
+      const slipResult = await ocrBankTransferSlip(buffer.toString('base64'), contentType);
+      if (paymentAmount(slipResult) || slipResult.invoiceNumber || slipResult.payment?.reference) {
+        result = slipResult;
+      }
+    }
 
     logger.info('[Line] OCR result', { confidence: result.confidence, supplierName: result.supplierName, total: result.total });
 
