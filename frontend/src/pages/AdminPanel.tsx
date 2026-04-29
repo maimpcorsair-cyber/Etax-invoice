@@ -1650,6 +1650,23 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   const [localReminderDays, setLocalReminderDays] = useState(3);
   const [copied, setCopied] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [liveStatus, setLiveStatus] = useState<{
+    checkedAt: string;
+    webhook?: { lastWebhookAt?: string; lastEventCount?: number; lastUnhandledError?: { at: string; eventType?: string; message: string } };
+    lineMessaging?: {
+      configured: boolean;
+      lastPushOkAt?: string;
+      lastReplyOkAt?: string;
+      lastPushFailure?: { at: string; status?: number; body?: string; error?: string };
+      lastReplyFailure?: { at: string; status?: number; body?: string; error?: string };
+    };
+    redis?: { ok: boolean; error?: string };
+    documentIntakesSchema?: { ok: boolean; missingColumns: string[]; error?: string };
+    recentDocumentIntakes?: { ok: boolean; items: Array<{ id: string; status: string; mimeType: string; error?: string | null; createdAt: string; updatedAt: string }> };
+    linkedUsers?: { ok: boolean; count: number };
+    ocrReadiness?: { productionReady: boolean; tier: string; warnings?: string[]; models?: { fastTextOrPdf?: string; scanImageOrPdf?: string; proEscalation?: string | null } };
+  } | null>(null);
+  const [liveLoading, setLiveLoading] = useState(false);
 
   useEffect(() => {
     if (!policy?.canUseLineOa) { setLoading(false); return; }
@@ -1665,6 +1682,29 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, [token, policy?.canUseLineOa]);
+
+  useEffect(() => {
+    if (!policy?.canUseLineOa) return;
+    let cancelled = false;
+    async function loadLiveStatus() {
+      setLiveLoading(true);
+      try {
+        const res = await fetch('/api/line/admin/live-status', { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json() as { data?: typeof liveStatus };
+        if (!cancelled) setLiveStatus(json.data ?? null);
+      } catch {
+        if (!cancelled) setLiveStatus(null);
+      } finally {
+        if (!cancelled) setLiveLoading(false);
+      }
+    }
+    void loadLiveStatus();
+    const timer = window.setInterval(loadLiveStatus, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [token, policy?.canUseLineOa]);
 
   const [richMenuLoading, setRichMenuLoading] = useState(false);
@@ -1747,6 +1787,15 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     });
   }
 
+  function healthPill(ok?: boolean, label?: string) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+        {ok ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+        {label ?? (ok ? 'OK' : 'Issue')}
+      </span>
+    );
+  }
+
   if (!policy?.canUseLineOa) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
@@ -1793,6 +1842,81 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
           <li>📊 {isThai ? 'สรุปยอด VAT และข้อมูลบัญชีได้ทันที' : 'Instant VAT summary and accounting data'}</li>
           <li>💬 {isThai ? 'พิมพ์คำถามภาษาไทยได้เลย' : 'Ask questions in Thai naturally'}</li>
         </ul>
+      </div>
+
+      {/* Live status dashboard */}
+      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-medium text-gray-800">
+              {isThai ? 'สถานะระบบ LINE/OCR สด' : 'Live LINE/OCR Status'}
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              {liveStatus?.checkedAt
+                ? `${isThai ? 'ตรวจล่าสุด' : 'Last checked'} ${new Date(liveStatus.checkedAt).toLocaleString()}`
+                : (isThai ? 'กำลังโหลดสถานะ...' : 'Loading status...')}
+            </p>
+          </div>
+          {liveLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div className="text-xs text-gray-500 mb-2">Webhook</div>
+            {healthPill(!!liveStatus?.webhook?.lastWebhookAt, liveStatus?.webhook?.lastWebhookAt ? 'Active' : 'No event')}
+            <p className="mt-2 text-xs text-gray-600">
+              {liveStatus?.webhook?.lastWebhookAt ? new Date(liveStatus.webhook.lastWebhookAt).toLocaleString() : '-'}
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div className="text-xs text-gray-500 mb-2">Redis</div>
+            {healthPill(liveStatus?.redis?.ok)}
+            {liveStatus?.redis?.error && <p className="mt-2 text-xs text-red-600 line-clamp-2">{liveStatus.redis.error}</p>}
+          </div>
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div className="text-xs text-gray-500 mb-2">Database</div>
+            {healthPill(liveStatus?.documentIntakesSchema?.ok, liveStatus?.documentIntakesSchema?.ok ? 'Migrated' : 'Needs migration')}
+            {!!liveStatus?.documentIntakesSchema?.missingColumns?.length && (
+              <p className="mt-2 text-xs text-red-600">Missing: {liveStatus.documentIntakesSchema.missingColumns.join(', ')}</p>
+            )}
+          </div>
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div className="text-xs text-gray-500 mb-2">OCR</div>
+            {healthPill(liveStatus?.ocrReadiness?.productionReady, liveStatus?.ocrReadiness?.productionReady ? 'Production' : 'Check env')}
+            <p className="mt-2 text-xs text-gray-600">{liveStatus?.ocrReadiness?.models?.fastTextOrPdf ?? '-'}</p>
+          </div>
+        </div>
+
+        {(liveStatus?.lineMessaging?.lastPushFailure || liveStatus?.lineMessaging?.lastReplyFailure || liveStatus?.webhook?.lastUnhandledError) && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+            {liveStatus.webhook?.lastUnhandledError && (
+              <p><strong>Webhook error:</strong> {liveStatus.webhook.lastUnhandledError.message}</p>
+            )}
+            {liveStatus.lineMessaging?.lastPushFailure && (
+              <p><strong>Push failed:</strong> {liveStatus.lineMessaging.lastPushFailure.status ?? '-'} {liveStatus.lineMessaging.lastPushFailure.body ?? liveStatus.lineMessaging.lastPushFailure.error}</p>
+            )}
+            {liveStatus.lineMessaging?.lastReplyFailure && (
+              <p><strong>Reply failed:</strong> {liveStatus.lineMessaging.lastReplyFailure.status ?? '-'} {liveStatus.lineMessaging.lastReplyFailure.body ?? liveStatus.lineMessaging.lastReplyFailure.error}</p>
+            )}
+          </div>
+        )}
+
+        {!!liveStatus?.recentDocumentIntakes?.items?.length && (
+          <div className="rounded-lg border border-gray-100 overflow-hidden">
+            <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
+              {isThai ? 'เอกสาร LINE ล่าสุด' : 'Recent LINE documents'}
+            </div>
+            <div className="divide-y divide-gray-100">
+              {liveStatus.recentDocumentIntakes.items.slice(0, 5).map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                  <span className="text-gray-600">{item.mimeType}</span>
+                  <span className="font-medium text-gray-900">{item.status}</span>
+                  <span className="text-gray-400">{new Date(item.createdAt).toLocaleTimeString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Connection Status card */}

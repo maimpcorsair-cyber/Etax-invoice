@@ -68,7 +68,7 @@ async function callGemini(
       ];
   const body = {
     contents: [{ parts }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+    generationConfig: { temperature: 0.1, maxOutputTokens: 2000, responseMimeType: 'application/json' },
   };
   const res = await fetchWithTimeout(url, {
     method: 'POST',
@@ -448,7 +448,16 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     return null;
   }
 
-  const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
+  let parsed: Partial<OcrResult>;
+  try {
+    parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
+  } catch (err) {
+    logger.warn('OCR: invalid JSON response', {
+      error: err instanceof Error ? err.message : String(err),
+      raw: raw.slice(0, 500),
+    });
+    return null;
+  }
   const allowedTypes = new Set<OcrResult['documentType']>([
     'tax_invoice',
     'receipt',

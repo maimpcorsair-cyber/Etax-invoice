@@ -6,6 +6,12 @@ import { OcrResult } from './aiService';
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
 const channelSecret = process.env.LINE_CHANNEL_SECRET ?? '';
 const replyContext = new AsyncLocalStorage<{ replyToken: string; used: boolean }>();
+const lineDiagnostics: {
+  lastPushOkAt?: string;
+  lastReplyOkAt?: string;
+  lastPushFailure?: { at: string; status?: number; body?: string; error?: string };
+  lastReplyFailure?: { at: string; status?: number; body?: string; error?: string };
+} = {};
 
 export interface OverdueInvoice {
   invoiceNumber: string;
@@ -39,11 +45,14 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
     });
     if (!res.ok) {
       const txt = await res.text();
+      lineDiagnostics.lastPushFailure = { at: new Date().toISOString(), status: res.status, body: txt.slice(0, 500) };
       logger.error('[Line] push failed', { status: res.status, body: txt, lineUserId });
       return false;
     }
+    lineDiagnostics.lastPushOkAt = new Date().toISOString();
     return true;
   } catch (err) {
+    lineDiagnostics.lastPushFailure = { at: new Date().toISOString(), error: String(err) };
     logger.error('[Line] push error', { error: String(err), lineUserId });
     return false;
   }
@@ -71,14 +80,26 @@ async function lineReply(replyToken: string, messages: object[]): Promise<boolea
     });
     if (!res.ok) {
       const txt = await res.text();
+      lineDiagnostics.lastReplyFailure = { at: new Date().toISOString(), status: res.status, body: txt.slice(0, 500) };
       logger.error('[Line] reply failed', { status: res.status, body: txt });
       return false;
     }
+    lineDiagnostics.lastReplyOkAt = new Date().toISOString();
     return true;
   } catch (err) {
+    lineDiagnostics.lastReplyFailure = { at: new Date().toISOString(), error: String(err) };
     logger.error('[Line] reply error', { error: String(err) });
     return false;
   }
+}
+
+export function getLineMessagingDiagnostics() {
+  return {
+    configured: !!channelAccessToken && !!channelSecret,
+    hasChannelAccessToken: !!channelAccessToken,
+    hasChannelSecret: !!channelSecret,
+    ...lineDiagnostics,
+  };
 }
 
 export async function sendLineText(lineUserId: string, text: string): Promise<boolean> {

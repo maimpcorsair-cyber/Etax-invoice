@@ -15,6 +15,7 @@ import {
   buildInvoiceFlexCard,
   verifyLineSignature,
   withLineReplyToken,
+  getLineMessagingDiagnostics,
   OverdueInvoice,
 } from '../services/lineService';
 import { askPinuch, buildCompanyContext, getOcrProductionReadiness, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
@@ -25,6 +26,11 @@ import { decodeQrFromImage } from '../services/qrDecodeService';
 export const lineRouter = Router();
 
 const OTP_TTL = 600; // 10 minutes
+const lineWebhookDiagnostics: {
+  lastWebhookAt?: string;
+  lastEventCount?: number;
+  lastUnhandledError?: { at: string; eventType?: string; message: string };
+} = {};
 
 const REQUIRED_OCR_FIELDS: Array<{ key: keyof OcrResult; label: string; hint: string }> = [
   { key: 'supplierName',  label: 'ชื่อผู้ขาย',                      hint: 'เช่น บริษัท ABC จำกัด' },
@@ -198,6 +204,12 @@ async function testRedisSessionWrite(): Promise<{ writeOk: boolean; info: Record
   } catch { /* INFO not critical */ }
 
   return { writeOk: true, info };
+}
+
+function isMissingDocumentIntakeColumnError(err: unknown) {
+  return err instanceof Prisma.PrismaClientKnownRequestError
+    && err.code === 'P2022'
+    && String(err.meta?.column ?? '').startsWith('document_intakes.');
 }
 
 async function safeRedisDel(key: string) {
@@ -744,6 +756,65 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
   }
 });
 
+lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  const companyId = req.user!.companyId;
+  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult] = await Promise.allSettled([
+    testRedisSessionWrite(),
+    prisma.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'document_intakes'
+        AND column_name IN ('targetType', 'targetId', 'purchaseInvoiceId')
+    `,
+    prisma.documentIntake.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        source: true,
+        mimeType: true,
+        status: true,
+        error: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.lineUserLink.count({ where: { user: { companyId }, isActive: true } }),
+  ]);
+
+  const columns = intakeColumnsResult.status === 'fulfilled'
+    ? intakeColumnsResult.value.map((row) => row.column_name)
+    : [];
+  const requiredColumns = ['targetType', 'targetId', 'purchaseInvoiceId'];
+  const missingColumns = requiredColumns.filter((column) => !columns.includes(column));
+
+  res.json({
+    data: {
+      checkedAt: new Date().toISOString(),
+      webhook: lineWebhookDiagnostics,
+      lineMessaging: getLineMessagingDiagnostics(),
+      redis: redisResult.status === 'fulfilled'
+        ? { ok: true, response: redisResult.value }
+        : { ok: false, error: redisResult.reason instanceof Error ? redisResult.reason.message : String(redisResult.reason) },
+      documentIntakesSchema: {
+        ok: missingColumns.length === 0,
+        missingColumns,
+        error: intakeColumnsResult.status === 'rejected'
+          ? intakeColumnsResult.reason instanceof Error ? intakeColumnsResult.reason.message : String(intakeColumnsResult.reason)
+          : undefined,
+      },
+      recentDocumentIntakes: recentIntakesResult.status === 'fulfilled'
+        ? { ok: true, items: recentIntakesResult.value }
+        : { ok: false, items: [], error: recentIntakesResult.reason instanceof Error ? recentIntakesResult.reason.message : String(recentIntakesResult.reason) },
+      linkedUsers: linkedUsersResult.status === 'fulfilled'
+        ? { ok: true, count: linkedUsersResult.value }
+        : { ok: false, count: 0, error: linkedUsersResult.reason instanceof Error ? linkedUsersResult.reason.message : String(linkedUsersResult.reason) },
+      ocrReadiness: getOcrProductionReadiness(),
+    },
+  });
+});
+
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 interface LineSource {
@@ -886,10 +957,19 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
 }
 
 async function handleDurableIntakeReply(lineUserId: string, text: string): Promise<boolean> {
-  const active = await prisma.documentIntake.findFirst({
-    where: { lineUserId, status: 'awaiting_input' },
-    orderBy: { updatedAt: 'desc' },
-  });
+  let active;
+  try {
+    active = await prisma.documentIntake.findFirst({
+      where: { lineUserId, status: 'awaiting_input' },
+      orderBy: { updatedAt: 'desc' },
+    });
+  } catch (err) {
+    if (isMissingDocumentIntakeColumnError(err)) {
+      logger.error('[Line] document_intakes schema is missing columns; deploy migrations before durable intake can work', { err });
+      return false;
+    }
+    throw err;
+  }
   if (!active) return false;
 
   const trimmed = text.trim();
@@ -1933,6 +2013,8 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
   let body: LineWebhookBody;
   try {
     body = JSON.parse((req.body as Buffer).toString()) as LineWebhookBody;
+    lineWebhookDiagnostics.lastWebhookAt = new Date().toISOString();
+    lineWebhookDiagnostics.lastEventCount = body.events?.length ?? 0;
     logger.info('[Line] Webhook parsed', { eventCount: body.events?.length ?? 0 });
   } catch (e) {
     logger.error('[Line] Webhook body parse failed', { error: String(e) });
@@ -2001,6 +2083,11 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
         await withLineReplyToken(event.replyToken, () => handlePostback(lineUserId, postbackData));
       }
     } catch (err) {
+      lineWebhookDiagnostics.lastUnhandledError = {
+        at: new Date().toISOString(),
+        eventType: event.type,
+        message: err instanceof Error ? err.message : String(err),
+      };
       logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, lineUserId });
       try {
         await sendLineText(lineUserId, 'ขอโทษครับ ระบบสะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง 🙏');
