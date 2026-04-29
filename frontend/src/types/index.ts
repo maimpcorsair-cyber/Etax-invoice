@@ -215,6 +215,7 @@ export interface DocumentIntake {
   fileSize: number;
   status: 'received' | 'processing' | 'saved' | 'needs_review' | 'failed' | string;
   ocrResult?: {
+    documentType?: string;
     documentTypeLabel?: string;
     supplierName?: string;
     supplierTaxId?: string;
@@ -222,6 +223,14 @@ export interface DocumentIntake {
     invoiceDate?: string;
     total?: number;
     confidence?: 'high' | 'medium' | 'low';
+    documentMetadata?: {
+      buyerName?: string;
+      sellerName?: string;
+      description?: string;
+      purchaseOrderNumber?: string;
+      quotationNumber?: string;
+      deliveryNoteNumber?: string;
+    };
   } | null;
   warnings?: string[] | null;
   error?: string | null;

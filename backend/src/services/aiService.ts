@@ -83,7 +83,23 @@ async function callGemini(
 }
 
 export interface OcrResult {
-  documentType: 'tax_invoice' | 'receipt' | 'invoice' | 'billing_note' | 'withholding_tax' | 'payment_advice' | 'bank_transfer' | 'credit_note' | 'debit_note' | 'other';
+  documentType:
+    | 'tax_invoice'
+    | 'receipt'
+    | 'invoice'
+    | 'billing_note'
+    | 'withholding_tax'
+    | 'payment_advice'
+    | 'bank_transfer'
+    | 'bank_statement'
+    | 'quotation'
+    | 'purchase_order'
+    | 'delivery_note'
+    | 'expense_receipt'
+    | 'contract'
+    | 'credit_note'
+    | 'debit_note'
+    | 'other';
   documentTypeLabel: string;
   supplierName: string;
   supplierTaxId: string;
@@ -109,6 +125,20 @@ export interface OcrResult {
     toAccount?: string;
     reference?: string;
     direction?: 'incoming' | 'outgoing' | 'unknown';
+  };
+  documentMetadata?: {
+    buyerName?: string;
+    buyerTaxId?: string;
+    sellerName?: string;
+    sellerTaxId?: string;
+    currency?: string;
+    dueDate?: string;
+    purchaseOrderNumber?: string;
+    quotationNumber?: string;
+    deliveryNoteNumber?: string;
+    withholdingTaxAmount?: number;
+    withholdingTaxRate?: number;
+    description?: string;
   };
 }
 
@@ -243,6 +273,12 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     'withholding_tax',
     'payment_advice',
     'bank_transfer',
+    'bank_statement',
+    'quotation',
+    'purchase_order',
+    'delivery_note',
+    'expense_receipt',
+    'contract',
     'credit_note',
     'debit_note',
     'other',
@@ -266,6 +302,7 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     rawText: parsed.rawText ?? azureContent,
     extractionProvider: parsed.extractionProvider ?? emptyResult.extractionProvider,
     payment: parsed.payment,
+    documentMetadata: parsed.documentMetadata,
   };
   result.validationWarnings = [
     ...validateOcrResult(result),
@@ -574,6 +611,12 @@ Rules:
   - "withholding_tax": withholding tax certificate / หนังสือรับรองหัก ณ ที่จ่าย / 50 ทวิ
   - "payment_advice": payment advice / remittance advice / หลักฐานแจ้งการชำระเงิน
   - "bank_transfer": bank transfer slip / mobile banking transfer confirmation / สลิปโอนเงิน / หลักฐานการโอน
+  - "bank_statement": bank account statement / รายการเดินบัญชี
+  - "quotation": quotation / ใบเสนอราคา
+  - "purchase_order": purchase order / ใบสั่งซื้อ
+  - "delivery_note": delivery note / ใบส่งของ / ใบส่งสินค้า
+  - "expense_receipt": small expense receipt / cash register slip / ใบเสร็จค่าใช้จ่ายทั่วไป
+  - "contract": contract/agreement / สัญญา / ข้อตกลง
   - "credit_note": credit note / ใบลดหนี้
   - "debit_note": debit note / ใบเพิ่มหนี้
   - "other": other accounting document
@@ -586,7 +629,7 @@ Rules:
   - confidence should be high only when amount, date, and reference or counterparty are visible
 
 {
-  "documentType": "tax_invoice|receipt|invoice|billing_note|withholding_tax|payment_advice|bank_transfer|credit_note|debit_note|other",
+  "documentType": "tax_invoice|receipt|invoice|billing_note|withholding_tax|payment_advice|bank_transfer|bank_statement|quotation|purchase_order|delivery_note|expense_receipt|contract|credit_note|debit_note|other",
   "documentTypeLabel": "ใบกำกับภาษี",
   "supplierName": "company name",
   "supplierTaxId": "1234567890123",
@@ -607,6 +650,20 @@ Rules:
     "toAccount": "masked account",
     "reference": "transaction reference",
     "direction": "incoming|outgoing|unknown"
+  },
+  "documentMetadata": {
+    "buyerName": "buyer/customer name",
+    "buyerTaxId": "buyer tax id",
+    "sellerName": "seller/vendor name",
+    "sellerTaxId": "seller tax id",
+    "currency": "THB",
+    "dueDate": "YYYY-MM-DD",
+    "purchaseOrderNumber": "PO number",
+    "quotationNumber": "quotation number",
+    "deliveryNoteNumber": "delivery note number",
+    "withholdingTaxAmount": 0,
+    "withholdingTaxRate": 0,
+    "description": "short extracted description"
   },
   "rawText": "all text found in document"
 }`;

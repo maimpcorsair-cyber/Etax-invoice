@@ -393,10 +393,14 @@ export default function PurchaseInvoices() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {item.ocrResult?.supplierName || item.ocrResult?.invoiceNumber || item.mimeType}
+                      {item.ocrResult?.supplierName
+                        || item.ocrResult?.documentMetadata?.sellerName
+                        || item.ocrResult?.documentMetadata?.buyerName
+                        || item.ocrResult?.invoiceNumber
+                        || item.mimeType}
                     </p>
                     <p className="text-xs text-gray-500 truncate">
-                      {item.status} · {formatDate(item.createdAt)}
+                      {(item.ocrResult?.documentTypeLabel || item.ocrResult?.documentType || item.status)} · {formatDate(item.createdAt)}
                       {item.ocrResult?.total ? ` · ${formatCurrency(item.ocrResult.total)}` : ''}
                     </p>
                   </div>

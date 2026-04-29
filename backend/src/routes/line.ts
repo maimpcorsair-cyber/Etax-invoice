@@ -41,6 +41,26 @@ type PaymentMatchResult = {
   warnings?: string[];
 };
 
+const PURCHASE_RECORD_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
+  'tax_invoice',
+  'receipt',
+  'invoice',
+  'billing_note',
+  'expense_receipt',
+  'credit_note',
+  'debit_note',
+]);
+
+const REVIEW_ONLY_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
+  'quotation',
+  'purchase_order',
+  'delivery_note',
+  'withholding_tax',
+  'bank_statement',
+  'contract',
+  'other',
+]);
+
 interface LineSession {
   state: 'awaiting_field';
   currentField: string;
@@ -103,6 +123,19 @@ function buildOcrTextSummary(result: OcrResult, note?: string) {
     `VAT: ${fmt(result.vatAmount)}\n` +
     `รวม: ${fmt(result.total)}\n` +
     `ความมั่นใจ: ${result.confidence}${warnings}`;
+}
+
+function buildReviewOnlySummary(result: OcrResult) {
+  const fmt = (value: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
+  const meta = result.documentMetadata;
+  return `รับเอกสารแล้วครับ ระบบแยกได้ว่าเป็น: ${result.documentTypeLabel || result.documentType}\n\n` +
+    `เลขที่เอกสาร: ${result.invoiceNumber || meta?.purchaseOrderNumber || meta?.quotationNumber || meta?.deliveryNoteNumber || '-'}\n` +
+    `คู่ค้า: ${result.supplierName || meta?.sellerName || meta?.buyerName || '-'}\n` +
+    `วันที่: ${result.invoiceDate || '-'}\n` +
+    `ยอดรวม: ${result.total ? fmt(result.total) : '-'}\n` +
+    `ความมั่นใจ: ${result.confidence}\n\n` +
+    `เอกสารนี้ยังไม่ถูกบันทึกเป็นภาษีซื้อ/รับชำระอัตโนมัติ กรุณาตรวจในคิวเอกสาร LINE`;
 }
 
 async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, companyId: string, fallbackId: string) {
@@ -1094,6 +1127,22 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
       });
       await sendLineText(lineUserId, match.message);
+      return;
+    }
+
+    if (REVIEW_ONLY_DOCUMENT_TYPES.has(result.documentType) || !PURCHASE_RECORD_DOCUMENT_TYPES.has(result.documentType)) {
+      await updateDocumentIntake(intake?.id, {
+        status: 'needs_review',
+        ocrResult: {
+          ...result,
+          qrText: qrResult.ok ? qrResult.text : undefined,
+        } as OcrResult,
+        warnings: [
+          ...(result.validationWarnings ?? []),
+          `review_only:${result.documentType}`,
+        ],
+      });
+      await sendLineText(lineUserId, buildReviewOnlySummary(result));
       return;
     }
 
