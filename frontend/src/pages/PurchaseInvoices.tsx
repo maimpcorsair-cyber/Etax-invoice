@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, TrendingDown, AlertTriangle, FileCheck2,
+  Upload, Image as ImageIcon, FileText, ExternalLink,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -63,7 +64,10 @@ export default function PurchaseInvoices() {
 
   const [items, setItems] = useState<PurchaseInvoice[]>([]);
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
+  const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
+  const [documentTypeFilter, setDocumentTypeFilter] = useState<'all' | 'pdf' | 'image'>('all');
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState(startOfMonthIso());
   const [to, setTo] = useState(todayIso());
@@ -84,27 +88,33 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const [res, intakeRes] = await Promise.all([
+      const [res, intakeRes, libraryRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch('/api/purchase-invoices/document-intakes/review', {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        fetch(`/api/purchase-invoices/document-intakes?type=${documentTypeFilter}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       const json = await res.json();
       const intakeJson = await intakeRes.json();
+      const libraryJson = await libraryRes.json();
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
       setItems(data);
       setReviewIntakes(intakeJson.data ?? []);
+      setDocumentLibrary(libraryJson.data ?? []);
     } catch {
       setItems([]);
       setReviewIntakes([]);
+      setDocumentLibrary([]);
     } finally {
       setLoading(false);
     }
-  }, [from, to, search, vatTypeFilter, token]);
+  }, [from, to, search, vatTypeFilter, documentTypeFilter, token]);
 
   useEffect(() => {
     const t = setTimeout(fetchItems, 300);
@@ -177,6 +187,46 @@ export default function PurchaseInvoices() {
 
   function field<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function fileUrl(item: DocumentIntake) {
+    return item.fileUrl || `/api/purchase-invoices/document-intakes/${item.id}/file`;
+  }
+
+  async function uploadDocument(file: File) {
+    if (isFreePlan) {
+      setError(isThai ? 'อัปเกรดเพื่ออัปโหลดเอกสารซื้อ' : 'Upgrade plan to upload purchase documents');
+      return;
+    }
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setError(isThai ? 'รองรับเฉพาะ PDF, JPG, PNG, WebP' : 'Only PDF, JPG, PNG, and WebP are supported');
+      return;
+    }
+    setUploading(true);
+    setError('');
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch('/api/purchase-invoices/document-intakes/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64 }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? 'Upload failed');
+      }
+      await fetchItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
   }
 
   function digitsOnly(v: string, max: number) {
@@ -321,6 +371,91 @@ export default function PurchaseInvoices() {
             : 'Upgrade to record Input VAT and auto-calculate VAT payable'}
         </div>
       )}
+
+      <div className="card space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary-600" />
+              {isThai ? 'คลังเอกสารซื้อ' : 'Purchase Document Library'}
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              {isThai
+                ? 'เอกสารจาก LINE และเว็บจะถูกรวมไว้ที่นี่ แยกดู PDF/รูป และเปิดไฟล์ต้นฉบับได้'
+                : 'Documents from LINE and web uploads are stored here with PDF/image filtering and original file preview.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={documentTypeFilter}
+              onChange={(e) => setDocumentTypeFilter(e.target.value as 'all' | 'pdf' | 'image')}
+              className="input-field w-auto"
+            >
+              <option value="all">{isThai ? 'ทุกไฟล์' : 'All files'}</option>
+              <option value="pdf">PDF</option>
+              <option value="image">{isThai ? 'รูปภาพ' : 'Images'}</option>
+            </select>
+            <label className={`btn-primary cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {isThai ? 'อัปโหลดเอกสาร' : 'Upload Document'}
+              <input
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={uploading || isFreePlan}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.currentTarget.value = '';
+                  if (file) void uploadDocument(file);
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        {documentLibrary.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500">
+            {isThai ? 'ยังไม่มีเอกสารในคลัง' : 'No documents in the library yet'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {documentLibrary.slice(0, 9).map((doc) => {
+              const isPdf = doc.mimeType === 'application/pdf';
+              const title = doc.ocrResult?.supplierName || doc.ocrResult?.invoiceNumber || doc.fileName || doc.mimeType;
+              return (
+                <div key={doc.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex items-start gap-2">
+                      <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isPdf ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
+                        {isPdf ? <FileText className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{title}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {doc.source} · {doc.status} · {formatDate(doc.createdAt)}
+                        </p>
+                        {doc.ocrResult?.total ? (
+                          <p className="text-xs font-semibold text-primary-700">{formatCurrency(doc.ocrResult.total)}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <a
+                      href={fileUrl(doc)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 rounded-lg text-gray-500 hover:text-primary-700 hover:bg-primary-50"
+                      title={isThai ? 'เปิดไฟล์' : 'Open file'}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                  {doc.error && <p className="text-xs text-rose-600 line-clamp-2">{doc.error}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {aiReviewItems.length > 0 && (
         <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">

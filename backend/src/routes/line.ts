@@ -22,6 +22,7 @@ import { askPinuch, buildCompanyContext, getOcrProductionReadiness, looksLikeBan
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { decodeQrFromImage } from '../services/qrDecodeService';
+import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 
 export const lineRouter = Router();
 
@@ -574,6 +575,19 @@ async function createDocumentIntake(input: {
   buffer: Buffer;
 }) {
   try {
+    let fileUrl: string | undefined;
+    let storageKey: string | undefined;
+    if (isStorageConfigured()) {
+      const ext = input.mimeType === 'application/pdf'
+        ? 'pdf'
+        : input.mimeType.includes('png')
+          ? 'png'
+          : input.mimeType.includes('webp')
+            ? 'webp'
+            : 'jpg';
+      storageKey = `companies/${input.companyId}/document-intakes/${new Date().toISOString().slice(0, 10)}/${input.messageId}.${ext}`;
+      fileUrl = await uploadToStorage(storageKey, input.buffer, input.mimeType);
+    }
     return await prisma.documentIntake.create({
       data: {
         companyId: input.companyId,
@@ -584,6 +598,8 @@ async function createDocumentIntake(input: {
         mimeType: input.mimeType,
         fileSize: input.buffer.length,
         fileBase64: input.buffer.toString('base64'),
+        fileUrl,
+        storageKey,
         status: 'received',
       },
     });
@@ -1744,6 +1760,12 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       }
 
       const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id);
+      if (intake.fileUrl) {
+        await prisma.purchaseInvoice.update({
+          where: { id: saved.id },
+          data: { pdfUrl: intake.fileUrl },
+        });
+      }
       await updateDocumentIntake(intake.id, {
         status: 'saved',
         ocrResult: result,

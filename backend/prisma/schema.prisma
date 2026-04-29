@@ -350,6 +350,8 @@ model DocumentIntake {
   mimeType          String
   fileSize          Int
   fileBase64        String?
+  fileUrl           String?
+  storageKey        String?
   status            String    @default("received") // received | processing | saved | needs_review | failed
   ocrResult         Json?
   warnings          Json?

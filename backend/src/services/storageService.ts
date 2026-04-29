@@ -14,6 +14,10 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.S3_BUCKET ?? 'etax-documents';
 
+export function isStorageConfigured() {
+  return !!process.env.S3_BUCKET && !!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY;
+}
+
 export async function uploadToStorage(key: string, body: Buffer, contentType: string): Promise<string> {
   await s3.send(new PutObjectCommand({
     Bucket: BUCKET,

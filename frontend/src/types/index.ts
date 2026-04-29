@@ -213,6 +213,8 @@ export interface DocumentIntake {
   source: string;
   mimeType: string;
   fileSize: number;
+  fileName?: string | null;
+  fileUrl?: string | null;
   status: 'received' | 'processing' | 'saved' | 'needs_review' | 'failed' | string;
   ocrResult?: {
     documentType?: string;
