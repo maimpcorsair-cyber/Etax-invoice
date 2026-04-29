@@ -58,6 +58,21 @@ function detectLineFileMimeType(buffer: Buffer, headerContentType: string, messa
   return headerContentType || 'application/octet-stream';
 }
 
+function compactOcrSessionData(result: OcrResult, companyId: string): OcrResult & { companyId: string } {
+  return {
+    ...result,
+    companyId,
+    rawText: result.rawText ? result.rawText.slice(0, 1000) : undefined,
+  };
+}
+
+async function testRedisSessionWrite() {
+  const key = `health:ocr-session:${Date.now()}`;
+  await redis.setex(key, 30, JSON.stringify({ ok: true, ts: Date.now() }));
+  await redis.del(key);
+  return 'SETEX_OK';
+}
+
 // GET /api/line/status
 lineRouter.get('/status', authenticate, async (req, res) => {
   try {
@@ -167,7 +182,7 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
   try {
     const [ocrResult, redisResult] = await Promise.allSettled([
       testOcrProvider(),
-      redis.ping(),
+      testRedisSessionWrite(),
     ]);
     const result = ocrResult.status === 'fulfilled'
       ? ocrResult.value
@@ -709,7 +724,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         state: 'awaiting_field',
         currentField: firstField.key,
         pendingFields: restFields.map(f => f.key),
-        data: { ...result, companyId },
+        data: compactOcrSessionData(result, companyId),
       };
       try {
         stage = 'redis_save_missing_fields';
@@ -732,7 +747,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
       stage = 'redis_save_ocr_temp';
-      await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify({ ...result, companyId }));
+      await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(compactOcrSessionData(result, companyId)));
     } catch (redisErr) {
       logger.error('[Line] OCR temp save failed', { err: redisErr });
       await sendLineText(lineUserId, 'อ่านเอกสารได้แล้วครับ แต่ระบบบันทึกข้อมูลชั่วคราวไม่ได้ กรุณาแจ้งผู้ดูแลให้ตรวจ REDIS_URL บน Render');
