@@ -73,6 +73,25 @@ async function testRedisSessionWrite() {
   return 'SETEX_OK';
 }
 
+function buildOcrTextSummary(result: OcrResult, note?: string) {
+  const fmt = (value: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
+  const warnings = result.validationWarnings?.length
+    ? `\n\n⚠️ หมายเหตุ:\n${result.validationWarnings.map((warning) => `- ${warning}`).join('\n')}`
+    : '';
+  const prefix = note ? `${note}\n\n` : '';
+  return `${prefix}อ่านเอกสารได้แล้วครับ แต่ยังบันทึก/ยืนยันในระบบไม่ได้ตอนนี้\n\n` +
+    `ประเภท: ${result.documentTypeLabel || result.documentType || '-'}\n` +
+    `ผู้ขาย: ${result.supplierName || '-'}\n` +
+    `เลขผู้เสียภาษี: ${result.supplierTaxId || '-'}\n` +
+    `เลขที่เอกสาร: ${result.invoiceNumber || '-'}\n` +
+    `วันที่: ${result.invoiceDate || '-'}\n` +
+    `ก่อน VAT: ${fmt(result.subtotal)}\n` +
+    `VAT: ${fmt(result.vatAmount)}\n` +
+    `รวม: ${fmt(result.total)}\n` +
+    `ความมั่นใจ: ${result.confidence}${warnings}`;
+}
+
 // GET /api/line/status
 lineRouter.get('/status', authenticate, async (req, res) => {
   try {
@@ -731,7 +750,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
       } catch (redisErr) {
         logger.error('[Line] OCR session save failed', { err: redisErr, stage: 'missing_fields' });
-        await sendLineText(lineUserId, 'อ่านเอกสารได้แล้วครับ แต่ระบบบันทึกข้อมูลชั่วคราวไม่ได้ กรุณาแจ้งผู้ดูแลให้ตรวจ REDIS_URL บน Render');
+        await sendLineText(lineUserId, buildOcrTextSummary(
+          result,
+          `ระบบบันทึกข้อมูลชั่วคราวไม่ได้ (${redisErr instanceof Error ? redisErr.message : String(redisErr)})`,
+        ));
         return;
       }
       stage = 'line_reply_missing_fields';
@@ -750,7 +772,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(compactOcrSessionData(result, companyId)));
     } catch (redisErr) {
       logger.error('[Line] OCR temp save failed', { err: redisErr });
-      await sendLineText(lineUserId, 'อ่านเอกสารได้แล้วครับ แต่ระบบบันทึกข้อมูลชั่วคราวไม่ได้ กรุณาแจ้งผู้ดูแลให้ตรวจ REDIS_URL บน Render');
+      await sendLineText(lineUserId, buildOcrTextSummary(
+        result,
+        `ระบบบันทึกข้อมูลชั่วคราวไม่ได้ (${redisErr instanceof Error ? redisErr.message : String(redisErr)})`,
+      ));
       return;
     }
 
