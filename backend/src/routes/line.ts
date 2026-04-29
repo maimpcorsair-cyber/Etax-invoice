@@ -16,7 +16,7 @@ import {
   verifyLineSignature,
   OverdueInvoice,
 } from '../services/lineService';
-import { askPinuch, buildCompanyContext, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
+import { askPinuch, buildCompanyContext, getOcrProductionReadiness, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { decodeQrFromImage } from '../services/qrDecodeService';
@@ -676,6 +676,7 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
     res.status(result.ok ? 200 : 503).json({
       data: {
         ...result,
+        productionReadiness: getOcrProductionReadiness(),
         redisFailureFallback: 'direct_db_save_then_ocr_text_summary',
         webhookReplyMode: 'reply_token_ack_with_push_fallback',
         redis: redisResult.status === 'fulfilled'

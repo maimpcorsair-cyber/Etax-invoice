@@ -10,6 +10,7 @@ const ocrTimeoutMs = Number(process.env.AI_OCR_TIMEOUT_MS ?? 30000);
 const geminiFastModel = process.env.GOOGLE_AI_OCR_FAST_MODEL ?? process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash-lite';
 const geminiScanModel = process.env.GOOGLE_AI_OCR_SCAN_MODEL ?? process.env.GOOGLE_AI_OCR_MODEL ?? 'gemini-2.5-flash';
 const geminiProVerifyModel = process.env.GOOGLE_AI_OCR_PRO_VERIFY_MODEL ?? 'gemini-2.5-pro';
+const proVerifyEnabled = process.env.AI_OCR_PRO_VERIFY_ENABLED !== 'false';
 const companyContextCacheTtl = Number(process.env.AI_COMPANY_CONTEXT_CACHE_TTL ?? 30);
 const companyContextCache = new Map<string, { expiresAt: number; value: string }>();
 
@@ -175,6 +176,54 @@ interface OcrOptions {
 interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}
+
+export function getOcrProductionReadiness() {
+  const hasAzure = isAzureDocumentIntelligenceConfigured();
+  const hasGemini = !!googleAiKey;
+  const hasOpenRouter = !!apiKey;
+  const usingFreeOpenRouterFallback = VISION_MODELS.some(model => /:free\b/.test(model))
+    || CHAT_MODELS.some(model => /:free\b/.test(model))
+    || PDF_MODELS.some(model => /:free\b/.test(model));
+  const missingEnv = [
+    hasAzure ? null : 'AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT',
+    hasAzure ? null : 'AZURE_DOCUMENT_INTELLIGENCE_KEY',
+    hasGemini ? null : 'GOOGLE_AI_API_KEY',
+  ].filter(Boolean) as string[];
+  const warnings = [
+    hasAzure ? null : 'Azure Document Intelligence is not configured; invoice extraction will rely more on vision LLMs.',
+    hasGemini ? null : 'Google Gemini API is not configured; OCR verification/escalation quality will be lower.',
+    usingFreeOpenRouterFallback ? 'OpenRouter free fallback models are present; useful for dev, not recommended as the main production OCR path.' : null,
+    proVerifyEnabled ? null : 'Gemini Pro verification is disabled by AI_OCR_PRO_VERIFY_ENABLED=false.',
+  ].filter(Boolean) as string[];
+
+  return {
+    productionReady: hasAzure && hasGemini && proVerifyEnabled,
+    tier: hasAzure && hasGemini && proVerifyEnabled ? 'paid_ocr_plus_llm_verify' : hasGemini ? 'llm_verify_only' : hasOpenRouter ? 'fallback_only' : 'not_configured',
+    providers: {
+      azureDocumentIntelligence: hasAzure,
+      googleGemini: hasGemini,
+      openRouterFallback: hasOpenRouter,
+      openRouterFreeFallbackPresent: usingFreeOpenRouterFallback,
+    },
+    models: {
+      fastTextOrPdf: geminiFastModel,
+      scanImageOrPdf: geminiScanModel,
+      proEscalation: proVerifyEnabled ? geminiProVerifyModel : null,
+    },
+    routing: {
+      primary: hasAzure ? 'Azure Document Intelligence prebuilt invoice + Gemini verify' : hasGemini ? 'Gemini direct OCR + rule validation' : 'OpenRouter fallback',
+      escalation: proVerifyEnabled && hasGemini ? 'Gemini Pro when confidence low, multi-page, missing critical fields, or validation warnings exist' : 'disabled',
+      safeguards: ['VAT arithmetic', 'Thai tax ID checksum', 'duplicate supplierTaxId+invoiceNumber', 'bank slip reclassification', 'vendor memory', 'human approval before save'],
+    },
+    missingEnv,
+    warnings,
+    estimatedCostControl: {
+      defaultPath: 'Use Azure/Gemini Flash for most documents.',
+      expensivePath: 'Use Pro only on low-confidence, multi-page, missing-field, or mismatched-total documents.',
+      suggestedPackagePolicy: 'Include a document quota per package and charge extra OCR credits for overage or Pro-escalated documents.',
+    },
+  };
 }
 
 async function callOpenRouter(
@@ -971,7 +1020,7 @@ Rules:
       }
     }
 
-    if (googleAiKey && shouldEscalateOcr(result, options)) {
+    if (googleAiKey && proVerifyEnabled && shouldEscalateOcr(result, options)) {
       try {
         logger.info('[OCR] Escalating to Gemini Pro verify', {
           model: geminiProVerifyModel,
