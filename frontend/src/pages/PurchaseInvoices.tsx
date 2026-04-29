@@ -403,6 +403,12 @@ export default function PurchaseInvoices() {
                       {(item.ocrResult?.documentTypeLabel || item.ocrResult?.documentType || item.status)} · {formatDate(item.createdAt)}
                       {item.ocrResult?.total ? ` · ${formatCurrency(item.ocrResult.total)}` : ''}
                     </p>
+                    {(item.ocrResult?.postingSuggestion || item.ocrResult?.expenseSubcategory || item.ocrResult?.expenseCategory) && (
+                      <p className="mt-1 text-xs text-rose-800 truncate">
+                        {item.ocrResult.postingSuggestion || item.ocrResult.expenseSubcategory || item.ocrResult.expenseCategory}
+                        {item.ocrResult.taxTreatment ? ` · ${item.ocrResult.taxTreatment}` : ''}
+                      </p>
+                    )}
                   </div>
                   <button onClick={openCreate} className="text-xs font-medium text-primary-700 hover:text-primary-900">
                     {isThai ? 'กรอกเอง' : 'Manual'}

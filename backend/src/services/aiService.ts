@@ -115,6 +115,29 @@ export interface OcrResult {
   extractionProvider?: string;
   verificationStage?: 'fast' | 'pro' | 'fallback';
   needsHumanReview?: boolean;
+  expenseCategory?:
+    | 'toll'
+    | 'fuel'
+    | 'parking'
+    | 'utilities'
+    | 'telecom'
+    | 'shipping'
+    | 'meals'
+    | 'travel'
+    | 'hotel'
+    | 'software'
+    | 'marketplace'
+    | 'office_supplies'
+    | 'bank_fee'
+    | 'professional_service'
+    | 'rent'
+    | 'repair_maintenance'
+    | 'medical'
+    | 'government_fee'
+    | 'other';
+  expenseSubcategory?: string;
+  taxTreatment?: 'input_vat_claimable' | 'vat_exempt' | 'non_deductible' | 'needs_review';
+  postingSuggestion?: string;
   payment?: {
     amount?: number;
     paidAt?: string;
@@ -303,6 +326,10 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     extractionProvider: parsed.extractionProvider ?? emptyResult.extractionProvider,
     payment: parsed.payment,
     documentMetadata: parsed.documentMetadata,
+    expenseCategory: parsed.expenseCategory,
+    expenseSubcategory: parsed.expenseSubcategory,
+    taxTreatment: parsed.taxTreatment,
+    postingSuggestion: parsed.postingSuggestion,
   };
   result.validationWarnings = [
     ...validateOcrResult(result),
@@ -627,6 +654,31 @@ Rules:
   - invoiceNumber = bank/reference/transaction id if visible
   - supplierName = receiver/payee name if it is an outgoing transfer, otherwise payer name if visible
   - confidence should be high only when amount, date, and reference or counterparty are visible
+- For expense receipts, classify expenseCategory and taxTreatment:
+  - toll: ทางด่วน, Expressway, Toll, Easy Pass, M-Flow, Motorway, EXAT, Don Muang Tollway
+  - fuel: น้ำมัน, fuel, gasoline, diesel, PTT, Bangchak, Shell, Esso, Caltex, PT
+  - parking: parking, ที่จอดรถ
+  - utilities: electricity/water bills, ค่าไฟ, ค่าน้ำ
+  - telecom: phone/internet, โทรศัพท์, อินเทอร์เน็ต, AIS, TRUE, DTAC, NT
+  - shipping: freight/courier/postage, Kerry, Flash, J&T, DHL, ไปรษณีย์
+  - meals: restaurant/food/refreshment, ร้านอาหาร, ค่าอาหาร, GrabFood, LINE MAN, Foodpanda
+  - travel: taxi/ride/transport/air ticket, Grab, Bolt, airfare
+  - hotel: hotel/accommodation
+  - software: SaaS/software/subscription, Google, Microsoft, Adobe, AWS
+  - marketplace: Shopee, Lazada, TikTok Shop, marketplace invoices
+  - office_supplies: stationery/office supplies
+  - bank_fee: bank charge/fee
+  - professional_service: legal/accounting/consulting/service fee
+  - rent: rent/lease
+  - repair_maintenance: repair/maintenance
+  - medical: clinic/hospital/pharmacy
+  - government_fee: government fee/tax/registration fee
+  - other: unclear
+- taxTreatment:
+  - input_vat_claimable when a valid tax invoice/VAT amount is visible and business use seems plausible
+  - vat_exempt when explicitly exempt/no VAT
+  - non_deductible for clearly personal/entertainment/non-claimable items
+  - needs_review when unsure, missing tax ID, or VAT treatment is ambiguous
 
 {
   "documentType": "tax_invoice|receipt|invoice|billing_note|withholding_tax|payment_advice|bank_transfer|bank_statement|quotation|purchase_order|delivery_note|expense_receipt|contract|credit_note|debit_note|other",
@@ -640,6 +692,10 @@ Rules:
   "vatAmount": 0,
   "total": 0,
   "confidence": "high|medium|low",
+  "expenseCategory": "toll|fuel|parking|utilities|telecom|shipping|meals|travel|hotel|software|marketplace|office_supplies|bank_fee|professional_service|rent|repair_maintenance|medical|government_fee|other",
+  "expenseSubcategory": "short specific category such as expressway toll, mobile internet, diesel, courier",
+  "taxTreatment": "input_vat_claimable|vat_exempt|non_deductible|needs_review",
+  "postingSuggestion": "Thai accounting posting suggestion, e.g. ค่าทางด่วน, ค่าน้ำมัน, ค่าขนส่ง",
   "payment": {
     "amount": 0,
     "paidAt": "YYYY-MM-DD",

@@ -121,6 +121,8 @@ function buildOcrTextSummary(result: OcrResult, note?: string) {
     `วันที่: ${result.invoiceDate || '-'}\n` +
     `ก่อน VAT: ${fmt(result.subtotal)}\n` +
     `VAT: ${fmt(result.vatAmount)}\n` +
+    `หมวด: ${result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '-'}\n` +
+    `ภาษี: ${result.taxTreatment || '-'}\n` +
     `รวม: ${fmt(result.total)}\n` +
     `ความมั่นใจ: ${result.confidence}${warnings}`;
 }
@@ -134,6 +136,8 @@ function buildReviewOnlySummary(result: OcrResult) {
     `คู่ค้า: ${result.supplierName || meta?.sellerName || meta?.buyerName || '-'}\n` +
     `วันที่: ${result.invoiceDate || '-'}\n` +
     `ยอดรวม: ${result.total ? fmt(result.total) : '-'}\n` +
+    `หมวด: ${result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '-'}\n` +
+    `ภาษี: ${result.taxTreatment || '-'}\n` +
     `ความมั่นใจ: ${result.confidence}\n\n` +
     `เอกสารนี้ยังไม่ถูกบันทึกเป็นภาษีซื้อ/รับชำระอัตโนมัติ กรุณาตรวจในคิวเอกสาร LINE`;
 }
@@ -165,10 +169,12 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
         vatAmount: result.vatAmount,
         total: result.total,
         vatType: 'vat7',
-        category: result.documentTypeLabel || result.documentType,
+        category: result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || result.documentTypeLabel || result.documentType,
         description: `นำเข้าจาก LINE OCR: ${result.documentTypeLabel || result.documentType || 'เอกสารซื้อ'}`,
         notes: [
           `AI confidence: ${result.confidence}`,
+          result.expenseCategory ? `Expense category: ${result.expenseCategory}` : null,
+          result.taxTreatment ? `Tax treatment: ${result.taxTreatment}` : null,
           result.extractionProvider ? `Provider: ${result.extractionProvider}` : null,
           result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
         ].filter(Boolean).join('\n'),

@@ -223,6 +223,10 @@ export interface DocumentIntake {
     invoiceDate?: string;
     total?: number;
     confidence?: 'high' | 'medium' | 'low';
+    expenseCategory?: string;
+    expenseSubcategory?: string;
+    taxTreatment?: string;
+    postingSuggestion?: string;
     documentMetadata?: {
       buyerName?: string;
       sellerName?: string;
