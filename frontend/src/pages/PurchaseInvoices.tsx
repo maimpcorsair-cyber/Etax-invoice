@@ -252,8 +252,27 @@ export default function PurchaseInvoices() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function fileUrl(item: DocumentIntake) {
-    return item.fileUrl || `/api/purchase-invoices/document-intakes/${item.id}/file`;
+  async function openDocumentFile(item: DocumentIntake) {
+    setError('');
+    try {
+      if (item.fileUrl && /^https?:\/\//i.test(item.fileUrl)) {
+        window.open(item.fileUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const res = await fetch(`/api/purchase-invoices/document-intakes/${item.id}/file`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error ?? (isThai ? 'เปิดไฟล์ไม่สำเร็จ' : 'Cannot open file'));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (isThai ? 'เปิดไฟล์ไม่สำเร็จ' : 'Cannot open file'));
+    }
   }
 
   function canConfirmDocument(doc: DocumentIntake) {
@@ -638,15 +657,14 @@ export default function PurchaseInvoices() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        <a
-                          href={fileUrl(doc)}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => void openDocumentFile(doc)}
                           className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                           {isThai ? 'ไฟล์' : 'File'}
-                        </a>
+                        </button>
                         {doc.status !== 'saved' && (
                           <>
                             <button
