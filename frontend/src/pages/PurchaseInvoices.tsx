@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
-  Receipt, CheckCircle, Clock, TrendingDown,
+  Receipt, CheckCircle, Clock, TrendingDown, AlertTriangle, FileCheck2,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -130,6 +130,9 @@ export default function PurchaseInvoices() {
   const totalSubtotal = items.reduce((s, p) => s + Number(p.subtotal || 0), 0);
   const totalVat = items.reduce((s, p) => s + Number(p.vatAmount || 0), 0);
   const totalAmount = items.reduce((s, p) => s + Number(p.total || 0), 0);
+  const aiReviewItems = items.filter((p) =>
+    (p.description ?? '').includes('LINE OCR') && !(p.notes ?? '').includes('AI reviewed'),
+  );
 
   function openCreate() {
     if (isFreePlan) {
@@ -250,6 +253,30 @@ export default function PurchaseInvoices() {
     fetchItems();
   }
 
+  async function handleMarkReviewed(p: PurchaseInvoice) {
+    const payload = {
+      supplierName: p.supplierName,
+      supplierTaxId: p.supplierTaxId,
+      supplierBranch: p.supplierBranch ?? '00000',
+      invoiceNumber: p.invoiceNumber,
+      invoiceDate: p.invoiceDate.split('T')[0],
+      dueDate: p.dueDate ? p.dueDate.split('T')[0] : undefined,
+      subtotal: Number(p.subtotal),
+      vatAmount: Number(p.vatAmount),
+      vatType: p.vatType,
+      description: p.description ?? undefined,
+      category: p.category ?? undefined,
+      notes: `${p.notes ? `${p.notes}\n` : ''}AI reviewed: ${new Date().toISOString()}`,
+      pdfUrl: p.pdfUrl ?? undefined,
+    };
+    await fetch(`/api/purchase-invoices/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+    fetchItems();
+  }
+
   const computedTotal = (() => {
     const s = parseFloat(form.subtotal);
     const v = parseFloat(form.vatAmount || '0');
@@ -283,6 +310,49 @@ export default function PurchaseInvoices() {
           {isThai
             ? 'อัปเกรดเพื่อบันทึก Input VAT และคำนวณภาษีที่ต้องชำระอัตโนมัติ'
             : 'Upgrade to record Input VAT and auto-calculate VAT payable'}
+        </div>
+      )}
+
+      {aiReviewItems.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border border-amber-100">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-amber-950">
+                  {isThai ? 'รายการจาก LINE OCR รอตรวจ' : 'LINE OCR items need review'}
+                </h2>
+                <p className="text-xs text-amber-800 mt-1">
+                  {isThai
+                    ? 'ตรวจเลขผู้เสียภาษี วันที่ และยอด VAT ก่อนนำไปยื่น ภ.พ.30'
+                    : 'Review tax ID, dates, and VAT totals before PP.30 filing.'}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-amber-800 bg-white border border-amber-200 rounded-full px-2 py-1">
+              {aiReviewItems.length}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {aiReviewItems.slice(0, 4).map((p) => (
+              <div key={p.id} className="bg-white border border-amber-100 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{p.supplierName}</p>
+                  <p className="text-xs text-gray-500 font-mono truncate">{p.invoiceNumber} · {formatCurrency(p.total)}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => openEdit(p)} className="p-2 text-primary-700 hover:bg-primary-50 rounded-lg" title={isThai ? 'ตรวจ/แก้ไข' : 'Review/Edit'}>
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleMarkReviewed(p)} className="p-2 text-green-700 hover:bg-green-50 rounded-lg" title={isThai ? 'ตรวจแล้ว' : 'Mark reviewed'}>
+                    <FileCheck2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -373,6 +443,12 @@ export default function PurchaseInvoices() {
                 <div>
                   <p className="font-semibold text-gray-900">{p.supplierName}</p>
                   <p className="text-xs text-gray-400 font-mono">{p.supplierTaxId}</p>
+                  {(p.description ?? '').includes('LINE OCR') && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                      <AlertTriangle className="w-3 h-3" />
+                      {isThai ? 'จาก LINE OCR' : 'LINE OCR'}
+                    </p>
+                  )}
                 </div>
                 <span className={p.isPaid ? 'badge-success' : 'badge-warning'}>
                   {p.isPaid ? (isThai ? 'ชำระแล้ว' : 'Paid') : (isThai ? 'ค้างชำระ' : 'Unpaid')}
@@ -441,6 +517,12 @@ export default function PurchaseInvoices() {
                     <td className="table-cell">
                       <p className="font-medium text-gray-900">{p.supplierName}</p>
                       {p.category && <p className="text-xs text-gray-400">{p.category}</p>}
+                      {(p.description ?? '').includes('LINE OCR') && (
+                        <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                          <AlertTriangle className="w-3 h-3" />
+                          {isThai ? 'จาก LINE OCR' : 'LINE OCR'}
+                        </p>
+                      )}
                     </td>
                     <td className="table-cell font-mono text-xs">{p.supplierTaxId}</td>
                     <td className="table-cell font-mono text-xs">{p.invoiceNumber}</td>
@@ -471,6 +553,11 @@ export default function PurchaseInvoices() {
                         <button onClick={() => openEdit(p)} className="p-1 text-primary-600 hover:text-primary-800" title={isThai ? 'แก้ไข' : 'Edit'}>
                           <Edit2 className="w-4 h-4" />
                         </button>
+                        {(p.description ?? '').includes('LINE OCR') && !(p.notes ?? '').includes('AI reviewed') && (
+                          <button onClick={() => handleMarkReviewed(p)} className="p-1 text-green-600 hover:text-green-800" title={isThai ? 'ตรวจแล้ว' : 'Mark reviewed'}>
+                            <FileCheck2 className="w-4 h-4" />
+                          </button>
+                        )}
                         <button onClick={() => handleDelete(p.id)} className="p-1 text-red-400 hover:text-red-600" title={isThai ? 'ลบ' : 'Delete'}>
                           <Trash2 className="w-4 h-4" />
                         </button>

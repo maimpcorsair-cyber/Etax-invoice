@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { authenticate, requireRole } from '../middleware/auth';
 import prisma from '../config/database';
 import redis from '../config/redis';
@@ -90,6 +91,69 @@ function buildOcrTextSummary(result: OcrResult, note?: string) {
     `VAT: ${fmt(result.vatAmount)}\n` +
     `รวม: ${fmt(result.total)}\n` +
     `ความมั่นใจ: ${result.confidence}${warnings}`;
+}
+
+async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, companyId: string, fallbackId: string) {
+  const link = await prisma.lineUserLink.findUnique({
+    where: { lineUserId },
+    select: { userId: true },
+  });
+
+  if (!link) {
+    throw new Error('Line user link not found while saving OCR purchase invoice');
+  }
+
+  const invoiceDate = result.invoiceDate ? new Date(result.invoiceDate) : new Date();
+  const invoiceNumber = result.invoiceNumber || `LINE-${fallbackId}`;
+  const supplierTaxId = result.supplierTaxId || '0000000000000';
+
+  try {
+    return await prisma.purchaseInvoice.create({
+      data: {
+        companyId,
+        supplierName: result.supplierName || 'ไม่ระบุ',
+        supplierTaxId,
+        supplierBranch: result.supplierBranch || '00000',
+        invoiceNumber,
+        invoiceDate,
+        subtotal: result.subtotal,
+        vatAmount: result.vatAmount,
+        total: result.total,
+        vatType: 'vat7',
+        category: result.documentTypeLabel || result.documentType,
+        description: `นำเข้าจาก LINE OCR: ${result.documentTypeLabel || result.documentType || 'เอกสารซื้อ'}`,
+        notes: [
+          `AI confidence: ${result.confidence}`,
+          result.extractionProvider ? `Provider: ${result.extractionProvider}` : null,
+          result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
+        ].filter(Boolean).join('\n'),
+        createdBy: link.userId,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const existing = await prisma.purchaseInvoice.findFirst({
+        where: { companyId, supplierTaxId, invoiceNumber },
+      });
+      if (existing) return existing;
+    }
+    throw err;
+  }
+}
+
+async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกเอกสารเรียบร้อย!') {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+  const typeLine = result.documentTypeLabel ? `\n🧾 ประเภท: ${result.documentTypeLabel}` : '';
+  const vatLine = result.vatAmount > 0 ? `\n💰 ภาษีซื้อ ${fmt(result.vatAmount)}` : '';
+  await sendLineTextWithQuickReply(
+    lineUserId,
+    `${prefix}${typeLine}\n📋 ${result.supplierName || '-'}${vatLine}\n💵 ยอดรวม ${fmt(result.total)}`,
+    [
+      { label: '✏️ แก้ไขข้อมูล', data: `edit_purchase:${purchaseId}`, displayText: 'แก้ไขข้อมูล' },
+      { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
+    ],
+  );
 }
 
 // GET /api/line/status
@@ -773,10 +837,21 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(compactOcrSessionData(result, companyId)));
     } catch (redisErr) {
       logger.error('[Line] OCR temp save failed', { err: redisErr });
-      await sendLineText(lineUserId, buildOcrTextSummary(
-        result,
-        `ระบบบันทึกข้อมูลชั่วคราวไม่ได้ (${redisErr instanceof Error ? redisErr.message : String(redisErr)})`,
-      ));
+      try {
+        const saved = await savePurchaseFromLineOcr(lineUserId, result, companyId, tempId);
+        await replySavedPurchase(
+          lineUserId,
+          result,
+          saved.id,
+          '✅ อ่านเอกสารและบันทึกเข้าระบบแล้วครับ',
+        );
+      } catch (saveErr) {
+        logger.error('[Line] OCR direct DB save failed after Redis failure', { err: saveErr });
+        await sendLineText(lineUserId, buildOcrTextSummary(
+          result,
+          `ระบบบันทึกข้อมูลชั่วคราวไม่ได้ (${redisErr instanceof Error ? redisErr.message : String(redisErr)})`,
+        ));
+      }
       return;
     }
 
@@ -810,57 +885,22 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         return;
       }
 
-      // Find creator user
-      const link = await prisma.lineUserLink.findUnique({
-        where: { lineUserId },
-        select: { userId: true },
-      });
+      const saved = await savePurchaseFromLineOcr(lineUserId, ocrData, companyId, tempId);
 
-      if (!link) {
-        await sendLineText(lineUserId, 'ยังไม่ได้เชื่อมบัญชี');
-        return;
+      try {
+        await redis.del(`ocr:temp:${tempId}`);
+      } catch (redisErr) {
+        logger.warn('[Line] Redis del failed after saving purchase', { err: redisErr, tempId });
       }
 
-      const invoiceDate = ocrData.invoiceDate
-        ? new Date(ocrData.invoiceDate)
-        : new Date();
-
-      const saved = await prisma.purchaseInvoice.create({
-        data: {
-          companyId,
-          supplierName: ocrData.supplierName || 'ไม่ระบุ',
-          supplierTaxId: ocrData.supplierTaxId || '0000000000000',
-          supplierBranch: ocrData.supplierBranch || '00000',
-          invoiceNumber: ocrData.invoiceNumber || `LINE-${tempId}`,
-          invoiceDate,
-          subtotal: ocrData.subtotal,
-          vatAmount: ocrData.vatAmount,
-          total: ocrData.total,
-          vatType: 'vat7',
-          category: ocrData.documentTypeLabel || ocrData.documentType,
-          description: `นำเข้าจาก LINE OCR: ${ocrData.documentTypeLabel || ocrData.documentType || 'เอกสารซื้อ'}`,
-          createdBy: link.userId,
-        },
-      });
-
-      await redis.del(`ocr:temp:${tempId}`);
-
       // Store edit reference
-      await redis.setex(`line:lastedit:${lineUserId}`, 300, saved.id);
+      try {
+        await redis.setex(`line:lastedit:${lineUserId}`, 300, saved.id);
+      } catch (redisErr) {
+        logger.warn('[Line] Redis lastedit save failed after saving purchase', { err: redisErr, purchaseId: saved.id });
+      }
 
-      const fmt = (n: number) =>
-        new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
-
-      const typeLine = ocrData.documentTypeLabel ? `\n🧾 ประเภท: ${ocrData.documentTypeLabel}` : '';
-      const vatLine = ocrData.vatAmount > 0 ? `\n💰 ภาษีซื้อ ${fmt(ocrData.vatAmount)}` : '';
-      await sendLineTextWithQuickReply(
-        lineUserId,
-        `✅ บันทึกเอกสารเรียบร้อย!${typeLine}\n📋 ${ocrData.supplierName}${vatLine}\n💵 ยอดรวม ${fmt(ocrData.total)}`,
-        [
-          { label: '✏️ แก้ไขข้อมูล', data: `edit_purchase:${saved.id}`, displayText: 'แก้ไขข้อมูล' },
-          { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
-        ],
-      );
+      await replySavedPurchase(lineUserId, ocrData, saved.id);
     } catch (err) {
       logger.error('[Line] confirm_purchase failed', { err, tempId });
       await sendLineText(lineUserId, 'ขอโทษ เกิดข้อผิดพลาดในการบันทึกข้อมูล');
