@@ -12,6 +12,7 @@ import {
   sendLineTextWithQuickReply,
   buildOverdueFlexCard,
   buildOcrConfirmFlexCard,
+  buildIntakeConfirmFlexCard,
   buildInvoiceFlexCard,
   verifyLineSignature,
   OverdueInvoice,
@@ -293,13 +294,10 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
       error: null,
     },
   });
-  await sendLineTextWithQuickReply(
+  await sendLineFlexMessage(
     lineUserId,
-    buildConfirmationSummary(result),
-    [
-      { label: '✅ ยืนยันบันทึก', data: `confirm_intake:${intakeId}`, displayText: 'ยืนยันบันทึก' },
-      { label: '❌ ยกเลิก', data: `cancel_intake:${intakeId}`, displayText: 'ยกเลิก' },
-    ],
+    'สรุปเอกสาร — กรุณายืนยัน',
+    buildIntakeConfirmFlexCard(result, intakeId),
   );
 }
 
@@ -838,6 +836,44 @@ async function handleDurableIntakeReply(lineUserId: string, text: string): Promi
 
   const result = active.ocrResult as unknown as OcrResult | null;
   if (!result) return false;
+
+  // Handle free-form field edit triggered by editintake: postback
+  if (active.error?.startsWith('editintake:')) {
+    const fieldKey = active.error.split(':')[1];
+    const updated = { ...result } as Record<string, unknown>;
+    if (fieldKey === 'total' || fieldKey === 'vatAmount' || fieldKey === 'subtotal') {
+      const num = parseFloat(trimmed.replace(/[^0-9.]/g, ''));
+      if (isNaN(num)) {
+        await sendLineText(lineUserId, '⚠️ กรุณาพิมพ์ตัวเลข เช่น 5350');
+        return true;
+      }
+      updated[fieldKey] = num;
+      if (fieldKey === 'total' && (result as OcrResult).vatAmount) {
+        updated['subtotal'] = num - (result as OcrResult).vatAmount;
+      }
+      if (fieldKey === 'vatAmount' && (result as OcrResult).total) {
+        updated['subtotal'] = (result as OcrResult).total - num;
+      }
+    } else {
+      updated[fieldKey] = trimmed;
+    }
+    const newResult = updated as unknown as OcrResult;
+    await prisma.documentIntake.update({
+      where: { id: active.id },
+      data: {
+        ocrResult: newResult as unknown as Prisma.InputJsonValue,
+        status: 'awaiting_confirmation',
+        error: null,
+      },
+    });
+    await sendLineFlexMessage(
+      lineUserId,
+      'อัพเดตแล้ว — กรุณายืนยัน',
+      buildIntakeConfirmFlexCard(newResult, active.id),
+    );
+    return true;
+  }
+
   const field = templateFieldsFor(result).find((item) => item.key === active.error) ?? missingTemplateFields(result)[0];
   if (!field) {
     await askForConfirmation(lineUserId, active.id, result);
@@ -1464,6 +1500,58 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       data: { status: 'needs_review', error: 'cancelled_by_user' },
     });
     await sendLineText(lineUserId, 'ยกเลิกแล้ว เอกสารยังอยู่ในคิวรอตรวจ');
+    return;
+  }
+
+  if (data.startsWith('edit_intake:')) {
+    const intakeId = data.slice('edit_intake:'.length);
+    const intake = await prisma.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    });
+    const result = intake?.ocrResult as unknown as OcrResult | null;
+    if (!intake || !result) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร กรุณาส่งไฟล์ใหม่');
+      return;
+    }
+    const editableFields = [
+      { label: '🏢 ผู้ขาย', data: `editintake:${intakeId}:supplierName` },
+      { label: '🪪 เลขผู้เสียภาษี', data: `editintake:${intakeId}:supplierTaxId` },
+      { label: '🔢 เลขที่เอกสาร', data: `editintake:${intakeId}:invoiceNumber` },
+      { label: '📅 วันที่', data: `editintake:${intakeId}:invoiceDate` },
+      { label: '💵 ยอดรวม', data: `editintake:${intakeId}:total` },
+      { label: '💰 VAT', data: `editintake:${intakeId}:vatAmount` },
+      { label: '✅ ยืนยันบันทึก', data: `confirm_intake:${intakeId}` },
+    ];
+    await sendLineTextWithQuickReply(
+      lineUserId,
+      '✏️ เลือกช่องที่ต้องการแก้ไข:',
+      editableFields,
+    );
+    return;
+  }
+
+  if (data.startsWith('editintake:')) {
+    const parts = data.split(':'); // ['editintake', intakeId, fieldKey]
+    const intakeId = parts[1];
+    const fieldKey = parts[2];
+    const fieldMeta: Record<string, { label: string; hint: string }> = {
+      supplierName:  { label: 'ชื่อผู้ขาย', hint: 'เช่น บริษัท ABC จำกัด' },
+      supplierTaxId: { label: 'เลขผู้เสียภาษี', hint: '13 หลัก เช่น 0105556001234' },
+      invoiceNumber: { label: 'เลขที่เอกสาร', hint: 'เช่น INV-2026-001' },
+      invoiceDate:   { label: 'วันที่เอกสาร', hint: 'YYYY-MM-DD เช่น 2026-04-29' },
+      total:         { label: 'ยอดรวม', hint: 'ตัวเลขเท่านั้น เช่น 5350' },
+      vatAmount:     { label: 'ภาษีมูลค่าเพิ่ม', hint: 'ตัวเลขเท่านั้น เช่น 350' },
+    };
+    const meta = fieldMeta[fieldKey] ?? { label: fieldKey, hint: '' };
+    await prisma.documentIntake.update({
+      where: { id: intakeId },
+      data: { status: 'awaiting_input', error: `editintake:${fieldKey}` },
+    });
+    await sendLineTextWithQuickReply(
+      lineUserId,
+      `✏️ แก้ไข: ${meta.label}\n💡 ${meta.hint}\n\nพิมพ์ค่าใหม่ได้เลย:`,
+      [{ label: '↩️ ยกเลิกแก้ไข', data: `edit_intake:${intakeId}`, displayText: 'ยกเลิกแก้ไข' }],
+    );
     return;
   }
 

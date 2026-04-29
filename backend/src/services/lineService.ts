@@ -274,59 +274,117 @@ export function buildInvoiceFlexCard(inv: InvoiceSummary): object {
   };
 }
 
-export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): object {
+function buildOcrFlexCardContents(result: OcrResult): { header: object; body: object } {
   const fmt = (n: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
 
-  const row = (label: string, value: string) => ({
+  const headerColor =
+    result.confidence === 'high' ? '#16a34a' :
+    result.confidence === 'medium' ? '#d97706' :
+    '#dc2626';
+
+  const confidenceLabel =
+    result.confidence === 'high' ? 'สูง' :
+    result.confidence === 'medium' ? 'กลาง' :
+    'ต่ำ';
+
+  const row = (label: string, value: string, bold = false) => ({
     type: 'box',
     layout: 'horizontal',
     contents: [
-      { type: 'text', text: label, size: 'sm', color: '#888888', flex: 2 },
-      { type: 'text', text: value, size: 'sm', color: '#333333', flex: 3, align: 'end', wrap: true },
+      { type: 'text', text: label, size: 'sm', color: '#888888', flex: 3 },
+      { type: 'text', text: value, size: bold ? 'md' : 'sm', color: '#111111', flex: 4, align: 'end' as const, wrap: true, weight: bold ? 'bold' as const : 'regular' as const },
     ],
   });
 
-  return {
-    type: 'bubble',
-    header: {
+  const taxIdDisplay = result.supplierTaxId && result.supplierTaxId.length > 4
+    ? `****${result.supplierTaxId.slice(-4)}`
+    : (result.supplierTaxId || '-');
+
+  const bodyContents: object[] = [
+    row('ผู้ขาย', result.supplierName || '-'),
+    row('เลขผู้เสียภาษี', taxIdDisplay),
+    row('เลขที่เอกสาร', result.invoiceNumber || '-'),
+    row('วันที่', result.invoiceDate || '-'),
+    { type: 'separator', margin: 'sm' },
+    row('ยอดก่อน VAT', result.subtotal ? fmt(result.subtotal) : '-'),
+    row('ภาษีมูลค่าเพิ่ม', result.vatAmount ? fmt(result.vatAmount) : '-'),
+    row('ยอดรวม', result.total ? fmt(result.total) : '-', true),
+  ];
+
+  if (result.validationWarnings?.length) {
+    bodyContents.push({
       type: 'box',
       layout: 'vertical',
-      backgroundColor: '#16a34a',
+      margin: 'sm',
+      backgroundColor: '#fff7ed',
+      cornerRadius: '4px',
+      paddingAll: '8px',
       contents: [
         {
           type: 'text',
-          text: `📄 ตรวจพบ${result.documentTypeLabel || 'เอกสาร'}`,
-          color: '#ffffff',
-          size: 'md',
-          weight: 'bold',
-        },
-        {
-          type: 'text',
-          text: `ความมั่นใจ: ${result.confidence === 'high' ? 'สูง' : result.confidence === 'medium' ? 'ปานกลาง' : 'ต่ำ'}${result.extractionProvider ? ` • ${result.extractionProvider}` : ''}`,
-          color: '#bbf7d0',
+          text: `⚠️ ข้อควรตรวจ:\n${result.validationWarnings.join('\n')}`,
           size: 'xs',
+          color: '#92400e',
+          wrap: true,
         },
+      ],
+    });
+  }
+
+  return {
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: headerColor,
+      contents: [
+        {
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            {
+              type: 'text',
+              text: `📄 ${result.documentTypeLabel || 'เอกสาร'}`,
+              color: '#ffffff',
+              size: 'md',
+              weight: 'bold' as const,
+              flex: 1,
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              backgroundColor: 'rgba(0,0,0,0.25)',
+              cornerRadius: '4px',
+              paddingAll: '4px',
+              contents: [
+                { type: 'text', text: confidenceLabel, color: '#ffffff', size: 'xs', align: 'center' as const },
+              ],
+            },
+          ],
+        },
+        ...(result.extractionProvider ? [{
+          type: 'text',
+          text: result.extractionProvider,
+          color: 'rgba(255,255,255,0.75)',
+          size: 'xs',
+        }] : []),
       ],
     },
     body: {
       type: 'box',
       layout: 'vertical',
       spacing: 'sm',
-      contents: [
-        row('ผู้ขาย', result.supplierName || '-'),
-        row('ประเภท', result.documentTypeLabel || '-'),
-        row('เลขผู้เสียภาษี', result.supplierTaxId || '-'),
-        row('เลขที่ใบกำกับ', result.invoiceNumber || '-'),
-        row('วันที่', result.invoiceDate || '-'),
-        row('ยอดก่อนภาษี', result.subtotal ? fmt(result.subtotal) : '-'),
-        row('ภาษีมูลค่าเพิ่ม', result.vatAmount ? fmt(result.vatAmount) : '-'),
-        row('ยอดรวม', result.total ? fmt(result.total) : '-'),
-        ...(result.validationWarnings?.length
-          ? [row('หมายเหตุ', result.validationWarnings.slice(0, 2).join(', '))]
-          : []),
-      ],
+      contents: bodyContents,
     },
+  };
+}
+
+export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string): object {
+  const { header, body } = buildOcrFlexCardContents(result);
+  return {
+    type: 'bubble',
+    header,
+    body,
     footer: {
       type: 'box',
       layout: 'horizontal',
@@ -337,31 +395,54 @@ export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): obje
           style: 'primary',
           color: '#16a34a',
           flex: 1,
-          action: {
-            type: 'postback',
-            label: '✅ บันทึก',
-            data: `confirm_purchase:${tempId}`,
-          },
+          action: { type: 'postback', label: '✅ บันทึก', data: `confirm_intake:${intakeId}` },
         },
         {
           type: 'button',
           style: 'secondary',
           flex: 1,
-          action: {
-            type: 'postback',
-            label: '✏️ แก้ไข',
-            data: `edit_before_save:${tempId}`,
-          },
+          action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${intakeId}` },
         },
         {
           type: 'button',
           style: 'secondary',
           flex: 1,
-          action: {
-            type: 'postback',
-            label: '❌ ยกเลิก',
-            data: `reject_purchase:${tempId}`,
-          },
+          action: { type: 'postback', label: '❌ ยกเลิก', data: `cancel_intake:${intakeId}` },
+        },
+      ],
+    },
+  };
+}
+
+export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): object {
+  const { header, body } = buildOcrFlexCardContents(result);
+  return {
+    type: 'bubble',
+    header,
+    body,
+    footer: {
+      type: 'box',
+      layout: 'horizontal',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#16a34a',
+          flex: 1,
+          action: { type: 'postback', label: '✅ บันทึก', data: `confirm_purchase:${tempId}` },
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          flex: 1,
+          action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_before_save:${tempId}` },
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          flex: 1,
+          action: { type: 'postback', label: '❌ ยกเลิก', data: `reject_purchase:${tempId}` },
         },
       ],
     },
