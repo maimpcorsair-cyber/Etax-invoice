@@ -275,6 +275,7 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
       data: {
         ...result,
         redisFailureFallback: 'direct_db_save_then_ocr_text_summary',
+        webhookReplyMode: 'reply_token_ack_with_push_fallback',
         redis: redisResult.status === 'fulfilled'
           ? { ok: true, response: redisResult.value }
           : { ok: false, error: redisResult.reason instanceof Error ? redisResult.reason.message : String(redisResult.reason) },
