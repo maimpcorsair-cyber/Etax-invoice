@@ -183,17 +183,16 @@ function buildRichMenuBody(): object {
 }
 
 async function lineApi(path: string, method: string, body?: object | Buffer, contentType = 'application/json'): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const headers: Record<string, string> = {
-    'Authorization': `Bearer ${TOKEN()}`,
-    'Content-Type': contentType,
-  };
+  const headers: Record<string, string> = { 'Authorization': `Bearer ${TOKEN()}` };
+  if (body !== undefined) headers['Content-Type'] = contentType;
+
   const res = await fetch(`https://api.line.me${path}`, {
     method,
     headers,
     body: body instanceof Buffer ? body : body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  if (!res.ok) return { ok: false, error: `${res.status} ${text}` };
+  if (!res.ok) return { ok: false, error: `${res.status} ${text.slice(0, 300)}` };
   try {
     const json = JSON.parse(text) as { richMenuId?: string };
     return { ok: true, id: json.richMenuId };
@@ -206,14 +205,15 @@ export async function setupRichMenu(): Promise<{ ok: boolean; richMenuId?: strin
   // 1. Create rich menu
   const createRes = await lineApi('/v2/bot/richmenu', 'POST', buildRichMenuBody());
   if (!createRes.ok || !createRes.id) {
-    logger.error('[RichMenu] Create failed', { error: createRes.error });
-    return { ok: false, error: createRes.error };
+    logger.error('[RichMenu] Step 1 create failed', { error: createRes.error });
+    return { ok: false, error: `[create] ${createRes.error}` };
   }
   const richMenuId = createRes.id;
-  logger.info('[RichMenu] Created', { richMenuId });
+  logger.info('[RichMenu] Step 1 created', { richMenuId });
 
   // 2. Upload image
   const png = generateRichMenuPNG();
+  logger.info('[RichMenu] PNG size', { bytes: png.length });
   const uploadRes = await lineApi(
     `/v2/bot/richmenu/${richMenuId}/content`,
     'POST',
@@ -221,15 +221,17 @@ export async function setupRichMenu(): Promise<{ ok: boolean; richMenuId?: strin
     'image/png',
   );
   if (!uploadRes.ok) {
-    logger.error('[RichMenu] Image upload failed', { error: uploadRes.error });
-    return { ok: false, error: uploadRes.error };
+    logger.error('[RichMenu] Step 2 image upload failed', { error: uploadRes.error });
+    return { ok: false, error: `[upload] ${uploadRes.error}` };
   }
-  logger.info('[RichMenu] Image uploaded');
+  logger.info('[RichMenu] Step 2 image uploaded');
 
-  // 3. Set as default for all users
-  const defaultRes = await lineApi(`/v2/bot/user/all/richmenu/${richMenuId}`, 'POST');
+  // 3. Set as default for all users (non-fatal)
+  const defaultRes = await lineApi(`/v2/bot/richmenu/default`, 'POST', { richMenuId });
   if (!defaultRes.ok) {
-    logger.warn('[RichMenu] Set default failed (non-fatal)', { error: defaultRes.error });
+    logger.warn('[RichMenu] Step 3 set default failed (non-fatal)', { error: defaultRes.error });
+  } else {
+    logger.info('[RichMenu] Step 3 set as default');
   }
 
   logger.info('[RichMenu] Setup complete', { richMenuId });

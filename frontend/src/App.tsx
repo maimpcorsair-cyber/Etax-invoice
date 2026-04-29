@@ -11,7 +11,6 @@ const InvoiceBuilder    = React.lazy(() => import('./pages/InvoiceBuilder'));
 const InvoiceList       = React.lazy(() => import('./pages/InvoiceList'));
 const AdminPanel        = React.lazy(() => import('./pages/AdminPanel'));
 const AuditLogs         = React.lazy(() => import('./pages/AuditLogs'));
-const Settings          = React.lazy(() => import('./pages/Settings'));
 const Login             = React.lazy(() => import('./pages/Login'));
 const Customers         = React.lazy(() => import('./pages/Customers'));
 const CustomerStatementPage = React.lazy(() => import('./pages/CustomerStatement'));
@@ -160,7 +159,6 @@ export default function App() {
           <Route path="pp30" element={<Pp30Filing />} />
           <Route path="admin" element={<AdminPanel />} />
           <Route path="audit" element={<AuditLogs />} />
-          <Route path="settings" element={<Settings />} />
           <Route path="plan" element={<PlanPage />} />
         </Route>
         <Route

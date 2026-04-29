@@ -10,7 +10,6 @@ import {
   Calculator,
   Shield,
   ShieldAlert,
-  Settings,
   LogOut,
   ChevronDown,
   Zap,
@@ -28,7 +27,6 @@ const navItems = [
   { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
   { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
   { key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin', roles: ['super_admin', 'admin'] },
-  { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
 const PLAN_BADGE: Record<string, string> = {
@@ -152,14 +150,7 @@ export default function Navbar() {
                       {t('nav.plan', { defaultValue: 'แผน / Plan' })}
                     </Link>
                   )}
-                  <Link
-                    to="/app/settings"
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <Settings className="w-4 h-4" />
-                    {t('nav.settings')}
-                  </Link>
+
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"

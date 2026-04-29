@@ -7,7 +7,6 @@ import {
   Users,
   Package,
   MoreHorizontal,
-  Settings,
   Shield,
   ShieldAlert,
   ShoppingCart,
@@ -46,7 +45,6 @@ export default function MobileBottomNav() {
   const moreItems = [
     { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
     { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
-    { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'
       ? [{ key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin' }]
       : []),

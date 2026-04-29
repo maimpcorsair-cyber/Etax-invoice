@@ -188,7 +188,8 @@
     "certificate": "ใบรับรองดิจิตอล",
     "rdConfig": "ตั้งค่า RD API",
     "billing": "ใบเสร็จและแพ็กเกจ",
-    "line": "Line พี่นุช"
+    "line": "Line พี่นุช",
+    "appSettings": "การตั้งค่า"
   },
   "audit": {
     "title": "บันทึกการตรวจสอบ",

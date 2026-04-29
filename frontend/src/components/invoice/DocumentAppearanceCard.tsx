@@ -46,8 +46,6 @@ export default function DocumentAppearanceCard({
       && !selectedBuiltinTemplate
       && !selectedCustomTemplate,
   ) || Boolean(selectedBuiltinTemplate && !supportsDocumentType(selectedBuiltinTemplate, docType));
-  const featuredTemplates = matchingBuiltinTemplates.slice(0, 4);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -116,12 +114,12 @@ export default function DocumentAppearanceCard({
           onChange={(e) => onTemplateChange(e.target.value || null)}
         >
           <option value="">
-            {isThai ? 'ใช้ธีมมาตรฐานของระบบ' : 'Use the standard system theme'}
+            {isThai ? '— ธีมมาตรฐานของระบบ (รองรับ e-Tax ทุกประเภท)' : '— Standard system theme (all e-Tax types)'}
           </option>
-          <optgroup label={isThai ? 'ธีมสำเร็จรูปของระบบ' : 'Built-in document themes'}>
+          <optgroup label={isThai ? 'ธีมสำเร็จรูป' : 'Built-in themes'}>
             {matchingBuiltinTemplates.map((template) => (
               <option key={template.id} value={template.id}>
-                {isThai ? template.nameTh : template.nameEn} - {isThai ? template.tagTh : template.tagEn}
+                {isThai ? template.nameTh : template.nameEn}
               </option>
             ))}
           </optgroup>
@@ -135,35 +133,46 @@ export default function DocumentAppearanceCard({
             </optgroup>
           )}
         </select>
+
         {hasUnsupportedSelection ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <span>
-              {isThai
-                ? 'Template ที่เลือกไว้ไม่ตรงกับประเภทเอกสารนี้แล้ว'
-                : 'The selected template no longer matches this document type.'}
-            </span>
-            <button
-              type="button"
-              onClick={() => onTemplateChange(null)}
-              className="font-semibold text-amber-900 underline underline-offset-2"
-            >
+            <span>{isThai ? 'Template ที่เลือกไว้ไม่ตรงกับประเภทเอกสารนี้แล้ว' : 'The selected template no longer matches this document type.'}</span>
+            <button type="button" onClick={() => onTemplateChange(null)} className="font-semibold text-amber-900 underline underline-offset-2">
               {isThai ? 'กลับไปใช้มาตรฐาน' : 'Use default'}
             </button>
           </div>
         ) : selectedBuiltinTemplate ? (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${selectedBuiltinTemplate.accentClass}`}>
-                {isThai ? selectedBuiltinTemplate.tagTh : selectedBuiltinTemplate.tagEn}
-              </span>
-              <span className="text-sm font-semibold text-slate-900">
-                {isThai ? selectedBuiltinTemplate.nameTh : selectedBuiltinTemplate.nameEn}
-              </span>
-              <span className="text-xs text-slate-400">{isThai ? 'ธีมระบบ' : 'System theme'}</span>
+          <div className={`mt-3 overflow-hidden rounded-2xl border ${selectedBuiltinTemplate.accentClass}`}>
+            {/* Color swatch bar */}
+            <div className="flex h-2">
+              {selectedBuiltinTemplate.swatches.map((cls, i) => (
+                <div key={i} className={`flex-1 ${cls}`} />
+              ))}
             </div>
-            <p className="mt-2 text-xs leading-5 text-slate-600">
-              {isThai ? selectedBuiltinTemplate.descriptionTh : selectedBuiltinTemplate.descriptionEn}
-            </p>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold leading-tight">
+                    {isThai ? selectedBuiltinTemplate.nameTh : selectedBuiltinTemplate.nameEn}
+                  </span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${selectedBuiltinTemplate.accentClass}`}>
+                    {isThai ? selectedBuiltinTemplate.tagTh : selectedBuiltinTemplate.tagEn}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 opacity-80">
+                  {isThai ? selectedBuiltinTemplate.descriptionTh : selectedBuiltinTemplate.descriptionEn}
+                </p>
+              </div>
+              {/* Mini document mockup */}
+              <div className="shrink-0 hidden sm:flex flex-col gap-1 w-14 rounded-lg border border-current/20 bg-white/60 p-1.5 shadow-sm">
+                <div className={`h-2 w-full rounded-sm ${selectedBuiltinTemplate.swatches[0]}`} />
+                <div className="h-1 w-4/5 rounded-sm bg-current opacity-30" />
+                <div className="h-1 w-3/5 rounded-sm bg-current opacity-20" />
+                <div className={`mt-1 h-1 w-full rounded-sm ${selectedBuiltinTemplate.swatches[1]} opacity-70`} />
+                <div className="h-1 w-4/5 rounded-sm bg-current opacity-20" />
+                <div className="h-1 w-3/5 rounded-sm bg-current opacity-20" />
+              </div>
+            </div>
           </div>
         ) : selectedCustomTemplate ? (
           <p className="mt-2 text-xs text-slate-500">
@@ -172,40 +181,10 @@ export default function DocumentAppearanceCard({
         ) : (
           <p className="mt-2 text-xs text-slate-500">
             {isThai
-              ? 'ค่าเริ่มต้นใช้ธีมมาตรฐานที่รองรับ e-Tax ทุกประเภท หรือเลือกโทนสีด้านล่างเพื่อเปลี่ยนบุคลิกเอกสาร'
-              : 'The default supports every e-Tax document type, or choose a tone below to change the document personality.'}
+              ? 'ใช้ธีมมาตรฐานของระบบ รองรับ e-Tax ทุกประเภท เลือกธีมด้านบนเพื่อเปลี่ยนบุคลิกเอกสาร'
+              : 'Using the standard system theme. Select a theme above to change the document personality.'}
           </p>
         )}
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        {featuredTemplates.map((template) => {
-          const isSelected = selectedTemplateId === template.id;
-          return (
-            <button
-              key={template.id}
-              type="button"
-              onClick={() => onTemplateChange(isSelected ? null : template.id)}
-              className={`rounded-xl border p-3 text-left transition ${
-                isSelected
-                  ? 'border-blue-400 bg-blue-50 shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-slate-900">
-                  {isThai ? template.nameTh : template.nameEn}
-                </span>
-                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${template.accentClass}`}>
-                  {isThai ? template.tagTh : template.tagEn}
-                </span>
-              </div>
-              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
-                {isThai ? template.descriptionTh : template.descriptionEn}
-              </p>
-            </button>
-          );
-        })}
       </div>
 
       <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">

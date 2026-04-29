@@ -188,7 +188,8 @@
     "certificate": "Digital Certificate",
     "rdConfig": "RD API Configuration",
     "billing": "Billing & Plans",
-    "line": "Line AI Assistant"
+    "line": "Line AI Assistant",
+    "appSettings": "Settings"
   },
   "audit": {
     "title": "Audit Logs",
