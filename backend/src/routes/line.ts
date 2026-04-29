@@ -178,11 +178,25 @@ function compactOcrSessionData(result: OcrResult, companyId: string): OcrResult 
   };
 }
 
-async function testRedisSessionWrite() {
+async function testRedisSessionWrite(): Promise<{ writeOk: boolean; info: Record<string, string | number> }> {
   const key = `health:ocr-session:${Date.now()}`;
   await redis.setex(key, 30, JSON.stringify({ ok: true, ts: Date.now() }));
   await redis.del(key);
-  return 'SETEX_OK';
+
+  // Pull key stats from Redis INFO
+  const info: Record<string, string | number> = {};
+  try {
+    const raw = await (redis as unknown as { info: () => Promise<string> }).info();
+    for (const line of raw.split('\r\n')) {
+      const [k, v] = line.split(':');
+      if (['used_memory_human', 'connected_clients', 'total_commands_processed',
+           'upstash_total_commands', 'upstash_monthly_commands', 'upstash_quota_limit'].includes(k)) {
+        info[k] = isNaN(Number(v)) ? v : Number(v);
+      }
+    }
+  } catch { /* INFO not critical */ }
+
+  return { writeOk: true, info };
 }
 
 function buildOcrTextSummary(result: OcrResult, note?: string) {
@@ -1618,6 +1632,22 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
     const lineUserId = event.source.userId;
     if (!lineUserId) continue;
 
+    // Idempotency: skip if this event was already processed (LINE retries on timeout)
+    const eventId = (event as { webhookEventId?: string }).webhookEventId
+      ?? ((event.type === 'message' && event.message) ? `msg:${event.message.id}` : null);
+    if (eventId) {
+      const dedupKey = `line:seen:${eventId}`;
+      try {
+        const already = await redis.set(dedupKey, '1', 'EX', 300, 'NX');
+        if (!already) {
+          logger.info('[Line] Duplicate event skipped', { eventId });
+          continue;
+        }
+      } catch {
+        // Redis unavailable — allow through rather than drop
+      }
+    }
+
     try {
       if (event.type === 'follow') {
         await sendLineText(
@@ -1650,7 +1680,9 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       }
     } catch (err) {
       logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, lineUserId });
-      await sendLineText(lineUserId, 'ขอโทษครับ ระบบ LINE สะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง');
+      try {
+        await sendLineText(lineUserId, 'ขอโทษครับ ระบบสะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง 🙏');
+      } catch { /* ignore send failure */ }
     }
   }
 }
