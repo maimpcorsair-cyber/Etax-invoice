@@ -200,6 +200,24 @@ async function testRedisSessionWrite(): Promise<{ writeOk: boolean; info: Record
   return { writeOk: true, info };
 }
 
+async function safeRedisDel(key: string) {
+  try {
+    await redis.del(key);
+  } catch (err) {
+    logger.warn('[Line] Redis DEL failed; continuing without cache cleanup', { err, key });
+  }
+}
+
+async function safeRedisSetex(key: string, ttlSeconds: number, value: string) {
+  try {
+    await redis.setex(key, ttlSeconds, value);
+    return true;
+  } catch (err) {
+    logger.warn('[Line] Redis SETEX failed; continuing without volatile session', { err, key });
+    return false;
+  }
+}
+
 function buildOcrTextSummary(result: OcrResult, note?: string) {
   const fmt = (value: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
@@ -771,7 +789,7 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
 
   // User can cancel the session at any time
   if (trimmed === 'ยกเลิก') {
-    await redis.del(`line:session:${lineUserId}`);
+    await safeRedisDel(`line:session:${lineUserId}`);
     await sendLineText(lineUserId, '❌ ยกเลิกแล้ว');
     return true;
   }
@@ -781,13 +799,13 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
     session = JSON.parse(raw) as LineSession;
   } catch (err) {
     logger.warn('[Line] Corrupted Redis LINE session cleared', { err, lineUserId });
-    await redis.del(`line:session:${lineUserId}`).catch(() => undefined);
+    await safeRedisDel(`line:session:${lineUserId}`);
     return false;
   }
   const field = REQUIRED_OCR_FIELDS.find(f => f.key === session.currentField);
   if (!field) {
     logger.warn('[Line] Unknown Redis LINE session field cleared', { lineUserId, currentField: session.currentField });
-    await redis.del(`line:session:${lineUserId}`).catch(() => undefined);
+    await safeRedisDel(`line:session:${lineUserId}`);
     return false;
   }
 
@@ -832,12 +850,16 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
     if (!nextField) {
       logger.warn('[Line] Unknown pending Redis LINE session field skipped', { lineUserId, nextKey });
       session.pendingFields = session.pendingFields.slice(1);
-      await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session)).catch(() => undefined);
+      await safeRedisSetex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
       return true;
     }
     session.currentField = nextKey;
     session.pendingFields = session.pendingFields.slice(1);
-    await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
+    const saved = await safeRedisSetex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
+    if (!saved) {
+      await sendLineText(lineUserId, 'ระบบจำสถานะชั่วคราวไม่ได้ตอนนี้ กรุณาส่งเอกสารใหม่หรือพิมพ์ "ช่วยเหลือ" เพื่อใช้งานคำสั่งอื่นครับ');
+      return true;
+    }
     await sendLineTextWithQuickReply(
       lineUserId,
       `✅ บันทึก ${field.label} แล้ว\n\n📌 กรุณาระบุต่อไป:\n${nextField.label}\n💡 ${nextField.hint}`,
@@ -847,10 +869,14 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
   }
 
   // All fields collected — show confirm card
-  await redis.del(`line:session:${lineUserId}`);
+  await safeRedisDel(`line:session:${lineUserId}`);
   const fullData = session.data as OcrResult & { companyId?: string };
   const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(fullData));
+  const tempSaved = await safeRedisSetex(`ocr:temp:${tempId}`, 600, JSON.stringify(fullData));
+  if (!tempSaved) {
+    await sendLineText(lineUserId, buildOcrTextSummary(fullData, 'ระบบจำข้อมูลยืนยันชั่วคราวไม่ได้ตอนนี้'));
+    return true;
+  }
   await sendLineFlexMessage(
     lineUserId,
     'ตรวจพบใบแจ้งหนี้ — กรุณายืนยัน',
@@ -954,12 +980,12 @@ async function handleEditReply(lineUserId: string, trimmed: string): Promise<boo
     session = JSON.parse(raw) as LineEditSession;
   } catch (err) {
     logger.warn('[Line] Corrupted Redis edit session cleared', { err, lineUserId });
-    await redis.del(`line:editsession:${lineUserId}`).catch(() => undefined);
+    await safeRedisDel(`line:editsession:${lineUserId}`);
     return false;
   }
 
   if (trimmed === 'ยกเลิก' || trimmed === 'เสร็จสิ้น') {
-    await redis.del(`line:editsession:${lineUserId}`);
+    await safeRedisDel(`line:editsession:${lineUserId}`);
     await sendLineText(lineUserId, '❌ ยกเลิกการแก้ไข');
     return true;
   }
@@ -1012,7 +1038,7 @@ async function handleEditReply(lineUserId: string, trimmed: string): Promise<boo
       where: { id: session.purchaseInvoiceId },
       data: { [session.currentField]: parsedValue } as Record<string, unknown>,
     });
-    await redis.del(`line:editsession:${lineUserId}`);
+    await safeRedisDel(`line:editsession:${lineUserId}`);
     await sendLineTextWithQuickReply(
       lineUserId,
       `✅ แก้ไข ${fieldDef.label} เรียบร้อยแล้ว`,
@@ -1071,7 +1097,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
           },
         });
 
-        await redis.del(`line:otp:${otp}`);
+        await safeRedisDel(`line:otp:${otp}`);
         await sendLineText(
           lineUserId,
           `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${existingUser?.name ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
