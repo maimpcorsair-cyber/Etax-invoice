@@ -416,6 +416,22 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
   }
 }
 
+async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string, fallbackId: string) {
+  const supplierTaxId = result.supplierTaxId || '0000000000000';
+  const invoiceNumber = result.invoiceNumber || `LINE-${fallbackId}`;
+  if (!supplierTaxId || supplierTaxId === '0000000000000' || !invoiceNumber) return null;
+  return prisma.purchaseInvoice.findFirst({
+    where: { companyId, supplierTaxId, invoiceNumber },
+    select: {
+      id: true,
+      supplierName: true,
+      invoiceNumber: true,
+      invoiceDate: true,
+      total: true,
+    },
+  });
+}
+
 async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกเอกสารเรียบร้อย!') {
   const fmt = (n: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
@@ -779,7 +795,9 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
 
 lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   const companyId = req.user!.companyId;
-  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult] = await Promise.allSettled([
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult, intakeStatusResult, storageResult] = await Promise.allSettled([
     testRedisSessionWrite(),
     prisma.$queryRaw<Array<{ column_name: string }>>`
       SELECT column_name
@@ -802,6 +820,25 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       },
     }),
     prisma.lineUserLink.count({ where: { user: { companyId }, isActive: true } }),
+    prisma.documentIntake.groupBy({
+      by: ['status'],
+      where: { companyId, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    Promise.all([
+      prisma.documentIntake.count({ where: { companyId, storageKey: { not: null }, createdAt: { gte: since } } }),
+      prisma.documentIntake.count({ where: { companyId, fileBase64: { not: null }, createdAt: { gte: since } } }),
+      prisma.documentIntake.count({
+        where: {
+          companyId,
+          createdAt: { gte: since },
+          OR: [
+            { error: { contains: 'duplicate', mode: 'insensitive' } },
+            { error: { contains: 'ซ้ำ' } },
+          ],
+        },
+      }),
+    ]),
   ]);
 
   const columns = intakeColumnsResult.status === 'fulfilled'
@@ -831,6 +868,20 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       linkedUsers: linkedUsersResult.status === 'fulfilled'
         ? { ok: true, count: linkedUsersResult.value }
         : { ok: false, count: 0, error: linkedUsersResult.reason instanceof Error ? linkedUsersResult.reason.message : String(linkedUsersResult.reason) },
+      documentOps: {
+        windowDays: 30,
+        byStatus: intakeStatusResult.status === 'fulfilled'
+          ? Object.fromEntries(intakeStatusResult.value.map((row) => [row.status, row._count._all]))
+          : {},
+        storage: storageResult.status === 'fulfilled'
+          ? {
+              configured: isStorageConfigured(),
+              storageBacked: storageResult.value[0],
+              databaseBacked: storageResult.value[1],
+              duplicateWarnings: storageResult.value[2],
+            }
+          : { configured: isStorageConfigured(), storageBacked: 0, databaseBacked: 0, duplicateWarnings: 0 },
+      },
       ocrReadiness: getOcrProductionReadiness(),
     },
   });
@@ -1764,6 +1815,24 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         return;
       }
 
+      const duplicate = await findDuplicatePurchaseFromOcr(result, intake.companyId, intake.id);
+      if (duplicate) {
+        await updateDocumentIntake(intake.id, {
+          status: 'needs_review',
+          ocrResult: result,
+          warnings: [...(result.validationWarnings ?? []), 'duplicate:purchase_invoice'],
+          error: `duplicate:${duplicate.id}`,
+          targetType: 'purchase_invoice',
+          targetId: duplicate.id,
+          purchaseInvoiceId: duplicate.id,
+        });
+        await sendLineText(
+          lineUserId,
+          `⚠️ พบเอกสารนี้เคยบันทึกแล้ว จึงยังไม่บันทึกซ้ำ\n📄 ${duplicate.invoiceNumber}\n🏢 ${duplicate.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(duplicate.total)}\n\nตรวจได้ที่หน้า Input VAT`,
+        );
+        return;
+      }
+
       const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id);
       await prisma.purchaseInvoice.update({
         where: { id: saved.id },
@@ -1861,6 +1930,15 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 
       if (!companyId) {
         await sendLineText(lineUserId, 'ขอโทษ ไม่พบข้อมูลบริษัท กรุณาเชื่อมบัญชีใหม่');
+        return;
+      }
+
+      const duplicate = await findDuplicatePurchaseFromOcr(ocrData, companyId, tempId);
+      if (duplicate) {
+        await sendLineText(
+          lineUserId,
+          `⚠️ พบเอกสารนี้เคยบันทึกแล้ว จึงยังไม่บันทึกซ้ำ\n📄 ${duplicate.invoiceNumber}\n🏢 ${duplicate.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(duplicate.total)}\n\nตรวจได้ที่หน้า Input VAT`,
+        );
         return;
       }
 

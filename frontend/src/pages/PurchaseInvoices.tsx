@@ -27,6 +27,20 @@ interface FormState {
   pdfUrl: string;
 }
 
+interface DocumentStats {
+  windowDays: number;
+  totalLast30Days: number;
+  failedLast30Days: number;
+  duplicateWarnings: number;
+  storage: {
+    configured: boolean;
+    storageBacked: number;
+    databaseBacked: number;
+  };
+  byStatus: Record<string, number>;
+  bySource: Record<string, number>;
+}
+
 const todayIso = () => new Date().toISOString().split('T')[0];
 
 function startOfMonthIso() {
@@ -65,6 +79,7 @@ export default function PurchaseInvoices() {
   const [items, setItems] = useState<PurchaseInvoice[]>([]);
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
+  const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null);
   const [documentTypeFilter, setDocumentTypeFilter] = useState<'all' | 'pdf' | 'image'>('all');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -89,7 +104,7 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const [res, intakeRes, libraryRes] = await Promise.all([
+      const [res, intakeRes, libraryRes, statsRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -99,19 +114,25 @@ export default function PurchaseInvoices() {
         fetch(`/api/purchase-invoices/document-intakes?type=${documentTypeFilter}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        fetch('/api/purchase-invoices/document-intakes/stats/summary', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       const json = await res.json();
       const intakeJson = await intakeRes.json();
       const libraryJson = await libraryRes.json();
+      const statsJson = await statsRes.json();
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
       setItems(data);
       setReviewIntakes(intakeJson.data ?? []);
       setDocumentLibrary(libraryJson.data ?? []);
+      setDocumentStats(statsJson.data ?? null);
     } catch {
       setItems([]);
       setReviewIntakes([]);
       setDocumentLibrary([]);
+      setDocumentStats(null);
     } finally {
       setLoading(false);
     }
@@ -497,6 +518,31 @@ export default function PurchaseInvoices() {
             </label>
           </div>
         </div>
+
+        {documentStats && (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+            {[
+              { label: isThai ? 'เอกสาร 30 วัน' : '30-day docs', value: documentStats.totalLast30Days, tone: 'bg-gray-50 text-gray-700' },
+              { label: isThai ? 'รอยืนยัน' : 'Awaiting', value: (documentStats.byStatus.awaiting_confirmation ?? 0) + (documentStats.byStatus.awaiting_input ?? 0), tone: 'bg-amber-50 text-amber-700' },
+              { label: isThai ? 'บันทึกแล้ว' : 'Saved', value: documentStats.byStatus.saved ?? 0, tone: 'bg-green-50 text-green-700' },
+              { label: isThai ? 'อ่านไม่สำเร็จ' : 'Failed', value: documentStats.failedLast30Days, tone: 'bg-rose-50 text-rose-700' },
+              { label: isThai ? 'ซ้ำที่กันไว้' : 'Duplicates', value: documentStats.duplicateWarnings, tone: 'bg-blue-50 text-blue-700' },
+            ].map((stat) => (
+              <div key={stat.label} className={`rounded-lg px-3 py-2 ${stat.tone}`}>
+                <p className="text-[11px] font-medium opacity-80">{stat.label}</p>
+                <p className="text-lg font-bold">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {documentStats && !documentStats.storage.configured && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {isThai
+              ? 'Storage ยังไม่พร้อม: ไฟล์ใหม่จะถูกเก็บใน database ชั่วคราว ควรตั้ง S3/R2 ก่อนขายจริง'
+              : 'Storage is not configured: new files are temporarily stored in the database. Configure S3/R2 before production.'}
+          </div>
+        )}
 
         {documentLibrary.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500">

@@ -61,6 +61,28 @@ function documentFileUrl(item: { id: string; fileUrl?: string | null }) {
   return item.fileUrl || `/api/purchase-invoices/document-intakes/${item.id}/file`;
 }
 
+function documentDateRange(days = 30) {
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  return from;
+}
+
+async function findDuplicatePurchase(companyId: string, supplierTaxId: string, invoiceNumber: string) {
+  if (!supplierTaxId || supplierTaxId.length !== 13 || !invoiceNumber) return null;
+  return prisma.purchaseInvoice.findFirst({
+    where: { companyId, supplierTaxId, invoiceNumber },
+    select: {
+      id: true,
+      supplierName: true,
+      supplierTaxId: true,
+      invoiceNumber: true,
+      invoiceDate: true,
+      total: true,
+      pdfUrl: true,
+    },
+  });
+}
+
 function normalizeOcrPurchasePayload(result: OcrResult, fileUrl?: string | null) {
   const supplierTaxId = (result.supplierTaxId ?? '').replace(/\D/g, '');
   const invoiceDate = result.invoiceDate || new Date().toISOString().slice(0, 10);
@@ -280,6 +302,74 @@ purchaseInvoicesRouter.get('/document-intakes', async (req, res) => {
   }
 });
 
+purchaseInvoicesRouter.get('/document-intakes/stats/summary', async (req, res) => {
+  try {
+    const since = documentDateRange(30);
+    const companyId = req.user!.companyId;
+    const [
+      byStatus,
+      bySource,
+      recentFailures,
+      duplicateWarnings,
+      storageBacked,
+      dbBacked,
+      totalLast30Days,
+    ] = await Promise.all([
+      prisma.documentIntake.groupBy({
+        by: ['status'],
+        where: { companyId, createdAt: { gte: since } },
+        _count: { _all: true },
+      }),
+      prisma.documentIntake.groupBy({
+        by: ['source'],
+        where: { companyId, createdAt: { gte: since } },
+        _count: { _all: true },
+      }),
+      prisma.documentIntake.count({
+        where: { companyId, status: 'failed', createdAt: { gte: since } },
+      }),
+      prisma.documentIntake.count({
+        where: {
+          companyId,
+          createdAt: { gte: since },
+          OR: [
+            { error: { contains: 'duplicate', mode: 'insensitive' } },
+            { error: { contains: 'ซ้ำ' } },
+          ],
+        },
+      }),
+      prisma.documentIntake.count({
+        where: { companyId, storageKey: { not: null }, createdAt: { gte: since } },
+      }),
+      prisma.documentIntake.count({
+        where: { companyId, fileBase64: { not: null }, createdAt: { gte: since } },
+      }),
+      prisma.documentIntake.count({
+        where: { companyId, createdAt: { gte: since } },
+      }),
+    ]);
+
+    res.json({
+      data: {
+        windowDays: 30,
+        totalLast30Days,
+        failedLast30Days: recentFailures,
+        duplicateWarnings,
+        storage: {
+          configured: isStorageConfigured(),
+          storageBacked,
+          databaseBacked: dbBacked,
+        },
+        byStatus: Object.fromEntries(byStatus.map((row) => [row.status, row._count._all])),
+        bySource: Object.fromEntries(bySource.map((row) => [row.source, row._count._all])),
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to summarize document intakes', { error: err });
+    res.status(500).json({ error: 'Failed to fetch document stats' });
+  }
+});
+
 purchaseInvoicesRouter.get('/document-intakes/:id/file', async (req, res) => {
   try {
     const item = await prisma.documentIntake.findFirst({
@@ -459,6 +549,31 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
         },
       });
       res.status(422).json({ error: 'Missing required OCR fields', missing: normalized.missing });
+      return;
+    }
+
+    const duplicate = await findDuplicatePurchase(
+      req.user!.companyId,
+      normalized.payload.supplierTaxId,
+      normalized.payload.invoiceNumber,
+    );
+    if (duplicate) {
+      await prisma.documentIntake.update({
+        where: { id: item.id },
+        data: {
+          status: 'needs_review',
+          targetType: 'purchase_invoice',
+          targetId: duplicate.id,
+          purchaseInvoiceId: duplicate.id,
+          warnings: [...(result.validationWarnings ?? []), 'duplicate:purchase_invoice'] as unknown as Prisma.InputJsonValue,
+          error: `Duplicate purchase invoice: ${duplicate.invoiceNumber}`,
+          processedAt: new Date(),
+        },
+      });
+      res.status(409).json({
+        error: 'Duplicate purchase invoice',
+        duplicate,
+      });
       return;
     }
 

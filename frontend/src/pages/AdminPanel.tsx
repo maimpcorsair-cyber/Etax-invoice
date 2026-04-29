@@ -1664,6 +1664,11 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     documentIntakesSchema?: { ok: boolean; missingColumns: string[]; error?: string };
     recentDocumentIntakes?: { ok: boolean; items: Array<{ id: string; status: string; mimeType: string; error?: string | null; createdAt: string; updatedAt: string }> };
     linkedUsers?: { ok: boolean; count: number };
+    documentOps?: {
+      windowDays: number;
+      byStatus: Record<string, number>;
+      storage: { configured: boolean; storageBacked: number; databaseBacked: number; duplicateWarnings: number };
+    };
     ocrReadiness?: { productionReady: boolean; tier: string; warnings?: string[]; models?: { fastTextOrPdf?: string; scanImageOrPdf?: string; proEscalation?: string | null } };
   } | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
@@ -1886,6 +1891,31 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             <p className="mt-2 text-xs text-gray-600">{liveStatus?.ocrReadiness?.models?.fastTextOrPdf ?? '-'}</p>
           </div>
         </div>
+
+        {liveStatus?.documentOps && (
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              { label: isThai ? 'รอยืนยัน' : 'Awaiting', value: (liveStatus.documentOps.byStatus.awaiting_confirmation ?? 0) + (liveStatus.documentOps.byStatus.awaiting_input ?? 0) },
+              { label: isThai ? 'บันทึกแล้ว' : 'Saved', value: liveStatus.documentOps.byStatus.saved ?? 0 },
+              { label: isThai ? 'ล้มเหลว' : 'Failed', value: liveStatus.documentOps.byStatus.failed ?? 0 },
+              { label: isThai ? 'ไฟล์บน Storage' : 'Storage files', value: liveStatus.documentOps.storage.storageBacked },
+              { label: isThai ? 'กันเอกสารซ้ำ' : 'Duplicates blocked', value: liveStatus.documentOps.storage.duplicateWarnings },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-gray-100 bg-white px-3 py-2">
+                <p className="text-[11px] text-gray-500">{item.label}</p>
+                <p className="text-lg font-bold text-gray-900">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {liveStatus?.documentOps && !liveStatus.documentOps.storage.configured && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            {isThai
+              ? 'Storage ยังไม่พร้อมสำหรับ production: เอกสารใหม่อาจถูกเก็บใน database ชั่วคราว ให้ตั้งค่า S3/R2 env ก่อนขายจริง'
+              : 'Production storage is not ready: new documents may be stored in the database temporarily. Configure S3/R2 env before launch.'}
+          </div>
+        )}
 
         {(liveStatus?.lineMessaging?.lastPushFailure || liveStatus?.lineMessaging?.lastReplyFailure || liveStatus?.webhook?.lastUnhandledError) && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
