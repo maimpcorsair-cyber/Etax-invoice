@@ -294,10 +294,34 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
       error: null,
     },
   });
-  await sendLineFlexMessage(
+
+  // Gap #1: Show category picker quick reply before the confirm Flex card
+  const aiCategory = result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '';
+  const categoryButtons: Array<{ label: string; data: string; displayText: string }> = [];
+
+  if (aiCategory) {
+    const shortLabel = aiCategory.length > 20 ? `${aiCategory.slice(0, 18)}…` : aiCategory;
+    categoryButtons.push({
+      label: `✅ ${shortLabel}`,
+      data: `set_category:${intakeId}:${aiCategory}`,
+      displayText: `ยืนยันหมวด: ${aiCategory}`,
+    });
+  }
+
+  categoryButtons.push(
+    { label: '🏢 ค่าบริการวิชาชีพ',   data: `set_category:${intakeId}:ค่าบริการวิชาชีพ`,   displayText: 'หมวด: ค่าบริการวิชาชีพ' },
+    { label: '⛽ ค่าน้ำมัน/ขนส่ง',    data: `set_category:${intakeId}:ค่าน้ำมัน/ขนส่ง`,    displayText: 'หมวด: ค่าน้ำมัน/ขนส่ง' },
+    { label: '🏬 วัสดุสำนักงาน',       data: `set_category:${intakeId}:วัสดุสำนักงาน`,       displayText: 'หมวด: วัสดุสำนักงาน' },
+    { label: '🔧 ค่าซ่อมบำรุง',        data: `set_category:${intakeId}:ค่าซ่อมบำรุง`,        displayText: 'หมวด: ค่าซ่อมบำรุง' },
+    { label: '💡 ค่าสาธารณูปโภค',     data: `set_category:${intakeId}:ค่าสาธารณูปโภค`,     displayText: 'หมวด: ค่าสาธารณูปโภค' },
+    { label: '📦 ค่าสินค้า/วัตถุดิบ',  data: `set_category:${intakeId}:ค่าสินค้า/วัตถุดิบ`,  displayText: 'หมวด: ค่าสินค้า/วัตถุดิบ' },
+    { label: '📋 อื่นๆ',               data: `set_category:${intakeId}:อื่นๆ`,               displayText: 'หมวด: อื่นๆ' },
+  );
+
+  await sendLineTextWithQuickReply(
     lineUserId,
-    'สรุปเอกสาร — กรุณายืนยัน',
-    buildIntakeConfirmFlexCard(result, intakeId),
+    `📂 หมวดค่าใช้จ่าย: ${aiCategory || 'ยังไม่ระบุ'}\nกดยืนยันหมวดนี้ หรือเลือกใหม่:`,
+    categoryButtons,
   );
 }
 
@@ -1067,6 +1091,10 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
       `📄 จัดการใบกำกับภาษีขาย:\n` +
       `• "ส่งใบ INV-001" — รับ Flex Card + ปุ่มเปิด PDF\n` +
       `• "ขอใบ / ดูใบ / หาใบ / pdf [เลขที่]" — ค้นหาเอกสาร\n\n` +
+      `🔍 ค้นหาเอกสารซื้อ:\n` +
+      `• "ค้นหา [ชื่อบริษัท]" — ค้นหาเอกสารตามผู้ขาย\n` +
+      `• "ใบล่าสุด" — เอกสาร 5 รายการล่าสุด\n` +
+      `• "ใบเดือนนี้" — สรุปเอกสารเดือนนี้\n\n` +
       `💬 ถามพี่นุชได้เลย เช่น "ภาษีซื้อเดือนนี้เท่าไร"\n\n` +
       `❌ พิมพ์ "ยกเลิก" เพื่อหยุดการกรอกข้อมูลกลางคัน`,
     );
@@ -1193,6 +1221,86 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
     } catch (err) {
       logger.error('[Line] invoice lookup failed', { err });
       await sendLineText(lineUserId, 'ขอโทษ ไม่สามารถค้นหาเอกสารได้');
+    }
+    return;
+  }
+
+  // Smart search handlers
+  const now = new Date();
+
+  const searchMatch = trimmed.match(/^ค้นหา\s+(.+)/);
+  if (searchMatch) {
+    const query = searchMatch[1].trim();
+    try {
+      const results = await prisma.purchaseInvoice.findMany({
+        where: {
+          companyId,
+          supplierName: { contains: query, mode: 'insensitive' },
+        },
+        orderBy: { invoiceDate: 'desc' },
+        take: 5,
+        select: { id: true, supplierName: true, invoiceNumber: true, invoiceDate: true, total: true, vatAmount: true },
+      });
+      if (results.length === 0) {
+        await sendLineText(lineUserId, `ไม่พบเอกสารที่มีชื่อผู้ขาย "${query}"`);
+        return;
+      }
+      const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+      const lines = results.map((r, i) =>
+        `${i + 1}. ${r.supplierName}\n   ${r.invoiceNumber} • ${r.invoiceDate?.toISOString().slice(0, 10) ?? '-'} • ${fmt(r.total)}`,
+      ).join('\n\n');
+      await sendLineText(lineUserId, `🔍 ผลการค้นหา "${query}" (${results.length} รายการ)\n\n${lines}`);
+    } catch (err) {
+      logger.error('[Line] smart search failed', { err, query });
+      await sendLineText(lineUserId, 'ขอโทษ ค้นหาไม่สำเร็จ กรุณาลองใหม่');
+    }
+    return;
+  }
+
+  if (['ใบล่าสุด', 'เอกสารล่าสุด', 'ล่าสุด'].includes(lower)) {
+    try {
+      const recent = await prisma.purchaseInvoice.findMany({
+        where: { companyId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { supplierName: true, invoiceNumber: true, invoiceDate: true, total: true },
+      });
+      if (recent.length === 0) {
+        await sendLineText(lineUserId, 'ยังไม่มีเอกสารในระบบ');
+        return;
+      }
+      const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+      const lines = recent.map((r, i) =>
+        `${i + 1}. ${r.supplierName}\n   ${r.invoiceNumber} • ${fmt(r.total)}`,
+      ).join('\n\n');
+      await sendLineText(lineUserId, `📋 เอกสารล่าสุด 5 รายการ\n\n${lines}`);
+    } catch (err) {
+      logger.error('[Line] recent invoices failed', { err });
+      await sendLineText(lineUserId, 'ขอโทษ ดึงข้อมูลไม่สำเร็จ กรุณาลองใหม่');
+    }
+    return;
+  }
+
+  if (['ใบเดือนนี้', 'เอกสารเดือนนี้'].includes(lower)) {
+    try {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthInvoices = await prisma.purchaseInvoice.findMany({
+        where: { companyId, invoiceDate: { gte: monthStart } },
+        orderBy: { invoiceDate: 'desc' },
+        take: 10,
+        select: { supplierName: true, invoiceNumber: true, total: true, vatAmount: true },
+      });
+      const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+      const totalVat = monthInvoices.reduce((s, r) => s + r.vatAmount, 0);
+      const totalAmt = monthInvoices.reduce((s, r) => s + r.total, 0);
+      const lines = monthInvoices.map((r, i) => `${i + 1}. ${r.supplierName} — ${fmt(r.total)}`).join('\n');
+      await sendLineText(
+        lineUserId,
+        `📅 เอกสารเดือนนี้ ${monthInvoices.length} รายการ\nรวม ${fmt(totalAmt)} (VAT ${fmt(totalVat)})\n\n${lines}`,
+      );
+    } catch (err) {
+      logger.error('[Line] month invoices failed', { err });
+      await sendLineText(lineUserId, 'ขอโทษ ดึงข้อมูลไม่สำเร็จ กรุณาลองใหม่');
     }
     return;
   }
@@ -1450,6 +1558,34 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 }
 
 async function handlePostback(lineUserId: string, data: string): Promise<void> {
+  if (data.startsWith('set_category:')) {
+    const parts = data.split(':');
+    const intakeId = parts[1];
+    const category = parts.slice(2).join(':');
+    try {
+      const intake = await prisma.documentIntake.findFirst({ where: { id: intakeId, lineUserId } });
+      const result = intake?.ocrResult as unknown as OcrResult | null;
+      if (!intake || !result) {
+        await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร');
+        return;
+      }
+      const updatedResult: OcrResult = { ...result, postingSuggestion: category, expenseSubcategory: category };
+      await prisma.documentIntake.update({
+        where: { id: intakeId },
+        data: { ocrResult: updatedResult as unknown as Prisma.InputJsonValue },
+      });
+      await sendLineFlexMessage(
+        lineUserId,
+        'สรุปเอกสาร — กรุณายืนยัน',
+        buildIntakeConfirmFlexCard(updatedResult, intakeId),
+      );
+    } catch (err) {
+      logger.error('[Line] set_category failed', { err, data });
+      await sendLineText(lineUserId, 'ขอโทษ เกิดข้อผิดพลาดในการบันทึกหมวด');
+    }
+    return;
+  }
+
   if (data.startsWith('confirm_intake:')) {
     const intakeId = data.slice('confirm_intake:'.length);
     try {
@@ -1652,10 +1788,39 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         { label: 'เลขผู้เสียภาษี',   data: `editfield:${purchaseId}:supplierTaxId`, displayText: 'แก้ไขเลขผู้เสียภาษี' },
         { label: 'เลขที่ใบกำกับ',    data: `editfield:${purchaseId}:invoiceNumber`, displayText: 'แก้ไขเลขที่ใบกำกับ' },
         { label: 'วันที่',            data: `editfield:${purchaseId}:invoiceDate`,   displayText: 'แก้ไขวันที่' },
-        { label: 'ยอดรวม',           data: `editfield:${purchaseId}:total`,         displayText: 'แก้ไขยอดรวม' },
+        { label: 'ยอดรวม',           data: `editfield:${purchaseId}:total`,          displayText: 'แก้ไขยอดรวม' },
+        { label: '🏢 สาขา',          data: `editfield:${purchaseId}:supplierBranch`, displayText: 'แก้ไขสาขา' },
+        { label: '📂 หมวดค่าใช้จ่าย', data: `editfield:${purchaseId}:category`,      displayText: 'แก้ไขหมวดค่าใช้จ่าย' },
+        { label: '🧾 ประเภทภาษี',    data: `editfield:${purchaseId}:vatType`,        displayText: 'แก้ไขประเภทภาษี' },
         { label: '❌ ยกเลิก',        text: 'เสร็จสิ้น' },
       ],
     );
+    return;
+  }
+
+  if (data.startsWith('editfield_val:')) {
+    // Direct-apply a value without free-text input (used for vatType quick reply)
+    const parts = data.split(':');
+    const purchaseId = parts[1];
+    const fieldKey = parts[2];
+    const value = parts.slice(3).join(':');
+    try {
+      await prisma.purchaseInvoice.update({
+        where: { id: purchaseId },
+        data: { [fieldKey]: value } as Record<string, unknown>,
+      });
+      await sendLineTextWithQuickReply(
+        lineUserId,
+        `✅ แก้ไข ${fieldKey} เรียบร้อยแล้ว`,
+        [
+          { label: '✏️ แก้ไขต่อ', data: `edit_purchase:${purchaseId}`, displayText: 'แก้ไขต่อ' },
+          { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
+        ],
+      );
+    } catch (err) {
+      logger.error('[Line] editfield_val failed', { err, data });
+      await sendLineText(lineUserId, '❌ ไม่สามารถแก้ไขได้ กรุณาลองใหม่');
+    }
     return;
   }
 
@@ -1663,7 +1828,30 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
     const parts = data.split(':');
     const purchaseId = parts[1];
     const fieldKey = parts[2];
-    const fieldDef = REQUIRED_OCR_FIELDS.find(f => f.key === fieldKey) ?? { label: fieldKey, hint: '' };
+
+    // vatType uses quick reply buttons instead of free text
+    if (fieldKey === 'vatType') {
+      await sendLineTextWithQuickReply(
+        lineUserId,
+        'เลือกประเภทภาษี:',
+        [
+          { label: 'ภาษี 7%',    data: `editfield_val:${purchaseId}:vatType:vat7`,      displayText: 'ภาษี 7%' },
+          { label: 'ยกเว้นภาษี', data: `editfield_val:${purchaseId}:vatType:vatExempt`, displayText: 'ยกเว้นภาษี' },
+          { label: 'ภาษีศูนย์',  data: `editfield_val:${purchaseId}:vatType:vatZero`,   displayText: 'ภาษีศูนย์' },
+          { label: '❌ ยกเลิก',  text: 'เสร็จสิ้น' },
+        ],
+      );
+      return;
+    }
+
+    const extraFieldMeta: Record<string, { label: string; hint: string }> = {
+      supplierBranch: { label: 'สาขาผู้ขาย', hint: 'เช่น 00000 หรือ สำนักงานใหญ่' },
+      category:       { label: 'หมวดค่าใช้จ่าย', hint: 'เช่น ค่าบริการ' },
+    };
+    const fieldDef =
+      REQUIRED_OCR_FIELDS.find(f => f.key === fieldKey) ??
+      extraFieldMeta[fieldKey] ??
+      { label: fieldKey, hint: '' };
 
     const editSession: LineEditSession = {
       state: 'editing_field',
