@@ -146,6 +146,10 @@ function missingTemplateFields(result: OcrResult) {
   });
 }
 
+function documentIntakeFileUrl(intakeId: string, fileUrl?: string | null) {
+  return fileUrl || `/api/purchase-invoices/document-intakes/${intakeId}/file`;
+}
+
 function parseTemplateReply(field: DocumentTemplateField, text: string): string | number | null {
   const trimmed = text.trim();
   if (field.type === 'money') {
@@ -577,7 +581,8 @@ async function createDocumentIntake(input: {
   try {
     let fileUrl: string | undefined;
     let storageKey: string | undefined;
-    if (isStorageConfigured()) {
+    const storageReady = isStorageConfigured();
+    if (storageReady) {
       const ext = input.mimeType === 'application/pdf'
         ? 'pdf'
         : input.mimeType.includes('png')
@@ -597,7 +602,7 @@ async function createDocumentIntake(input: {
         sourceMessageId: input.messageId,
         mimeType: input.mimeType,
         fileSize: input.buffer.length,
-        fileBase64: input.buffer.toString('base64'),
+        fileBase64: storageReady ? undefined : input.buffer.toString('base64'),
         fileUrl,
         storageKey,
         status: 'received',
@@ -1760,12 +1765,10 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       }
 
       const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id);
-      if (intake.fileUrl) {
-        await prisma.purchaseInvoice.update({
-          where: { id: saved.id },
-          data: { pdfUrl: intake.fileUrl },
-        });
-      }
+      await prisma.purchaseInvoice.update({
+        where: { id: saved.id },
+        data: { pdfUrl: documentIntakeFileUrl(intake.id, intake.fileUrl) },
+      });
       await updateDocumentIntake(intake.id, {
         status: 'saved',
         ocrResult: result,

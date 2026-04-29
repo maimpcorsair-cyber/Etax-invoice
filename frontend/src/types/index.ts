@@ -215,7 +215,7 @@ export interface DocumentIntake {
   fileSize: number;
   fileName?: string | null;
   fileUrl?: string | null;
-  status: 'received' | 'processing' | 'saved' | 'needs_review' | 'failed' | string;
+  status: 'received' | 'processing' | 'awaiting_input' | 'awaiting_confirmation' | 'saved' | 'needs_review' | 'failed' | 'rejected' | string;
   ocrResult?: {
     documentType?: string;
     documentTypeLabel?: string;

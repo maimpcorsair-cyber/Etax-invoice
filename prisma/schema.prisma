@@ -352,7 +352,7 @@ model DocumentIntake {
   fileBase64        String?
   fileUrl           String?
   storageKey        String?
-  status            String    @default("received") // received | processing | saved | needs_review | failed
+  status            String    @default("received") // received | processing | awaiting_input | awaiting_confirmation | saved | needs_review | failed | rejected
   ocrResult         Json?
   warnings          Json?
   error             String?
@@ -364,6 +364,7 @@ model DocumentIntake {
   updatedAt         DateTime  @updatedAt
 
   @@index([companyId, status, createdAt])
+  @@index([companyId, purchaseInvoiceId])
   @@index([sourceMessageId])
   @@map("document_intakes")
 }

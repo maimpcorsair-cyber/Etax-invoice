@@ -10,7 +10,8 @@ import {
   resolveCompanyAccessPolicy,
 } from '../services/accessPolicyService';
 import { logger } from '../config/logger';
-import { isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { downloadFromStorage, getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { ocrSupplierInvoice, OcrResult } from '../services/aiService';
 
 export const purchaseInvoicesRouter = Router();
 
@@ -41,6 +42,101 @@ const uploadDocumentSchema = z.object({
   mimeType: z.string().min(1),
   fileBase64: z.string().min(1),
 });
+
+const attachDocumentSchema = z.object({
+  purchaseInvoiceId: z.string().min(1),
+});
+
+const purchaseRecordDocumentTypes = new Set<OcrResult['documentType']>([
+  'tax_invoice',
+  'receipt',
+  'invoice',
+  'billing_note',
+  'expense_receipt',
+  'credit_note',
+  'debit_note',
+]);
+
+function documentFileUrl(item: { id: string; fileUrl?: string | null }) {
+  return item.fileUrl || `/api/purchase-invoices/document-intakes/${item.id}/file`;
+}
+
+function normalizeOcrPurchasePayload(result: OcrResult, fileUrl?: string | null) {
+  const supplierTaxId = (result.supplierTaxId ?? '').replace(/\D/g, '');
+  const invoiceDate = result.invoiceDate || new Date().toISOString().slice(0, 10);
+  const total = Number(result.total || 0);
+  const vatAmount = Number(result.vatAmount || 0);
+  const subtotal = Number(result.subtotal || (total > 0 ? Math.max(total - vatAmount, 0) : 0));
+  const vatType = vatAmount > 0 ? 'vat7' : (result.taxTreatment === 'vat_exempt' ? 'vatExempt' : 'vatZero');
+  const missing = [
+    result.supplierName ? null : 'supplierName',
+    supplierTaxId.length === 13 ? null : 'supplierTaxId',
+    result.invoiceNumber ? null : 'invoiceNumber',
+    result.invoiceDate ? null : 'invoiceDate',
+    total > 0 ? null : 'total',
+  ].filter(Boolean) as string[];
+
+  return {
+    missing,
+    payload: {
+      supplierName: result.supplierName || 'ไม่ทราบผู้ขาย',
+      supplierTaxId,
+      supplierBranch: result.supplierBranch || '00000',
+      invoiceNumber: result.invoiceNumber || `OCR-${Date.now()}`,
+      invoiceDate,
+      dueDate: result.documentMetadata?.dueDate || undefined,
+      subtotal,
+      vatAmount,
+      vatType: vatType as 'vat7' | 'vatExempt' | 'vatZero',
+      description: [
+        `Document AI confirmed (${result.documentTypeLabel || result.documentType})`,
+        result.postingSuggestion,
+        result.extractionProvider,
+      ].filter(Boolean).join(' · '),
+      category: result.expenseSubcategory || result.expenseCategory,
+      notes: [
+        result.confidence ? `AI confidence: ${result.confidence}` : null,
+        result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join(', ')}` : null,
+      ].filter(Boolean).join('\n') || undefined,
+      pdfUrl: fileUrl || undefined,
+    },
+  };
+}
+
+async function readDocumentIntakeBuffer(item: { fileBase64?: string | null; storageKey?: string | null }) {
+  if (item.fileBase64) return Buffer.from(item.fileBase64, 'base64');
+  if (item.storageKey) return downloadFromStorage(item.storageKey);
+  return null;
+}
+
+async function analyzeDocumentBuffer(buffer: Buffer, mimeType: string, companyId: string): Promise<OcrResult> {
+  if (mimeType === 'application/pdf') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { PDFParse } = require('pdf-parse');
+      const parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const textResult = await parser.getText();
+      const pdfText = (textResult.text ?? '').trim().slice(0, 8000);
+      if (pdfText.length > 30) {
+        return ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain', {
+          pageCount: textResult.total ?? 1,
+          source: 'text_pdf',
+          companyId,
+        });
+      }
+    } catch (err) {
+      logger.warn('Purchase document pdf text extraction failed; falling back to OCR', { error: String(err) });
+    }
+    return ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf', {
+      source: 'scan_pdf',
+      companyId,
+    });
+  }
+  return ocrSupplierInvoice(buffer.toString('base64'), mimeType, {
+    source: mimeType.startsWith('image/') ? 'image' : 'unknown',
+    companyId,
+  });
+}
 
 type ListQuery = {
   from?: string;
@@ -109,7 +205,7 @@ purchaseInvoicesRouter.get('/document-intakes/review', async (req, res) => {
       companyId: req.user!.companyId,
       status: status && status !== 'all'
         ? status
-        : { in: ['received', 'processing', 'needs_review', 'failed'] },
+        : { in: ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed'] },
     };
 
     const items = await prisma.documentIntake.findMany({
@@ -188,10 +284,14 @@ purchaseInvoicesRouter.get('/document-intakes/:id/file', async (req, res) => {
   try {
     const item = await prisma.documentIntake.findFirst({
       where: { id: req.params.id, companyId: req.user!.companyId },
-      select: { fileBase64: true, fileName: true, mimeType: true, fileUrl: true },
+      select: { fileBase64: true, fileName: true, mimeType: true, fileUrl: true, storageKey: true },
     });
     if (!item) {
       res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+    if (item.storageKey) {
+      res.redirect(await getPresignedUrl(item.storageKey, 900));
       return;
     }
     if (item.fileUrl) {
@@ -228,7 +328,8 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
 
     let fileUrl: string | undefined;
     let storageKey: string | undefined;
-    if (isStorageConfigured()) {
+    const storageReady = isStorageConfigured();
+    if (storageReady) {
       const ext = body.mimeType === 'application/pdf' ? 'pdf' : body.mimeType.split('/')[1] || 'bin';
       storageKey = `companies/${req.user!.companyId}/document-intakes/web/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       fileUrl = await uploadToStorage(storageKey, buffer, body.mimeType);
@@ -242,7 +343,7 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
         fileName: body.fileName,
         mimeType: body.mimeType,
         fileSize: buffer.length,
-        fileBase64: buffer.toString('base64'),
+        fileBase64: storageReady ? undefined : buffer.toString('base64'),
         fileUrl,
         storageKey,
         status: 'needs_review',
@@ -256,6 +357,217 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
     }
     logger.error('Failed to upload purchase document', { error: err });
     res.status(500).json({ error: 'Failed to upload document' });
+  }
+});
+
+purchaseInvoicesRouter.post('/document-intakes/:id/analyze', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const item = await prisma.documentIntake.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      select: {
+        id: true,
+        companyId: true,
+        fileBase64: true,
+        storageKey: true,
+        mimeType: true,
+        fileUrl: true,
+      },
+    });
+    if (!item) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(item.mimeType)) {
+      res.status(400).json({ error: 'Unsupported file type' });
+      return;
+    }
+
+    const buffer = await readDocumentIntakeBuffer(item);
+    if (!buffer) {
+      res.status(404).json({ error: 'Original file is not available' });
+      return;
+    }
+
+    await prisma.documentIntake.update({
+      where: { id: item.id },
+      data: { status: 'processing', error: null },
+    });
+
+    const result = await analyzeDocumentBuffer(buffer, item.mimeType, req.user!.companyId);
+    const hasUsefulData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount || result.payment?.amount;
+    const status = hasUsefulData && purchaseRecordDocumentTypes.has(result.documentType)
+      ? 'awaiting_confirmation'
+      : 'needs_review';
+
+    const updated = await prisma.documentIntake.update({
+      where: { id: item.id },
+      data: {
+        status,
+        ocrResult: result as unknown as Prisma.InputJsonValue,
+        warnings: result.validationWarnings as unknown as Prisma.InputJsonValue,
+        error: hasUsefulData ? null : 'OCR returned no useful fields',
+        processedAt: new Date(),
+      },
+    });
+
+    res.json({ data: updated });
+  } catch (err) {
+    logger.error('Failed to analyze purchase document', { error: err });
+    await prisma.documentIntake.updateMany({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      data: {
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'OCR failed',
+        processedAt: new Date(),
+      },
+    });
+    res.status(500).json({ error: 'Failed to analyze document' });
+  }
+});
+
+purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const item = await prisma.documentIntake.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      select: { id: true, fileUrl: true, ocrResult: true },
+    });
+    if (!item) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    const result = item.ocrResult as unknown as OcrResult | null;
+    if (!result) {
+      res.status(400).json({ error: 'Document has no OCR result yet' });
+      return;
+    }
+    if (!purchaseRecordDocumentTypes.has(result.documentType)) {
+      res.status(400).json({ error: 'This document type is not a purchase invoice/receipt' });
+      return;
+    }
+
+    const normalized = normalizeOcrPurchasePayload(result, documentFileUrl(item));
+    if (normalized.missing.length > 0) {
+      await prisma.documentIntake.update({
+        where: { id: item.id },
+        data: {
+          status: 'needs_review',
+          warnings: [...(result.validationWarnings ?? []), ...normalized.missing.map((field) => `missing:${field}`)] as unknown as Prisma.InputJsonValue,
+          error: `Missing required fields: ${normalized.missing.join(', ')}`,
+        },
+      });
+      res.status(422).json({ error: 'Missing required OCR fields', missing: normalized.missing });
+      return;
+    }
+
+    const created = await prisma.purchaseInvoice.create({
+      data: {
+        companyId: req.user!.companyId,
+        ...normalized.payload,
+        total: normalized.payload.subtotal + normalized.payload.vatAmount,
+        createdBy: req.user!.userId,
+      },
+    });
+    const updated = await prisma.documentIntake.update({
+      where: { id: item.id },
+      data: {
+        status: 'saved',
+        targetType: 'purchase_invoice',
+        targetId: created.id,
+        purchaseInvoiceId: created.id,
+        error: null,
+        processedAt: new Date(),
+      },
+    });
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'document_intake.confirm_purchase',
+      resourceType: 'document_intake',
+      resourceId: item.id,
+      details: { purchaseInvoiceId: created.id, supplierName: created.supplierName, total: created.total },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.status(201).json({ data: updated, purchaseInvoice: created });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      res.status(409).json({ error: 'Purchase invoice with this supplier and invoice number already exists' });
+      return;
+    }
+    logger.error('Failed to confirm purchase document', { error: err });
+    res.status(500).json({ error: 'Failed to confirm purchase document' });
+  }
+});
+
+purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const body = attachDocumentSchema.parse(req.body);
+    const [item, purchase] = await Promise.all([
+      prisma.documentIntake.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        select: { id: true, fileUrl: true },
+      }),
+      prisma.purchaseInvoice.findFirst({
+        where: { id: body.purchaseInvoiceId, companyId: req.user!.companyId },
+        select: { id: true, pdfUrl: true },
+      }),
+    ]);
+    if (!item || !purchase) {
+      res.status(404).json({ error: 'Document or purchase invoice not found' });
+      return;
+    }
+
+    const file = documentFileUrl(item);
+    const [updated] = await prisma.$transaction([
+      prisma.documentIntake.update({
+        where: { id: item.id },
+        data: {
+          status: 'saved',
+          targetType: 'purchase_invoice',
+          targetId: purchase.id,
+          purchaseInvoiceId: purchase.id,
+          error: null,
+          processedAt: new Date(),
+        },
+      }),
+      prisma.purchaseInvoice.update({
+        where: { id: purchase.id },
+        data: purchase.pdfUrl ? {} : { pdfUrl: file },
+      }),
+    ]);
+
+    res.json({ data: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to attach purchase document', { error: err });
+    res.status(500).json({ error: 'Failed to attach document' });
+  }
+});
+
+purchaseInvoicesRouter.post('/document-intakes/:id/reject', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const updated = await prisma.documentIntake.updateMany({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      data: { status: 'rejected', error: 'rejected_by_user', processedAt: new Date() },
+    });
+    if (updated.count === 0) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error('Failed to reject purchase document', { error: err });
+    res.status(500).json({ error: 'Failed to reject document' });
   }
 });
 

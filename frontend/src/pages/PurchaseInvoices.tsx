@@ -68,6 +68,7 @@ export default function PurchaseInvoices() {
   const [documentTypeFilter, setDocumentTypeFilter] = useState<'all' | 'pdf' | 'image'>('all');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [documentActionId, setDocumentActionId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState(startOfMonthIso());
   const [to, setTo] = useState(todayIso());
@@ -191,6 +192,90 @@ export default function PurchaseInvoices() {
 
   function fileUrl(item: DocumentIntake) {
     return item.fileUrl || `/api/purchase-invoices/document-intakes/${item.id}/file`;
+  }
+
+  function canConfirmDocument(doc: DocumentIntake) {
+    const type = doc.ocrResult?.documentType;
+    return !!doc.ocrResult && ['tax_invoice', 'receipt', 'invoice', 'billing_note', 'expense_receipt', 'credit_note', 'debit_note'].includes(type || '');
+  }
+
+  async function runDocumentAction(path: string, errorFallback: string) {
+    setError('');
+    try {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? errorFallback);
+      await fetchItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : errorFallback);
+    }
+  }
+
+  async function attachDocument(doc: DocumentIntake) {
+    const keyword = prompt(isThai ? 'พิมพ์เลขใบซื้อหรือชื่อผู้ขายที่ต้องการแนบไฟล์นี้' : 'Enter purchase invoice number or supplier name to attach this file');
+    if (!keyword?.trim()) return;
+    const normalized = keyword.trim().toLowerCase();
+    const match = items.find((item) =>
+      item.invoiceNumber.toLowerCase() === normalized
+      || item.invoiceNumber.toLowerCase().includes(normalized)
+      || item.supplierName.toLowerCase().includes(normalized),
+    );
+    if (!match) {
+      setError(isThai ? 'ไม่พบรายการซื้อที่ตรงกับคำค้นนี้ในช่วงวันที่ที่เปิดอยู่' : 'No matching purchase invoice in the current date range');
+      return;
+    }
+    setDocumentActionId(doc.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/purchase-invoices/document-intakes/${doc.id}/attach-purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ purchaseInvoiceId: match.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? 'Attach failed');
+      await fetchItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (isThai ? 'แนบเอกสารไม่สำเร็จ' : 'Attach failed'));
+    } finally {
+      setDocumentActionId(null);
+    }
+  }
+
+  async function analyzeDocument(doc: DocumentIntake) {
+    if (isFreePlan) {
+      setError(isThai ? 'อัปเกรดเพื่ออ่านเอกสารด้วย AI' : 'Upgrade plan to analyze documents with AI');
+      return;
+    }
+    setDocumentActionId(doc.id);
+    await runDocumentAction(
+      `/api/purchase-invoices/document-intakes/${doc.id}/analyze`,
+      isThai ? 'อ่านเอกสารไม่สำเร็จ' : 'Document analysis failed',
+    );
+    setDocumentActionId(null);
+  }
+
+  async function confirmDocument(doc: DocumentIntake) {
+    if (!confirm(isThai ? 'ยืนยันบันทึกเอกสารนี้เป็นรายการซื้อ?' : 'Confirm this document as a purchase invoice?')) return;
+    setDocumentActionId(doc.id);
+    await runDocumentAction(
+      `/api/purchase-invoices/document-intakes/${doc.id}/confirm-purchase`,
+      isThai ? 'บันทึกเอกสารไม่สำเร็จ' : 'Confirm document failed',
+    );
+    setDocumentActionId(null);
+  }
+
+  async function rejectDocument(doc: DocumentIntake) {
+    if (!confirm(isThai ? 'ย้ายเอกสารนี้ไปสถานะไม่ใช้?' : 'Reject this document?')) return;
+    setDocumentActionId(doc.id);
+    await runDocumentAction(
+      `/api/purchase-invoices/document-intakes/${doc.id}/reject`,
+      isThai ? 'ปฏิเสธเอกสารไม่สำเร็จ' : 'Reject document failed',
+    );
+    setDocumentActionId(null);
   }
 
   async function uploadDocument(file: File) {
@@ -448,6 +533,53 @@ export default function PurchaseInvoices() {
                     >
                       <ExternalLink className="w-4 h-4" />
                     </a>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {doc.status === 'saved' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {isThai ? 'บันทึกแล้ว' : 'Saved'}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => void analyzeDocument(doc)}
+                          disabled={documentActionId === doc.id || doc.status === 'processing'}
+                          className="inline-flex items-center gap-1 rounded-lg border border-primary-200 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:opacity-60"
+                        >
+                          {documentActionId === doc.id || doc.status === 'processing'
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Search className="w-3.5 h-3.5" />}
+                          {isThai ? 'อ่าน AI' : 'Analyze'}
+                        </button>
+                        {canConfirmDocument(doc) && (
+                          <button
+                            onClick={() => void confirmDocument(doc)}
+                            disabled={documentActionId === doc.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-green-200 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-60"
+                          >
+                            <FileCheck2 className="w-3.5 h-3.5" />
+                            {isThai ? 'ยืนยันบันทึก' : 'Confirm'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => void attachDocument(doc)}
+                          disabled={documentActionId === doc.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          {isThai ? 'แนบกับรายการ' : 'Attach'}
+                        </button>
+                        <button
+                          onClick={() => void rejectDocument(doc)}
+                          disabled={documentActionId === doc.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          {isThai ? 'ไม่ใช้' : 'Reject'}
+                        </button>
+                      </>
+                    )}
                   </div>
                   {doc.error && <p className="text-xs text-rose-600 line-clamp-2">{doc.error}</p>}
                 </div>
