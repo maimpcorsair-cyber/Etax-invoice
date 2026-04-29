@@ -115,6 +115,7 @@ export interface OcrResult {
 interface OcrOptions {
   pageCount?: number;
   source?: 'text_pdf' | 'scan_pdf' | 'image' | 'text' | 'unknown';
+  qrText?: string;
 }
 
 interface OpenRouterMessage {
@@ -300,10 +301,12 @@ function looksLikeUnclassifiedSlip(result: OcrResult) {
 export async function ocrBankTransferSlip(
   imageBase64: string,
   mimeType: string,
+  qrText?: string,
 ): Promise<OcrResult> {
   const emptyResult = buildEmptyOcrResult('bank_transfer', 'สลิปโอนเงิน');
   if (!googleAiKey && !apiKey) return emptyResult;
 
+  const qrContext = qrText ? `\n\nDecoded QR/barcode payload evidence:\n${qrText.slice(0, 1200)}\n` : '';
   const prompt = `You are a specialist OCR engine for Thai mobile banking transfer slips and bank payment confirmations.
 The input may be a screenshot/photo/PDF from Thai banks such as KBank, SCB, Bangkok Bank, Krungthai, Krungsri, TTB, GSB, BAAC, CIMB, UOB, or PromptPay.
 
@@ -340,8 +343,9 @@ Rules:
 - total and payment.amount must be the transferred amount, not balance or fee.
 - invoiceDate and payment.paidAt must be the transfer date.
 - invoiceNumber and payment.reference should use transaction id/reference number if visible.
+- If Decoded QR/barcode payload evidence is provided, use it to help extract reference, account/PromptPay id, amount, and bank payload. Cross-check it against visible OCR text.
 - direction is "outgoing" if the slip says money was sent/โอนเงินออก/จากบัญชีเรา to another party; "incoming" if money was received/รับเงิน/เงินเข้า; otherwise "unknown".
-- confidence high requires amount plus date plus either reference or counterparty name.`;
+- confidence high requires amount plus date plus either reference or counterparty name.${qrContext}`;
 
   try {
     let raw = '';
@@ -689,7 +693,7 @@ Rules:
     }
 
     if (mimeType !== 'text/plain' && looksLikeUnclassifiedSlip(result)) {
-      const slipResult = await ocrBankTransferSlip(imageBase64, mimeType);
+      const slipResult = await ocrBankTransferSlip(imageBase64, mimeType, options.qrText);
       if (paymentAmountFromOcr(slipResult) > 0 || slipResult.invoiceNumber || slipResult.payment?.reference) {
         return slipResult;
       }

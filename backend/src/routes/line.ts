@@ -19,6 +19,7 @@ import {
 import { askPinuch, buildCompanyContext, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
+import { decodeQrFromImage } from '../services/qrDecodeService';
 
 export const lineRouter = Router();
 
@@ -962,6 +963,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     stage = 'detect_file_type';
     const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '', messageType);
     const isPdf = contentType === 'application/pdf';
+    const qrResult = !isPdf ? decodeQrFromImage(buffer, contentType) : { ok: false };
     const companyId = link.user.companyId;
     const creator = await prisma.lineUserLink.findUnique({
       where: { lineUserId },
@@ -1027,20 +1029,32 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       }
     } else {
       stage = 'ocr_image';
-      result = await ocrSupplierInvoice(buffer.toString('base64'), contentType, { source: 'image' });
+      result = await ocrSupplierInvoice(buffer.toString('base64'), contentType, {
+        source: 'image',
+        qrText: qrResult.ok ? qrResult.text : undefined,
+      });
     }
 
     if (!result) return;
 
     if (!isPdf && result.documentType !== 'bank_transfer' && result.documentType !== 'payment_advice' && !paymentAmount(result)) {
       stage = 'ocr_bank_slip_specialist';
-      const slipResult = await ocrBankTransferSlip(buffer.toString('base64'), contentType);
+      const slipResult = await ocrBankTransferSlip(
+        buffer.toString('base64'),
+        contentType,
+        qrResult.ok ? qrResult.text : undefined,
+      );
       if (paymentAmount(slipResult) || slipResult.invoiceNumber || slipResult.payment?.reference) {
         result = slipResult;
       }
     }
 
-    logger.info('[Line] OCR result', { confidence: result.confidence, supplierName: result.supplierName, total: result.total });
+    logger.info('[Line] OCR result', {
+      confidence: result.confidence,
+      supplierName: result.supplierName,
+      total: result.total,
+      qrDecoded: qrResult.ok,
+    });
 
     const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount || paymentAmount(result);
     if (!hasAnyData) {
@@ -1069,7 +1083,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       const match = await handleBankTransferDocument(lineUserId, result, companyId, creator.userId);
       await updateDocumentIntake(intake?.id, {
         status: match.status,
-        ocrResult: result,
+        ocrResult: {
+          ...result,
+          qrText: qrResult.ok ? qrResult.text : undefined,
+        } as OcrResult,
         warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
         error: match.ok ? undefined : match.message,
         targetType: match.targetType,
@@ -1088,7 +1105,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       void restFields;
       await updateDocumentIntake(intake?.id, {
         status: 'needs_review',
-        ocrResult: result,
+        ocrResult: {
+          ...result,
+          qrText: qrResult.ok ? qrResult.text : undefined,
+        } as OcrResult,
         warnings: [
           ...(result.validationWarnings ?? []),
           ...missingFields.map((fieldDef) => `missing:${fieldDef.key}`),
@@ -1109,7 +1129,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       const saved = await savePurchaseFromLineOcr(lineUserId, result, companyId, tempId);
       await updateDocumentIntake(intake?.id, {
         status: 'saved',
-        ocrResult: result,
+        ocrResult: {
+          ...result,
+          qrText: qrResult.ok ? qrResult.text : undefined,
+        } as OcrResult,
         warnings: result.validationWarnings,
         targetType: 'purchase_invoice',
         targetId: saved.id,
