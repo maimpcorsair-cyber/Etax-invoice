@@ -208,6 +208,29 @@ export interface PurchaseInvoice {
   updatedAt: string;
 }
 
+export interface DocumentIntake {
+  id: string;
+  source: string;
+  mimeType: string;
+  fileSize: number;
+  status: 'received' | 'processing' | 'saved' | 'needs_review' | 'failed' | string;
+  ocrResult?: {
+    documentTypeLabel?: string;
+    supplierName?: string;
+    supplierTaxId?: string;
+    invoiceNumber?: string;
+    invoiceDate?: string;
+    total?: number;
+    confidence?: 'high' | 'medium' | 'low';
+  } | null;
+  warnings?: string[] | null;
+  error?: string | null;
+  purchaseInvoiceId?: string | null;
+  processedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VatSummaryByType {
   vat7: { totalExclVat: number; vatAmount: number; count: number };
   vatExempt: { totalExclVat: number; vatAmount: number; count: number };

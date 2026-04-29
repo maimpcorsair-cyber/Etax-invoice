@@ -6,7 +6,7 @@ import {
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import type { PurchaseInvoice } from '../types';
+import type { DocumentIntake, PurchaseInvoice } from '../types';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
 
@@ -62,6 +62,7 @@ export default function PurchaseInvoices() {
   const { policy } = useCompanyAccessPolicy();
 
   const [items, setItems] = useState<PurchaseInvoice[]>([]);
+  const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState(startOfMonthIso());
@@ -83,15 +84,23 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const res = await fetch(`/api/purchase-invoices?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [res, intakeRes] = await Promise.all([
+        fetch(`/api/purchase-invoices?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/purchase-invoices/document-intakes/review', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
       const json = await res.json();
+      const intakeJson = await intakeRes.json();
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
       setItems(data);
+      setReviewIntakes(intakeJson.data ?? []);
     } catch {
       setItems([]);
+      setReviewIntakes([]);
     } finally {
       setLoading(false);
     }
@@ -350,6 +359,56 @@ export default function PurchaseInvoices() {
                     <FileCheck2 className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {reviewIntakes.length > 0 && (
+        <div className="border border-rose-200 bg-rose-50 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border border-rose-100">
+                <Receipt className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-rose-950">
+                  {isThai ? 'เอกสาร LINE ที่ต้องดูเอง' : 'LINE documents needing attention'}
+                </h2>
+                <p className="text-xs text-rose-800 mt-1">
+                  {isThai
+                    ? 'ระบบรับไฟล์แล้ว แต่ OCR ยังไม่ครบหรือประมวลผลไม่สำเร็จ'
+                    : 'Files were received, but OCR was incomplete or failed.'}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-rose-800 bg-white border border-rose-200 rounded-full px-2 py-1">
+              {reviewIntakes.length}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {reviewIntakes.slice(0, 4).map((item) => (
+              <div key={item.id} className="bg-white border border-rose-100 rounded-lg px-3 py-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {item.ocrResult?.supplierName || item.ocrResult?.invoiceNumber || item.mimeType}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {item.status} · {formatDate(item.createdAt)}
+                      {item.ocrResult?.total ? ` · ${formatCurrency(item.ocrResult.total)}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={openCreate} className="text-xs font-medium text-primary-700 hover:text-primary-900">
+                    {isThai ? 'กรอกเอง' : 'Manual'}
+                  </button>
+                </div>
+                {(item.error || item.warnings?.length) && (
+                  <p className="mt-1 text-xs text-rose-700 line-clamp-2">
+                    {item.error || item.warnings?.join(', ')}
+                  </p>
+                )}
               </div>
             ))}
           </div>

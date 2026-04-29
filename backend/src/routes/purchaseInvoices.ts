@@ -95,6 +95,44 @@ purchaseInvoicesRouter.get('/', async (req, res) => {
 });
 
 /* ─── Get one ─── */
+purchaseInvoicesRouter.get('/document-intakes/review', async (req, res) => {
+  try {
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const where: Prisma.DocumentIntakeWhereInput = {
+      companyId: req.user!.companyId,
+      status: status && status !== 'all'
+        ? status
+        : { in: ['received', 'processing', 'needs_review', 'failed'] },
+    };
+
+    const items = await prisma.documentIntake.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        source: true,
+        mimeType: true,
+        fileSize: true,
+        status: true,
+        ocrResult: true,
+        warnings: true,
+        error: true,
+        purchaseInvoiceId: true,
+        processedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json({ data: items });
+  } catch (err) {
+    logger.error('Failed to list document intakes', { error: err });
+    res.status(500).json({ error: 'Failed to fetch document intakes' });
+  }
+});
+
+/* ─── Get one ─── */
 purchaseInvoicesRouter.get('/:id', async (req, res) => {
   try {
     const item = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {

@@ -157,6 +157,62 @@ async function replySavedPurchase(lineUserId: string, result: OcrResult, purchas
   );
 }
 
+async function createDocumentIntake(input: {
+  companyId: string;
+  userId: string;
+  lineUserId: string;
+  messageId: string;
+  mimeType: string;
+  buffer: Buffer;
+}) {
+  try {
+    return await prisma.documentIntake.create({
+      data: {
+        companyId: input.companyId,
+        userId: input.userId,
+        lineUserId: input.lineUserId,
+        source: 'line',
+        sourceMessageId: input.messageId,
+        mimeType: input.mimeType,
+        fileSize: input.buffer.length,
+        fileBase64: input.buffer.toString('base64'),
+        status: 'received',
+      },
+    });
+  } catch (err) {
+    logger.warn('[Line] Document intake create failed; continuing inline', { err });
+    return null;
+  }
+}
+
+async function updateDocumentIntake(
+  id: string | null | undefined,
+  data: {
+    status: string;
+    ocrResult?: OcrResult;
+    warnings?: string[];
+    error?: string;
+    purchaseInvoiceId?: string;
+  },
+) {
+  if (!id) return;
+  try {
+    await prisma.documentIntake.update({
+      where: { id },
+      data: {
+        status: data.status,
+        ocrResult: data.ocrResult as Prisma.InputJsonValue | undefined,
+        warnings: data.warnings as Prisma.InputJsonValue | undefined,
+        error: data.error,
+        purchaseInvoiceId: data.purchaseInvoiceId,
+        processedAt: ['saved', 'needs_review', 'failed'].includes(data.status) ? new Date() : undefined,
+      },
+    });
+  } catch (err) {
+    logger.warn('[Line] Document intake update failed', { err, intakeId: id, status: data.status });
+  }
+}
+
 // GET /api/line/status
 lineRouter.get('/status', authenticate, async (req, res) => {
   try {
@@ -753,14 +809,35 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     stage = 'detect_file_type';
     const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '', messageType);
     const isPdf = contentType === 'application/pdf';
+    const companyId = link.user.companyId;
+    const creator = await prisma.lineUserLink.findUnique({
+      where: { lineUserId },
+      select: { userId: true },
+    });
+    const intake = creator
+      ? await createDocumentIntake({
+          companyId,
+          userId: creator.userId,
+          lineUserId,
+          messageId,
+          mimeType: contentType,
+          buffer,
+        })
+      : null;
 
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
 
     if (!['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(contentType)) {
       await sendLineText(lineUserId, 'ไฟล์ชนิดนี้ยังไม่รองรับครับ กรุณาส่งเป็นรูป JPG/PNG/WebP หรือ PDF');
+      await updateDocumentIntake(intake?.id, {
+        status: 'failed',
+        error: `Unsupported file type: ${contentType}`,
+      });
       return;
     }
+
+    await updateDocumentIntake(intake?.id, { status: 'processing' });
 
     if (isPdf) {
       // Step 1: extract text (fast, cheap — works for digital/typed PDFs)
@@ -806,75 +883,65 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount;
     if (!hasAnyData) {
+      await updateDocumentIntake(intake?.id, {
+        status: 'failed',
+        ocrResult: result,
+        warnings: result.validationWarnings,
+        error: 'OCR returned no useful fields',
+      });
       await sendLineText(lineUserId, '❌ ยังอ่านข้อมูลจากเอกสารนี้ไม่ได้\n\nกรุณาลองถ่ายให้ชัดขึ้น เห็นทั้งใบ ไม่เอียง แสงพอ และเห็นเลขผู้เสียภาษี/วันที่/ยอดรวม หรือส่งเป็น PDF ต้นฉบับ');
       return;
     }
-
-    const companyId = link.user.companyId;
 
     // Check for missing required fields
     const missingFields = getMissingFields(result);
 
     if (missingFields.length > 0) {
-      // Store partial data as session, ask for first missing field
       const [firstField, ...restFields] = missingFields;
-      const session: LineSession = {
-        state: 'awaiting_field',
-        currentField: firstField.key,
-        pendingFields: restFields.map(f => f.key),
-        data: compactOcrSessionData(result, companyId),
-      };
-      try {
-        stage = 'redis_save_missing_fields';
-        await redis.setex(`line:session:${lineUserId}`, 600, JSON.stringify(session));
-      } catch (redisErr) {
-        logger.error('[Line] OCR session save failed', { err: redisErr, stage: 'missing_fields' });
-        await sendLineText(lineUserId, buildOcrTextSummary(
-          result,
-          `ระบบบันทึกข้อมูลชั่วคราวไม่ได้ (${redisErr instanceof Error ? redisErr.message : String(redisErr)})`,
-        ));
-        return;
-      }
-      stage = 'line_reply_missing_fields';
-      await sendLineTextWithQuickReply(
+      void restFields;
+      await updateDocumentIntake(intake?.id, {
+        status: 'needs_review',
+        ocrResult: result,
+        warnings: [
+          ...(result.validationWarnings ?? []),
+          ...missingFields.map((fieldDef) => `missing:${fieldDef.key}`),
+        ],
+      });
+      await sendLineText(
         lineUserId,
-        `📝 ข้อมูลบางส่วนไม่ครบ กรุณาระบุ:\n\n📌 ${firstField.label}\n💡 ${firstField.hint}`,
-        [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
+        `${buildOcrTextSummary(result, 'อ่านเอกสารได้บางส่วน แต่ยังไม่บันทึกเพราะข้อมูลสำคัญไม่ครบ')}\n\n` +
+        `กรุณาตรวจในหน้า Input VAT หรือส่งไฟล์ที่ชัดขึ้น\nช่องแรกที่ขาด: ${firstField.label}`,
       );
       return;
     }
 
-    // All required fields present — proceed to confirm card
+    // All required fields present — save immediately and surface it in the web review queue.
     const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    stage = 'direct_db_save_purchase';
     try {
-      stage = 'redis_save_ocr_temp';
-      await redis.setex(`ocr:temp:${tempId}`, 600, JSON.stringify(compactOcrSessionData(result, companyId)));
-    } catch (redisErr) {
-      logger.error('[Line] OCR temp save failed', { err: redisErr });
-      try {
-        const saved = await savePurchaseFromLineOcr(lineUserId, result, companyId, tempId);
-        await replySavedPurchase(
-          lineUserId,
-          result,
-          saved.id,
-          '✅ อ่านเอกสารและบันทึกเข้าระบบแล้วครับ',
-        );
-      } catch (saveErr) {
-        logger.error('[Line] OCR direct DB save failed after Redis failure', { err: saveErr });
-        await sendLineText(lineUserId, buildOcrTextSummary(
-          result,
-          `ระบบบันทึกข้อมูลชั่วคราวไม่ได้ (${redisErr instanceof Error ? redisErr.message : String(redisErr)})`,
-        ));
-      }
-      return;
+      const saved = await savePurchaseFromLineOcr(lineUserId, result, companyId, tempId);
+      await updateDocumentIntake(intake?.id, {
+        status: 'saved',
+        ocrResult: result,
+        warnings: result.validationWarnings,
+        purchaseInvoiceId: saved.id,
+      });
+      await replySavedPurchase(
+        lineUserId,
+        result,
+        saved.id,
+        '✅ อ่านเอกสารและบันทึกเข้าระบบแล้วครับ',
+      );
+    } catch (saveErr) {
+      logger.error('[Line] OCR direct DB save failed', { err: saveErr });
+      await updateDocumentIntake(intake?.id, {
+        status: 'failed',
+        ocrResult: result,
+        warnings: result.validationWarnings,
+        error: saveErr instanceof Error ? saveErr.message : String(saveErr),
+      });
+      await sendLineText(lineUserId, buildOcrTextSummary(result, 'อ่านเอกสารได้แล้ว แต่บันทึกเข้า DB ไม่สำเร็จ'));
     }
-
-    stage = 'line_reply_confirm_card';
-    await sendLineFlexMessage(
-      lineUserId,
-      'ตรวจพบใบแจ้งหนี้ — กรุณายืนยัน',
-      buildOcrConfirmFlexCard(result, tempId),
-    );
   } catch (err) {
     logger.error('[Line] handleImageMessage failed', { err, stage });
     await sendLineText(lineUserId, `ขอโทษ เกิดข้อผิดพลาดในการอ่านเอกสาร (ขั้นตอน: ${stage})`);

@@ -339,6 +339,31 @@ model PurchaseInvoice {
   @@map("purchase_invoices")
 }
 
+model DocumentIntake {
+  id                String    @id @default(cuid())
+  companyId         String
+  userId            String
+  lineUserId        String?
+  source            String    @default("line")
+  sourceMessageId   String?
+  fileName          String?
+  mimeType          String
+  fileSize          Int
+  fileBase64        String?
+  status            String    @default("received") // received | processing | saved | needs_review | failed
+  ocrResult         Json?
+  warnings          Json?
+  error             String?
+  purchaseInvoiceId String?
+  processedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId, status, createdAt])
+  @@index([sourceMessageId])
+  @@map("document_intakes")
+}
+
 model AuditLog {
   id           String   @id @default(cuid())
   companyId    String
