@@ -2,6 +2,12 @@ import 'dotenv/config';
 import { logger } from './config/logger';
 
 async function startWorkers() {
+  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
+    logger.error('Worker cannot start: REDIS_URL is missing. Set the Upstash rediss:// URL on the Render worker service.');
+    process.exitCode = 1;
+    return;
+  }
+
   const results = await Promise.allSettled([
     import('./queues/workers/pdfWorker'),
     import('./queues/workers/rdSubmitWorker'),
