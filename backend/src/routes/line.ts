@@ -16,7 +16,7 @@ import {
   verifyLineSignature,
   OverdueInvoice,
 } from '../services/lineService';
-import { askPinuch, buildCompanyContext, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
+import { askPinuch, buildCompanyContext, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { decodeQrFromImage } from '../services/qrDecodeService';
@@ -1265,7 +1265,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     if (!result) return;
 
-    if (!isPdf && result.documentType !== 'bank_transfer' && result.documentType !== 'payment_advice' && !paymentAmount(result)) {
+    if (!isPdf
+      && result.documentType !== 'bank_transfer'
+      && result.documentType !== 'payment_advice'
+      && (!paymentAmount(result) || looksLikeBankSlipCandidate(result))) {
       stage = 'ocr_bank_slip_specialist';
       const slipResult = await ocrBankTransferSlip(
         buffer.toString('base64'),

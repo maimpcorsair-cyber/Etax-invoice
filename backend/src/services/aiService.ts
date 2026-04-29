@@ -362,6 +362,46 @@ function looksLikeUnclassifiedSlip(result: OcrResult) {
     || (!!result.rawText && /โอน|transfer|พร้อมเพย์|promptpay|transaction|reference|บัญชี|ธนาคาร|bank/i.test(result.rawText));
 }
 
+function bankSlipEvidenceText(result: OcrResult) {
+  return [
+    result.rawText,
+    result.documentTypeLabel,
+    result.supplierName,
+    result.invoiceNumber,
+    result.payment?.bankName,
+    result.payment?.fromName,
+    result.payment?.fromAccount,
+    result.payment?.toName,
+    result.payment?.toAccount,
+    result.payment?.reference,
+  ].filter(Boolean).join('\n');
+}
+
+export function looksLikeBankSlipCandidate(result: OcrResult) {
+  const text = bankSlipEvidenceText(result);
+  const invoiceRef = `${result.invoiceNumber || ''}${result.payment?.reference || ''}`;
+  const isAccountingMisclass = new Set<OcrResult['documentType']>([
+    'tax_invoice',
+    'receipt',
+    'invoice',
+    'expense_receipt',
+    'payment_advice',
+    'other',
+  ]).has(result.documentType);
+  const hasBankKeyword = /SCB|KBank|Kasikorn|กสิกร|ไทยพาณิชย์|Bangkok Bank|กรุงเทพ|Krungthai|กรุงไทย|Krungsri|กรุงศรี|TTB|ทหารไทย|ธนชาต|GSB|ออมสิน|BAAC|ธ\.ก\.ส\.|UOB|CIMB|PromptPay|พร้อมเพย์|Mobile Banking|โมบายแบงก์กิ้ง|โอนเงิน|โอนสำเร็จ|รายการโอน|เลขที่รายการ|หมายเลขอ้างอิง|transaction|transfer|reference|from account|to account|จากบัญชี|ไปยังบัญชี|ผู้โอน|ผู้รับ|ธนาคาร|bank/i.test(text);
+  const hasTransferAction = /โอน|transfer|พร้อมเพย์|promptpay|transaction|เลขที่รายการ|หมายเลขอ้างอิง|reference/i.test(text);
+  const hasLongBankRef = /(?=.*[A-Z])(?=.*\d)[A-Z0-9]{12,}/i.test(invoiceRef);
+  const amount = paymentAmountFromOcr(result);
+  const subtotalEqualsTotal = amount > 0 && Math.abs(Number(result.subtotal || 0) - amount) < 0.01;
+  const noVat = Number(result.vatAmount || 0) === 0;
+
+  return isAccountingMisclass
+    && amount > 0
+    && noVat
+    && (hasTransferAction || hasBankKeyword)
+    && (subtotalEqualsTotal || hasLongBankRef || hasTransferAction);
+}
+
 export async function ocrBankTransferSlip(
   imageBase64: string,
   mimeType: string,
@@ -630,6 +670,7 @@ Rules:
 - supplierTaxId: 13-digit Thai tax ID (remove dashes/spaces)
 - invoiceDate: convert to YYYY-MM-DD format
 - confidence: "high" if most fields found, "medium" if some fields found, "low" only if document is completely unreadable
+- Mobile banking transfer confirmations / สลิปโอนเงิน are NEVER tax_invoice or receipt, even when a shop/payee name, tax-like number, or long transaction number is visible.
 - documentType must be one of:
   - "tax_invoice": Thai tax invoice / ใบกำกับภาษี
   - "receipt": receipt / ใบเสร็จรับเงิน
@@ -805,9 +846,14 @@ Rules:
       result.rawText = azureResult.content;
     }
 
-    if (mimeType !== 'text/plain' && looksLikeUnclassifiedSlip(result)) {
+    if (mimeType !== 'text/plain' && (looksLikeUnclassifiedSlip(result) || looksLikeBankSlipCandidate(result))) {
       const slipResult = await ocrBankTransferSlip(imageBase64, mimeType, options.qrText);
       if (paymentAmountFromOcr(slipResult) > 0 || slipResult.invoiceNumber || slipResult.payment?.reference) {
+        logger.info('[OCR] Reclassified document as bank transfer slip', {
+          originalType: result.documentType,
+          originalLabel: result.documentTypeLabel,
+          originalSupplier: result.supplierName,
+        });
         return slipResult;
       }
     }
