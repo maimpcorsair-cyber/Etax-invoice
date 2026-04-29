@@ -7,7 +7,6 @@ import redis from '../config/redis';
 import { logger } from '../config/logger';
 import {
   sendLineText,
-  replyLineText,
   sendLineFlexMessage,
   sendLineTextWithQuickReply,
   buildOverdueFlexCard,
@@ -15,6 +14,7 @@ import {
   buildIntakeConfirmFlexCard,
   buildInvoiceFlexCard,
   verifyLineSignature,
+  withLineReplyToken,
   OverdueInvoice,
 } from '../services/lineService';
 import { askPinuch, buildCompanyContext, getOcrProductionReadiness, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
@@ -1992,18 +1992,13 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;
         if (msg.type === 'text') {
-          await handleTextMessage(lineUserId, (msg as LineTextMessage).text);
+          await withLineReplyToken(event.replyToken, () => handleTextMessage(lineUserId, (msg as LineTextMessage).text));
         } else if (msg.type === 'image' || msg.type === 'file') {
-          const acknowledged = event.replyToken
-            ? await replyLineText(event.replyToken, '📄 กำลังอ่านเอกสาร รอสักครู่...')
-            : false;
-          if (!acknowledged) {
-            await sendLineText(lineUserId, '📄 กำลังอ่านเอกสาร รอสักครู่...');
-          }
-          await handleImageMessage(lineUserId, msg.id, msg.type);
+          await withLineReplyToken(event.replyToken, () => handleImageMessage(lineUserId, msg.id, msg.type));
         }
       } else if (event.type === 'postback' && event.postback) {
-        await handlePostback(lineUserId, event.postback.data);
+        const postbackData = event.postback.data;
+        await withLineReplyToken(event.replyToken, () => handlePostback(lineUserId, postbackData));
       }
     } catch (err) {
       logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, lineUserId });

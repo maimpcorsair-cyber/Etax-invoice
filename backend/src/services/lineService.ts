@@ -1,9 +1,11 @@
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'async_hooks';
 import { logger } from '../config/logger';
 import { OcrResult } from './aiService';
 
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
 const channelSecret = process.env.LINE_CHANNEL_SECRET ?? '';
+const replyContext = new AsyncLocalStorage<{ replyToken: string; used: boolean }>();
 
 export interface OverdueInvoice {
   invoiceNumber: string;
@@ -17,6 +19,13 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
   if (!channelAccessToken) {
     logger.warn('[Line] LINE_CHANNEL_ACCESS_TOKEN not set — Line messaging disabled');
     return false;
+  }
+  const ctx = replyContext.getStore();
+  if (ctx && !ctx.used) {
+    ctx.used = true;
+    const replied = await lineReply(ctx.replyToken, messages);
+    if (replied) return true;
+    logger.warn('[Line] replyToken send failed; falling back to push', { lineUserId });
   }
   try {
     const body = JSON.stringify({ to: lineUserId, messages });
@@ -38,6 +47,11 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
     logger.error('[Line] push error', { error: String(err), lineUserId });
     return false;
   }
+}
+
+export async function withLineReplyToken<T>(replyToken: string | undefined, fn: () => Promise<T>): Promise<T> {
+  if (!replyToken) return fn();
+  return replyContext.run({ replyToken, used: false }, fn);
 }
 
 async function lineReply(replyToken: string, messages: object[]): Promise<boolean> {
