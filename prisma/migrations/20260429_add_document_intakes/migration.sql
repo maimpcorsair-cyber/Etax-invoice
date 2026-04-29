@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS "document_intakes" (
     "ocrResult" JSONB,
     "warnings" JSONB,
     "error" TEXT,
+    "targetType" TEXT,
+    "targetId" TEXT,
     "purchaseInvoiceId" TEXT,
     "processedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

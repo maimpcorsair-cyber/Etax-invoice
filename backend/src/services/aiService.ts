@@ -83,7 +83,7 @@ async function callGemini(
 }
 
 export interface OcrResult {
-  documentType: 'tax_invoice' | 'receipt' | 'invoice' | 'billing_note' | 'withholding_tax' | 'payment_advice' | 'credit_note' | 'debit_note' | 'other';
+  documentType: 'tax_invoice' | 'receipt' | 'invoice' | 'billing_note' | 'withholding_tax' | 'payment_advice' | 'bank_transfer' | 'credit_note' | 'debit_note' | 'other';
   documentTypeLabel: string;
   supplierName: string;
   supplierTaxId: string;
@@ -99,6 +99,17 @@ export interface OcrResult {
   extractionProvider?: string;
   verificationStage?: 'fast' | 'pro' | 'fallback';
   needsHumanReview?: boolean;
+  payment?: {
+    amount?: number;
+    paidAt?: string;
+    bankName?: string;
+    fromName?: string;
+    fromAccount?: string;
+    toName?: string;
+    toAccount?: string;
+    reference?: string;
+    direction?: 'incoming' | 'outgoing' | 'unknown';
+  };
 }
 
 interface OcrOptions {
@@ -226,6 +237,7 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     'billing_note',
     'withholding_tax',
     'payment_advice',
+    'bank_transfer',
     'credit_note',
     'debit_note',
     'other',
@@ -248,6 +260,7 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     confidence: parsed.confidence ?? 'low',
     rawText: parsed.rawText ?? azureContent,
     extractionProvider: parsed.extractionProvider ?? emptyResult.extractionProvider,
+    payment: parsed.payment,
   };
   result.validationWarnings = [
     ...validateOcrResult(result),
@@ -453,13 +466,20 @@ Rules:
   - "billing_note": billing note / ใบวางบิล / ใบเรียกเก็บเงิน
   - "withholding_tax": withholding tax certificate / หนังสือรับรองหัก ณ ที่จ่าย / 50 ทวิ
   - "payment_advice": payment advice / remittance advice / หลักฐานแจ้งการชำระเงิน
+  - "bank_transfer": bank transfer slip / mobile banking transfer confirmation / สลิปโอนเงิน / หลักฐานการโอน
   - "credit_note": credit note / ใบลดหนี้
   - "debit_note": debit note / ใบเพิ่มหนี้
   - "other": other accounting document
 - documentTypeLabel: short Thai label for the document type
+- For bank_transfer, extract payment details into payment and use:
+  - total = transferred amount
+  - invoiceDate = transfer date
+  - invoiceNumber = bank/reference/transaction id if visible
+  - supplierName = receiver/payee name if it is an outgoing transfer, otherwise payer name if visible
+  - confidence should be high only when amount, date, and reference or counterparty are visible
 
 {
-  "documentType": "tax_invoice|receipt|invoice|billing_note|withholding_tax|payment_advice|credit_note|debit_note|other",
+  "documentType": "tax_invoice|receipt|invoice|billing_note|withholding_tax|payment_advice|bank_transfer|credit_note|debit_note|other",
   "documentTypeLabel": "ใบกำกับภาษี",
   "supplierName": "company name",
   "supplierTaxId": "1234567890123",
@@ -470,6 +490,17 @@ Rules:
   "vatAmount": 0,
   "total": 0,
   "confidence": "high|medium|low",
+  "payment": {
+    "amount": 0,
+    "paidAt": "YYYY-MM-DD",
+    "bankName": "bank name",
+    "fromName": "payer name",
+    "fromAccount": "masked account",
+    "toName": "payee name",
+    "toAccount": "masked account",
+    "reference": "transaction reference",
+    "direction": "incoming|outgoing|unknown"
+  },
   "rawText": "all text found in document"
 }`;
 

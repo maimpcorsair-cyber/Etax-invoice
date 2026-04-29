@@ -18,6 +18,7 @@ import {
 } from '../services/lineService';
 import { askPinuch, buildCompanyContext, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
+import { calculateInvoicePaymentSummary } from '../services/paymentService';
 
 export const lineRouter = Router();
 
@@ -29,6 +30,15 @@ const REQUIRED_OCR_FIELDS: Array<{ key: keyof OcrResult; label: string; hint: st
   { key: 'invoiceDate',   label: 'วันที่ในใบกำกับภาษี',              hint: 'เช่น 27/04/2567 หรือ 2026-04-27' },
   { key: 'total',         label: 'ยอดรวมทั้งสิ้น (บาท)',            hint: 'เช่น 10700' },
 ];
+
+type PaymentMatchResult = {
+  ok: boolean;
+  message: string;
+  status: 'saved' | 'needs_review' | 'failed';
+  targetId?: string;
+  targetType?: 'sales_invoice' | 'purchase_invoice';
+  warnings?: string[];
+};
 
 interface LineSession {
   state: 'awaiting_field';
@@ -157,6 +167,145 @@ async function replySavedPurchase(lineUserId: string, result: OcrResult, purchas
   );
 }
 
+function paymentAmount(result: OcrResult) {
+  return Number(result.payment?.amount ?? result.total ?? 0);
+}
+
+function paymentDate(result: OcrResult) {
+  return result.payment?.paidAt || result.invoiceDate || new Date().toISOString().split('T')[0];
+}
+
+function paymentReference(result: OcrResult) {
+  return result.payment?.reference || result.invoiceNumber || '';
+}
+
+function closeAmount(left: number, right: number) {
+  return Math.abs(left - right) <= 1;
+}
+
+async function handleBankTransferDocument(lineUserId: string, result: OcrResult, companyId: string, userId: string): Promise<PaymentMatchResult> {
+  const amount = paymentAmount(result);
+  if (!amount || amount <= 0) {
+    return {
+      ok: false,
+      status: 'needs_review',
+      message: 'อ่านสลิปโอนได้ แต่ยังไม่พบยอดเงินที่ชัดเจน กรุณาตรวจในหน้า Input VAT',
+      warnings: ['missing:payment.amount'],
+    };
+  }
+
+  const direction = result.payment?.direction ?? 'unknown';
+  const paidAt = new Date(paymentDate(result));
+  const reference = paymentReference(result) || undefined;
+  const counterparty = [result.payment?.fromName, result.payment?.toName, result.supplierName]
+    .filter(Boolean)
+    .join(' ');
+
+  if (direction !== 'outgoing') {
+    const candidates = await prisma.invoice.findMany({
+      where: {
+        companyId,
+        isPaid: false,
+        status: { not: 'cancelled' },
+        OR: [
+          { total: { gte: amount - 1, lte: amount + 1 } },
+          reference ? { invoiceNumber: { contains: reference, mode: 'insensitive' } } : undefined,
+          counterparty ? { buyer: { nameTh: { contains: counterparty.slice(0, 40), mode: 'insensitive' } } } : undefined,
+        ].filter(Boolean) as Prisma.InvoiceWhereInput[],
+      },
+      include: { payments: true, buyer: { select: { nameTh: true } } },
+      orderBy: { invoiceDate: 'desc' },
+      take: 5,
+    });
+    const exact = candidates.find((invoice) => closeAmount(invoice.total - (invoice.paidAmount ?? 0), amount) || closeAmount(invoice.total, amount));
+    if (exact) {
+      const payment = await prisma.$transaction(async (tx) => {
+        const created = await tx.payment.create({
+          data: {
+            id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            invoiceId: exact.id,
+            amount,
+            method: 'transfer',
+            reference,
+            paidAt,
+            note: `นำเข้าจากสลิปโอนเงิน LINE OCR${result.payment?.bankName ? ` (${result.payment.bankName})` : ''}`,
+            createdBy: userId,
+          },
+        });
+        const summary = await calculateInvoicePaymentSummary(tx, exact.id);
+        await tx.invoice.update({
+          where: { id: exact.id },
+          data: {
+            isPaid: summary.isPaid,
+            paidAt: summary.paidAt,
+            paidAmount: summary.paidAmount,
+          },
+        });
+        return created;
+      });
+      void payment;
+      return {
+        ok: true,
+        status: 'saved',
+        targetId: exact.id,
+        targetType: 'sales_invoice',
+        message: `✅ บันทึกรับชำระจากสลิปแล้ว\n📄 ${exact.invoiceNumber}\n👤 ${exact.buyer.nameTh}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}`,
+      };
+    }
+
+    return {
+      ok: false,
+      status: 'needs_review',
+      targetType: 'sales_invoice',
+      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}\nกรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
+      warnings: ['unmatched:sales_invoice'],
+    };
+  }
+
+  const purchaseCandidates = await prisma.purchaseInvoice.findMany({
+    where: {
+      companyId,
+      isPaid: false,
+      OR: [
+        { total: { gte: amount - 1, lte: amount + 1 } },
+        reference ? { invoiceNumber: { contains: reference, mode: 'insensitive' } } : undefined,
+        result.payment?.toName ? { supplierName: { contains: result.payment.toName.slice(0, 40), mode: 'insensitive' } } : undefined,
+      ].filter(Boolean) as Prisma.PurchaseInvoiceWhereInput[],
+    },
+    orderBy: { invoiceDate: 'desc' },
+    take: 5,
+  });
+  const exactPurchase = purchaseCandidates.find((purchase) => closeAmount(purchase.total, amount));
+  if (exactPurchase) {
+    await prisma.purchaseInvoice.update({
+      where: { id: exactPurchase.id },
+      data: {
+        isPaid: true,
+        paidAt,
+        notes: [
+          exactPurchase.notes,
+          `ชำระโดยสลิปโอนเงิน LINE OCR${reference ? ` ref: ${reference}` : ''}${result.payment?.bankName ? ` bank: ${result.payment.bankName}` : ''}`,
+        ].filter(Boolean).join('\n'),
+      },
+    });
+    return {
+      ok: true,
+      status: 'saved',
+      targetId: exactPurchase.id,
+      targetType: 'purchase_invoice',
+      message: `✅ บันทึกจ่ายชำระเอกสารซื้อแล้ว\n📄 ${exactPurchase.invoiceNumber}\n🏢 ${exactPurchase.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}`,
+    };
+  }
+
+  return {
+    ok: false,
+    status: 'needs_review',
+    targetType: 'purchase_invoice',
+    message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับเอกสารซื้อไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}\nกรุณาตรวจในหน้า Input VAT`,
+    warnings: ['unmatched:purchase_invoice'],
+  };
+}
+
 async function createDocumentIntake(input: {
   companyId: string;
   userId: string;
@@ -192,6 +341,8 @@ async function updateDocumentIntake(
     ocrResult?: OcrResult;
     warnings?: string[];
     error?: string;
+    targetType?: string;
+    targetId?: string;
     purchaseInvoiceId?: string;
   },
 ) {
@@ -204,6 +355,8 @@ async function updateDocumentIntake(
         ocrResult: data.ocrResult as Prisma.InputJsonValue | undefined,
         warnings: data.warnings as Prisma.InputJsonValue | undefined,
         error: data.error,
+        targetType: data.targetType,
+        targetId: data.targetId,
         purchaseInvoiceId: data.purchaseInvoiceId,
         processedAt: ['saved', 'needs_review', 'failed'].includes(data.status) ? new Date() : undefined,
       },
@@ -881,7 +1034,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     logger.info('[Line] OCR result', { confidence: result.confidence, supplierName: result.supplierName, total: result.total });
 
-    const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount;
+    const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount || paymentAmount(result);
     if (!hasAnyData) {
       await updateDocumentIntake(intake?.id, {
         status: 'failed',
@@ -890,6 +1043,32 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         error: 'OCR returned no useful fields',
       });
       await sendLineText(lineUserId, '❌ ยังอ่านข้อมูลจากเอกสารนี้ไม่ได้\n\nกรุณาลองถ่ายให้ชัดขึ้น เห็นทั้งใบ ไม่เอียง แสงพอ และเห็นเลขผู้เสียภาษี/วันที่/ยอดรวม หรือส่งเป็น PDF ต้นฉบับ');
+      return;
+    }
+
+    if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
+      if (!creator) {
+        await updateDocumentIntake(intake?.id, {
+          status: 'failed',
+          ocrResult: result,
+          warnings: result.validationWarnings,
+          error: 'Line user link not found for payment matching',
+        });
+        await sendLineText(lineUserId, 'อ่านสลิปโอนได้แล้วครับ แต่ยังไม่พบผู้ใช้ที่เชื่อมบัญชี กรุณาเชื่อม LINE ใหม่');
+        return;
+      }
+      stage = 'match_bank_transfer';
+      const match = await handleBankTransferDocument(lineUserId, result, companyId, creator.userId);
+      await updateDocumentIntake(intake?.id, {
+        status: match.status,
+        ocrResult: result,
+        warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
+        error: match.ok ? undefined : match.message,
+        targetType: match.targetType,
+        targetId: match.targetId,
+        purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
+      });
+      await sendLineText(lineUserId, match.message);
       return;
     }
 
@@ -924,6 +1103,8 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         status: 'saved',
         ocrResult: result,
         warnings: result.validationWarnings,
+        targetType: 'purchase_invoice',
+        targetId: saved.id,
         purchaseInvoiceId: saved.id,
       });
       await replySavedPurchase(

@@ -354,6 +354,8 @@ model DocumentIntake {
   ocrResult         Json?
   warnings          Json?
   error             String?
+  targetType        String?
+  targetId          String?
   purchaseInvoiceId String?
   processedAt       DateTime?
   createdAt         DateTime  @default(now())

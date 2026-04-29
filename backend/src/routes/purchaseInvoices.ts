@@ -118,6 +118,8 @@ purchaseInvoicesRouter.get('/document-intakes/review', async (req, res) => {
         ocrResult: true,
         warnings: true,
         error: true,
+        targetType: true,
+        targetId: true,
         purchaseInvoiceId: true,
         processedAt: true,
         createdAt: true,

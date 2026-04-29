@@ -225,6 +225,8 @@ export interface DocumentIntake {
   } | null;
   warnings?: string[] | null;
   error?: string | null;
+  targetType?: string | null;
+  targetId?: string | null;
   purchaseInvoiceId?: string | null;
   processedAt?: string | null;
   createdAt: string;
