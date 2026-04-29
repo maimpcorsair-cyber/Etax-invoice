@@ -273,7 +273,7 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
     res.status(result.ok ? 200 : 503).json({
       data: {
         ...result,
-        redisFailureFallback: 'ocr_text_summary',
+        redisFailureFallback: 'direct_db_save_then_ocr_text_summary',
         redis: redisResult.status === 'fulfilled'
           ? { ok: true, response: redisResult.value }
           : { ok: false, error: redisResult.reason instanceof Error ? redisResult.reason.message : String(redisResult.reason) },
