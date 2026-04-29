@@ -224,6 +224,9 @@ function buildReviewOnlySummary(result: OcrResult) {
 function buildConfirmationSummary(result: OcrResult) {
   const fmt = (value: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
+  const warningLine = result.validationWarnings?.length
+    ? `\n\nข้อควรตรวจ: ${result.validationWarnings.slice(0, 3).join(' / ')}`
+    : '';
   if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
     return `สรุปสลิปโอนเงินก่อนบันทึก\n\n` +
       `ยอดโอน: ${fmt(paymentAmount(result))}\n` +
@@ -232,7 +235,7 @@ function buildConfirmationSummary(result: OcrResult) {
       `จาก: ${result.payment?.fromName || '-'}\n` +
       `ถึง: ${result.payment?.toName || '-'}\n` +
       `ทิศทาง: ${result.payment?.direction || 'unknown'}\n` +
-      `ความมั่นใจ: ${result.confidence}`;
+      `ความมั่นใจ: ${result.confidence}${warningLine}`;
   }
 
   return `สรุปเอกสารก่อนบันทึก\n\n` +
@@ -246,7 +249,7 @@ function buildConfirmationSummary(result: OcrResult) {
     `ยอดรวม: ${fmt(result.total)}\n` +
     `หมวด: ${result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '-'}\n` +
     `ภาษี: ${result.taxTreatment || '-'}\n` +
-    `ความมั่นใจ: ${result.confidence}`;
+    `ความมั่นใจ: ${result.confidence}${warningLine}`;
 }
 
 async function askForMissingField(lineUserId: string, intakeId: string, result: OcrResult, field: DocumentTemplateField) {
@@ -299,6 +302,11 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
   const invoiceDate = result.invoiceDate ? new Date(result.invoiceDate) : new Date();
   const invoiceNumber = result.invoiceNumber || `LINE-${fallbackId}`;
   const supplierTaxId = result.supplierTaxId || '0000000000000';
+  const vatType = result.taxTreatment === 'vat_exempt'
+    ? 'vatExempt'
+    : result.vatAmount > 0
+      ? 'vat7'
+      : 'vatZero';
 
   try {
     return await prisma.purchaseInvoice.create({
@@ -312,16 +320,17 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
         subtotal: result.subtotal,
         vatAmount: result.vatAmount,
         total: result.total,
-        vatType: 'vat7',
+        vatType,
         category: result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || result.documentTypeLabel || result.documentType,
         description: `นำเข้าจาก LINE OCR: ${result.documentTypeLabel || result.documentType || 'เอกสารซื้อ'}`,
         notes: [
           `AI confidence: ${result.confidence}`,
           result.expenseCategory ? `Expense category: ${result.expenseCategory}` : null,
-          result.taxTreatment ? `Tax treatment: ${result.taxTreatment}` : null,
-          result.extractionProvider ? `Provider: ${result.extractionProvider}` : null,
-          result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
-        ].filter(Boolean).join('\n'),
+        result.taxTreatment ? `Tax treatment: ${result.taxTreatment}` : null,
+        result.validationWarnings?.some(w => w.includes('เอกสารซ้ำ')) ? 'Possible duplicate: true' : null,
+        result.extractionProvider ? `Provider: ${result.extractionProvider}` : null,
+        result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
+      ].filter(Boolean).join('\n'),
         createdBy: link.userId,
       },
     });
@@ -1245,6 +1254,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         result = await ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain', {
           pageCount,
           source: 'text_pdf',
+          companyId,
         });
       } else {
         // Step 2b: no text (scanned PDF) — send PDF binary to Gemini via OpenRouter
@@ -1253,6 +1263,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf', {
           pageCount,
           source: 'scan_pdf',
+          companyId,
         });
       }
     } else {
@@ -1260,6 +1271,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       result = await ocrSupplierInvoice(buffer.toString('base64'), contentType, {
         source: 'image',
         qrText: qrResult.ok ? qrResult.text : undefined,
+        companyId,
       });
     }
 

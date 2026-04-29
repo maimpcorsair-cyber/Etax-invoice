@@ -169,6 +169,7 @@ interface OcrOptions {
   pageCount?: number;
   source?: 'text_pdf' | 'scan_pdf' | 'image' | 'text' | 'unknown';
   qrText?: string;
+  companyId?: string;
 }
 
 interface OpenRouterMessage {
@@ -230,8 +231,12 @@ function isValidThaiTaxId(taxId: string) {
 
 function validateOcrResult(result: OcrResult): string[] {
   const warnings: string[] = [];
+  const documentTypesRequiringTaxId = new Set<OcrResult['documentType']>(['tax_invoice', 'invoice', 'receipt', 'expense_receipt']);
   if (result.supplierTaxId && !isValidThaiTaxId(result.supplierTaxId)) {
     warnings.push('เลขผู้เสียภาษีอาจไม่ถูกต้องตาม checksum');
+  }
+  if (!result.supplierTaxId && documentTypesRequiringTaxId.has(result.documentType) && result.vatAmount > 0) {
+    warnings.push('เอกสารมี VAT แต่ไม่พบเลขผู้เสียภาษีผู้ขาย');
   }
   if (result.subtotal > 0 && result.vatAmount > 0) {
     const expectedVat = Math.round(result.subtotal * 0.07 * 100) / 100;
@@ -246,6 +251,113 @@ function validateOcrResult(result: OcrResult): string[] {
     }
   }
   return warnings;
+}
+
+async function buildOcrVendorMemoryContext(companyId?: string) {
+  if (!companyId) return '';
+  try {
+    const rows = await prisma.purchaseInvoice.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 80,
+      select: {
+        supplierName: true,
+        supplierTaxId: true,
+        supplierBranch: true,
+        category: true,
+        vatType: true,
+        subtotal: true,
+        vatAmount: true,
+        total: true,
+      },
+    });
+    if (!rows.length) return '';
+
+    const byVendor = new Map<string, {
+      supplierName: string;
+      supplierTaxId: string;
+      supplierBranch: string | null;
+      category: string | null;
+      vatType: string;
+      count: number;
+      lastTotal: number;
+      lastVatAmount: number;
+    }>();
+    for (const row of rows) {
+      const key = row.supplierTaxId && row.supplierTaxId !== '0000000000000'
+        ? row.supplierTaxId
+        : row.supplierName.trim().toLowerCase();
+      const existing = byVendor.get(key);
+      if (existing) {
+        existing.count += 1;
+        continue;
+      }
+      byVendor.set(key, {
+        supplierName: row.supplierName,
+        supplierTaxId: row.supplierTaxId,
+        supplierBranch: row.supplierBranch,
+        category: row.category,
+        vatType: row.vatType,
+        count: 1,
+        lastTotal: row.total,
+        lastVatAmount: row.vatAmount,
+      });
+    }
+
+    const vendors = [...byVendor.values()].slice(0, 20);
+    return `\n\nCompany vendor memory from approved/saved purchase documents. Use only as a hint; visible document text wins if it conflicts:\n${JSON.stringify(vendors, null, 2)}`;
+  } catch (err) {
+    logger.warn('[OCR] Vendor memory load failed', { error: err instanceof Error ? err.message : String(err) });
+    return '';
+  }
+}
+
+async function applyBusinessValidation(result: OcrResult, companyId?: string): Promise<OcrResult> {
+  const warnings = new Set(result.validationWarnings ?? validateOcrResult(result));
+  if (!companyId) {
+    return { ...result, validationWarnings: [...warnings] };
+  }
+
+  try {
+    if (result.supplierTaxId && result.invoiceNumber) {
+      const duplicate = await prisma.purchaseInvoice.findFirst({
+        where: {
+          companyId,
+          supplierTaxId: result.supplierTaxId,
+          invoiceNumber: result.invoiceNumber,
+        },
+        select: { id: true },
+      });
+      if (duplicate) warnings.add('พบเลขที่เอกสารนี้ในภาษีซื้อแล้ว อาจเป็นเอกสารซ้ำ');
+    }
+
+    const knownVendor = await prisma.purchaseInvoice.findFirst({
+      where: {
+        companyId,
+        OR: ([
+          result.supplierTaxId ? { supplierTaxId: result.supplierTaxId } : undefined,
+          result.supplierName ? { supplierName: { contains: result.supplierName, mode: 'insensitive' } } : undefined,
+        ].filter(Boolean) as any),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { supplierName: true, supplierTaxId: true, supplierBranch: true, category: true, vatType: true },
+    });
+
+    if (knownVendor) {
+      if (!result.supplierTaxId || result.supplierTaxId === '0000000000000') result.supplierTaxId = knownVendor.supplierTaxId;
+      if (!result.supplierBranch) result.supplierBranch = knownVendor.supplierBranch || '00000';
+      if (!result.postingSuggestion && knownVendor.category) result.postingSuggestion = knownVendor.category;
+      if (!result.taxTreatment && knownVendor.vatType === 'vat7') result.taxTreatment = 'input_vat_claimable';
+      warnings.add(`พบ vendor เดิมในระบบ: ${knownVendor.supplierName}`);
+    }
+  } catch (err) {
+    logger.warn('[OCR] Business validation failed', { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  return {
+    ...result,
+    validationWarnings: [...warnings],
+  };
 }
 
 function shouldEscalateOcr(result: OcrResult, options?: OcrOptions) {
@@ -784,13 +896,14 @@ Rules:
     const azureContext = azureResult?.ok
       ? `\n\nAzure Document Intelligence result:\nFields:\n${JSON.stringify(azureResult.fields, null, 2)}\n\nOCR text:\n${azureResult.content.slice(0, 6000)}`
       : '';
+    const vendorMemoryContext = await buildOcrVendorMemoryContext(options.companyId);
 
     // Try Gemini first (verifies Azure OCR when available; otherwise handles text, image, and PDF directly)
     if (googleAiKey) {
       try {
         const fastModel = mimeType === 'text/plain' ? geminiFastModel : geminiScanModel;
         logger.info('[OCR] Trying Gemini API', { mimeType, model: fastModel, source: options.source });
-        raw = await callGemini(mimeType, imageBase64, buildVerifyPrompt(`${ocrPrompt}${azureContext}`), ocrTimeoutMs, fastModel);
+        raw = await callGemini(mimeType, imageBase64, buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`), ocrTimeoutMs, fastModel);
         logger.info('[OCR] Gemini responded', { chars: raw.length });
       } catch (geminiErr) {
         logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
@@ -801,12 +914,12 @@ Rules:
     if (!raw) {
       const isText = mimeType === 'text/plain';
       const userContent: OpenRouterMessage['content'] = isText
-        ? `${ocrPrompt}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
+        ? `${ocrPrompt}${vendorMemoryContext}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
         : azureResult?.ok
-          ? `${ocrPrompt}${azureContext}`
+          ? `${ocrPrompt}${azureContext}${vendorMemoryContext}`
         : [
             { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-            { type: 'text', text: ocrPrompt },
+            { type: 'text', text: `${ocrPrompt}${vendorMemoryContext}` },
           ];
       const messages: OpenRouterMessage[] = [{ role: 'user', content: userContent }];
       const isPdf = mimeType === 'application/pdf';
@@ -869,7 +982,7 @@ Rules:
         const proRaw = await callGemini(
           mimeType,
           imageBase64,
-          buildVerifyPrompt(`${ocrPrompt}${azureContext}`, result, true),
+          buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, result, true),
           ocrTimeoutMs,
           geminiProVerifyModel,
         );
@@ -887,6 +1000,7 @@ Rules:
     }
 
     result.validationWarnings = result.validationWarnings?.length ? result.validationWarnings : validateOcrResult(result);
+    result = await applyBusinessValidation(result, options.companyId);
     result.needsHumanReview = shouldHumanReviewOcr(result);
     return result;
   } catch (err) {
