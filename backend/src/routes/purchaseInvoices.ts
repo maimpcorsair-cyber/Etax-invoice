@@ -425,7 +425,7 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       fileUrl = await uploadToStorage(storageKey, buffer, body.mimeType);
     }
 
-    const created = await prisma.documentIntake.create({
+    let created = await prisma.documentIntake.create({
       data: {
         companyId: req.user!.companyId,
         userId: req.user!.userId,
@@ -436,9 +436,38 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
         fileBase64: storageReady ? undefined : buffer.toString('base64'),
         fileUrl,
         storageKey,
-        status: 'needs_review',
+        status: 'processing',
       },
     });
+
+    try {
+      const result = await analyzeDocumentBuffer(buffer, body.mimeType, req.user!.companyId);
+      const hasUsefulData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount || result.payment?.amount;
+      const status = hasUsefulData && purchaseRecordDocumentTypes.has(result.documentType)
+        ? 'awaiting_confirmation'
+        : 'needs_review';
+      created = await prisma.documentIntake.update({
+        where: { id: created.id },
+        data: {
+          status,
+          ocrResult: result as unknown as Prisma.InputJsonValue,
+          warnings: result.validationWarnings as unknown as Prisma.InputJsonValue,
+          error: hasUsefulData ? null : 'OCR returned no useful fields',
+          processedAt: new Date(),
+        },
+      });
+    } catch (ocrErr) {
+      logger.error('Uploaded purchase document OCR failed', { error: ocrErr, intakeId: created.id });
+      created = await prisma.documentIntake.update({
+        where: { id: created.id },
+        data: {
+          status: 'failed',
+          error: ocrErr instanceof Error ? ocrErr.message : 'OCR failed',
+          processedAt: new Date(),
+        },
+      });
+    }
+
     res.status(201).json({ data: created });
   } catch (err) {
     if (err instanceof z.ZodError) {

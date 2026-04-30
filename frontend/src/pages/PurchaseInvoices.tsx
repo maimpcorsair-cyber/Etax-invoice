@@ -326,19 +326,6 @@ export default function PurchaseInvoices() {
     }
   }
 
-  async function analyzeDocument(doc: DocumentIntake) {
-    if (isFreePlan) {
-      setError(isThai ? 'อัปเกรดเพื่ออ่านเอกสารด้วย AI' : 'Upgrade plan to analyze documents with AI');
-      return;
-    }
-    setDocumentActionId(doc.id);
-    await runDocumentAction(
-      `/api/purchase-invoices/document-intakes/${doc.id}/analyze`,
-      isThai ? 'อ่านเอกสารไม่สำเร็จ' : 'Document analysis failed',
-    );
-    setDocumentActionId(null);
-  }
-
   async function confirmDocument(doc: DocumentIntake) {
     if (!confirm(isThai ? 'ยืนยันบันทึกเอกสารนี้เป็นรายการซื้อ?' : 'Confirm this document as a purchase invoice?')) return;
     setDocumentActionId(doc.id);
@@ -387,7 +374,12 @@ export default function PurchaseInvoices() {
         const json = await res.json();
         throw new Error(json.error ?? 'Upload failed');
       }
+      const json = await res.json().catch(() => ({}));
       await fetchItems();
+      const status = json.data?.status as string | undefined;
+      if (status === 'failed' || status === 'needs_review') {
+        setError(isThai ? 'อัปโหลดแล้ว แต่ระบบต้องให้ตรวจเอกสารนี้เอง' : 'Uploaded, but this document needs manual review');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -667,14 +659,12 @@ export default function PurchaseInvoices() {
                         </button>
                         {doc.status !== 'saved' && (
                           <>
-                            <button
-                              onClick={() => void analyzeDocument(doc)}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-lg border border-primary-200 px-2.5 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:opacity-60"
-                            >
-                              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                              {isThai ? 'อ่าน AI' : 'Analyze'}
-                            </button>
+                            {busy && (
+                              <span className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                {isThai ? 'กำลังอ่าน' : 'Reading'}
+                              </span>
+                            )}
                             {canConfirmDocument(doc) && (
                               <button
                                 onClick={() => void confirmDocument(doc)}
