@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Plus, ArrowRight, CheckCircle2, XCircle, Clock, AlertTriangle, Bot, Table2, HardDrive, UserCheck } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus } from '../types';
@@ -57,6 +57,13 @@ interface RdComplianceMonth {
   }[];
 }
 
+interface IntegrationStatus {
+  lineAi: { connected: boolean; displayName?: string | null; notificationsEnabled: boolean };
+  googleAccount: { connected: boolean; email?: string | null };
+  googleSheets: { connected: boolean; mode: string };
+  googleDrive: { connected: boolean; mode: string };
+}
+
 function SkeletonCard() {
   return (
     <div className="card animate-pulse">
@@ -101,6 +108,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [compliance, setCompliance] = useState<RdComplianceMonth[]>([]);
+  const [integrations, setIntegrations] = useState<IntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,9 +122,10 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [statsRes, invRes] = await Promise.all([
+        const [statsRes, invRes, integrationRes] = await Promise.all([
           fetch('/api/dashboard/stats', { headers }),
           fetch('/api/invoices?limit=5', { headers }),
+          fetch('/api/dashboard/integration-status', { headers }),
         ]);
 
         if (!statsRes.ok) throw new Error(isThai ? 'โหลดสถิติไม่สำเร็จ' : 'Failed to load stats');
@@ -124,9 +133,13 @@ export default function Dashboard() {
 
         const statsJson = await statsRes.json() as { data: DashboardStats };
         const invJson = await invRes.json() as { data: Invoice[] };
+        const integrationJson = integrationRes.ok
+          ? await integrationRes.json() as { data: IntegrationStatus }
+          : { data: null };
 
         setStats(statsJson.data);
         setRecentInvoices(invJson.data ?? []);
+        setIntegrations(integrationJson.data);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -219,6 +232,76 @@ export default function Dashboard() {
               </div>
             ))}
       </div>
+
+      {integrations && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">
+                {isThai ? 'สถานะการเชื่อมต่อของระบบ' : 'Connection Status'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {isThai ? 'ดูว่าบัญชีนี้เชื่อม LINE AI, Google Sheets และ Drive พร้อมใช้งานหรือยัง' : 'Check whether this account is connected to LINE AI, Google Sheets, and Drive.'}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {[
+              {
+                key: 'line',
+                icon: Bot,
+                title: isThai ? 'LINE AI' : 'LINE AI',
+                ok: integrations.lineAi.connected,
+                detail: integrations.lineAi.connected
+                  ? (integrations.lineAi.displayName || (isThai ? 'ผูกบัญชีแล้ว' : 'Connected'))
+                  : (isThai ? 'ยังไม่ได้ผูก' : 'Not connected'),
+              },
+              {
+                key: 'google',
+                icon: UserCheck,
+                title: isThai ? 'บัญชี Google' : 'Google Account',
+                ok: integrations.googleAccount.connected,
+                detail: integrations.googleAccount.email || '-',
+              },
+              {
+                key: 'sheets',
+                icon: Table2,
+                title: 'Google Sheets',
+                ok: integrations.googleSheets.connected,
+                detail: integrations.googleSheets.connected
+                  ? (isThai ? 'พร้อม export' : 'Export ready')
+                  : (isThai ? 'ยังไม่ตั้งค่า export' : 'Export not configured'),
+              },
+              {
+                key: 'drive',
+                icon: HardDrive,
+                title: 'Google Drive',
+                ok: integrations.googleDrive.connected,
+                detail: integrations.googleDrive.connected
+                  ? (isThai ? 'พร้อม sync ไฟล์' : 'File sync ready')
+                  : (isThai ? 'ยังไม่เชื่อม Drive' : 'Drive not connected'),
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.key} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+                      <Icon className="w-4 h-4 text-primary-600" />
+                      {item.title}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.ok ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {item.ok ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                      {item.ok ? (isThai ? 'พร้อม' : 'Ready') : (isThai ? 'รอตั้งค่า' : 'Pending')}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 truncate">{item.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {!loading && stats && (
         <div className="card">

@@ -7,6 +7,57 @@ import { rdComplianceQueue } from '../queues/rdComplianceQueue';
 
 export const dashboardRouter = Router();
 
+dashboardRouter.get('/integration-status', async (req, res) => {
+  try {
+    const [lineLink, company] = await Promise.all([
+      prisma.lineUserLink.findUnique({
+        where: { userId: req.user!.userId },
+        select: { isActive: true, displayName: true, linkedAt: true },
+      }),
+      prisma.company.findUnique({
+        where: { id: req.user!.companyId },
+        select: { lineNotifyEnabled: true },
+      }),
+    ]);
+
+    const googleSheetsConfigured = !!(
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+      || process.env.GOOGLE_APPLICATION_CREDENTIALS
+      || process.env.GOOGLE_CLIENT_EMAIL
+    );
+    const googleDriveConfigured = !!(
+      process.env.GOOGLE_DRIVE_ENABLED === 'true'
+      || process.env.GOOGLE_DRIVE_FOLDER_ID
+    );
+
+    res.json({
+      data: {
+        lineAi: {
+          connected: !!lineLink?.isActive,
+          displayName: lineLink?.displayName ?? null,
+          linkedAt: lineLink?.linkedAt ?? null,
+          notificationsEnabled: !!company?.lineNotifyEnabled,
+        },
+        googleAccount: {
+          connected: !!req.user?.email,
+          email: req.user?.email ?? null,
+        },
+        googleSheets: {
+          connected: googleSheetsConfigured,
+          mode: googleSheetsConfigured ? 'service_account' : 'not_configured',
+        },
+        googleDrive: {
+          connected: googleDriveConfigured,
+          mode: googleDriveConfigured ? 'workspace_folder' : 'not_configured',
+        },
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to load integration status', { error: err });
+    res.status(500).json({ error: 'Failed to load integration status' });
+  }
+});
+
 /* ─── GET /api/dashboard/stats ─── */
 dashboardRouter.get('/stats', async (req, res) => {
   try {

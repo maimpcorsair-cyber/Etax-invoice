@@ -698,6 +698,46 @@ purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole
   }
 });
 
+purchaseInvoicesRouter.post('/document-intakes/:id/attach-sales-invoice', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const body = attachDocumentSchema.parse(req.body);
+    const [item, invoice] = await Promise.all([
+      prisma.documentIntake.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        select: { id: true },
+      }),
+      prisma.invoice.findFirst({
+        where: { id: body.purchaseInvoiceId, companyId: req.user!.companyId },
+        select: { id: true, invoiceNumber: true },
+      }),
+    ]);
+    if (!item || !invoice) {
+      res.status(404).json({ error: 'Document or invoice not found' });
+      return;
+    }
+
+    const updated = await prisma.documentIntake.update({
+      where: { id: item.id },
+      data: {
+        status: 'saved',
+        targetType: 'sales_invoice',
+        targetId: invoice.id,
+        error: null,
+        processedAt: new Date(),
+      },
+    });
+
+    res.json({ data: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to attach sales invoice document', { error: err });
+    res.status(500).json({ error: 'Failed to attach document' });
+  }
+});
+
 purchaseInvoicesRouter.post('/document-intakes/:id/reject', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
   try {
     const updated = await prisma.documentIntake.updateMany({

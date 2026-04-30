@@ -7,7 +7,7 @@ import {
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import type { DocumentIntake, PurchaseInvoice } from '../types';
+import type { DocumentIntake, Invoice, PurchaseInvoice } from '../types';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
 type DocumentStatusFilter = 'action' | 'all' | 'saved' | 'failed';
@@ -78,6 +78,7 @@ export default function PurchaseInvoices() {
   const { policy } = useCompanyAccessPolicy();
 
   const [items, setItems] = useState<PurchaseInvoice[]>([]);
+  const [salesInvoices, setSalesInvoices] = useState<Invoice[]>([]);
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null);
@@ -96,6 +97,9 @@ export default function PurchaseInvoices() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [attachDoc, setAttachDoc] = useState<DocumentIntake | null>(null);
+  const [attachTargetType, setAttachTargetType] = useState<'purchase_invoice' | 'sales_invoice'>('purchase_invoice');
+  const [attachTargetId, setAttachTargetId] = useState('');
 
   const isFreePlan = policy?.plan === 'free';
 
@@ -106,8 +110,11 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const [res, intakeRes, libraryRes, statsRes] = await Promise.all([
+      const [res, salesRes, intakeRes, libraryRes, statsRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/invoices?limit=50', {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch('/api/purchase-invoices/document-intakes/review', {
@@ -121,17 +128,20 @@ export default function PurchaseInvoices() {
         }),
       ]);
       const json = await res.json();
+      const salesJson = await salesRes.json();
       const intakeJson = await intakeRes.json();
       const libraryJson = await libraryRes.json();
       const statsJson = await statsRes.json();
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
       setItems(data);
+      setSalesInvoices(salesJson.data ?? []);
       setReviewIntakes(intakeJson.data ?? []);
       setDocumentLibrary(libraryJson.data ?? []);
       setDocumentStats(statsJson.data ?? null);
     } catch {
       setItems([]);
+      setSalesInvoices([]);
       setReviewIntakes([]);
       setDocumentLibrary([]);
       setDocumentStats(null);
@@ -216,6 +226,33 @@ export default function PurchaseInvoices() {
     return 'bg-amber-50 text-amber-700 border-amber-100';
   }
 
+  function missingDocumentFields(doc: DocumentIntake) {
+    const result = doc.ocrResult;
+    if (!result) return [isThai ? 'ยังไม่มีผลอ่านเอกสาร' : 'No OCR result yet'];
+    const missing = [
+      result.supplierName ? null : (isThai ? 'ชื่อผู้ขาย' : 'Supplier'),
+      result.supplierTaxId ? null : (isThai ? 'เลขผู้เสียภาษี' : 'Tax ID'),
+      result.invoiceNumber ? null : (isThai ? 'เลขที่เอกสาร' : 'Document no.'),
+      result.invoiceDate ? null : (isThai ? 'วันที่' : 'Date'),
+      result.total ? null : (isThai ? 'ยอดรวม' : 'Total'),
+    ].filter(Boolean) as string[];
+    return missing;
+  }
+
+  function confidenceLabel(confidence?: string) {
+    if (confidence === 'high') return isThai ? 'มั่นใจสูง' : 'High confidence';
+    if (confidence === 'medium') return isThai ? 'มั่นใจกลาง' : 'Medium confidence';
+    if (confidence === 'low') return isThai ? 'มั่นใจต่ำ' : 'Low confidence';
+    return isThai ? 'ยังไม่ทราบความมั่นใจ' : 'No confidence yet';
+  }
+
+  function confidenceClass(confidence?: string) {
+    if (confidence === 'high') return 'bg-green-50 text-green-700 border-green-100';
+    if (confidence === 'medium') return 'bg-amber-50 text-amber-700 border-amber-100';
+    if (confidence === 'low') return 'bg-rose-50 text-rose-700 border-rose-100';
+    return 'bg-gray-50 text-gray-600 border-gray-100';
+  }
+
   function openCreate() {
     if (isFreePlan) {
       setError(isThai ? 'อัปเกรดเพื่อบันทึก Input VAT' : 'Upgrade plan to record Input VAT');
@@ -295,29 +332,31 @@ export default function PurchaseInvoices() {
     }
   }
 
-  async function attachDocument(doc: DocumentIntake) {
-    const keyword = prompt(isThai ? 'พิมพ์เลขใบซื้อหรือชื่อผู้ขายที่ต้องการแนบไฟล์นี้' : 'Enter purchase invoice number or supplier name to attach this file');
-    if (!keyword?.trim()) return;
-    const normalized = keyword.trim().toLowerCase();
-    const match = items.find((item) =>
-      item.invoiceNumber.toLowerCase() === normalized
-      || item.invoiceNumber.toLowerCase().includes(normalized)
-      || item.supplierName.toLowerCase().includes(normalized),
-    );
-    if (!match) {
-      setError(isThai ? 'ไม่พบรายการซื้อที่ตรงกับคำค้นนี้ในช่วงวันที่ที่เปิดอยู่' : 'No matching purchase invoice in the current date range');
+  function openAttachDialog(doc: DocumentIntake) {
+    setAttachDoc(doc);
+    setAttachTargetType('purchase_invoice');
+    setAttachTargetId(items[0]?.id ?? '');
+    setError('');
+  }
+
+  async function submitAttachDocument() {
+    if (!attachDoc || !attachTargetId) {
+      setError(isThai ? 'กรุณาเลือกเอกสารปลายทาง' : 'Please choose a target document');
       return;
     }
-    setDocumentActionId(doc.id);
-    setError('');
+    setDocumentActionId(attachDoc.id);
+    const path = attachTargetType === 'purchase_invoice'
+      ? `/api/purchase-invoices/document-intakes/${attachDoc.id}/attach-purchase`
+      : `/api/purchase-invoices/document-intakes/${attachDoc.id}/attach-sales-invoice`;
     try {
-      const res = await fetch(`/api/purchase-invoices/document-intakes/${doc.id}/attach-purchase`, {
+      const res = await fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ purchaseInvoiceId: match.id }),
+        body: JSON.stringify({ purchaseInvoiceId: attachTargetId }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error ?? 'Attach failed');
+      setAttachDoc(null);
       await fetchItems();
     } catch (err) {
       setError(err instanceof Error ? err.message : (isThai ? 'แนบเอกสารไม่สำเร็จ' : 'Attach failed'));
@@ -646,6 +685,21 @@ export default function PurchaseInvoices() {
                               {doc.error || doc.warnings?.join(', ')}
                             </p>
                           )}
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${confidenceClass(doc.ocrResult?.confidence)}`}>
+                              {confidenceLabel(doc.ocrResult?.confidence)}
+                            </span>
+                            {missingDocumentFields(doc).length > 0 ? (
+                              <span className="text-[11px] text-amber-700">
+                                {isThai ? 'ขาด: ' : 'Missing: '}
+                                {missingDocumentFields(doc).join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-green-700">
+                                {isThai ? 'ข้อมูลหลักครบ รอยืนยัน' : 'Required fields complete'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -676,7 +730,7 @@ export default function PurchaseInvoices() {
                               </button>
                             )}
                             <button
-                              onClick={() => void attachDocument(doc)}
+                              onClick={() => openAttachDialog(doc)}
                               disabled={busy}
                               className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
                             >
@@ -1152,6 +1206,68 @@ export default function PurchaseInvoices() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {isThai ? 'บันทึก' : 'Save'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {attachDoc && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">
+                {isThai ? 'แนบเอกสารกับรายการ' : 'Attach document'}
+              </h2>
+              <button onClick={() => setAttachDoc(null)} className="p-1 rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="label">{isThai ? 'ประเภทปลายทาง' : 'Target type'}</label>
+                <select
+                  value={attachTargetType}
+                  onChange={(e) => {
+                    const value = e.target.value as 'purchase_invoice' | 'sales_invoice';
+                    setAttachTargetType(value);
+                    setAttachTargetId(value === 'purchase_invoice' ? (items[0]?.id ?? '') : (salesInvoices[0]?.id ?? ''));
+                  }}
+                  className="input-field"
+                >
+                  <option value="purchase_invoice">{isThai ? 'เอกสารจ่าย / ภาษีซื้อ' : 'Purchase / payment document'}</option>
+                  <option value="sales_invoice">{isThai ? 'อินวอยขาย / ใบกำกับภาษีขาย' : 'Sales invoice'}</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">{isThai ? 'เลือกรายการ' : 'Choose document'}</label>
+                <select
+                  value={attachTargetId}
+                  onChange={(e) => setAttachTargetId(e.target.value)}
+                  className="input-field"
+                >
+                  {(attachTargetType === 'purchase_invoice' ? items : salesInvoices).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {attachTargetType === 'purchase_invoice'
+                        ? `${(item as PurchaseInvoice).invoiceNumber} · ${(item as PurchaseInvoice).supplierName} · ${formatCurrency((item as PurchaseInvoice).total)}`
+                        : `${(item as Invoice).invoiceNumber} · ${(item as Invoice).buyer?.nameTh ?? ''} · ${formatCurrency((item as Invoice).total)}`}
+                    </option>
+                  ))}
+                </select>
+                {!attachTargetId && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    {isThai ? 'ยังไม่มีรายการปลายทางในช่วงข้อมูลที่โหลดอยู่' : 'No target records are currently loaded.'}
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setAttachDoc(null)} className="btn-secondary">
+                  {isThai ? 'ยกเลิก' : 'Cancel'}
+                </button>
+                <button onClick={() => void submitAttachDocument()} disabled={!attachTargetId || documentActionId === attachDoc.id} className="btn-primary">
+                  {documentActionId === attachDoc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  {isThai ? 'แนบเอกสาร' : 'Attach'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
