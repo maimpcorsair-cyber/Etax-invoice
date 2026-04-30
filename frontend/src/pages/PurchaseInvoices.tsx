@@ -94,6 +94,7 @@ export default function PurchaseInvoices() {
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<PurchaseInvoice | null>(null);
+  const [reviewingDoc, setReviewingDoc] = useState<DocumentIntake | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -226,6 +227,12 @@ export default function PurchaseInvoices() {
     return 'bg-amber-50 text-amber-700 border-amber-100';
   }
 
+  function sourceLabel(source: string) {
+    if (source === 'line') return isThai ? 'อัปโหลดผ่าน LINE' : 'Uploaded via LINE';
+    if (source === 'web') return isThai ? 'อัปโหลดผ่านหน้าเว็บ' : 'Uploaded via web';
+    return source;
+  }
+
   function missingDocumentFields(doc: DocumentIntake) {
     const result = doc.ocrResult;
     if (!result) return [isThai ? 'ยังไม่มีผลอ่านเอกสาร' : 'No OCR result yet'];
@@ -266,6 +273,7 @@ export default function PurchaseInvoices() {
 
   function openEdit(p: PurchaseInvoice) {
     setEditing(p);
+    setReviewingDoc(null);
     setForm({
       supplierName: p.supplierName,
       supplierTaxId: p.supplierTaxId,
@@ -280,6 +288,39 @@ export default function PurchaseInvoices() {
       category: p.category ?? '',
       notes: p.notes ?? '',
       pdfUrl: p.pdfUrl ?? '',
+    });
+    setError('');
+    setShowModal(true);
+  }
+
+  function openReviewDocument(doc: DocumentIntake) {
+    const result = doc.ocrResult;
+    const total = Number(result?.total || 0);
+    const vatAmount = Number(result?.vatAmount || 0);
+    const subtotal = Number(result?.subtotal || Math.max(total - vatAmount, 0));
+    setEditing(null);
+    setReviewingDoc(doc);
+    setForm({
+      supplierName: result?.supplierName ?? '',
+      supplierTaxId: (result?.supplierTaxId ?? '').replace(/\D/g, '').slice(0, 13),
+      supplierBranch: result?.supplierBranch ?? '00000',
+      invoiceNumber: result?.invoiceNumber ?? '',
+      invoiceDate: result?.invoiceDate || todayIso(),
+      dueDate: result?.documentMetadata?.dueDate ?? '',
+      subtotal: subtotal ? String(subtotal) : '',
+      vatType: vatAmount > 0 ? 'vat7' : (result?.taxTreatment === 'vat_exempt' ? 'vatExempt' : 'vatZero'),
+      vatAmount: vatAmount ? String(vatAmount) : '0',
+      description: [
+        result?.documentTypeLabel || result?.documentType,
+        result?.postingSuggestion,
+      ].filter(Boolean).join(' · '),
+      category: result?.expenseSubcategory || result?.expenseCategory || '',
+      notes: [
+        result?.confidence ? `AI confidence: ${result.confidence}` : null,
+        result?.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
+        `${isThai ? 'ที่มา' : 'Source'}: ${sourceLabel(doc.source)}`,
+      ].filter(Boolean).join('\n'),
+      pdfUrl: '',
     });
     setError('');
     setShowModal(true);
@@ -363,16 +404,6 @@ export default function PurchaseInvoices() {
     } finally {
       setDocumentActionId(null);
     }
-  }
-
-  async function confirmDocument(doc: DocumentIntake) {
-    if (!confirm(isThai ? 'ยืนยันบันทึกเอกสารนี้เป็นรายการซื้อ?' : 'Confirm this document as a purchase invoice?')) return;
-    setDocumentActionId(doc.id);
-    await runDocumentAction(
-      `/api/purchase-invoices/document-intakes/${doc.id}/confirm-purchase`,
-      isThai ? 'บันทึกเอกสารไม่สำเร็จ' : 'Confirm document failed',
-    );
-    setDocumentActionId(null);
   }
 
   async function rejectDocument(doc: DocumentIntake) {
@@ -483,7 +514,17 @@ export default function PurchaseInvoices() {
         const json = await res.json();
         throw new Error(json.error ?? 'Save failed');
       }
+      const savedJson = await res.json().catch(() => ({}));
+      const savedId = savedJson.data?.id as string | undefined;
+      if (reviewingDoc && savedId) {
+        await fetch(`/api/purchase-invoices/document-intakes/${reviewingDoc.id}/attach-purchase`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ purchaseInvoiceId: savedId }),
+        });
+      }
       setShowModal(false);
+      setReviewingDoc(null);
       fetchItems();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -677,7 +718,7 @@ export default function PurchaseInvoices() {
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-gray-500 truncate">
-                            {doc.source} · {doc.ocrResult?.documentTypeLabel || doc.ocrResult?.documentType || doc.mimeType} · {formatDate(doc.createdAt)}
+                            {sourceLabel(doc.source)} · {doc.ocrResult?.documentTypeLabel || doc.ocrResult?.documentType || doc.mimeType} · {formatDate(doc.createdAt)}
                             {doc.ocrResult?.total ? ` · ${formatCurrency(doc.ocrResult.total)}` : ''}
                           </p>
                           {(doc.error || doc.warnings?.length) && (
@@ -721,12 +762,12 @@ export default function PurchaseInvoices() {
                             )}
                             {canConfirmDocument(doc) && (
                               <button
-                                onClick={() => void confirmDocument(doc)}
+                                onClick={() => openReviewDocument(doc)}
                                 disabled={busy}
                                 className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-60"
                               >
-                                <FileCheck2 className="w-3.5 h-3.5" />
-                                {isThai ? 'บันทึก' : 'Save'}
+                                <Edit2 className="w-3.5 h-3.5" />
+                                {isThai ? 'ตรวจ/ยืนยัน' : 'Review'}
                               </button>
                             )}
                             <button
@@ -1031,7 +1072,9 @@ export default function PurchaseInvoices() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">
-                {editing
+                {reviewingDoc
+                  ? (isThai ? 'ตรวจข้อมูลจาก AI ก่อนบันทึก' : 'Review AI prefill before saving')
+                  : editing
                   ? (isThai ? 'แก้ไขรายการซื้อ' : 'Edit Purchase Invoice')
                   : (isThai ? 'เพิ่มรายการซื้อ' : 'Add Purchase Invoice')}
               </h2>
@@ -1043,6 +1086,15 @@ export default function PurchaseInvoices() {
             <div className="p-5 space-y-4">
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+              )}
+
+              {reviewingDoc && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {sourceLabel(reviewingDoc.source)} · {confidenceLabel(reviewingDoc.ocrResult?.confidence)}
+                  {missingDocumentFields(reviewingDoc).length > 0
+                    ? ` · ${isThai ? 'ช่องที่ต้องเติม: ' : 'Missing fields: '}${missingDocumentFields(reviewingDoc).join(', ')}`
+                    : ` · ${isThai ? 'ข้อมูลหลักครบแล้ว กรุณาตรวจอีกครั้งก่อนบันทึก' : 'Required fields are complete. Please review before saving.'}`}
+                </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

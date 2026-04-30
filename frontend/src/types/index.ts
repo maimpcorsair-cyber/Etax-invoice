@@ -221,10 +221,14 @@ export interface DocumentIntake {
     documentTypeLabel?: string;
     supplierName?: string;
     supplierTaxId?: string;
+    supplierBranch?: string;
     invoiceNumber?: string;
     invoiceDate?: string;
+    subtotal?: number;
+    vatAmount?: number;
     total?: number;
     confidence?: 'high' | 'medium' | 'low';
+    validationWarnings?: string[];
     expenseCategory?: string;
     expenseSubcategory?: string;
     taxTreatment?: string;
@@ -236,6 +240,7 @@ export interface DocumentIntake {
       purchaseOrderNumber?: string;
       quotationNumber?: string;
       deliveryNoteNumber?: string;
+      dueDate?: string;
     };
   } | null;
   warnings?: string[] | null;
