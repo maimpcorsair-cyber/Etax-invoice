@@ -618,10 +618,6 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
             <div className="max-w-3xl">
-              <div className="animate-fade-in inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 mb-8 shadow-sm">
-                <Zap className="w-4 h-4 flex-shrink-0" />
-                <span>{isThai ? '✨ AI ผู้ช่วยบัญชีและภาษีของคุณ' : '✨ Your AI Accounting & Tax Assistant'}</span>
-              </div>
 
               <h1 className="animate-slide-in-left max-w-4xl text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl leading-tight mb-6" style={{animationDelay:'0.15s'}}>
                 {t('landing.hero.title')}
@@ -661,65 +657,127 @@ export default function Landing() {
             </div>
 
             <aside className="animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
-              {/* Billy mascot — receipt bill character */}
-              <div className="flex justify-center mb-4">
-                <svg viewBox="0 0 160 220" width="140" height="196" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Drop shadow */}
-                  <ellipse cx="80" cy="210" rx="42" ry="8" fill="#d1fae5" opacity="0.7"/>
-                  {/* Legs */}
-                  <rect x="54" y="178" width="16" height="24" rx="6" fill="#e2e8f0"/>
-                  <rect x="90" y="178" width="16" height="24" rx="6" fill="#e2e8f0"/>
-                  {/* Green shoes */}
-                  <ellipse cx="62" cy="203" rx="16" ry="9" fill="#16a34a"/>
-                  <ellipse cx="98" cy="203" rx="16" ry="9" fill="#059669"/>
-                  {/* Shoe highlight */}
-                  <ellipse cx="56" cy="199" rx="5" ry="3" fill="#4ade80" opacity="0.5"/>
-                  <ellipse cx="92" cy="199" rx="5" ry="3" fill="#4ade80" opacity="0.5"/>
-                  {/* Arms */}
-                  <path d="M28 120 Q14 130 18 148" stroke="#e2e8f0" strokeWidth="14" strokeLinecap="round" fill="none"/>
-                  <path d="M132 120 Q146 130 142 148" stroke="#e2e8f0" strokeWidth="14" strokeLinecap="round" fill="none"/>
-                  {/* Receipt body — slightly rounded rectangle with paper texture */}
-                  <rect x="22" y="36" width="116" height="152" rx="6" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="2"/>
-                  {/* Receipt body inner white */}
-                  <rect x="26" y="40" width="108" height="144" rx="4" fill="white"/>
-                  {/* Zigzag torn top edge */}
-                  <path d="M22,36 L30,22 L38,36 L46,22 L54,36 L62,22 L70,36 L78,22 L86,36 L94,22 L102,36 L110,22 L118,36 L126,22 L134,36 L138,36" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" strokeLinejoin="round"/>
-                  {/* Receipt lines — like real receipt content */}
-                  <line x1="36" y1="68" x2="124" y2="68" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  <line x1="36" y1="80" x2="100" y2="80" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  <line x1="36" y1="92" x2="112" y2="92" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  {/* Green separator line */}
-                  <line x1="36" y1="104" x2="124" y2="104" stroke="#16a34a" strokeWidth="1.5" strokeDasharray="4 2"/>
-                  <line x1="36" y1="116" x2="90" y2="116" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  <line x1="36" y1="128" x2="78" y2="128" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  {/* Eyes — big friendly circular eyes */}
-                  <circle cx="62" cy="56" r="13" fill="#1e293b"/>
-                  <circle cx="98" cy="56" r="13" fill="#1e293b"/>
-                  {/* Eye whites / shine */}
-                  <circle cx="67" cy="51" r="4.5" fill="white"/>
-                  <circle cx="103" cy="51" r="4.5" fill="white"/>
-                  <circle cx="69" cy="49" r="2" fill="white" opacity="0.7"/>
-                  <circle cx="105" cy="49" r="2" fill="white" opacity="0.7"/>
-                  {/* Cheeks */}
-                  <ellipse cx="45" cy="70" rx="9" ry="6" fill="#fda4af" opacity="0.55"/>
-                  <ellipse cx="115" cy="70" rx="9" ry="6" fill="#fda4af" opacity="0.55"/>
-                  {/* Smile — wide friendly curve */}
-                  <path d="M 55 76 Q 80 95 105 76" stroke="#1e293b" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+              {/* Billy mascot — faithful SVG of the 3D receipt character */}
+              <div className="flex justify-center mb-2">
+                <svg viewBox="0 0 200 280" width="160" height="224" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* ── Ground shadow ── */}
+                  <ellipse cx="100" cy="272" rx="52" ry="7" fill="#bbf7d0" opacity="0.7"/>
+
+                  {/* ── Legs ── */}
+                  <rect x="62" y="216" width="22" height="38" rx="10" fill="#f1f5f9"/>
+                  <rect x="116" y="216" width="22" height="38" rx="10" fill="#f1f5f9"/>
+                  {/* Leg shading */}
+                  <rect x="62" y="216" width="6" height="38" rx="10" fill="#e2e8f0"/>
+                  <rect x="116" y="216" width="6" height="38" rx="10" fill="#e2e8f0"/>
+
+                  {/* ── Green sneakers ── */}
+                  {/* Left shoe */}
+                  <ellipse cx="73" cy="254" rx="20" ry="11" fill="#16a34a"/>
+                  <ellipse cx="70" cy="252" rx="14" ry="7" fill="#15803d"/>
+                  {/* Sole white stripe */}
+                  <ellipse cx="73" cy="258" rx="19" ry="5" fill="white" opacity="0.3"/>
+                  {/* Lace dots */}
+                  <circle cx="68" cy="250" r="1.5" fill="white" opacity="0.8"/>
+                  <circle cx="73" cy="248" r="1.5" fill="white" opacity="0.8"/>
+                  <circle cx="78" cy="250" r="1.5" fill="white" opacity="0.8"/>
+                  {/* Right shoe */}
+                  <ellipse cx="127" cy="254" rx="20" ry="11" fill="#16a34a"/>
+                  <ellipse cx="124" cy="252" rx="14" ry="7" fill="#15803d"/>
+                  <ellipse cx="127" cy="258" rx="19" ry="5" fill="white" opacity="0.3"/>
+                  <circle cx="122" cy="250" r="1.5" fill="white" opacity="0.8"/>
+                  <circle cx="127" cy="248" r="1.5" fill="white" opacity="0.8"/>
+                  <circle cx="132" cy="250" r="1.5" fill="white" opacity="0.8"/>
+
+                  {/* ── Left arm (holding phone) ── */}
+                  <path d="M42 140 C24 148 20 168 26 180 C30 188 38 190 44 186" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1"/>
+                  <ellipse cx="34" cy="170" rx="14" ry="22" fill="#f1f5f9" transform="rotate(-20 34 170)"/>
+                  {/* Round hand */}
+                  <circle cx="30" cy="182" r="12" fill="#f1f5f9"/>
+                  <circle cx="30" cy="182" r="10" fill="white"/>
+
+                  {/* ── Phone in left hand ── */}
+                  <rect x="10" y="148" width="36" height="58" rx="6" fill="#1e293b"/>
+                  <rect x="13" y="152" width="30" height="50" rx="4" fill="#334155"/>
+                  {/* Camera bump */}
+                  <circle cx="16" cy="156" r="3" fill="#0f172a"/>
+                  <circle cx="16" cy="156" r="2" fill="#1e293b"/>
+                  {/* Screen glow */}
+                  <rect x="14" y="153" width="28" height="48" rx="3" fill="#4ade80" opacity="0.15"/>
+                  {/* B on phone */}
+                  <text x="28" y="181" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="14" fontWeight="900" fill="white" opacity="0.9">B</text>
+
+                  {/* ── Right arm ── */}
+                  <ellipse cx="166" cy="160" rx="14" ry="22" fill="#f1f5f9" transform="rotate(15 166 160)"/>
+                  <circle cx="170" cy="176" r="12" fill="#f1f5f9"/>
+                  <circle cx="170" cy="176" r="10" fill="white"/>
+
+                  {/* ── Receipt body — main white body ── */}
+                  {/* Shadow/depth layer */}
+                  <rect x="36" y="50" width="130" height="178" rx="14" fill="#e2e8f0"/>
+                  {/* Main body */}
+                  <rect x="32" y="46" width="130" height="178" rx="14" fill="#f8fafc"/>
+                  {/* White inner */}
+                  <rect x="36" y="50" width="122" height="170" rx="12" fill="white"/>
+
+                  {/* ── Crown / spike top edge ── */}
+                  <path d="M32,46 L44,22 L56,44 L68,16 L80,44 L92,16 L104,44 L116,16 L128,44 L140,22 L154,42 L162,46"
+                    fill="white" stroke="#e2e8f0" strokeWidth="1.5" strokeLinejoin="round"/>
+                  {/* Fill spikes white */}
+                  <path d="M32,46 L44,22 L56,44 L68,16 L80,44 L92,16 L104,44 L116,16 L128,44 L140,22 L154,42 L162,46 L162,60 L32,60 Z"
+                    fill="white"/>
+
+                  {/* ── Eyebrows — thin arch above eyes ── */}
+                  <path d="M66 82 Q76 74 86 80" stroke="#1e293b" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+                  <path d="M110 80 Q120 74 130 82" stroke="#1e293b" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+
+                  {/* ── Eyes — big round black with white shine ── */}
+                  <circle cx="76" cy="96" r="17" fill="#1e293b"/>
+                  <circle cx="120" cy="96" r="17" fill="#1e293b"/>
+                  {/* Iris highlight */}
+                  <circle cx="83" cy="89" r="6" fill="white"/>
+                  <circle cx="127" cy="89" r="6" fill="white"/>
+                  <circle cx="86" cy="87" r="2.5" fill="white" opacity="0.6"/>
+                  <circle cx="130" cy="87" r="2.5" fill="white" opacity="0.6"/>
+
+                  {/* ── Cheeks ── */}
+                  <ellipse cx="54" cy="112" rx="12" ry="8" fill="#fda4af" opacity="0.5"/>
+                  <ellipse cx="142" cy="112" rx="12" ry="8" fill="#fda4af" opacity="0.5"/>
+
+                  {/* ── Open smiling mouth ── */}
+                  {/* Mouth path — open happy */}
+                  <path d="M72 120 Q98 144 124 120" fill="#ef4444" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round"/>
                   {/* Teeth */}
-                  <path d="M 65 80 Q 80 92 95 80" fill="white" stroke="none"/>
-                  {/* Green scarf / cape collar */}
-                  <path d="M38 145 Q80 162 122 145 L126 158 Q80 178 34 158 Z" fill="#16a34a"/>
-                  <path d="M52 145 Q80 155 108 145 L106 152 Q80 162 54 152 Z" fill="#15803d"/>
-                  {/* Scarf knot */}
-                  <ellipse cx="80" cy="150" rx="10" ry="8" fill="#4ade80"/>
-                  <ellipse cx="80" cy="150" rx="6" ry="5" fill="#16a34a"/>
-                  {/* "B" badge on body */}
-                  <circle cx="80" cy="120" r="12" fill="#16a34a"/>
-                  <text x="80" y="125" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="14" fontWeight="900" fill="white">B</text>
-                  {/* Sparkles around mascot */}
-                  <path d="M140 50 L142 44 L144 50 L150 52 L144 54 L142 60 L140 54 L134 52 Z" fill="#4ade80" opacity="0.8"/>
-                  <path d="M16 80 L17.5 76 L19 80 L23 81.5 L19 83 L17.5 87 L16 83 L12 81.5 Z" fill="#86efac" opacity="0.7"/>
-                  <path d="M138 90 L139 87 L140 90 L143 91 L140 92 L139 95 L138 92 L135 91 Z" fill="#4ade80" opacity="0.6"/>
+                  <path d="M76 121 Q98 138 120 121" fill="white" stroke="none"/>
+                  {/* Tongue hint */}
+                  <ellipse cx="98" cy="134" rx="10" ry="5" fill="#f87171" opacity="0.6"/>
+
+                  {/* ── Receipt lines on body ── */}
+                  <line x1="52" y1="155" x2="144" y2="155" stroke="#e5e7eb" strokeWidth="2"/>
+                  <line x1="52" y1="166" x2="120" y2="166" stroke="#e5e7eb" strokeWidth="2"/>
+                  <line x1="52" y1="177" x2="130" y2="177" stroke="#e5e7eb" strokeWidth="2"/>
+                  <line x1="52" y1="188" x2="108" y2="188" stroke="#e5e7eb" strokeWidth="2"/>
+
+                  {/* ── Green scarf / cape ── */}
+                  {/* Cape back */}
+                  <path d="M120 138 C150 140 172 155 168 195 C162 210 145 215 132 210 L128 192 C138 196 148 192 150 180 C153 162 138 148 118 148 Z" fill="#15803d"/>
+                  {/* Scarf front band */}
+                  <path d="M55 138 Q98 152 142 138 L145 154 Q98 168 52 154 Z" fill="#16a34a"/>
+                  {/* Scarf fold */}
+                  <path d="M68 138 Q98 148 128 138 L126 148 Q98 158 70 148 Z" fill="#15803d"/>
+                  {/* Knot at center */}
+                  <ellipse cx="98" cy="148" rx="14" ry="10" fill="#4ade80"/>
+                  <ellipse cx="98" cy="148" rx="9" ry="7" fill="#16a34a"/>
+                  <ellipse cx="98" cy="148" rx="5" ry="4" fill="#22c55e"/>
+
+                  {/* ── Green B badge ── */}
+                  <circle cx="98" cy="175" r="14" fill="#16a34a"/>
+                  <circle cx="98" cy="175" r="12" fill="#15803d"/>
+                  <text x="98" y="180" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="15" fontWeight="900" fill="white">B</text>
+
+                  {/* ── Sparkle decorations ── */}
+                  <path d="M168 60 L170 53 L172 60 L179 62 L172 64 L170 71 L168 64 L161 62 Z" fill="#4ade80" opacity="0.9"/>
+                  <path d="M20 100 L21.5 95 L23 100 L28 101.5 L23 103 L21.5 108 L20 103 L15 101.5 Z" fill="#86efac" opacity="0.8"/>
+                  <path d="M170 110 L171 106 L172 110 L176 111 L172 112 L171 116 L170 112 L166 111 Z" fill="#4ade80" opacity="0.7"/>
                 </svg>
               </div>
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -993,25 +1051,99 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="rounded-3xl p-12 text-center text-white" style={{background: 'linear-gradient(135deg,#2563eb 0%,#1e40af 100%)'}}>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              {isThai ? 'พร้อมเริ่มต้นหรือยัง?' : 'Ready to get started?'}
-            </h2>
-            <p className="text-blue-100 mb-8 text-lg max-w-2xl mx-auto">
-              {isThai
-                ? 'เข้าร่วมระบบ e-Tax Invoice ที่มีความปลอดภัยและเชื่อถือได้'
-                : 'Join thousands of businesses using our secure and reliable e-Invoice system'}
-            </p>
-            <button
-              type="button"
-              onClick={() => openCheckout('free')}
-              className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-blue-50 transition-all duration-200 hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
-            >
-              {t('landing.hero.cta')}
-              <ArrowRight className="w-5 h-5" />
-            </button>
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="relative overflow-hidden rounded-3xl p-12 text-center text-white" style={{background: 'linear-gradient(135deg,#16a34a 0%,#059669 50%,#047857 100%)'}}>
+            {/* Floating doodles inside CTA — Billy themed */}
+            {/* Mini Billy face — top left */}
+            <div className="pointer-events-none absolute left-8 top-6 opacity-20" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
+              <svg width="64" height="88" viewBox="0 0 64 88" fill="none">
+                <rect x="4" y="18" width="56" height="66" rx="6" fill="white"/>
+                <path d="M4,18 L9,8 L14,18 L19,8 L24,18 L29,8 L34,18 L39,8 L44,18 L49,8 L54,8 L60,18" fill="white" stroke="white" strokeWidth="1"/>
+                <circle cx="22" cy="36" r="8" fill="#1e293b"/>
+                <circle cx="42" cy="36" r="8" fill="#1e293b"/>
+                <circle cx="25" cy="33" r="3" fill="white"/>
+                <circle cx="45" cy="33" r="3" fill="white"/>
+                <path d="M18 48 Q32 60 46 48" stroke="#1e293b" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+                <ellipse cx="32" cy="68" rx="18" ry="8" fill="#16a34a" opacity="0.8"/>
+              </svg>
+            </div>
+            {/* Receipt sketch — bottom left */}
+            <div className="pointer-events-none absolute left-16 bottom-4 opacity-15" style={{animation:'float 9s ease-in-out infinite', animationDelay:'1s'}}>
+              <svg width="50" height="70" viewBox="0 0 50 70" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+                <rect x="4" y="4" width="42" height="58" rx="4"/>
+                <line x1="10" y1="18" x2="40" y2="18"/>
+                <line x1="10" y1="26" x2="32" y2="26"/>
+                <line x1="10" y1="34" x2="36" y2="34"/>
+                <line x1="10" y1="46" x2="40" y2="46" strokeWidth="3"/>
+                <path d="M4 58 L10 50 L16 58 L22 50 L28 58 L34 50 L40 58 L46 50 L46 58" strokeWidth="1.5"/>
+              </svg>
+            </div>
+            {/* Sparkle — top right */}
+            <div className="pointer-events-none absolute right-16 top-8 opacity-25" style={{animation:'float 6s ease-in-out infinite', animationDelay:'0.5s'}}>
+              <svg width="60" height="60" viewBox="0 0 60 60" fill="white">
+                <path d="M30 5 L32.5 24 L52 27.5 L32.5 31 L30 50 L27.5 31 L8 27.5 L27.5 24 Z"/>
+                <path d="M52 8 L53.5 14 L60 15.5 L53.5 17 L52 23 L50.5 17 L44 15.5 L50.5 14 Z" opacity="0.6"/>
+              </svg>
+            </div>
+            {/* Mini QR — bottom right */}
+            <div className="pointer-events-none absolute right-10 bottom-6 opacity-15" style={{animation:'float 8s ease-in-out infinite', animationDelay:'2s'}}>
+              <svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="4" width="18" height="18" rx="2"/>
+                <rect x="8" y="8" width="10" height="10"/>
+                <rect x="34" y="4" width="18" height="18" rx="2"/>
+                <rect x="38" y="8" width="10" height="10"/>
+                <rect x="4" y="34" width="18" height="18" rx="2"/>
+                <rect x="8" y="38" width="10" height="10"/>
+                <line x1="34" y1="34" x2="40" y2="34"/>
+                <line x1="44" y1="34" x2="52" y2="34"/>
+                <line x1="34" y1="42" x2="34" y2="52"/>
+                <line x1="44" y1="42" x2="52" y2="42"/>
+                <line x1="44" y1="50" x2="52" y2="50"/>
+              </svg>
+            </div>
+            {/* Squiggle arrow — mid right */}
+            <div className="pointer-events-none absolute right-6 top-[40%] opacity-20" style={{animation:'float 11s ease-in-out infinite', animationDelay:'3s'}}>
+              <svg width="50" height="70" viewBox="0 0 50 70" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M6 60 C12 44 18 52 24 36 C30 20 36 30 42 14"/>
+                <path d="M38 10 L42 14 L38 20"/>
+              </svg>
+            </div>
+
+            {/* CTA content */}
+            <div className="relative z-10">
+              {/* Billy mini icon above title */}
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <svg viewBox="0 0 40 48" width="32" height="38" fill="none">
+                    <rect x="4" y="12" width="32" height="34" rx="4" fill="white"/>
+                    <path d="M4,12 L7,5 L10,12 L13,5 L16,12 L19,5 L22,12 L25,5 L28,12 L31,5 L34,5 L36,12" fill="white" stroke="white" strokeWidth="1"/>
+                    <circle cx="14" cy="22" r="5" fill="#1e293b"/>
+                    <circle cx="26" cy="22" r="5" fill="#1e293b"/>
+                    <circle cx="16" cy="20" r="2" fill="white"/>
+                    <circle cx="28" cy="20" r="2" fill="white"/>
+                    <path d="M12 30 Q20 37 28 30" stroke="#1e293b" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                  </svg>
+                </div>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                {isThai ? 'พร้อมเริ่มต้นหรือยัง?' : 'Ready to get started?'}
+              </h2>
+              <p className="text-green-100 mb-8 text-lg max-w-2xl mx-auto">
+                {isThai
+                  ? 'ให้ Billoy ช่วยจัดการบัญชีและภาษีให้คุณ ง่าย ครบ จบที่เดียว'
+                  : 'Let Billoy handle your accounting and tax — simple, complete, all in one place'}
+              </p>
+              <button
+                type="button"
+                onClick={() => openCheckout('free')}
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-green-50 transition-all duration-200 hover:-translate-y-1 shadow-lg hover:shadow-xl"
+              >
+                {t('landing.hero.cta')}
+                <ArrowRight className="w-5 h-5" />
+              </button>
+              <p className="mt-4 text-green-200 text-sm">{isThai ? 'ฟรี 20 เอกสาร ไม่ต้องใช้บัตรเครดิต' : 'Free 20 documents — no credit card needed'}</p>
+            </div>
           </div>
         </div>
       </section>
