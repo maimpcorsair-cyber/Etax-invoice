@@ -42,6 +42,10 @@ html, body {
     font-family: 'Inter', system-ui, sans-serif;
   }
 
+  html[lang='zh'] {
+    font-family: 'Noto Sans SC', 'Inter', system-ui, sans-serif;
+  }
+
   body {
     @apply antialiased text-gray-900 bg-gray-50;
     font-weight: 400;

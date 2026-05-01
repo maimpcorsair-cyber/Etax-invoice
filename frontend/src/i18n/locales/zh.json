@@ -1,0 +1,409 @@
+{
+  "app": {
+    "name": "Billoy",
+    "tagline": "您的智能会计与税务助手",
+    "shortName": "Billoy"
+  },
+  "nav": {
+    "dashboard": "控制台",
+    "invoices": "税务发票",
+    "createInvoice": "创建发票",
+    "receipts": "收据",
+    "customers": "客户",
+    "products": "产品/服务",
+    "purchaseInvoices": "采购记录",
+    "vatSummary": "增值税汇总",
+    "admin": "管理面板",
+    "audit": "审计日志",
+    "settings": "设置",
+    "logout": "退出登录",
+    "profile": "个人资料",
+    "plan": "套餐 / Plan"
+  },
+  "landing": {
+    "hero": {
+      "title": "会计与税务，轻松搞定",
+      "subtitle": "Billoy 自动读取您的文件，生成正确的税务发票，并提交泰国税务局 — 一站式完成。",
+      "cta": "免费开始使用",
+      "ctaSecondary": "查看套餐",
+      "trustText": "安全 · 自动备份 · LINE 连接"
+    },
+    "features": {
+      "title": "核心功能",
+      "rd": {
+        "title": "符合税务局标准",
+        "desc": "按泰国税务局规范生成 XML，附带数字签名"
+      },
+      "bilingual": {
+        "title": "泰英双语",
+        "desc": "可用泰语、英语或双语同时创建文件"
+      },
+      "pdf": {
+        "title": "PDF/A-3 标准",
+        "desc": "生成支持泰语字体的 PDF，并内嵌 XML"
+      },
+      "queue": {
+        "title": "自动队列处理",
+        "desc": "通过 BullMQ 批量处理文件，支持自动重试"
+      }
+    }
+  },
+  "dashboard": {
+    "title": "控制台",
+    "welcome": "欢迎",
+    "summary": {
+      "totalInvoices": "发票总数",
+      "totalRevenue": "总收入",
+      "pendingApproval": "待审批",
+      "submittedToRD": "已提交税务局",
+      "thisMonth": "本月",
+      "lastMonth": "上月"
+    },
+    "recentInvoices": "最近发票",
+    "viewAll": "查看全部",
+    "quickActions": "快捷操作",
+    "createNew": "创建新发票",
+    "chart": {
+      "monthly": "月度收入",
+      "status": "文件状态"
+    }
+  },
+  "invoice": {
+    "title": "发票",
+    "taxInvoice": "税务发票",
+    "receipt": "收据",
+    "creditNote": "贷项通知单",
+    "debitNote": "借项通知单",
+    "number": "发票编号",
+    "date": "日期",
+    "dueDate": "到期日",
+    "seller": "卖方",
+    "buyer": "买方",
+    "items": "商品/服务明细",
+    "addItem": "添加商品",
+    "removeItem": "删除商品",
+    "itemName": "商品名称",
+    "description": "描述",
+    "quantity": "数量",
+    "unit": "单位",
+    "unitPrice": "单价",
+    "discount": "折扣",
+    "amount": "金额",
+    "subtotal": "小计（含税前）",
+    "vat": "增值税（7%）",
+    "vatExempt": "免增值税",
+    "total": "合计",
+    "totalText": "总金额",
+    "totalInWords": "金额大写",
+    "notes": "备注",
+    "paymentMethod": "付款方式",
+    "bankAccount": "银行账户",
+    "language": {
+      "label": "文件语言",
+      "th": "泰语",
+      "en": "英语",
+      "both": "双语（泰/英）"
+    },
+    "status": {
+      "draft": "草稿",
+      "pending": "待处理",
+      "approved": "已批准",
+      "submitted": "已提交",
+      "rejected": "已拒绝",
+      "cancelled": "已取消"
+    },
+    "actions": {
+      "save": "保存",
+      "saveDraft": "保存草稿",
+      "preview": "预览",
+      "download": "下载 PDF",
+      "downloadXML": "下载 XML",
+      "submitToRD": "提交至税务局",
+      "print": "打印",
+      "cancel": "取消",
+      "edit": "编辑",
+      "duplicate": "复制",
+      "sendEmail": "发送邮件"
+    },
+    "create": "创建发票",
+    "edit": "编辑发票",
+    "list": "发票列表",
+    "search": "搜索发票",
+    "filter": {
+      "all": "全部",
+      "dateRange": "日期范围",
+      "status": "状态",
+      "customer": "客户"
+    },
+    "rdSubmission": {
+      "title": "税务局提交",
+      "pending": "待提交",
+      "inProgress": "提交中",
+      "in_progress": "提交中",
+      "success": "提交成功",
+      "failed": "提交失败",
+      "retrying": "重试中"
+    }
+  },
+  "customer": {
+    "title": "客户",
+    "name": "姓名/公司",
+    "nameTh": "泰语名称",
+    "nameEn": "英语名称",
+    "taxId": "税务识别号（13位）",
+    "branchCode": "分支代码",
+    "branchName": "分支名称",
+    "address": "地址",
+    "addressTh": "泰语地址",
+    "addressEn": "英语地址",
+    "email": "电子邮件",
+    "phone": "电话",
+    "contactPerson": "联系人",
+    "add": "添加客户",
+    "edit": "编辑客户",
+    "search": "搜索客户"
+  },
+  "product": {
+    "title": "产品/服务",
+    "nameTh": "泰语名称",
+    "nameEn": "英语名称",
+    "code": "产品代码",
+    "unit": "单位",
+    "price": "价格",
+    "vatType": "增值税类型",
+    "vatTypes": {
+      "vat7": "增值税 7%",
+      "vatExempt": "免增值税",
+      "vatZero": "零税率"
+    },
+    "add": "添加产品/服务",
+    "edit": "编辑产品/服务"
+  },
+  "admin": {
+    "title": "管理面板",
+    "systemOverview": "系统概览",
+    "users": "用户管理",
+    "roles": "角色与权限",
+    "templates": "文件模板",
+    "company": "公司信息",
+    "certificate": "数字证书",
+    "rdConfig": "税务局 API 配置",
+    "billing": "账单与套餐",
+    "line": "LINE AI 助手",
+    "appSettings": "系统设置"
+  },
+  "audit": {
+    "title": "审计日志",
+    "action": "操作",
+    "user": "用户",
+    "timestamp": "时间",
+    "details": "详情",
+    "ipAddress": "IP 地址",
+    "language": "语言",
+    "export": "导出日志",
+    "lockedTitle": "审计日志仅限 Business 套餐及以上",
+    "lockedBody": "升级套餐以查看用户活动、重要变更及公司内部可追溯的操作记录。"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "languageDesc": "选择系统显示语言",
+    "theme": "主题",
+    "notifications": "通知",
+    "company": "公司设置",
+    "security": "安全",
+    "api": "API 密钥",
+    "save": "保存设置"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "退出",
+    "email": "电子邮件",
+    "password": "密码",
+    "forgotPassword": "忘记密码？",
+    "rememberMe": "记住我",
+    "loginButton": "登录",
+    "loginError": "邮箱或密码错误",
+    "secure": "安全连接"
+  },
+  "legal": {
+    "privacy": {
+      "eyebrow": "隐私政策",
+      "title": "隐私政策",
+      "description": "Billoy 说明我们如何收集、使用和保护客户数据。",
+      "summary": "我们仅收集提供服务所需的信息，并采取适当措施保护该数据。",
+      "sections": [
+        {
+          "title": "1. 我们收集的信息",
+          "body": [
+            "我们收集您直接提供的信息，例如公司名称、税务ID、地址、管理员姓名、电子邮件和电话号码。",
+            "使用系统时，我们还可能处理发票记录、客户信息和使用数据，以提供服务和技术支持。"
+          ]
+        },
+        {
+          "title": "2. 信息用途",
+          "body": [
+            "我们使用您的信息来创建账户、激活订阅、管理付款和提供税务发票工作流程。",
+            "部分信息可能用于改进服务、检测滥用行为和遵守法律义务。"
+          ]
+        },
+        {
+          "title": "3. 第三方共享",
+          "body": [
+            "我们可能与运营平台所需的服务提供商共享有限信息，例如支付处理商和托管提供商。",
+            "我们不向第三方出售客户个人数据。"
+          ]
+        },
+        {
+          "title": "4. 数据保护与保留",
+          "body": [
+            "我们采取合理的技术和组织措施保护数据安全。",
+            "数据仅在服务交付、法律义务和合理争议解决所需的期限内保留。"
+          ]
+        },
+        {
+          "title": "5. 您的权利与联系方式",
+          "body": [
+            "您可通过 support@maidomdom.com 联系我们，请求访问、更正或查询与您相关的个人数据。",
+            "如本政策发生重大变更，我们将更新本页面。"
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "eyebrow": "服务条款",
+      "title": "服务条款",
+      "description": "Billoy 作为月度 SaaS 税务发票平台的订阅、使用和计费条款。",
+      "summary": "订阅或使用 Billoy 即表示您同意这些服务条款，包括我们的7天退款政策。",
+      "sections": [
+        {
+          "title": "1. 服务性质",
+          "body": [
+            "Billoy 是一项订阅制软件服务，帮助企业在线管理税务发票工作流程和相关电子文件操作。",
+            "我们可能会随时间改进功能、安全性和集成，前提是不会不合理地删除客户订阅的核心服务。"
+          ]
+        },
+        {
+          "title": "2. 注册与用户账户",
+          "body": [
+            "用户必须在注册时提供准确完整的公司和管理员信息。",
+            "客户负责维护账户安全和管理组织内部的用户权限。"
+          ]
+        },
+        {
+          "title": "3. 计费与周期性收费",
+          "body": [
+            "Billoy 订阅费用按定价页面显示的套餐收取，通过 Stripe 等支付提供商处理，可能每月自动续费。",
+            "您授权我们按所选套餐收取相应费用、税款及相关费用。"
+          ]
+        },
+        {
+          "title": "4. 取消与访问",
+          "body": [
+            "客户可使用订阅管理工具取消未来续费，取消将按当前计费周期规则生效。",
+            "如付款失败、违反条款或行为威胁平台安全，我们可能暂停访问。"
+          ]
+        },
+        {
+          "title": "5. 7天退款政策",
+          "body": [
+            "客户可在初次付款后7天内申请月度套餐退款，前提是服务实质上不可用或存在我们无法在合理时间内解决的重大技术问题。",
+            "超过7天后，订阅费用通常不予退还，除非法律要求或我们酌情决定例外处理。"
+          ]
+        },
+        {
+          "title": "6. 支持与计费联系",
+          "body": [
+            "如有套餐、付款、退款或服务访问方面的问题，请联系 support@maidomdom.com。",
+            "这些条款可能会不时更新，最新版本将始终发布在我们的公共网站上。"
+          ]
+        }
+      ]
+    },
+    "contact": {
+      "eyebrow": "联系我们",
+      "title": "联系 Billoy",
+      "description": "直接联系我们的团队，解答套餐、计费、发票、退款和平台支持方面的问题。",
+      "supportTitle": "支持团队",
+      "supportDescription": "我们的团队可协助解决入职、公司设置、登录问题和账户权限等技术问题。",
+      "billingTitle": "我们能帮助的事项",
+      "supportTopics": [
+        "订阅注册与周期性计费",
+        "收据与账单状态查询",
+        "7天内退款申请",
+        "访问问题与管理员账户设置"
+      ],
+      "channels": [
+        {
+          "icon": "mail",
+          "label": "支持与计费邮箱",
+          "value": "support@maidomdom.com",
+          "href": "mailto:support@maidomdom.com"
+        },
+        {
+          "icon": "phone",
+          "label": "电话",
+          "value": "02-123-4567",
+          "href": "tel:021234567"
+        }
+      ]
+    }
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "发生错误",
+    "success": "成功",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "view": "查看",
+    "save": "保存",
+    "search": "搜索",
+    "filter": "筛选",
+    "reset": "重置",
+    "export": "导出",
+    "import": "导入",
+    "print": "打印",
+    "download": "下载",
+    "upload": "上传",
+    "back": "返回",
+    "next": "下一步",
+    "previous": "上一步",
+    "of": "共",
+    "total": "总计",
+    "noData": "暂无数据",
+    "required": "此字段为必填项",
+    "invalidFormat": "格式无效",
+    "baht": "泰铢",
+    "thb": "THB",
+    "yes": "是",
+    "no": "否",
+    "active": "活跃",
+    "inactive": "停用",
+    "actions": "操作",
+    "status": "状态",
+    "date": "日期",
+    "amount": "金额",
+    "name": "名称",
+    "description": "描述",
+    "showMore": "显示更多",
+    "showLess": "显示更少"
+  },
+  "errors": {
+    "required": "此字段为必填项",
+    "invalidEmail": "邮箱格式无效",
+    "invalidTaxId": "税务ID必须为13位数字",
+    "networkError": "无法连接到服务器",
+    "unauthorized": "您无权执行此操作",
+    "notFound": "未找到所请求的资源",
+    "serverError": "服务器内部错误"
+  },
+  "pagination": {
+    "showing": "显示",
+    "to": "至",
+    "of": "共",
+    "entries": "条",
+    "perPage": "每页"
+  }
+}
