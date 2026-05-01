@@ -78,6 +78,7 @@ export default function PurchaseInvoices() {
   const { policy } = useCompanyAccessPolicy();
 
   const [items, setItems] = useState<PurchaseInvoice[]>([]);
+  const [attachPurchaseTargets, setAttachPurchaseTargets] = useState<PurchaseInvoice[]>([]);
   const [salesInvoices, setSalesInvoices] = useState<Invoice[]>([]);
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
@@ -111,8 +112,11 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const [res, salesRes, intakeRes, libraryRes, statsRes] = await Promise.all([
+      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/purchase-invoices?limit=100', {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch('/api/invoices?limit=50', {
@@ -129,6 +133,7 @@ export default function PurchaseInvoices() {
         }),
       ]);
       const json = await res.json();
+      const attachPurchasesJson = await attachPurchasesRes.json();
       const salesJson = await salesRes.json();
       const intakeJson = await intakeRes.json();
       const libraryJson = await libraryRes.json();
@@ -136,12 +141,14 @@ export default function PurchaseInvoices() {
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
       setItems(data);
+      setAttachPurchaseTargets(attachPurchasesJson.data ?? []);
       setSalesInvoices(salesJson.data ?? []);
       setReviewIntakes(intakeJson.data ?? []);
       setDocumentLibrary(libraryJson.data ?? []);
       setDocumentStats(statsJson.data ?? null);
     } catch {
       setItems([]);
+      setAttachPurchaseTargets([]);
       setSalesInvoices([]);
       setReviewIntakes([]);
       setDocumentLibrary([]);
@@ -196,6 +203,7 @@ export default function PurchaseInvoices() {
     if (documentStatusFilter === 'failed') return doc.status === 'failed';
     return true;
   });
+  const purchaseTargetOptions = attachPurchaseTargets.length > 0 ? attachPurchaseTargets : items;
 
   function documentTitle(doc: DocumentIntake) {
     return doc.ocrResult?.supplierName
@@ -353,9 +361,8 @@ export default function PurchaseInvoices() {
     }
   }
 
-  function canConfirmDocument(doc: DocumentIntake) {
-    const type = doc.ocrResult?.documentType;
-    return !!doc.ocrResult && ['tax_invoice', 'receipt', 'invoice', 'billing_note', 'expense_receipt', 'credit_note', 'debit_note'].includes(type || '');
+  function canReviewDocument(doc: DocumentIntake) {
+    return ['received', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed'].includes(doc.status);
   }
 
   async function runDocumentAction(path: string, errorFallback: string) {
@@ -376,7 +383,7 @@ export default function PurchaseInvoices() {
   function openAttachDialog(doc: DocumentIntake) {
     setAttachDoc(doc);
     setAttachTargetType('purchase_invoice');
-    setAttachTargetId(items[0]?.id ?? '');
+    setAttachTargetId(purchaseTargetOptions[0]?.id ?? '');
     setError('');
   }
 
@@ -393,7 +400,9 @@ export default function PurchaseInvoices() {
       const res = await fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ purchaseInvoiceId: attachTargetId }),
+        body: JSON.stringify(attachTargetType === 'purchase_invoice'
+          ? { purchaseInvoiceId: attachTargetId }
+          : { invoiceId: attachTargetId }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error ?? 'Attach failed');
@@ -760,14 +769,16 @@ export default function PurchaseInvoices() {
                                 {isThai ? 'กำลังอ่าน' : 'Reading'}
                               </span>
                             )}
-                            {canConfirmDocument(doc) && (
+                            {canReviewDocument(doc) && (
                               <button
                                 onClick={() => openReviewDocument(doc)}
                                 disabled={busy}
                                 className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-60"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
-                                {isThai ? 'ตรวจ/ยืนยัน' : 'Review'}
+                                {doc.ocrResult
+                                  ? (isThai ? 'ตรวจ/ยืนยัน' : 'Review')
+                                  : (isThai ? 'กรอกเอง' : 'Manual entry')}
                               </button>
                             )}
                             <button
@@ -1282,7 +1293,7 @@ export default function PurchaseInvoices() {
                   onChange={(e) => {
                     const value = e.target.value as 'purchase_invoice' | 'sales_invoice';
                     setAttachTargetType(value);
-                    setAttachTargetId(value === 'purchase_invoice' ? (items[0]?.id ?? '') : (salesInvoices[0]?.id ?? ''));
+                    setAttachTargetId(value === 'purchase_invoice' ? (purchaseTargetOptions[0]?.id ?? '') : (salesInvoices[0]?.id ?? ''));
                   }}
                   className="input-field"
                 >
@@ -1297,7 +1308,7 @@ export default function PurchaseInvoices() {
                   onChange={(e) => setAttachTargetId(e.target.value)}
                   className="input-field"
                 >
-                  {(attachTargetType === 'purchase_invoice' ? items : salesInvoices).map((item) => (
+                  {(attachTargetType === 'purchase_invoice' ? purchaseTargetOptions : salesInvoices).map((item) => (
                     <option key={item.id} value={item.id}>
                       {attachTargetType === 'purchase_invoice'
                         ? `${(item as PurchaseInvoice).invoiceNumber} · ${(item as PurchaseInvoice).supplierName} · ${formatCurrency((item as PurchaseInvoice).total)}`
@@ -1307,7 +1318,7 @@ export default function PurchaseInvoices() {
                 </select>
                 {!attachTargetId && (
                   <p className="mt-2 text-xs text-amber-700">
-                    {isThai ? 'ยังไม่มีรายการปลายทางในช่วงข้อมูลที่โหลดอยู่' : 'No target records are currently loaded.'}
+                    {isThai ? 'ยังไม่มีรายการปลายทางให้แนบ' : 'No target records are available.'}
                   </p>
                 )}
               </div>

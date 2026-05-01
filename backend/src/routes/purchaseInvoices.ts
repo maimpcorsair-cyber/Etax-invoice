@@ -47,6 +47,13 @@ const attachDocumentSchema = z.object({
   purchaseInvoiceId: z.string().min(1),
 });
 
+const attachSalesDocumentSchema = z.object({
+  invoiceId: z.string().min(1).optional(),
+  purchaseInvoiceId: z.string().min(1).optional(),
+}).refine((value) => value.invoiceId || value.purchaseInvoiceId, {
+  message: 'invoiceId is required',
+});
+
 const purchaseRecordDocumentTypes = new Set<OcrResult['documentType']>([
   'tax_invoice',
   'receipt',
@@ -700,14 +707,15 @@ purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole
 
 purchaseInvoicesRouter.post('/document-intakes/:id/attach-sales-invoice', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
   try {
-    const body = attachDocumentSchema.parse(req.body);
+    const body = attachSalesDocumentSchema.parse(req.body);
+    const invoiceId = body.invoiceId ?? body.purchaseInvoiceId!;
     const [item, invoice] = await Promise.all([
       prisma.documentIntake.findFirst({
         where: { id: req.params.id, companyId: req.user!.companyId },
         select: { id: true },
       }),
       prisma.invoice.findFirst({
-        where: { id: body.purchaseInvoiceId, companyId: req.user!.companyId },
+        where: { id: invoiceId, companyId: req.user!.companyId },
         select: { id: true, invoiceNumber: true },
       }),
     ]);

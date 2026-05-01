@@ -9,7 +9,7 @@ export const dashboardRouter = Router();
 
 dashboardRouter.get('/integration-status', async (req, res) => {
   try {
-    const [lineLink, company] = await Promise.all([
+    const [lineLink, company, user] = await Promise.all([
       prisma.lineUserLink.findUnique({
         where: { userId: req.user!.userId },
         select: { isActive: true, displayName: true, linkedAt: true },
@@ -17,6 +17,10 @@ dashboardRouter.get('/integration-status', async (req, res) => {
       prisma.company.findUnique({
         where: { id: req.user!.companyId },
         select: { lineNotifyEnabled: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { email: true, googleSub: true },
       }),
     ]);
 
@@ -39,8 +43,8 @@ dashboardRouter.get('/integration-status', async (req, res) => {
           notificationsEnabled: !!company?.lineNotifyEnabled,
         },
         googleAccount: {
-          connected: !!req.user?.email,
-          email: req.user?.email ?? null,
+          connected: !!user?.googleSub,
+          email: user?.email ?? req.user?.email ?? null,
         },
         googleSheets: {
           connected: googleSheetsConfigured,

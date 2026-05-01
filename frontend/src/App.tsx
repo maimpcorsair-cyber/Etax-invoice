@@ -30,6 +30,7 @@ const InvoiceVerify     = React.lazy(() => import('./pages/InvoiceVerify'));
 const PurchaseInvoices  = React.lazy(() => import('./pages/PurchaseInvoices'));
 const VatSummary        = React.lazy(() => import('./pages/VatSummary'));
 const Pp30Filing        = React.lazy(() => import('./pages/Pp30Filing'));
+const AiChat            = React.lazy(() => import('./pages/AiChat'));
 import { useAuthStore } from './store/authStore';
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
 import { usePushNotifications } from './hooks/usePushNotifications';
@@ -156,6 +157,7 @@ export default function App() {
           <Route path="products" element={<Products />} />
           <Route path="purchase-invoices" element={<PurchaseInvoices />} />
           <Route path="vat-summary" element={<VatSummary />} />
+          <Route path="ai-chat" element={<AiChat />} />
           <Route path="pp30" element={<Pp30Filing />} />
           <Route path="admin" element={<AdminPanel />} />
           <Route path="audit" element={<AuditLogs />} />

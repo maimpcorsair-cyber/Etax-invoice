@@ -261,7 +261,9 @@ export default function Dashboard() {
                 icon: UserCheck,
                 title: isThai ? 'บัญชี Google' : 'Google Account',
                 ok: integrations.googleAccount.connected,
-                detail: integrations.googleAccount.email || '-',
+                detail: integrations.googleAccount.connected
+                  ? (integrations.googleAccount.email || (isThai ? 'เชื่อมแล้ว' : 'Connected'))
+                  : (isThai ? 'ยังไม่ได้เชื่อม Google OAuth' : 'Google OAuth not connected'),
               },
               {
                 key: 'sheets',
@@ -354,7 +356,7 @@ export default function Dashboard() {
             { label: isThai ? 'ใบกำกับภาษี' : 'Tax Invoice', href: '/app/invoices/new', color: 'bg-blue-500' },
             { label: isThai ? 'ใบเสร็จรับเงิน' : 'Receipt', href: '/app/invoices/new?type=receipt', color: 'bg-green-500' },
             { label: isThai ? 'ใบลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note', color: 'bg-orange-500' },
-            { label: isThai ? 'ส่งออก Excel' : 'Export Excel', href: '#', color: 'bg-purple-500' },
+            { label: isThai ? 'รายการ/ส่งออก' : 'List / Export', href: '/app/invoices', color: 'bg-purple-500' },
           ].map((action) => (
             <Link
               key={action.label}

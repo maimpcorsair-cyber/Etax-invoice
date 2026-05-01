@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   Zap,
+  Bot,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -21,11 +22,15 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 
 const navItems = [
   { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { key: 'aiChat', href: '/app/ai-chat', icon: Bot, labelKey: 'nav.aiChat' },
   { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
-  { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
-  { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
   { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
   { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
+  { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
+  { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
+];
+
+const adminNavItems = [
   { key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin', roles: ['super_admin', 'admin'] },
 ];
 
@@ -43,7 +48,8 @@ export default function Navbar() {
   const { policy } = useCompanyAccessPolicy();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const visibleItems = navItems.filter(
+  const visibleItems = navItems;
+  const visibleAdminItems = adminNavItems.filter(
     (item) => !item.roles || item.roles.includes(user?.role ?? ''),
   );
 
@@ -65,35 +71,60 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-2">
             {user?.role === 'super_admin' && (
               <Link
                 to="/ops/overview"
-                className="mr-2 flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 transition-colors hover:bg-emerald-100"
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
               >
                 <ShieldAlert className="w-4 h-4" />
                 Owner Plane
               </Link>
             )}
-            {visibleItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.key}
-                  to={item.href}
-                  className={clsx(
-                    'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                    isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {t(item.labelKey)}
-                </Link>
-              );
-            })}
+            <div className="flex items-center gap-1 rounded-2xl border border-gray-200 bg-gray-50/80 p-1 shadow-sm">
+              {visibleItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.key}
+                    to={item.href}
+                    className={clsx(
+                      'flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all',
+                      isActive
+                        ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
+                        : 'text-gray-600 hover:bg-white/80 hover:text-gray-950',
+                    )}
+                  >
+                    <Icon className={clsx('w-4 h-4', isActive ? 'text-primary-600' : 'text-gray-400')} />
+                    {t(item.labelKey)}
+                  </Link>
+                );
+              })}
+            </div>
+            {visibleAdminItems.length > 0 && (
+              <div className="flex items-center gap-1 rounded-2xl border border-gray-200 bg-white p-1">
+                {visibleAdminItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.key}
+                      to={item.href}
+                      className={clsx(
+                        'flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all',
+                        isActive
+                          ? 'bg-slate-900 text-white shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-950',
+                      )}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {t(item.labelKey)}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Right side */}

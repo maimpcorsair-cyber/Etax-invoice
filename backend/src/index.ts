@@ -22,6 +22,7 @@ import { purchaseInvoicesRouter } from './routes/purchaseInvoices';
 import { vatSummaryRouter } from './routes/vatSummary';
 import { pp30Router } from './routes/pp30';
 import { lineRouter, lineWebhookHandler } from './routes/line';
+import { aiChatRouter } from './routes/aiChat';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -90,6 +91,7 @@ app.use('/api/purchase-invoices', purchaseInvoicesRouter);
 app.use('/api/vat-summary', vatSummaryRouter);
 app.use('/api/pp30', pp30Router);
 app.use('/api/line', lineRouter);
+app.use('/api/ai-chat', authenticate, aiChatRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   void next;
