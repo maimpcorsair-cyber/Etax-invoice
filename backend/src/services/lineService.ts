@@ -226,7 +226,7 @@ export function buildOverdueFlexCard(invoices: OverdueInvoice[]): object {
           color: '#dc2626',
           action: {
             type: 'uri',
-            label: 'ดูทั้งหมดใน e-Tax',
+            label: 'ดูทั้งหมดใน ชัชบัญชี',
             uri: 'https://etax-invoice.vercel.app/app/invoices',
           },
         },

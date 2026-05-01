@@ -111,7 +111,7 @@ function buildRdSuccessHtml(data: InvoiceEmailData): string {
     ${data.rdDocId ? `<div class="row"><span class="lbl">RD Doc ID</span><span style="font-family:monospace;font-size:12px">${data.rdDocId}</span></div>` : ''}
     ${data.pdfUrl ? `<div style="margin-top:20px;text-align:center"><a href="${data.pdfUrl}" style="display:inline-block;padding:10px 20px;background:#1d4ed8;color:white;border-radius:8px;text-decoration:none;font-size:14px">${isTh ? 'ดาวน์โหลด PDF' : 'Download PDF'}</a></div>` : ''}
   </div>
-  <div class="footer">e-Tax Invoice System | ${isTh ? 'ระบบใบกำกับภาษีอิเล็กทรอนิกส์' : 'Thailand Revenue Department Compliant'}</div>
+  <div class="footer">ชัชชาติ การบัญชี | ${isTh ? 'ระบบใบกำกับภาษีอิเล็กทรอนิกส์' : 'Thailand Revenue Department Compliant'}</div>
 </div>
 </body>
 </html>`;
@@ -136,7 +136,7 @@ function buildRdFailedHtml(data: InvoiceEmailData, reason: string): string {
     <div class="error-box">${reason}</div>
     <p style="font-size:13px;color:#6b7280">${isTh ? 'กรุณาตรวจสอบและส่งใหม่ด้วยตนเองในระบบ' : 'Please review and resubmit manually in the system.'}</p>
   </div>
-  <div class="footer">e-Tax Invoice System — Admin Alert</div>
+  <div class="footer">ชัชชาติ การบัญชี — Admin Alert</div>
 </div>
 </body>
 </html>`;
@@ -168,7 +168,7 @@ function buildInvoiceForCustomerHtml(data: InvoiceEmailData): string {
     ${data.pdfUrl ? `<div style="margin-top:20px;text-align:center"><a href="${data.pdfUrl}" style="display:inline-block;padding:10px 20px;background:#1d4ed8;color:white;border-radius:8px;text-decoration:none;font-size:14px">${isTh ? 'ดาวน์โหลดใบกำกับภาษี' : 'Download Invoice'}</a></div>` : ''}
     <p style="margin-top:16px;font-size:13px;color:#6b7280">${isTh ? 'ขอบคุณที่ใช้บริการ' : 'Thank you for your business.'}</p>
   </div>
-  <div class="footer">e-Tax Invoice System | ${data.sellerNameTh}</div>
+  <div class="footer">ชัชชาติ การบัญชี | ${data.sellerNameTh}</div>
 </div>
 </body>
 </html>`;
@@ -199,7 +199,7 @@ function buildStatementForCustomerHtml(data: StatementEmailData): string {
     <div class="row"><span class="lbl">${isTh ? 'วันที่ออกรายงาน' : 'Generated at'}</span><strong>${data.generatedAt.toLocaleDateString(isTh ? 'th-TH' : 'en-GB')}</strong></div>
     <p style="margin-top:16px;font-size:13px;color:#6b7280">${isTh ? 'หากมีข้อสงสัยเกี่ยวกับยอดคงค้าง กรุณาติดต่อกลับบริษัทผู้ออกเอกสาร' : 'If you have any questions about these balances, please contact the issuing company.'}</p>
   </div>
-  <div class="footer">e-Tax Invoice System | ${data.companyNameTh}</div>
+  <div class="footer">ชัชชาติ การบัญชี | ${data.companyNameTh}</div>
 </div>
 </body>
 </html>`;
@@ -225,14 +225,14 @@ function buildBillingActivationHtml(data: BillingActivationEmailData): string {
   </div>
   <div class="body">
     <p style="margin-top:0">${isTh ? `สวัสดีคุณ <strong>${data.adminName}</strong>` : `Hello <strong>${data.adminName}</strong>,`}</p>
-    <p>${isTh ? `การสมัครใช้งานแพ็กเกจ <strong>${data.planName}</strong> ของบริษัทคุณถูกเปิดใช้งานเรียบร้อยแล้ว สามารถเริ่มใช้งานระบบ e-Tax Invoice ได้ทันที` : `Your <strong>${data.planName}</strong> subscription has been activated successfully. You can start using the e-Tax Invoice platform right away.`}</p>
+    <p>${isTh ? `การสมัครใช้งานแพ็กเกจ <strong>${data.planName}</strong> ของบริษัทคุณถูกเปิดใช้งานเรียบร้อยแล้ว สามารถเริ่มใช้งานระบบ ชัชบัญชี ได้ทันที` : `Your <strong>${data.planName}</strong> subscription has been activated successfully. You can start using ชัชบัญชี right away.`}</p>
     <div class="row"><span class="lbl">${isTh ? 'อีเมลผู้ดูแล' : 'Admin email'}</span><strong>${data.adminEmail}</strong></div>
     <div class="row"><span class="lbl">${isTh ? 'แพ็กเกจ' : 'Plan'}</span><strong>${data.planName}</strong></div>
     ${amountPaid ? `<div class="row"><span class="lbl">${isTh ? 'ยอดชำระ' : 'Amount paid'}</span><strong>${amountPaid}</strong></div>` : ''}
     <div class="row"><span class="lbl">${isTh ? 'ช่องทางชำระ' : 'Payment method'}</span><strong>${paymentMethod}</strong></div>
     ${data.loginUrl ? `<div style="text-align:center"><a class="cta" href="${data.loginUrl}">${isTh ? 'เข้าสู่ระบบ' : 'Sign in'}</a></div>` : ''}
   </div>
-  <div class="footer">e-Tax Invoice System | Welcome onboard</div>
+  <div class="footer">ชัชชาติ การบัญชี | Welcome onboard</div>
 </div>
 </body>
 </html>`;
@@ -265,7 +265,7 @@ function buildBillingRenewalLinkHtml(data: BillingRenewalLinkEmailData): string 
     ${data.expiresAt ? `<div class="row"><span class="lbl">${isTh ? 'หมดอายุลิงก์' : 'Link expires'}</span><strong>${data.expiresAt.toLocaleString(isTh ? 'th-TH' : 'en-GB')}</strong></div>` : ''}
     <div style="text-align:center"><a class="cta" href="${data.renewalUrl}">${isTh ? 'ชำระค่าต่ออายุ' : 'Pay renewal'}</a></div>
   </div>
-  <div class="footer">e-Tax Invoice System | Renewal</div>
+  <div class="footer">ชัชชาติ การบัญชี | Renewal</div>
 </div>
 </body>
 </html>`;
@@ -297,7 +297,7 @@ function buildBillingPaymentFailedHtml(data: BillingPaymentFailedEmailData): str
     <div class="row"><span class="lbl">${isTh ? 'ช่องทางชำระ' : 'Payment method'}</span><strong>${paymentMethod}</strong></div>
     ${data.retryUrl ? `<div style="text-align:center"><a class="cta" href="${data.retryUrl}">${isTh ? 'ชำระอีกครั้ง' : 'Retry payment'}</a></div>` : ''}
   </div>
-  <div class="footer">e-Tax Invoice System | Billing alert</div>
+  <div class="footer">ชัชชาติ การบัญชี | Billing alert</div>
 </div>
 </body>
 </html>`;
@@ -311,7 +311,7 @@ export async function sendRdSuccessEmail(
   const isTh = data.language === 'th' || data.language === 'both';
   try {
     await transporter.sendMail({
-      from: `"e-Tax Invoice" <${process.env.SMTP_USER}>`,
+      from: `"ชัชบัญชี" <${process.env.SMTP_USER}>`,
       to: adminEmail,
       subject: `✅ ${isTh ? 'ส่งกรมสรรพากรสำเร็จ' : 'RD Submission Success'}: ${data.invoiceNumber}`,
       html: buildRdSuccessHtml(data),
@@ -330,7 +330,7 @@ export async function sendRdFailedEmail(
   if (!process.env.SMTP_HOST) { logger.warn('SMTP not configured, skipping email'); return; }
   try {
     await transporter.sendMail({
-      from: `"e-Tax Invoice" <${process.env.SMTP_USER}>`,
+      from: `"ชัชบัญชี" <${process.env.SMTP_USER}>`,
       to: adminEmail,
       subject: `❌ RD Submission Failed: ${data.invoiceNumber}`,
       html: buildRdFailedHtml(data, reason),
@@ -390,7 +390,7 @@ export async function sendBillingActivationEmail(
   if (!process.env.SMTP_HOST) { logger.warn('SMTP not configured, skipping email'); return; }
   try {
     await transporter.sendMail({
-      from: `"e-Tax Invoice" <${process.env.SMTP_USER}>`,
+      from: `"ชัชบัญชี" <${process.env.SMTP_USER}>`,
       to: data.adminEmail,
       subject: `${data.locale === 'en' ? 'Account activated' : 'เปิดใช้งานระบบสำเร็จ'}: ${data.companyNameTh}`,
       html: buildBillingActivationHtml(data),
@@ -407,7 +407,7 @@ export async function sendRenewalLinkEmail(
   if (!process.env.SMTP_HOST) { logger.warn('SMTP not configured, skipping email'); return; }
   try {
     await transporter.sendMail({
-      from: `"e-Tax Invoice" <${process.env.SMTP_USER}>`,
+      from: `"ชัชบัญชี" <${process.env.SMTP_USER}>`,
       to: data.adminEmail,
       subject: `${data.locale === 'en' ? 'Subscription renewal link' : 'ลิงก์ชำระค่าต่ออายุระบบ'}: ${data.companyNameTh}`,
       html: buildBillingRenewalLinkHtml(data),
@@ -424,7 +424,7 @@ export async function sendBillingPaymentFailedEmail(
   if (!process.env.SMTP_HOST) { logger.warn('SMTP not configured, skipping email'); return; }
   try {
     await transporter.sendMail({
-      from: `"e-Tax Invoice" <${process.env.SMTP_USER}>`,
+      from: `"ชัชบัญชี" <${process.env.SMTP_USER}>`,
       to: data.adminEmail,
       subject: `${data.locale === 'en' ? 'Payment unsuccessful' : 'ชำระค่าบริการไม่สำเร็จ'}: ${data.companyNameTh}`,
       html: buildBillingPaymentFailedHtml(data),
