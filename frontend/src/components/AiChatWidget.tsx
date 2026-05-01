@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useState } from 'react';
-import { Bot, Loader2, MessageCircle, Send, X } from 'lucide-react';
+import { Bot, Loader2, MessageCircle, Paperclip, Send, X } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 
@@ -21,6 +21,7 @@ export default function AiChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'hello',
@@ -31,6 +32,7 @@ export default function AiChatWidget() {
     },
   ]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim();
@@ -68,6 +70,67 @@ export default function AiChatWidget() {
     void send();
   }
 
+  async function uploadDocument(file: File) {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setMessages((prev) => [...prev, {
+        id: id(),
+        role: 'assistant',
+        content: isThai ? 'รองรับเฉพาะ PDF, JPG, PNG และ WebP ครับ' : 'Only PDF, JPG, PNG, and WebP are supported.',
+      }]);
+      return;
+    }
+
+    setMessages((prev) => [...prev, {
+      id: id(),
+      role: 'user',
+      content: `${isThai ? 'อัปโหลดเอกสาร' : 'Uploaded document'}: ${file.name}`,
+    }]);
+    setUploading(true);
+
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/purchase-invoices/document-intakes/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64 }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? 'Upload failed');
+
+      const status = json.data?.status as string | undefined;
+      const result = json.data?.ocrResult as { supplierName?: string; invoiceNumber?: string; total?: number; confidence?: string } | undefined;
+      const summary = [
+        result?.supplierName ? `${isThai ? 'ผู้ขาย' : 'Supplier'}: ${result.supplierName}` : null,
+        result?.invoiceNumber ? `${isThai ? 'เลขที่' : 'No.'}: ${result.invoiceNumber}` : null,
+        result?.total ? `${isThai ? 'ยอดรวม' : 'Total'}: ${new Intl.NumberFormat(isThai ? 'th-TH' : 'en-US', { style: 'currency', currency: 'THB' }).format(result.total)}` : null,
+        result?.confidence ? `${isThai ? 'ความมั่นใจ' : 'Confidence'}: ${result.confidence}` : null,
+      ].filter(Boolean).join('\n');
+
+      setMessages((prev) => [...prev, {
+        id: id(),
+        role: 'assistant',
+        content: isThai
+          ? `อ่านเอกสารแล้วครับ สถานะ: ${status ?? 'รอตรวจ'}\n${summary || 'ยังดึงข้อมูลหลักไม่ได้'}\n\nไปที่บันทึกซื้อเพื่อตรวจ/ยืนยันก่อนบันทึกได้เลยครับ`
+          : `Document processed. Status: ${status ?? 'review pending'}\n${summary || 'Core fields were not extracted yet.'}\n\nReview and confirm it in Purchase Invoices.`,
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: id(),
+        role: 'assistant',
+        content: isThai ? 'อัปโหลดไม่สำเร็จครับ กรุณาลองใหม่ หรือไปอัปโหลดที่หน้าบันทึกซื้อ' : 'Upload failed. Please try again or upload from Purchase Invoices.',
+      }]);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div className="fixed bottom-20 left-4 z-50 lg:bottom-6 lg:left-auto lg:right-4">
       {open && (
@@ -100,10 +163,10 @@ export default function AiChatWidget() {
                 </div>
               );
             })}
-            {sending && (
+            {(sending || uploading) && (
               <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {isThai ? 'กำลังคิด...' : 'Thinking...'}
+                {uploading ? (isThai ? 'กำลังอ่านเอกสาร...' : 'Reading document...') : (isThai ? 'กำลังคิด...' : 'Thinking...')}
               </div>
             )}
           </div>
@@ -114,7 +177,7 @@ export default function AiChatWidget() {
                 <button
                   key={q}
                   onClick={() => void send(q)}
-                  disabled={sending}
+                  disabled={sending || uploading}
                   className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                 >
                   {q}
@@ -123,14 +186,35 @@ export default function AiChatWidget() {
             </div>
             <form onSubmit={submit} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2 py-1.5 focus-within:border-primary-300 focus-within:bg-white">
               <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.currentTarget.value = '';
+                  if (file) void uploadDocument(file);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={sending || uploading}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50"
+                aria-label={isThai ? 'อัปโหลดเอกสาร' : 'Upload document'}
+                title={isThai ? 'อัปโหลดเอกสาร' : 'Upload document'}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              </button>
+              <input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={isThai ? 'ถามพี่นุช...' : 'Ask Pinuch...'}
                 className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none"
-                disabled={sending}
+                disabled={sending || uploading}
               />
-              <button type="submit" disabled={sending || !input.trim()} className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={sending || uploading || !input.trim()} className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </button>
             </form>
