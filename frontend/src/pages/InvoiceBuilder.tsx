@@ -136,6 +136,9 @@ export default function InvoiceBuilder() {
       documentMode: form.documentMode,
       bankPaymentInfo: form.bankPaymentInfo || undefined,
       showCompanyLogo: form.showCompanyLogo,
+      signatureImageUrl: form.signatureImageUrl || undefined,
+      signerName: form.signerName || undefined,
+      signerTitle: form.signerTitle || undefined,
     });
   };
 
@@ -303,6 +306,12 @@ export default function InvoiceBuilder() {
           onShowCompanyLogoChange={form.setShowCompanyLogo}
           documentLogoUrl={form.logoUrl}
           onDocumentLogoChange={form.setLogoUrl}
+          signatureImageUrl={form.signatureImageUrl}
+          onSignatureImageChange={form.setSignatureImageUrl}
+          signerName={form.signerName}
+          onSignerNameChange={form.setSignerName}
+          signerTitle={form.signerTitle}
+          onSignerTitleChange={form.setSignerTitle}
           docType={form.docType}
           docLanguage={form.docLanguage}
         />

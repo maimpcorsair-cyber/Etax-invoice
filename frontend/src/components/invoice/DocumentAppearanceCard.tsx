@@ -14,6 +14,12 @@ interface Props {
   onShowCompanyLogoChange: (value: boolean) => void;
   documentLogoUrl: string | null;
   onDocumentLogoChange: (value: string | null) => void;
+  signatureImageUrl: string | null;
+  onSignatureImageChange: (value: string | null) => void;
+  signerName: string;
+  onSignerNameChange: (value: string) => void;
+  signerTitle: string;
+  onSignerTitleChange: (value: string) => void;
   docType: InvoiceType;
   docLanguage: Language;
 }
@@ -30,6 +36,12 @@ export default function DocumentAppearanceCard({
   onShowCompanyLogoChange,
   documentLogoUrl,
   onDocumentLogoChange,
+  signatureImageUrl,
+  onSignatureImageChange,
+  signerName,
+  onSignerNameChange,
+  signerTitle,
+  onSignerTitleChange,
   docType,
   docLanguage,
 }: Props) {
@@ -51,6 +63,13 @@ export default function DocumentAppearanceCard({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => onDocumentLogoChange(event.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+  const handleSignatureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => onSignatureImageChange(event.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -254,6 +273,61 @@ export default function DocumentAppearanceCard({
             ? 'ใช้สำหรับตราแบรนด์ย่อย, โลโก้แคมเปญ, หรือเครื่องหมายเฉพาะบนใบ invoice/receipt โดยไม่กระทบข้อมูลบริษัทหลัก'
             : 'Useful for a sub-brand seal, campaign mark, or a document-specific badge without changing the main company identity.'}
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-900">
+            {isThai ? 'ลายเซ็นผู้มีอำนาจบนเอกสาร' : 'Authorized signature'}
+          </h4>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            {isThai
+              ? 'รูปเซ็นและชื่อจะแสดงบน PDF ตอนออกเอกสาร ใช้สำหรับความน่าเชื่อถือของเอกสารที่ส่งให้ลูกค้า'
+              : 'The signature image and signer details appear on issued PDFs to make customer-facing documents look official.'}
+          </p>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">{isThai ? 'ชื่อผู้ลงนาม' : 'Signer name'}</label>
+            <input
+              value={signerName}
+              onChange={(e) => onSignerNameChange(e.target.value)}
+              className="input-field"
+              placeholder={isThai ? 'เช่น นายสมชาย ใจดี' : 'e.g. John Smith'}
+            />
+          </div>
+          <div>
+            <label className="label">{isThai ? 'ตำแหน่ง' : 'Title'}</label>
+            <input
+              value={signerTitle}
+              onChange={(e) => onSignerTitleChange(e.target.value)}
+              className="input-field"
+              placeholder={isThai ? 'เช่น กรรมการผู้จัดการ' : 'e.g. Managing Director'}
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-4">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleSignatureFileChange}
+            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+          />
+          {signatureImageUrl && (
+            <button
+              type="button"
+              onClick={() => onSignatureImageChange(null)}
+              className="text-red-500 hover:text-red-700 font-semibold text-sm px-3 py-2 rounded hover:bg-red-50"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {signatureImageUrl && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <img src={signatureImageUrl} alt="signature preview" className="h-16 object-contain" />
+          </div>
+        )}
       </div>
     </div>
   );

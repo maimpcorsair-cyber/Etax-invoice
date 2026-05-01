@@ -27,6 +27,9 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [documentMode, setDocumentMode] = useState<'ordinary' | 'electronic'>('electronic');
   const [bankPaymentInfo, setBankPaymentInfo] = useState('');
+  const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null);
+  const [signerName, setSignerName] = useState('');
+  const [signerTitle, setSignerTitle] = useState('');
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
 
@@ -65,6 +68,9 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setBankPaymentInfo(invoice.bankPaymentInfo ?? '');
     setShowCompanyLogo(invoice.showCompanyLogo ?? true);
     setLogoUrl(invoice.documentLogoUrl ?? null);
+    setSignatureImageUrl(invoice.signatureImageUrl ?? null);
+    setSignerName(invoice.signerName ?? '');
+    setSignerTitle(invoice.signerTitle ?? '');
     setItems(
       invoice.items.length > 0
         ? invoice.items.map((item) => ({
@@ -127,6 +133,9 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     bankPaymentInfo: bankPaymentInfo || undefined,
     showCompanyLogo,
     documentLogoUrl: logoUrl || undefined,
+    signatureImageUrl: signatureImageUrl || undefined,
+    signerName: signerName || undefined,
+    signerTitle: signerTitle || undefined,
     referenceDocNumber: referenceDocNumber || undefined,
   });
 
@@ -243,6 +252,12 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setDocumentMode,
     bankPaymentInfo,
     setBankPaymentInfo,
+    signatureImageUrl,
+    setSignatureImageUrl,
+    signerName,
+    setSignerName,
+    signerTitle,
+    setSignerTitle,
     subtotal,
     totalVat,
     total,

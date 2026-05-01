@@ -59,6 +59,9 @@ interface PdfInvoiceData {
   templateNote?: string | null;
   documentMode?: 'ordinary' | 'electronic' | null;
   bankPaymentInfo?: string | null;
+  signatureImageUrl?: string | null;
+  signerName?: string | null;
+  signerTitle?: string | null;
   onlineViewUrl?: string | null;
   onlineQrDataUrl?: string | null;
 }
@@ -657,7 +660,17 @@ function buildHtml(data: PdfInvoiceData): string {
     background: #fcfdff;
     text-align: center;
   }
-  .sig-space { height: 58px; }
+  .sig-space {
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sig-image {
+    max-height: 54px;
+    max-width: 170px;
+    object-fit: contain;
+  }
   .sig-line {
     border-top: 1px solid #c8d2e4;
     margin: 0 auto 10px;
@@ -667,6 +680,11 @@ function buildHtml(data: PdfInvoiceData): string {
     font-size: 11px;
     font-weight: 600;
     color: #556171;
+  }
+  .sig-name {
+    margin-top: 3px;
+    font-size: 10px;
+    color: #6b7280;
   }
   .document-support {
     display: grid;
@@ -910,18 +928,19 @@ function buildHtml(data: PdfInvoiceData): string {
         </div>
       </div>
 
-      ${!isElectronicDocument ? `
+      ${(!isElectronicDocument || data.signatureImageUrl || data.signerName || data.signerTitle) ? `
         <div class="signature-grid">
           <div class="sig-card">
-            <div class="sig-space"></div>
+            <div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="authorized signature"/>` : ''}</div>
             <div class="sig-line"></div>
             <div class="sig-title">${labels.preparedBy}</div>
+            ${(data.signerName || data.signerTitle) ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>` : ''}
           </div>
-          <div class="sig-card">
+          ${!isElectronicDocument ? `<div class="sig-card">
             <div class="sig-space"></div>
             <div class="sig-line"></div>
             <div class="sig-title">${labels.receivedBy}</div>
-          </div>
+          </div>` : '<div></div>'}
         </div>
       ` : ''}
 

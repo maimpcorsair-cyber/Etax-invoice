@@ -48,6 +48,9 @@ const createInvoiceSchema = z.object({
   bankPaymentInfo: z.string().optional(),
   showCompanyLogo: z.boolean().optional(),
   documentLogoUrl: z.string().optional(),
+  signatureImageUrl: z.string().optional(),
+  signerName: z.string().optional(),
+  signerTitle: z.string().optional(),
   referenceInvoiceId: z.string().optional(),
   referenceDocNumber: z.string().optional(),
   asDraft: z.boolean().optional().default(false),
@@ -66,6 +69,9 @@ const previewInvoiceSchema = z.object({
   documentMode: z.enum(['ordinary', 'electronic']).optional(),
   bankPaymentInfo: z.string().optional(),
   showCompanyLogo: z.boolean().optional(),
+  signatureImageUrl: z.string().optional(),
+  signerName: z.string().optional(),
+  signerTitle: z.string().optional(),
 })
 
 function calculateTotals(items: z.infer<typeof itemSchema>[]) {
@@ -363,6 +369,9 @@ invoicesRouter.post('/', async (req, res) => {
         bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
+        signatureImageUrl: body.signatureImageUrl ?? null,
+        signerName: body.signerName ?? null,
+        signerTitle: body.signerTitle ?? null,
       },
     };
 
@@ -445,6 +454,9 @@ invoicesRouter.post('/', async (req, res) => {
         bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
+        signatureImageUrl: body.signatureImageUrl ?? null,
+        signerName: body.signerName ?? null,
+        signerTitle: body.signerTitle ?? null,
       },
     });
   } catch (err) {
@@ -502,6 +514,9 @@ invoicesRouter.get('/:id', async (req, res) => {
         bankPaymentInfo?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
+        signatureImageUrl?: string | null;
+        signerName?: string | null;
+        signerTitle?: string | null;
       };
     } | null;
     const verificationUrl = `${process.env.APP_ORIGIN ?? 'https://etax-invoice.vercel.app'}/invoices/verify/${invoice.id}`;
@@ -513,6 +528,9 @@ invoicesRouter.get('/:id', async (req, res) => {
         bankPaymentInfo: sellerSnap?.documentPreferences?.bankPaymentInfo ?? null,
         showCompanyLogo: sellerSnap?.documentPreferences?.showCompanyLogo ?? true,
         documentLogoUrl: sellerSnap?.documentPreferences?.documentLogoUrl ?? null,
+        signatureImageUrl: sellerSnap?.documentPreferences?.signatureImageUrl ?? null,
+        signerName: sellerSnap?.documentPreferences?.signerName ?? null,
+        signerTitle: sellerSnap?.documentPreferences?.signerTitle ?? null,
         verificationUrl,
       },
     });
@@ -565,6 +583,9 @@ invoicesRouter.patch('/:id', async (req, res) => {
         bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
+        signatureImageUrl: body.signatureImageUrl ?? null,
+        signerName: body.signerName ?? null,
+        signerTitle: body.signerTitle ?? null,
       },
     };
 
@@ -636,6 +657,9 @@ invoicesRouter.patch('/:id', async (req, res) => {
         bankPaymentInfo: body.bankPaymentInfo ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
+        signatureImageUrl: body.signatureImageUrl ?? null,
+        signerName: body.signerName ?? null,
+        signerTitle: body.signerTitle ?? null,
       },
     });
   } catch (err) {
@@ -975,6 +999,9 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
         bankPaymentInfo?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
+        signatureImageUrl?: string | null;
+        signerName?: string | null;
+        signerTitle?: string | null;
       };
     } | null)?.documentPreferences) ?? {};
 
@@ -1027,6 +1054,9 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
       bankPaymentInfo: documentPrefs.bankPaymentInfo ?? null,
       showCompanyLogo: documentPrefs.showCompanyLogo ?? true,
       documentLogoUrl: documentPrefs.documentLogoUrl ?? null,
+      signatureImageUrl: documentPrefs.signatureImageUrl ?? null,
+      signerName: documentPrefs.signerName ?? null,
+      signerTitle: documentPrefs.signerTitle ?? null,
       referenceDocNumber: invoice.referenceDocNumber ?? undefined,
     };
 
@@ -1116,6 +1146,9 @@ invoicesRouter.post('/preview', async (req, res) => {
       documentMode: body.documentMode ?? 'electronic',
       bankPaymentInfo: body.bankPaymentInfo ?? null,
       showCompanyLogo: body.showCompanyLogo ?? true,
+      signatureImageUrl: body.signatureImageUrl ?? null,
+      signerName: body.signerName ?? null,
+      signerTitle: body.signerTitle ?? null,
     };
 
     if (req.query.format === 'html') {

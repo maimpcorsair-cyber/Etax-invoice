@@ -48,6 +48,9 @@ export const pdfWorker = new Worker<PdfJobData>(
         bankPaymentInfo?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
+        signatureImageUrl?: string | null;
+        signerName?: string | null;
+        signerTitle?: string | null;
       };
     } | null;
 
@@ -100,6 +103,9 @@ export const pdfWorker = new Worker<PdfJobData>(
       bankPaymentInfo: sellerSnap?.documentPreferences?.bankPaymentInfo ?? null,
       showCompanyLogo: sellerSnap?.documentPreferences?.showCompanyLogo ?? true,
       documentLogoUrl: sellerSnap?.documentPreferences?.documentLogoUrl ?? null,
+      signatureImageUrl: sellerSnap?.documentPreferences?.signatureImageUrl ?? null,
+      signerName: sellerSnap?.documentPreferences?.signerName ?? null,
+      signerTitle: sellerSnap?.documentPreferences?.signerTitle ?? null,
     }, invoice.companyId);
     const pdfBuffer = await generatePdfFromHtml(html);
 

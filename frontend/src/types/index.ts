@@ -170,6 +170,9 @@ export interface Invoice {
   bankPaymentInfo?: string | null;
   showCompanyLogo?: boolean;
   documentLogoUrl?: string | null;
+  signatureImageUrl?: string | null;
+  signerName?: string | null;
+  signerTitle?: string | null;
   referenceDocNumber?: string;
   referenceInvoiceId?: string;
   // Payment tracking
