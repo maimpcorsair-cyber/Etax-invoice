@@ -12,7 +12,6 @@ import {
   ShoppingCart,
   Calculator,
   X,
-  Bot,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
@@ -20,9 +19,9 @@ import { isNative } from '../hooks/useNative';
 
 const primaryTabs = [
   { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { key: 'aiChat', href: '/app/ai-chat', icon: Bot, labelKey: 'nav.aiChat' },
   { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
   { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
+  { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
 ];
 
 export default function MobileBottomNav() {
@@ -44,7 +43,6 @@ export default function MobileBottomNav() {
   if (!isMobile) return null;
 
   const moreItems = [
-    { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
     { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'

@@ -6,7 +6,6 @@
   },
   "nav": {
     "dashboard": "แดชบอร์ด",
-    "aiChat": "AI Chat",
     "invoices": "ใบกำกับภาษี",
     "createInvoice": "สร้างใบกำกับภาษี",
     "receipts": "ใบเสร็จรับเงิน",

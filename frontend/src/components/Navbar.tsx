@@ -13,7 +13,6 @@ import {
   LogOut,
   ChevronDown,
   Zap,
-  Bot,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -22,7 +21,6 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 
 const navItems = [
   { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { key: 'aiChat', href: '/app/ai-chat', icon: Bot, labelKey: 'nav.aiChat' },
   { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
   { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
   { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
