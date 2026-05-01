@@ -488,76 +488,139 @@ export default function Landing() {
       <section className="pt-32 pb-24 relative overflow-hidden">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_30%)]" />
 
-        {/* Floating doodles — e-Tax themed background elements */}
-        {/* Receipt sketch — top left */}
-        <div className="pointer-events-none absolute left-6 top-24 opacity-25 hidden lg:block rotate-[-8deg]" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
-          <svg width="110" height="138" viewBox="0 0 120 150" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="10" y="8" width="100" height="134" rx="6" />
-            <line x1="24" y1="32" x2="96" y2="32" />
-            <line x1="24" y1="48" x2="80" y2="48" />
-            <line x1="24" y1="64" x2="88" y2="64" />
-            <line x1="24" y1="80" x2="72" y2="80" />
-            <line x1="24" y1="96" x2="84" y2="96" />
-            <line x1="24" y1="114" x2="96" y2="114" strokeWidth="3" />
-            <path d="M10 128 Q20 138 30 128 Q40 118 50 128 Q60 138 70 128 Q80 118 90 128 Q100 138 110 128" strokeWidth="2" />
+        {/* Floating doodle background — scroll with page, sketch-style e-Tax illustrations */}
+
+        {/* Receipt with zigzag bottom — top left */}
+        <div className="pointer-events-none absolute left-4 top-28 opacity-[0.18] hidden lg:block rotate-[-10deg]" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
+          <svg width="100" height="140" viewBox="0 0 100 140" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="8" y="6" width="84" height="110" rx="5"/>
+            <line x1="20" y1="28" x2="80" y2="28"/>
+            <line x1="20" y1="42" x2="66" y2="42"/>
+            <line x1="20" y1="56" x2="74" y2="56"/>
+            <line x1="20" y1="70" x2="58" y2="70"/>
+            <line x1="20" y1="84" x2="72" y2="84"/>
+            <line x1="20" y1="100" x2="80" y2="100" strokeWidth="3"/>
+            {/* Zigzag bottom tear */}
+            <path d="M8 116 L16 106 L24 116 L32 106 L40 116 L48 106 L56 116 L64 106 L72 116 L80 106 L88 106 L92 116" strokeWidth="2"/>
+          </svg>
+        </div>
+
+        {/* Mini Billy face doodle — left middle */}
+        <div className="pointer-events-none absolute left-8 top-[42%] opacity-[0.16] hidden xl:block rotate-[6deg]" style={{animation:'float 8.5s ease-in-out infinite', animationDelay:'1.2s'}}>
+          <svg width="72" height="96" viewBox="0 0 72 96" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {/* Mini receipt body */}
+            <rect x="4" y="16" width="64" height="72" rx="4"/>
+            {/* Zigzag top */}
+            <path d="M4,16 L10,8 L16,16 L22,8 L28,16 L34,8 L40,16 L46,8 L52,16 L58,8 L64,16 L68,16" strokeWidth="2"/>
+            {/* Eyes */}
+            <circle cx="26" cy="38" r="7" strokeWidth="2.5"/>
+            <circle cx="46" cy="38" r="7" strokeWidth="2.5"/>
+            <circle cx="28" cy="36" r="2.5" fill="#059669" stroke="none"/>
+            <circle cx="48" cy="36" r="2.5" fill="#059669" stroke="none"/>
+            {/* Smile */}
+            <path d="M22 52 Q36 64 50 52"/>
+            {/* Scarf hint */}
+            <path d="M10 75 Q36 84 62 75" strokeWidth="3"/>
           </svg>
         </div>
 
         {/* Squiggly arrow — bottom left */}
-        <div className="pointer-events-none absolute left-12 bottom-16 opacity-30 hidden xl:block" style={{animation:'float 9s ease-in-out infinite', animationDelay:'1.5s'}}>
-          <svg width="110" height="90" viewBox="0 0 100 80" fill="none" stroke="#86efac" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M10 70 C20 50, 30 60, 40 40 C50 20, 60 35, 70 20 C80 8, 88 12, 90 8" />
-            <path d="M82 6 L90 8 L86 16" />
+        <div className="pointer-events-none absolute left-10 bottom-20 opacity-[0.22] hidden xl:block" style={{animation:'float 9s ease-in-out infinite', animationDelay:'1.5s'}}>
+          <svg width="100" height="80" viewBox="0 0 100 80" fill="none" stroke="#86efac" strokeWidth="3" strokeLinecap="round">
+            <path d="M8 68 C18 48, 28 58, 38 38 C48 18, 58 33, 68 18 C78 6, 86 10, 88 6"/>
+            <path d="M80 4 L88 6 L84 14"/>
           </svg>
         </div>
 
-        {/* Invoice document — top right */}
-        <div className="pointer-events-none absolute right-6 top-20 opacity-25 hidden lg:block rotate-[8deg]" style={{animation:'float 8s ease-in-out infinite', animationDelay:'0.8s'}}>
-          <svg width="100" height="128" viewBox="0 0 110 140" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 6 L80 6 L102 28 L102 134 Q102 136 100 136 L8 136 Q6 136 6 134 L6 8 Q6 6 8 6Z" />
-            <path d="M80 6 L80 28 L102 28" strokeWidth="2" />
-            <line x1="20" y1="50" x2="88" y2="50" />
-            <line x1="20" y1="64" x2="70" y2="64" />
-            <line x1="20" y1="78" x2="80" y2="78" />
-            <line x1="20" y1="92" x2="60" y2="92" />
-            <rect x="20" y="106" width="68" height="16" rx="3" strokeWidth="2" fill="none" />
+        {/* Invoice / A4 doc with folded corner — top right */}
+        <div className="pointer-events-none absolute right-4 top-24 opacity-[0.18] hidden lg:block rotate-[10deg]" style={{animation:'float 8s ease-in-out infinite', animationDelay:'0.8s'}}>
+          <svg width="96" height="124" viewBox="0 0 96 124" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 4 L68 4 L90 26 L90 120 Q90 122 88 122 L6 122 Q4 122 4 120 L4 6 Q4 4 6 4Z"/>
+            <path d="M68 4 L68 26 L90 26" strokeWidth="2"/>
+            {/* Content lines */}
+            <line x1="16" y1="44" x2="78" y2="44"/>
+            <line x1="16" y1="56" x2="58" y2="56"/>
+            <line x1="16" y1="68" x2="70" y2="68"/>
+            <line x1="16" y1="80" x2="50" y2="80"/>
+            <line x1="16" y1="92" x2="64" y2="92"/>
+            {/* Total box */}
+            <rect x="16" y="104" width="60" height="12" rx="2" strokeWidth="2"/>
+          </svg>
+        </div>
+
+        {/* Sparkle stars — right side */}
+        <div className="pointer-events-none absolute right-12 top-[45%] opacity-[0.25] hidden lg:block" style={{animation:'float 6s ease-in-out infinite', animationDelay:'0.4s'}}>
+          <svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round">
+            {/* 4-point star */}
+            <path d="M35 8 L38 28 L58 31 L38 34 L35 54 L32 34 L12 31 L32 28 Z"/>
+            {/* Small star */}
+            <path d="M58 12 L59.5 18 L66 19.5 L59.5 21 L58 27 L56.5 21 L50 19.5 L56.5 18 Z"/>
+            {/* Dot */}
+            <circle cx="14" cy="52" r="3" fill="#4ade80" stroke="none" opacity="0.5"/>
           </svg>
         </div>
 
         {/* QR Code sketch — bottom right */}
-        <div className="pointer-events-none absolute right-10 bottom-12 opacity-30 hidden xl:block rotate-[-5deg]" style={{animation:'float 6.5s ease-in-out infinite', animationDelay:'2s'}}>
-          <svg width="88" height="88" viewBox="0 0 80 80" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="6" y="6" width="26" height="26" rx="3" />
-            <rect x="14" y="14" width="10" height="10" />
-            <rect x="48" y="6" width="26" height="26" rx="3" />
-            <rect x="56" y="14" width="10" height="10" />
-            <rect x="6" y="48" width="26" height="26" rx="3" />
-            <rect x="14" y="56" width="10" height="10" />
-            <line x1="48" y1="48" x2="56" y2="48" />
-            <line x1="60" y1="48" x2="74" y2="48" />
-            <line x1="48" y1="56" x2="48" y2="68" />
-            <line x1="60" y1="56" x2="74" y2="56" />
-            <line x1="60" y1="64" x2="60" y2="74" />
-            <line x1="68" y1="64" x2="74" y2="64" />
+        <div className="pointer-events-none absolute right-8 bottom-16 opacity-[0.20] hidden xl:block rotate-[-6deg]" style={{animation:'float 6.5s ease-in-out infinite', animationDelay:'2s'}}>
+          <svg width="84" height="84" viewBox="0 0 80 80" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="6" y="6" width="26" height="26" rx="3"/>
+            <rect x="14" y="14" width="10" height="10"/>
+            <rect x="48" y="6" width="26" height="26" rx="3"/>
+            <rect x="56" y="14" width="10" height="10"/>
+            <rect x="6" y="48" width="26" height="26" rx="3"/>
+            <rect x="14" y="56" width="10" height="10"/>
+            <line x1="48" y1="48" x2="56" y2="48"/>
+            <line x1="60" y1="48" x2="74" y2="48"/>
+            <line x1="48" y1="56" x2="48" y2="68"/>
+            <line x1="60" y1="56" x2="74" y2="56"/>
+            <line x1="60" y1="64" x2="60" y2="74"/>
+            <line x1="68" y1="64" x2="74" y2="64"/>
           </svg>
         </div>
 
-        {/* Stamp circle — mid left */}
-        <div className="pointer-events-none absolute left-10 top-[58%] opacity-20 hidden xl:block" style={{animation:'float 10s ease-in-out infinite', animationDelay:'3s'}}>
-          <svg width="86" height="86" viewBox="0 0 90 90" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round">
-            <circle cx="45" cy="45" r="38" strokeDasharray="6 4" />
-            <circle cx="45" cy="45" r="30" />
+        {/* Stamp circle — mid left lower */}
+        <div className="pointer-events-none absolute left-6 top-[65%] opacity-[0.16] hidden xl:block" style={{animation:'float 10s ease-in-out infinite', animationDelay:'3s'}}>
+          <svg width="82" height="82" viewBox="0 0 90 90" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round">
+            <circle cx="45" cy="45" r="38" strokeDasharray="6 4"/>
+            <circle cx="45" cy="45" r="30"/>
             <text x="45" y="40" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#16a34a" fill="#16a34a" strokeWidth="0.3">กรมสรรพากร</text>
             <text x="45" y="54" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#16a34a" fill="#16a34a" strokeWidth="0.3">e-TAX ✓</text>
+          </svg>
+        </div>
+
+        {/* Calculator sketch — top center-left */}
+        <div className="pointer-events-none absolute left-[18%] top-32 opacity-[0.14] hidden xl:block rotate-[4deg]" style={{animation:'float 7.5s ease-in-out infinite', animationDelay:'2.5s'}}>
+          <svg width="64" height="80" viewBox="0 0 60 76" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="4" width="52" height="68" rx="6"/>
+            <rect x="10" y="10" width="40" height="18" rx="3"/>
+            {/* Keypad dots */}
+            <circle cx="18" cy="42" r="3"/> <circle cx="30" cy="42" r="3"/> <circle cx="42" cy="42" r="3"/>
+            <circle cx="18" cy="54" r="3"/> <circle cx="30" cy="54" r="3"/> <circle cx="42" cy="54" r="3"/>
+            <circle cx="18" cy="66" r="3"/> <circle cx="30" cy="66" r="3"/>
+            <rect x="36" y="60" width="10" height="10" rx="2"/>
+          </svg>
+        </div>
+
+        {/* Pencil sketch — right center */}
+        <div className="pointer-events-none absolute right-[14%] top-[35%] opacity-[0.18] hidden xl:block rotate-[-30deg]" style={{animation:'float 11s ease-in-out infinite', animationDelay:'4s'}}>
+          <svg width="32" height="100" viewBox="0 0 32 100" fill="none" stroke="#86efac" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="8" y="10" width="16" height="72" rx="3"/>
+            {/* Eraser */}
+            <rect x="8" y="6" width="16" height="8" rx="2" stroke="#4ade80"/>
+            {/* Tip */}
+            <path d="M8 82 L16 96 L24 82"/>
+            {/* Lines on pencil */}
+            <line x1="8" y1="30" x2="24" y2="30"/>
+            <line x1="8" y1="50" x2="24" y2="50"/>
           </svg>
         </div>
 
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
             <div className="max-w-3xl">
-              <div className="animate-fade-in inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-primary-700 mb-8 shadow-sm">
-                <FileCheck className="w-4 h-4 flex-shrink-0" />
-                <span>{isThai ? '🇹🇭 มาตรฐาน e-Tax Invoice v2.0' : '🇹🇭 e-Tax Invoice v2.0 Compliant'}</span>
+              <div className="animate-fade-in inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 mb-8 shadow-sm">
+                <Zap className="w-4 h-4 flex-shrink-0" />
+                <span>{isThai ? '✨ AI ผู้ช่วยบัญชีและภาษีของคุณ' : '✨ Your AI Accounting & Tax Assistant'}</span>
               </div>
 
               <h1 className="animate-slide-in-left max-w-4xl text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl leading-tight mb-6" style={{animationDelay:'0.15s'}}>
@@ -598,30 +661,65 @@ export default function Landing() {
             </div>
 
             <aside className="animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
-              {/* Billy mascot — receipt character */}
+              {/* Billy mascot — receipt bill character */}
               <div className="flex justify-center mb-4">
-                <svg viewBox="0 0 120 160" width="120" height="160" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Receipt body */}
-                  <rect x="10" y="30" width="100" height="120" rx="8" fill="white" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  {/* Jagged top edge (receipt style) */}
-                  <polyline points="10,30 18,20 26,30 34,20 42,30 50,20 58,30 66,20 74,30 82,20 90,30 98,20 106,20 110,30" fill="white" stroke="#e5e7eb" strokeWidth="1.5"/>
-                  {/* Eyes */}
-                  <circle cx="42" cy="75" r="10" fill="#111827"/>
-                  <circle cx="78" cy="75" r="10" fill="#111827"/>
-                  <circle cx="46" cy="71" r="3" fill="white"/>
-                  <circle cx="82" cy="71" r="3" fill="white"/>
-                  {/* Cheeks */}
-                  <ellipse cx="30" cy="90" rx="8" ry="5" fill="#fca5a5" opacity="0.6"/>
-                  <ellipse cx="90" cy="90" rx="8" ry="5" fill="#fca5a5" opacity="0.6"/>
-                  {/* Smile */}
-                  <path d="M 45 98 Q 60 110 75 98" stroke="#111827" strokeWidth="3" fill="none" strokeLinecap="round"/>
-                  {/* Green scarf */}
-                  <rect x="25" y="130" width="70" height="14" rx="7" fill="#16a34a"/>
+                <svg viewBox="0 0 160 220" width="140" height="196" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Drop shadow */}
+                  <ellipse cx="80" cy="210" rx="42" ry="8" fill="#d1fae5" opacity="0.7"/>
+                  {/* Legs */}
+                  <rect x="54" y="178" width="16" height="24" rx="6" fill="#e2e8f0"/>
+                  <rect x="90" y="178" width="16" height="24" rx="6" fill="#e2e8f0"/>
                   {/* Green shoes */}
-                  <ellipse cx="38" cy="150" rx="14" ry="8" fill="#059669"/>
-                  <ellipse cx="82" cy="150" rx="14" ry="8" fill="#059669"/>
-                  {/* "B" letter on body */}
-                  <text x="54" y="125" fontFamily="Arial" fontSize="16" fontWeight="bold" fill="#16a34a">B</text>
+                  <ellipse cx="62" cy="203" rx="16" ry="9" fill="#16a34a"/>
+                  <ellipse cx="98" cy="203" rx="16" ry="9" fill="#059669"/>
+                  {/* Shoe highlight */}
+                  <ellipse cx="56" cy="199" rx="5" ry="3" fill="#4ade80" opacity="0.5"/>
+                  <ellipse cx="92" cy="199" rx="5" ry="3" fill="#4ade80" opacity="0.5"/>
+                  {/* Arms */}
+                  <path d="M28 120 Q14 130 18 148" stroke="#e2e8f0" strokeWidth="14" strokeLinecap="round" fill="none"/>
+                  <path d="M132 120 Q146 130 142 148" stroke="#e2e8f0" strokeWidth="14" strokeLinecap="round" fill="none"/>
+                  {/* Receipt body — slightly rounded rectangle with paper texture */}
+                  <rect x="22" y="36" width="116" height="152" rx="6" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="2"/>
+                  {/* Receipt body inner white */}
+                  <rect x="26" y="40" width="108" height="144" rx="4" fill="white"/>
+                  {/* Zigzag torn top edge */}
+                  <path d="M22,36 L30,22 L38,36 L46,22 L54,36 L62,22 L70,36 L78,22 L86,36 L94,22 L102,36 L110,22 L118,36 L126,22 L134,36 L138,36" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" strokeLinejoin="round"/>
+                  {/* Receipt lines — like real receipt content */}
+                  <line x1="36" y1="68" x2="124" y2="68" stroke="#e5e7eb" strokeWidth="1.5"/>
+                  <line x1="36" y1="80" x2="100" y2="80" stroke="#e5e7eb" strokeWidth="1.5"/>
+                  <line x1="36" y1="92" x2="112" y2="92" stroke="#e5e7eb" strokeWidth="1.5"/>
+                  {/* Green separator line */}
+                  <line x1="36" y1="104" x2="124" y2="104" stroke="#16a34a" strokeWidth="1.5" strokeDasharray="4 2"/>
+                  <line x1="36" y1="116" x2="90" y2="116" stroke="#e5e7eb" strokeWidth="1.5"/>
+                  <line x1="36" y1="128" x2="78" y2="128" stroke="#e5e7eb" strokeWidth="1.5"/>
+                  {/* Eyes — big friendly circular eyes */}
+                  <circle cx="62" cy="56" r="13" fill="#1e293b"/>
+                  <circle cx="98" cy="56" r="13" fill="#1e293b"/>
+                  {/* Eye whites / shine */}
+                  <circle cx="67" cy="51" r="4.5" fill="white"/>
+                  <circle cx="103" cy="51" r="4.5" fill="white"/>
+                  <circle cx="69" cy="49" r="2" fill="white" opacity="0.7"/>
+                  <circle cx="105" cy="49" r="2" fill="white" opacity="0.7"/>
+                  {/* Cheeks */}
+                  <ellipse cx="45" cy="70" rx="9" ry="6" fill="#fda4af" opacity="0.55"/>
+                  <ellipse cx="115" cy="70" rx="9" ry="6" fill="#fda4af" opacity="0.55"/>
+                  {/* Smile — wide friendly curve */}
+                  <path d="M 55 76 Q 80 95 105 76" stroke="#1e293b" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+                  {/* Teeth */}
+                  <path d="M 65 80 Q 80 92 95 80" fill="white" stroke="none"/>
+                  {/* Green scarf / cape collar */}
+                  <path d="M38 145 Q80 162 122 145 L126 158 Q80 178 34 158 Z" fill="#16a34a"/>
+                  <path d="M52 145 Q80 155 108 145 L106 152 Q80 162 54 152 Z" fill="#15803d"/>
+                  {/* Scarf knot */}
+                  <ellipse cx="80" cy="150" rx="10" ry="8" fill="#4ade80"/>
+                  <ellipse cx="80" cy="150" rx="6" ry="5" fill="#16a34a"/>
+                  {/* "B" badge on body */}
+                  <circle cx="80" cy="120" r="12" fill="#16a34a"/>
+                  <text x="80" y="125" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="14" fontWeight="900" fill="white">B</text>
+                  {/* Sparkles around mascot */}
+                  <path d="M140 50 L142 44 L144 50 L150 52 L144 54 L142 60 L140 54 L134 52 Z" fill="#4ade80" opacity="0.8"/>
+                  <path d="M16 80 L17.5 76 L19 80 L23 81.5 L19 83 L17.5 87 L16 83 L12 81.5 Z" fill="#86efac" opacity="0.7"/>
+                  <path d="M138 90 L139 87 L140 90 L143 91 L140 92 L139 95 L138 92 L135 91 Z" fill="#4ade80" opacity="0.6"/>
                 </svg>
               </div>
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
