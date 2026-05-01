@@ -488,6 +488,70 @@ export default function Landing() {
       <section className="pt-32 pb-24 relative overflow-hidden">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_30%)]" />
 
+        {/* Floating doodles — e-Tax themed background elements */}
+        {/* Receipt sketch — top left */}
+        <div className="pointer-events-none absolute left-6 top-24 opacity-25 hidden lg:block rotate-[-8deg]" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
+          <svg width="110" height="138" viewBox="0 0 120 150" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="10" y="8" width="100" height="134" rx="6" />
+            <line x1="24" y1="32" x2="96" y2="32" />
+            <line x1="24" y1="48" x2="80" y2="48" />
+            <line x1="24" y1="64" x2="88" y2="64" />
+            <line x1="24" y1="80" x2="72" y2="80" />
+            <line x1="24" y1="96" x2="84" y2="96" />
+            <line x1="24" y1="114" x2="96" y2="114" strokeWidth="3" />
+            <path d="M10 128 Q20 138 30 128 Q40 118 50 128 Q60 138 70 128 Q80 118 90 128 Q100 138 110 128" strokeWidth="2" />
+          </svg>
+        </div>
+
+        {/* Squiggly arrow — bottom left */}
+        <div className="pointer-events-none absolute left-12 bottom-16 opacity-30 hidden xl:block" style={{animation:'float 9s ease-in-out infinite', animationDelay:'1.5s'}}>
+          <svg width="110" height="90" viewBox="0 0 100 80" fill="none" stroke="#ff6b6b" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M10 70 C20 50, 30 60, 40 40 C50 20, 60 35, 70 20 C80 8, 88 12, 90 8" />
+            <path d="M82 6 L90 8 L86 16" />
+          </svg>
+        </div>
+
+        {/* Invoice document — top right */}
+        <div className="pointer-events-none absolute right-6 top-20 opacity-25 hidden lg:block rotate-[8deg]" style={{animation:'float 8s ease-in-out infinite', animationDelay:'0.8s'}}>
+          <svg width="100" height="128" viewBox="0 0 110 140" fill="none" stroke="#1e40af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 6 L80 6 L102 28 L102 134 Q102 136 100 136 L8 136 Q6 136 6 134 L6 8 Q6 6 8 6Z" />
+            <path d="M80 6 L80 28 L102 28" strokeWidth="2" />
+            <line x1="20" y1="50" x2="88" y2="50" />
+            <line x1="20" y1="64" x2="70" y2="64" />
+            <line x1="20" y1="78" x2="80" y2="78" />
+            <line x1="20" y1="92" x2="60" y2="92" />
+            <rect x="20" y="106" width="68" height="16" rx="3" strokeWidth="2" fill="none" />
+          </svg>
+        </div>
+
+        {/* QR Code sketch — bottom right */}
+        <div className="pointer-events-none absolute right-10 bottom-12 opacity-30 hidden xl:block rotate-[-5deg]" style={{animation:'float 6.5s ease-in-out infinite', animationDelay:'2s'}}>
+          <svg width="88" height="88" viewBox="0 0 80 80" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="6" y="6" width="26" height="26" rx="3" />
+            <rect x="14" y="14" width="10" height="10" />
+            <rect x="48" y="6" width="26" height="26" rx="3" />
+            <rect x="56" y="14" width="10" height="10" />
+            <rect x="6" y="48" width="26" height="26" rx="3" />
+            <rect x="14" y="56" width="10" height="10" />
+            <line x1="48" y1="48" x2="56" y2="48" />
+            <line x1="60" y1="48" x2="74" y2="48" />
+            <line x1="48" y1="56" x2="48" y2="68" />
+            <line x1="60" y1="56" x2="74" y2="56" />
+            <line x1="60" y1="64" x2="60" y2="74" />
+            <line x1="68" y1="64" x2="74" y2="64" />
+          </svg>
+        </div>
+
+        {/* Stamp circle — mid left */}
+        <div className="pointer-events-none absolute left-10 top-[58%] opacity-20 hidden xl:block" style={{animation:'float 10s ease-in-out infinite', animationDelay:'3s'}}>
+          <svg width="86" height="86" viewBox="0 0 90 90" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round">
+            <circle cx="45" cy="45" r="38" strokeDasharray="6 4" />
+            <circle cx="45" cy="45" r="30" />
+            <text x="45" y="40" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#2563eb" fill="#2563eb" strokeWidth="0.3">กรมสรรพากร</text>
+            <text x="45" y="54" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#2563eb" fill="#2563eb" strokeWidth="0.3">e-TAX ✓</text>
+          </svg>
+        </div>
+
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
             <div className="max-w-3xl">
