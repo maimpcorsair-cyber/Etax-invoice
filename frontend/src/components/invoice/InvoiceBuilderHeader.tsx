@@ -47,19 +47,32 @@ export default function InvoiceBuilderHeader({
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-              1. {isThai ? 'กรอกข้อมูล' : 'Fill in details'}
-            </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-              2. {isThai ? 'ตรวจตัวอย่าง' : 'Preview'}
-            </span>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 font-medium">
-              3. {isThai ? 'บันทึกร่าง' : 'Save draft'}
-            </span>
-            <span className="rounded-full bg-green-100 px-3 py-1 text-green-700 font-medium">
-              4. {isThai ? 'ออกเอกสาร' : 'Issue document'}
-            </span>
+          <div className="flex items-center gap-0">
+            {[
+              { label: isThai ? 'กรอกข้อมูล' : 'Fill details', active: true, done: false },
+              { label: isThai ? 'ตรวจตัวอย่าง' : 'Preview', active: false, done: false },
+              { label: isThai ? 'บันทึกร่าง' : 'Save draft', active: false, done: false },
+              { label: isThai ? 'ออกเอกสาร' : 'Issue', active: false, done: false },
+            ].map((step, i) => (
+              <div key={i} className="flex items-center">
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      step.active
+                        ? 'text-white shadow-button'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                    style={step.active ? {background:'linear-gradient(135deg,#2563eb,#1e40af)'} : {}}
+                  >
+                    {i + 1}
+                  </div>
+                  <span className={`text-xs font-medium hidden sm:block ${step.active ? 'text-primary-700' : 'text-gray-400'}`}>
+                    {step.label}
+                  </span>
+                </div>
+                {i < 3 && <div className="w-6 h-px bg-gray-200 mx-1" />}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -82,7 +95,8 @@ export default function InvoiceBuilderHeader({
             {isThai ? 'บันทึกร่าง' : 'Save draft'}
           </button>
           <button
-            className="btn-primary bg-green-600 hover:bg-green-700 focus:ring-green-500"
+            className="btn-primary"
+            style={{background:'linear-gradient(135deg,#10b981,#059669)'}}
             onClick={onIssue}
             disabled={saving || hasValidationErrors}
             title={isThai ? 'ออกเอกสารจริง — ล็อกเลขเอกสาร สร้าง PDF + QR Code' : 'Issue document — lock number, generate PDF & QR Code'}

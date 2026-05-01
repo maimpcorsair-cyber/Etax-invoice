@@ -61,9 +61,11 @@ export default function Navbar() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/app/dashboard" className="flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary-700" strokeWidth={2} />
-            <span className="font-bold text-gray-900 text-sm hidden sm:block">
+          <Link to="/app/dashboard" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg" style={{background:'linear-gradient(135deg,#2563eb,#1e40af)'}}>
+              <FileText className="w-4 h-4 text-white" strokeWidth={2.5} />
+            </div>
+            <span className="font-bold text-gray-900 text-sm hidden sm:block group-hover:text-primary-600 transition-colors">
               {t('app.shortName')}
             </span>
           </Link>
@@ -146,7 +148,7 @@ export default function Navbar() {
                 aria-expanded={userMenuOpen}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <div className="w-7 h-7 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#ff6b6b,#e85555)'}}>
                   {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
                 </div>
                 <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-24 truncate">

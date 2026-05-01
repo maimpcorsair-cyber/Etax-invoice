@@ -181,15 +181,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Welcome Banner */}
+      <div className="rounded-2xl p-6 text-white flex items-center justify-between" style={{background: 'linear-gradient(135deg,#2563eb 0%,#1e40af 100%)'}}>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {t('dashboard.welcome')}, {user?.name}
-          </p>
+          <p className="text-blue-200 text-sm font-medium mb-1">{t('dashboard.welcome')}</p>
+          <h1 className="text-xl sm:text-2xl font-bold">{user?.name}</h1>
+          <p className="text-blue-100 text-sm mt-1">{t('dashboard.title')}</p>
         </div>
-        <Link to="/app/invoices/new" className="btn-primary hidden lg:inline-flex">
+        <Link to="/app/invoices/new" className="hidden lg:inline-flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-blue-50 transition-all duration-200 hover:-translate-y-0.5 shadow-lg text-sm">
           <Plus className="w-4 h-4" />
           {t('dashboard.createNew')}
         </Link>
@@ -224,11 +223,11 @@ export default function Dashboard() {
         {loading
           ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
           : statCards.map((stat) => (
-              <div key={stat.key} className="card p-3 sm:p-6">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              <div key={stat.key} className="card p-4 sm:p-6 text-center card-hover">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
                   {t(`dashboard.summary.${stat.key}`)}
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-primary-600">{stat.value}</p>
               </div>
             ))}
       </div>

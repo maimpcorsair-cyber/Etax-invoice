@@ -587,22 +587,30 @@ export default function Landing() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {features.map(({ icon: Icon, key }) => (
-            <div
-              key={key}
-              className="group rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-primary-700">
-                <Icon className="w-6 h-6 text-primary-600" strokeWidth={2} />
+          {features.map(({ icon: Icon, key }, i) => {
+            const gradients = [
+              'from-primary-600 to-primary-dark',
+              'from-accent-500 to-accent-dark',
+              'from-emerald-500 to-emerald-700',
+              'from-violet-500 to-violet-700',
+            ];
+            return (
+              <div
+                key={key}
+                className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-2 hover:shadow-card-hover hover:border-primary-200 card-hover"
+              >
+                <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${gradients[i % gradients.length]} shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+                  <Icon className="w-7 h-7 text-white" strokeWidth={2} />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 text-base">
+                  {t(`landing.features.${key}.title`)}
+                </h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {t(`landing.features.${key}.desc`)}
+                </p>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2 text-lg">
-                {t(`landing.features.${key}.title`)}
-              </h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {t(`landing.features.${key}.desc`)}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -627,15 +635,18 @@ export default function Landing() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              {documentOpsPillars.map(({ icon: Icon, th, en, descTh, descEn }) => (
-                <div key={en} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-primary-700 shadow-sm">
-                    <Icon className="h-5 w-5" />
+              {documentOpsPillars.map(({ icon: Icon, th, en, descTh, descEn }, i) => {
+                const iconBgs = ['from-primary-600 to-primary-dark','from-accent-500 to-accent-dark','from-emerald-500 to-emerald-700','from-violet-500 to-violet-700'];
+                return (
+                  <div key={en} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${iconBgs[i % iconBgs.length]} shadow-sm`}>
+                      <Icon className="h-5 w-5 text-white" />
+                    </div>
+                    <h3 className="mt-4 text-base font-bold text-slate-950">{isThai ? th : en}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{isThai ? descTh : descEn}</p>
                   </div>
-                  <h3 className="mt-4 text-base font-bold text-slate-950">{isThai ? th : en}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{isThai ? descTh : descEn}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -686,7 +697,7 @@ export default function Landing() {
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-full shadow-lg">
+                    <span className="px-4 py-1.5 text-white text-xs font-bold rounded-full shadow-lg whitespace-nowrap" style={{background: 'linear-gradient(135deg,#ff6b6b,#e85555)'}}>
                       ⭐ {isThai ? 'ยอดนิยม' : 'MOST POPULAR'}
                     </span>
                   </div>
@@ -792,20 +803,26 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-slate-900 relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            {isThai ? 'พร้อมเริ่มต้นหรือยัง?' : 'Ready to get started?'}
-          </h2>
-          <p className="text-primary-100 mb-8 text-lg max-w-2xl mx-auto">
-            {isThai
-              ? 'เข้าร่วมระบบ e-Tax Invoice ที่มีความปลอดภัยและเชื่อถือได้'
-              : 'Join thousands of businesses using our secure and reliable e-Invoice system'}
-          </p>
-          <button type="button" onClick={() => openCheckout('free')} className="inline-flex btn-primary lg bg-white text-slate-900 hover:bg-slate-50">
-            {t('landing.hero.cta')}
-            <ArrowRight className="w-5 h-5" />
-          </button>
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="rounded-3xl p-12 text-center text-white" style={{background: 'linear-gradient(135deg,#2563eb 0%,#1e40af 100%)'}}>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              {isThai ? 'พร้อมเริ่มต้นหรือยัง?' : 'Ready to get started?'}
+            </h2>
+            <p className="text-blue-100 mb-8 text-lg max-w-2xl mx-auto">
+              {isThai
+                ? 'เข้าร่วมระบบ e-Tax Invoice ที่มีความปลอดภัยและเชื่อถือได้'
+                : 'Join thousands of businesses using our secure and reliable e-Invoice system'}
+            </p>
+            <button
+              type="button"
+              onClick={() => openCheckout('free')}
+              className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-blue-50 transition-all duration-200 hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
+            >
+              {t('landing.hero.cta')}
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </section>
 
