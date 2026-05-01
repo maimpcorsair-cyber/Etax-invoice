@@ -182,7 +182,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="rounded-2xl p-6 text-white flex items-center justify-between" style={{background: 'linear-gradient(135deg,#2563eb 0%,#1e40af 100%)'}}>
+      <div className="rounded-2xl p-6 text-white flex items-center justify-between" style={{background: 'linear-gradient(135deg,#f97316 0%,#ea580c 100%)'}}>
         <div>
           <p className="text-blue-200 text-sm font-medium mb-1">{t('dashboard.welcome')}</p>
           <h1 className="text-xl sm:text-2xl font-bold">{user?.name}</h1>

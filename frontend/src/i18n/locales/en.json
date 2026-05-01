@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "e-Tax Invoice System",
-    "tagline": "Manage e-Tax invoices and receipts compliant with Thailand Revenue Department standards",
-    "shortName": "e-Tax Invoice"
+    "name": "Chadchart Accounting",
+    "tagline": "Work. Work. Work. — Accurate books, real RD submission.",
+    "shortName": "ChadAcct"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -21,8 +21,8 @@
   },
   "landing": {
     "hero": {
-      "title": "e-Tax Invoice System",
-      "subtitle": "Complete, Fast, and Compliant with Thailand Revenue Department Standards",
+      "title": "Accurate Books, Real RD Submission",
+      "subtitle": "Work. Work. Work. — AI-powered e-Tax invoicing that actually submits to Thailand's Revenue Department.",
       "cta": "Get Started Free",
       "ctaSecondary": "View Demo",
       "trustText": "Trusted by 500+ companies"

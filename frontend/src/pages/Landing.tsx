@@ -486,12 +486,12 @@ export default function Landing() {
 
       {/* Hero Section */}
       <section className="pt-32 pb-24 relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_30%)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_30%)]" />
 
         {/* Floating doodles — e-Tax themed background elements */}
         {/* Receipt sketch — top left */}
         <div className="pointer-events-none absolute left-6 top-24 opacity-25 hidden lg:block rotate-[-8deg]" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
-          <svg width="110" height="138" viewBox="0 0 120 150" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="110" height="138" viewBox="0 0 120 150" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="10" y="8" width="100" height="134" rx="6" />
             <line x1="24" y1="32" x2="96" y2="32" />
             <line x1="24" y1="48" x2="80" y2="48" />
@@ -513,7 +513,7 @@ export default function Landing() {
 
         {/* Invoice document — top right */}
         <div className="pointer-events-none absolute right-6 top-20 opacity-25 hidden lg:block rotate-[8deg]" style={{animation:'float 8s ease-in-out infinite', animationDelay:'0.8s'}}>
-          <svg width="100" height="128" viewBox="0 0 110 140" fill="none" stroke="#1e40af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="100" height="128" viewBox="0 0 110 140" fill="none" stroke="#ea580c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8 6 L80 6 L102 28 L102 134 Q102 136 100 136 L8 136 Q6 136 6 134 L6 8 Q6 6 8 6Z" />
             <path d="M80 6 L80 28 L102 28" strokeWidth="2" />
             <line x1="20" y1="50" x2="88" y2="50" />
@@ -544,11 +544,11 @@ export default function Landing() {
 
         {/* Stamp circle — mid left */}
         <div className="pointer-events-none absolute left-10 top-[58%] opacity-20 hidden xl:block" style={{animation:'float 10s ease-in-out infinite', animationDelay:'3s'}}>
-          <svg width="86" height="86" viewBox="0 0 90 90" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round">
+          <svg width="86" height="86" viewBox="0 0 90 90" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round">
             <circle cx="45" cy="45" r="38" strokeDasharray="6 4" />
             <circle cx="45" cy="45" r="30" />
-            <text x="45" y="40" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#2563eb" fill="#2563eb" strokeWidth="0.3">กรมสรรพากร</text>
-            <text x="45" y="54" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#2563eb" fill="#2563eb" strokeWidth="0.3">e-TAX ✓</text>
+            <text x="45" y="40" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#f97316" fill="#f97316" strokeWidth="0.3">กรมสรรพากร</text>
+            <text x="45" y="54" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#f97316" fill="#f97316" strokeWidth="0.3">e-TAX ✓</text>
           </svg>
         </div>
 
@@ -598,6 +598,34 @@ export default function Landing() {
             </div>
 
             <aside className="animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
+              {/* Chadchart mascot — orange vest accountant */}
+              <div className="flex justify-center mb-4">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                  {/* Head */}
+                  <circle cx="40" cy="22" r="14" fill="#FDE68A" stroke="#F97316" strokeWidth="2"/>
+                  {/* Hair */}
+                  <path d="M26 22 Q27 10 40 10 Q53 10 54 22" fill="#1C1C2E"/>
+                  {/* Eyes */}
+                  <circle cx="35" cy="22" r="2" fill="#1C1C2E"/>
+                  <circle cx="45" cy="22" r="2" fill="#1C1C2E"/>
+                  {/* Smile */}
+                  <path d="M35 28 Q40 33 45 28" stroke="#F97316" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                  {/* Orange vest body */}
+                  <rect x="22" y="38" width="36" height="28" rx="6" fill="#F97316"/>
+                  {/* Shirt under */}
+                  <rect x="30" y="38" width="20" height="28" rx="0" fill="white"/>
+                  {/* Vest stripe */}
+                  <line x1="40" y1="38" x2="40" y2="66" stroke="#F97316" strokeWidth="2"/>
+                  {/* Neck */}
+                  <rect x="35" y="34" width="10" height="6" fill="#FDE68A"/>
+                  {/* Arms */}
+                  <rect x="10" y="40" width="14" height="8" rx="4" fill="#F97316"/>
+                  <rect x="56" y="40" width="14" height="8" rx="4" fill="#F97316"/>
+                  {/* Tablet in right hand */}
+                  <rect x="60" y="44" width="16" height="20" rx="3" fill="#1C1C2E" transform="rotate(-10 68 54)"/>
+                  <rect x="62" y="46" width="12" height="16" rx="2" fill="#60A5FA" transform="rotate(-10 68 54)"/>
+                </svg>
+              </div>
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Operational Snapshot' : 'Operational Snapshot'}</p>

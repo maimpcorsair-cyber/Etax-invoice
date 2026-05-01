@@ -62,7 +62,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/app/dashboard" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg" style={{background:'linear-gradient(135deg,#2563eb,#1e40af)'}}>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg" style={{background:'linear-gradient(135deg,#f97316,#ea580c)'}}>
               <FileText className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
             <span className="font-bold text-gray-900 text-sm hidden sm:block group-hover:text-primary-600 transition-colors">
