@@ -62,7 +62,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/app/dashboard" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg" style={{background:'linear-gradient(135deg,#f97316,#ea580c)'}}>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg" style={{background:'linear-gradient(135deg,#16a34a,#059669)'}}>
               <FileText className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
             <span className="font-bold text-gray-900 text-sm hidden sm:block group-hover:text-primary-600 transition-colors">
@@ -148,7 +148,7 @@ export default function Navbar() {
                 aria-expanded={userMenuOpen}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#ff6b6b,#e85555)'}}>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#22c55e,#16a34a)'}}>
                   {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
                 </div>
                 <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-24 truncate">

@@ -85,12 +85,12 @@ html, body {
   /* Buttons */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-button;
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    background: linear-gradient(135deg, #16a34a 0%, #059669 100%);
   }
 
   .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(249,115,22,0.4);
+    box-shadow: 0 8px 25px rgba(22,163,74,0.4);
   }
 
   .btn-primary.sm {
@@ -163,7 +163,7 @@ html, body {
   }
 
   .input-field:focus {
-    box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+    box-shadow: 0 0 0 3px rgba(22,163,74,0.1);
   }
 
   .input-field:disabled {
