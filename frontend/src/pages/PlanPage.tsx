@@ -47,40 +47,40 @@ const PLANS: PlanDef[] = [
     badgeColor: 'bg-gray-100 text-gray-700',
     headerBg: 'bg-gray-50',
     icon: <FileText className="w-5 h-5" />,
-    docs: '10',
+    docs: '20',
     users: '1',
     customers: '50',
-    products: '20',
+    products: '50',
   },
   {
     key: 'starter',
     nameTh: 'สตาร์ทเตอร์',
     nameEn: 'Starter',
-    price: '฿990',
+    price: '฿790',
     priceSub: '/เดือน',
     color: 'border-blue-200',
     badgeColor: 'bg-blue-100 text-blue-700',
     headerBg: 'bg-blue-50',
     icon: <Zap className="w-5 h-5 text-blue-600" />,
-    docs: '100',
+    docs: '150',
     users: '3',
-    customers: 'ไม่จำกัด',
-    products: 'ไม่จำกัด',
+    customers: '500',
+    products: '500',
   },
   {
     key: 'business',
     nameTh: 'บิสสิเนส',
     nameEn: 'Business',
-    price: '฿2,490',
+    price: '฿1,990',
     priceSub: '/เดือน',
     color: 'border-purple-200',
     badgeColor: 'bg-purple-100 text-purple-700',
     headerBg: 'bg-purple-50',
     icon: <Star className="w-5 h-5 text-purple-600" />,
-    docs: '500',
-    users: '20',
-    customers: 'ไม่จำกัด',
-    products: 'ไม่จำกัด',
+    docs: '800',
+    users: '8',
+    customers: '5,000',
+    products: '5,000',
   },
   {
     key: 'enterprise',
@@ -104,7 +104,7 @@ const PLANS: PlanDef[] = [
 interface FeatureRow {
   labelTh: string;
   labelEn: string;
-  values: Record<PlanKey, boolean | string>;
+  values: Record<PlanKey, boolean | string | { th: string; en: string }>;
 }
 
 const FEATURE_ROWS: FeatureRow[] = [
@@ -127,6 +127,21 @@ const FEATURE_ROWS: FeatureRow[] = [
     labelTh: 'ส่งออก Excel',
     labelEn: 'Excel Export',
     values: { free: false, starter: true, business: true, enterprise: true },
+  },
+  {
+    labelTh: 'AI อ่านเอกสารผ่านเว็บ/LINE',
+    labelEn: 'AI document intake via web/LINE',
+    values: {
+      free: { th: 'เว็บ', en: 'Web' },
+      starter: { th: 'เว็บ + LINE', en: 'Web + LINE' },
+      business: { th: 'เว็บ + LINE + Drive/Sheets', en: 'Web + LINE + Drive/Sheets' },
+      enterprise: { th: 'กำหนดเอง', en: 'Custom' },
+    },
+  },
+  {
+    labelTh: 'ตรวจสลิป/ใบเสร็จ/เอกสารค่าใช้จ่าย',
+    labelEn: 'Slip, receipt, and expense document review',
+    values: { free: { th: 'พื้นฐาน', en: 'Basic' }, starter: true, business: true, enterprise: true },
   },
   {
     labelTh: 'Audit Log',
@@ -530,8 +545,10 @@ export default function PlanPage() {
                           ) : (
                             <X className="w-4 h-4 text-gray-300 mx-auto" />
                           )
-                        ) : (
+                        ) : typeof val === 'string' ? (
                           <span className="text-sm text-gray-700">{val}</span>
+                        ) : (
+                          <span className="text-sm text-gray-700">{isThai ? val.th : val.en}</span>
                         )}
                       </td>
                     );
@@ -603,9 +620,15 @@ export default function PlanPage() {
                             val
                               ? <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
                               : <X className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                          ) : typeof val === 'object' && val !== null ? (
+                            <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
                           ) : null}
                           <span className={typeof val === 'boolean' && !val ? 'text-gray-400' : 'text-gray-700'}>
                             {isThai ? row.labelTh : row.labelEn}
+                            {typeof val === 'string' && <span className="ml-1 font-medium">({val})</span>}
+                            {typeof val === 'object' && val !== null && (
+                              <span className="ml-1 font-medium">({isThai ? val.th : val.en})</span>
+                            )}
                           </span>
                         </div>
                       );

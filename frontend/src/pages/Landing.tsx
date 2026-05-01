@@ -26,10 +26,62 @@ type PricingPlan = {
 };
 
 const pricingPlans: PricingPlan[] = [
-  { key: 'free', price: 'ฟรี', limitTh: 'ทดลอง 10 เอกสาร/เดือน', limitEn: 'Try 10 docs/month', summaryTh: 'สำหรับทดลอง workflow และ preview ก่อนใช้งานจริง', summaryEn: 'Best for evaluating the workflow before going live.', priceEn: 'Free' },
-  { key: 'starter', price: '990', limitTh: 'สูงสุด 100 ใบ/เดือน', limitEn: 'Up to 100 docs/month', summaryTh: 'สำหรับธุรกิจเล็กที่ใช้งานจริงคนเดียว', summaryEn: 'Best for solo operators running real invoices.' },
-  { key: 'business', price: '2,490', limitTh: 'สูงสุด 500 ใบ/เดือน', limitEn: 'Up to 500 docs/month', summaryTh: 'สำหรับทีมบัญชีที่ต้องทำงานร่วมกันทุกวัน', summaryEn: 'Best for teams that need shared access and controls.', popular: true },
-  { key: 'enterprise', price: 'ติดต่อเรา', limitTh: 'ไม่จำกัด', limitEn: 'Unlimited', summaryTh: 'สำหรับองค์กรที่ต้องการโควตาและการตั้งค่าเฉพาะ', summaryEn: 'Best for higher-volume companies with custom requirements.', priceEn: 'Contact us' },
+  { key: 'free', price: 'ฟรี', limitTh: 'ทดลอง 20 เอกสาร/เดือน', limitEn: 'Try 20 docs/month', summaryTh: 'สำหรับทดลองอ่านเอกสาร ออก draft และดู workflow ก่อนใช้งานจริง', summaryEn: 'Best for testing document intake, drafts, and the workflow before going live.', priceEn: 'Free' },
+  { key: 'starter', price: '790', limitTh: 'สูงสุด 150 ใบ/เดือน', limitEn: 'Up to 150 docs/month', summaryTh: 'สำหรับเจ้าของธุรกิจที่ต้องอ่านบิล เก็บหลักฐาน และออก e-Tax จริง', summaryEn: 'Best for owner-led businesses that need OCR, evidence, and real e-Tax.' },
+  { key: 'business', price: '1,990', limitTh: 'สูงสุด 800 ใบ/เดือน', limitEn: 'Up to 800 docs/month', summaryTh: 'สำหรับทีมบัญชีที่ต้องตรวจเอกสาร ซื้อ-ขาย ส่ง RD และ export ทุกเดือน', summaryEn: 'Best for accounting teams handling purchases, sales, RD submission, and exports.', popular: true },
+  { key: 'enterprise', price: 'ติดต่อเรา', limitTh: 'ไม่จำกัด + SLA', limitEn: 'Unlimited + SLA', summaryTh: 'สำหรับองค์กรที่ต้องการโควตา โมเดลตรวจเอกสาร และ workflow เฉพาะ', summaryEn: 'Best for high-volume companies with custom verification and workflow needs.', priceEn: 'Contact us' },
+];
+
+const documentOpsPillars = [
+  {
+    icon: FileCheck,
+    th: 'AI อ่านเอกสารก่อนบันทึก',
+    en: 'AI reads before posting',
+    descTh: 'PDF text, รูปถ่าย, สลิปธนาคาร, ใบเสร็จ, บิลเงินสด, ทางด่วน และเอกสารค่าใช้จ่ายไทย/อังกฤษ ถูกแยกประเภทก่อนเข้าระบบ',
+    descEn: 'PDF text, photos, bank slips, receipts, cash bills, toll receipts, and Thai/English expense documents are classified before posting.',
+  },
+  {
+    icon: ShieldCheck,
+    th: 'ตรวจซ้ำด้วยกฎบัญชี',
+    en: 'Accounting rule checks',
+    descTh: 'ตรวจ VAT 7%, เลขผู้เสียภาษี, วันที่, ยอดรวม, เอกสารซ้ำ และช่องที่ขาด แล้วให้ผู้ใช้ยืนยันก่อนบันทึก',
+    descEn: 'Checks VAT, tax IDs, dates, totals, duplicates, and missing fields before users confirm.',
+  },
+  {
+    icon: Send,
+    th: 'ต่อยอดถึง e-Tax และ RD',
+    en: 'Extends to e-Tax and RD',
+    descTh: 'ไม่ได้หยุดแค่เก็บค่าใช้จ่าย แต่เชื่อมกับการออกใบกำกับภาษี XML, ลงลายเซ็น, timestamp และส่งกรมสรรพากร',
+    descEn: 'Goes beyond expense capture with XML e-Tax, signing, timestamping, and Revenue Department submission.',
+  },
+  {
+    icon: FileSpreadsheet,
+    th: 'พร้อมส่งสำนักงานบัญชี',
+    en: 'Accountant-ready exports',
+    descTh: 'เก็บไฟล์แนบเป็นคลังเอกสาร แยกที่มาจาก LINE/เว็บ และ export เป็น Excel, Google Sheets หรือ Drive folder',
+    descEn: 'Keeps an evidence library, tracks LINE/web sources, and exports to Excel, Google Sheets, or Drive folders.',
+  },
+];
+
+const marketingArticles = [
+  {
+    th: 'ลดงานคีย์ใบเสร็จปลายเดือน',
+    en: 'Cut month-end receipt entry',
+    bodyTh: 'ให้ทีมโยนเอกสารเข้าระบบทุกวัน AI อ่านและจัดหมวดทันที สิ้นเดือนเหลือแค่ตรวจรายการที่มั่นใจต่ำ',
+    bodyEn: 'Let the team drop documents daily. AI reads and categorizes them, leaving low-confidence items for month-end review.',
+  },
+  {
+    th: 'สลิปธนาคารควรถูกบันทึกคู่กับเอกสาร',
+    en: 'Bank slips should attach to records',
+    bodyTh: 'สลิปโอนเงินช่วยยืนยันการจ่าย แต่ต้องผูกกับใบซื้อหรือใบสำคัญจ่าย เพื่อให้ตรวจย้อนหลังได้ครบ',
+    bodyEn: 'Transfer slips prove payment, but they should attach to purchase documents or payment vouchers for audit trails.',
+  },
+  {
+    th: 'เว็บแชท AI ลดต้นทุน LINE quota',
+    en: 'Web AI chat avoids LINE quota burn',
+    bodyTh: 'คำถามวิเคราะห์ข้อมูลให้คุยในเว็บ ส่วน LINE ใช้กับงานรับเอกสารและแจ้งเตือนสำคัญ เพื่อลดต้นทุนข้อความ',
+    bodyEn: 'Use web chat for data analysis and reserve LINE for document intake and important notifications.',
+  },
 ];
 
 function currency(value: number) {
@@ -88,21 +140,22 @@ export default function Landing() {
   const planDetails = useMemo(() => ({
     free: [
       { icon: FileText, available: true, th: 'Preview, PDF และ XML draft', en: 'Preview, PDF, and XML draft' },
-      { icon: Files, available: true, th: 'ทดลองได้ 10 เอกสาร/เดือน', en: 'Up to 10 documents per month' },
+      { icon: Files, available: true, th: 'ทดลองได้ 20 เอกสาร/เดือน', en: 'Up to 20 documents per month' },
+      { icon: FileCheck, available: true, th: 'AI อ่านเอกสารผ่านเว็บแบบทดลอง', en: 'Trial web AI document intake' },
       { icon: Users, available: false, th: 'ยังไม่รองรับหลายผู้ใช้', en: 'No multi-user access yet' },
       { icon: Send, available: false, th: 'ยังส่งข้อมูลไป RD ไม่ได้', en: 'RD submission is not included' },
     ],
     starter: [
       { icon: Send, available: true, th: 'ส่งข้อมูลไป RD ได้จริง', en: 'Real RD submission included' },
-      { icon: ShieldCheck, available: true, th: 'ใช้งาน certificate และ email ได้', en: 'Certificate and email sending included' },
-      { icon: Users, available: false, th: '1 ผู้ใช้หลักเท่านั้น', en: 'Single primary user only' },
-      { icon: Lock, available: false, th: 'ยังไม่มี audit log / custom template', en: 'No audit logs or custom templates yet' },
+      { icon: FileCheck, available: true, th: 'อ่านเอกสารเว็บ/LINE พร้อมรอยืนยัน', en: 'Web/LINE AI intake with review queue' },
+      { icon: ShieldCheck, available: true, th: 'Certificate, email และ Excel export', en: 'Certificate, email, and Excel export' },
+      { icon: Users, available: true, th: 'สูงสุด 3 ผู้ใช้', en: 'Up to 3 users' },
     ],
     business: [
-      { icon: Users, available: true, th: 'หลายผู้ใช้พร้อม role ภายในทีม', en: 'Multi-user access with internal roles' },
-      { icon: ScrollText, available: true, th: 'Audit logs และ document templates', en: 'Audit logs and document templates' },
-      { icon: FileSpreadsheet, available: true, th: 'Export Excel และ Google Sheets', en: 'Excel and Google Sheets export' },
-      { icon: ShieldCheck, available: true, th: 'เหมาะกับงาน production เต็มรูปแบบ', en: 'Production-ready for day-to-day operations' },
+      { icon: Users, available: true, th: 'สูงสุด 8 ผู้ใช้พร้อม role ภายในทีม', en: 'Up to 8 users with internal roles' },
+      { icon: ScrollText, available: true, th: 'Audit logs, template และ status เอกสาร', en: 'Audit logs, templates, and document statuses' },
+      { icon: FileSpreadsheet, available: true, th: 'Excel, Google Sheets และ Drive workflow', en: 'Excel, Google Sheets, and Drive workflow' },
+      { icon: ShieldCheck, available: true, th: 'เหมาะกับงาน production ซื้อ-ขายเต็มรูปแบบ', en: 'Production-ready for purchase and sales operations' },
     ],
     enterprise: [
       { icon: Files, available: true, th: 'โควตาเอกสารและผู้ใช้ตามสัญญา', en: 'Custom document and user limits' },
@@ -119,6 +172,11 @@ export default function Landing() {
       values: { free: true, starter: true, business: true, enterprise: true },
     },
     {
+      labelTh: 'AI อ่านเอกสารซื้อ/สลิป/ใบเสร็จ',
+      labelEn: 'AI purchase, slip, and receipt intake',
+      values: { free: { th: 'เว็บทดลอง', en: 'Web trial' }, starter: { th: 'เว็บ + LINE', en: 'Web + LINE' }, business: { th: 'เว็บ + LINE + queue', en: 'Web + LINE + queue' }, enterprise: { th: 'กำหนดเอง', en: 'Custom' } },
+    },
+    {
       labelTh: 'ส่งข้อมูลไปกรมสรรพากร',
       labelEn: 'Submit to Revenue Department',
       values: { free: false, starter: true, business: true, enterprise: true },
@@ -126,11 +184,16 @@ export default function Landing() {
     {
       labelTh: 'หลายผู้ใช้ในบริษัทเดียวกัน',
       labelEn: 'Multi-user access in one company',
-      values: { free: false, starter: false, business: { th: 'สูงสุด 5', en: 'Up to 5' }, enterprise: { th: 'ตามสัญญา', en: 'By contract' } },
+      values: { free: false, starter: { th: 'สูงสุด 3', en: 'Up to 3' }, business: { th: 'สูงสุด 8', en: 'Up to 8' }, enterprise: { th: 'ตามสัญญา', en: 'By contract' } },
     },
     {
       labelTh: 'Export และ Audit Logs',
       labelEn: 'Export and audit logs',
+      values: { free: false, starter: { th: 'Excel', en: 'Excel' }, business: true, enterprise: true },
+    },
+    {
+      labelTh: 'Google Drive / Sheets',
+      labelEn: 'Google Drive / Sheets',
       values: { free: false, starter: false, business: true, enterprise: true },
     },
     {
@@ -543,15 +606,71 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Document Operations Positioning */}
+      <section className="border-y border-slate-200 bg-white py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-700">
+                {isThai ? 'แข่งด้วย workflow ทั้งระบบ' : 'Compete on the whole workflow'}
+              </p>
+              <h2 className="mt-3 text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">
+                {isThai
+                  ? 'ไม่ใช่แค่เก็บใบเสร็จ แต่พาเอกสารไปถึงบัญชีและ e-Tax'
+                  : 'Not just receipt capture. Documents move all the way to accounting and e-Tax.'}
+              </h2>
+              <p className="mt-5 max-w-xl text-base leading-7 text-slate-600">
+                {isThai
+                  ? 'เครื่องมือเก็บค่าใช้จ่ายทั่วไปเก่งเรื่องบันทึกบิล แต่ระบบนี้รวมฝั่งซื้อ ฝั่งขาย เอกสารแนบ การยืนยันจากคน และการส่งกรมสรรพากรไว้ในที่เดียว'
+                  : 'Typical expense tools focus on bill capture. This system brings purchases, sales, attachments, human review, and Revenue Department submission into one workspace.'}
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {documentOpsPillars.map(({ icon: Icon, th, en, descTh, descEn }) => (
+                <div key={en} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-primary-700 shadow-sm">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-4 text-base font-bold text-slate-950">{isThai ? th : en}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{isThai ? descTh : descEn}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            {marketingArticles.map((article) => (
+              <article key={article.en} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {isThai ? 'คู่มือใช้งานจริง' : 'Playbook'}
+                </p>
+                <h3 className="mt-3 text-lg font-bold text-slate-950">
+                  {isThai ? article.th : article.en}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {isThai ? article.bodyTh : article.bodyEn}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing-checkout" className="py-24 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_30%)]">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-16">
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary-700">
+              {isThai ? 'เริ่มถูกกว่า ซื้อเพิ่มเฉพาะตอนโต' : 'Lower entry price, scale when volume grows'}
+            </p>
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              {isThai ? 'แพ็กเกจราคา' : 'Simple, Transparent Pricing'}
+              {isThai ? 'แพ็กเกจสำหรับแข่งงานเอกสารจริง' : 'Pricing built for real document operations'}
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              {isThai ? 'เลือกแพ็กเกจที่เหมาะสมกับธุรกิจของคุณ' : 'Choose the perfect plan for your business'}
+              {isThai
+                ? 'รวม AI อ่านเอกสาร, คลังไฟล์แนบ, e-Tax, RD และ export ในระบบเดียว ไม่ต้องซื้อเครื่องมือแยกหลายตัว'
+                : 'AI document intake, evidence library, e-Tax, RD submission, and exports in one workspace.'}
             </p>
           </div>
 
@@ -1165,7 +1284,7 @@ export default function Landing() {
                   {[
                     isThai ? 'สร้างบริษัทในระบบให้อัตโนมัติ' : 'Automatically creates your company profile',
                     isThai ? 'สร้างบัญชีผู้ดูแลจากอีเมล Google ที่สมัคร' : 'Creates your admin account from the Google email used during signup',
-                    selectedPlan === 'free' ? (isThai ? 'ใช้ฟรี 10 เอกสาร/เดือน' : 'Free access with 10 documents per month') : (isThai ? 'เปิดสิทธิ์แพ็กเกจและบันทึกสถานะสมาชิก' : 'Activates your plan and stores subscription status'),
+                    selectedPlan === 'free' ? (isThai ? 'ใช้ฟรี 20 เอกสาร/เดือน' : 'Free access with 20 documents per month') : (isThai ? 'เปิดสิทธิ์แพ็กเกจและบันทึกสถานะสมาชิก' : 'Activates your plan and stores subscription status'),
                     isThai ? 'เข้าใช้ต่อด้วย Continue with Google ได้ทันที' : 'Lets you continue with Google right away',
                   ].map((item) => (
                     <li key={item} className="flex gap-3">

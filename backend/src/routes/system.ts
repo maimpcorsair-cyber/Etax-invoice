@@ -101,8 +101,8 @@ systemRouter.get('/overview', async (_req, res) => {
 
     const activeSubscriptions = subscriptions.filter((subscription) => subscription.status === 'active');
     const monthlyRecurringRevenue = activeSubscriptions.reduce((sum, subscription) => {
-      if (subscription.plan === 'starter') return sum + 990;
-      if (subscription.plan === 'business') return sum + 2490;
+      if (subscription.plan === 'starter') return sum + 790;
+      if (subscription.plan === 'business') return sum + 1990;
       return sum;
     }, 0);
     const paidTransactions = transactions.filter((transaction) => ['paid', 'activated'].includes(transaction.status));
