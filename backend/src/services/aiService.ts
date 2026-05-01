@@ -676,7 +676,7 @@ export async function buildCompanyContext(companyId: string): Promise<string> {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [company, salesAgg, purchaseAgg, overdueInvoices, recentInvoices] = await Promise.all([
+  const [company, salesAgg, purchaseAgg, overdueInvoices, recentInvoices, recentPurchaseInvoices] = await Promise.all([
     prisma.company.findUnique({
       where: { id: companyId },
       select: { nameTh: true, taxId: true },
@@ -712,6 +712,20 @@ export async function buildCompanyContext(companyId: string): Promise<string> {
         buyer: { select: { nameTh: true } },
       },
     }),
+    prisma.purchaseInvoice.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+      select: {
+        supplierName: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        total: true,
+        vatAmount: true,
+        category: true,
+        isPaid: true,
+      },
+    }),
   ]);
 
   const outputVat = salesAgg._sum.vatAmount ?? 0;
@@ -742,6 +756,15 @@ export async function buildCompanyContext(companyId: string): Promise<string> {
       isPaid: inv.isPaid,
       dueDate: inv.dueDate?.toISOString().split('T')[0] ?? null,
     })),
+    recentPurchaseInvoices: recentPurchaseInvoices.map((inv) => ({
+      invoiceNumber: inv.invoiceNumber,
+      supplier: inv.supplierName,
+      invoiceDate: inv.invoiceDate?.toISOString().split('T')[0] ?? null,
+      total: inv.total,
+      vatAmount: inv.vatAmount,
+      category: inv.category ?? null,
+      isPaid: inv.isPaid,
+    })),
   };
 
   const serialized = JSON.stringify(context, null, 2);
@@ -761,6 +784,7 @@ export async function askPinuch(
   companyName: string,
   taxId: string,
   userQuestion: string,
+  options: { channel?: 'line' | 'web' } = {},
 ): Promise<string> {
   if (!apiKey) {
     return '⚠️ AI ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแล';
@@ -768,14 +792,26 @@ export async function askPinuch(
 
   try {
     const context = await buildCompanyContext(companyId);
+    const channel = options.channel ?? 'line';
+    const channelInstruction = channel === 'web'
+      ? `ช่องทาง: Web app
+- ผู้ใช้อยู่ในเว็บแล้ว ห้ามแนะนำลิงก์เข้าระบบ/หน้ารายการเอกสาร เว้นแต่ผู้ใช้ถามหาลิงก์โดยตรง
+- ตอบแบบผู้ช่วยวิเคราะห์: สรุปตัวเลข แจกแจงรายการ ชี้สิ่งที่ควรตรวจต่อ และเสนอ next action ที่ทำได้ในระบบ
+- คำตอบยาวได้พอเหมาะ ใช้หัวข้อสั้นและ bullet ที่อ่านง่าย`
+      : `ช่องทาง: LINE
+- ตอบสั้นมากเพื่อประหยัด LINE message quota
+- ถ้าผู้ใช้ถามทั่วไป ให้ตอบเฉพาะสาระสำคัญ 3-5 บรรทัด
+- แนบลิงก์เฉพาะเมื่อผู้ใช้ถามหาทางเข้า เปิดเว็บ ดาวน์โหลด ดูเอกสาร หรือ login โดยตรง`;
 
     const messages: OpenRouterMessage[] = [
       {
         role: 'system',
         content: `คุณคือ "พี่นุช" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
 คุณช่วยเหลือพนักงานบัญชีในการตอบคำถามเกี่ยวกับภาษีมูลค่าเพิ่ม ใบกำกับภาษี และข้อมูลทางการเงิน
-ตอบเป็นภาษาไทยเสมอ กระชับและเข้าใจง่าย
-ถ้าผู้ใช้ถามหาลิงก์, ทางเข้า, login, เปิดระบบ, ดาวน์โหลดเอกสาร หรือดูเอกสาร ให้แนบลิงก์ระบบที่เกี่ยวข้องเสมอ:
+ตอบเป็นภาษาไทยเสมอ เข้าใจง่าย และไม่ใส่อีโมจิเกินจำเป็น
+${channelInstruction}
+
+ลิงก์ระบบที่ใช้ได้เมื่อจำเป็น:
 - เข้าระบบ: https://etax-invoice.vercel.app
 - หน้ารายการเอกสาร: https://etax-invoice.vercel.app/app/invoices
 - หน้าภาษีซื้อ/เอกสารซื้อ: https://etax-invoice.vercel.app/app/purchase-invoices
@@ -798,7 +834,7 @@ ${context}`,
       },
     ];
 
-    const answer = await callOpenRouter(CHAT_MODELS, messages, 700, chatTimeoutMs);
+    const answer = await callOpenRouter(CHAT_MODELS, messages, channel === 'web' ? 1000 : 450, chatTimeoutMs);
     return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

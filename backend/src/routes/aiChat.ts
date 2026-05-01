@@ -28,6 +28,7 @@ aiChatRouter.post('/message', async (req, res) => {
       company.nameTh,
       company.taxId,
       body.message,
+      { channel: 'web' },
     );
 
     res.json({
