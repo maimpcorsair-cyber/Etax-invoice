@@ -491,20 +491,20 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-primary-700 mb-8 shadow-sm">
-            <FileCheck className="w-4 h-4 flex-shrink-0" />
-            <span>{isThai ? '🇹🇭 มาตรฐาน e-Tax Invoice v2.0' : '🇹🇭 e-Tax Invoice v2.0 Compliant'}</span>
-          </div>
+              <div className="animate-fade-in inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-primary-700 mb-8 shadow-sm">
+                <FileCheck className="w-4 h-4 flex-shrink-0" />
+                <span>{isThai ? '🇹🇭 มาตรฐาน e-Tax Invoice v2.0' : '🇹🇭 e-Tax Invoice v2.0 Compliant'}</span>
+              </div>
 
-              <h1 className="max-w-4xl text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl leading-tight mb-6">
+              <h1 className="animate-slide-in-left max-w-4xl text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl leading-tight mb-6" style={{animationDelay:'0.15s'}}>
                 {t('landing.hero.title')}
               </h1>
 
-              <p className="max-w-3xl text-lg leading-8 text-slate-600 sm:text-xl mb-10">
+              <p className="animate-slide-in-left max-w-3xl text-lg leading-8 text-slate-600 sm:text-xl mb-10" style={{animationDelay:'0.3s'}}>
                 {t('landing.hero.subtitle')}
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="animate-slide-in-left flex flex-col sm:flex-row gap-4 mb-8" style={{animationDelay:'0.45s'}}>
                 <button type="button" onClick={() => openCheckout('free')} className="btn-primary lg">
                   {t('landing.hero.cta')}
                   <ArrowRight className="w-5 h-5" />
@@ -515,9 +515,9 @@ export default function Landing() {
                 </a>
               </div>
 
-              <p className="text-sm font-medium text-slate-500">{t('landing.hero.trustText')}</p>
+              <p className="animate-fade-in text-sm font-medium text-slate-500" style={{animationDelay:'0.55s'}}>{t('landing.hero.trustText')}</p>
 
-              <div className="mt-10 grid gap-3 sm:grid-cols-3">
+              <div className="animate-slide-up mt-10 grid gap-3 sm:grid-cols-3" style={{animationDelay:'0.6s'}}>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'เหมาะกับ' : 'Best for'}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'ทีมบัญชีและธุรกิจ SME' : 'Accounting teams and SME operators'}</div>
@@ -533,7 +533,7 @@ export default function Landing() {
               </div>
             </div>
 
-            <aside className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
+            <aside className="animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Operational Snapshot' : 'Operational Snapshot'}</p>
@@ -597,7 +597,8 @@ export default function Landing() {
             return (
               <div
                 key={key}
-                className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-2 hover:shadow-card-hover hover:border-primary-200 card-hover"
+                className="animate-slide-up group rounded-2xl border border-slate-200 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-2 hover:shadow-card-hover hover:border-primary-200 card-hover"
+                style={{animationDelay: `${0.1 + i * 0.1}s`}}
               >
                 <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${gradients[i % gradients.length]} shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
                   <Icon className="w-7 h-7 text-white" strokeWidth={2} />
@@ -686,14 +687,15 @@ export default function Landing() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-            {pricingPlans.map((plan) => (
+            {pricingPlans.map((plan, pi) => (
               <div
                 key={plan.key}
-                className={`relative flex h-full flex-col rounded-[28px] border bg-white p-6 shadow-sm transition-all duration-300 ${
+                className={`animate-slide-up relative flex h-full flex-col rounded-[28px] border bg-white p-6 shadow-sm transition-all duration-300 ${
                   plan.popular
                     ? 'md:scale-105 border-primary-300 ring-2 ring-primary-500 ring-offset-2 shadow-xl'
                     : 'border-slate-200 hover:shadow-md'
                 }`}
+                style={{animationDelay: `${0.1 + pi * 0.1}s`}}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
