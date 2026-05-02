@@ -16,6 +16,7 @@ import BuyerCard from '../components/invoice/BuyerCard';
 import ItemsTable from '../components/invoice/ItemsTable';
 import NotesPaymentCard from '../components/invoice/NotesPaymentCard';
 import PreviewModal from '../components/invoice/PreviewModal';
+import TemplateMarketplace from '../components/invoice/TemplateMarketplace';
 import type { DocumentTemplateOption } from '../types';
 import { builtinDocumentTemplates, supportsDocumentType } from '../lib/documentTemplatePresets';
 
@@ -101,6 +102,8 @@ export default function InvoiceBuilder() {
   const [templates, setTemplates] = useState<DocumentTemplateOption[]>([]);
   const [issuedInvoiceId, setIssuedInvoiceId] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
+
+  const [showMarketplace, setShowMarketplace] = useState(false);
 
   // Inline preview state (right panel)
   const [inlinePreviewHtml, setInlinePreviewHtml] = useState<string | null>(null);
@@ -467,28 +470,67 @@ export default function InvoiceBuilder() {
         <div ref={previewPanelRef} className="flex-1 flex flex-col bg-gray-100 min-w-0">
           {/* Preview toolbar */}
           <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                {isThai ? 'เทมเพลตเอกสาร / Template' : 'Template'}
-              </label>
-              <select
-                value={form.templateId ?? ''}
-                onChange={(e) => handleTemplateChange(e.target.value || null)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              >
-                <option value="">{isThai ? 'มาตรฐาน (ค่าเริ่มต้น)' : 'Standard (Default)'}</option>
-                {matchingBuiltinTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>{isThai ? t.nameTh : t.nameEn}</option>
-                ))}
-                {filteredCustomTemplates.length > 0 && (
-                  <optgroup label={isThai ? 'แม่แบบบริษัท' : 'Company templates'}>
-                    {filteredCustomTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+            {/* Template selector button */}
+            <button
+              onClick={() => setShowMarketplace(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px 6px 8px',
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: 10,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                minWidth: 0,
+                flex: 1,
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = '#1e3a8a';
+                (e.currentTarget as HTMLElement).style.background = '#fff';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
+                (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+              }}
+            >
+              {/* Color swatches of current template */}
+              {(() => {
+                const tw: Record<string, string> = {
+                  'bg-white': '#fff', 'bg-blue-900': '#1e3a8a', 'bg-blue-200': '#bfdbfe',
+                  'bg-slate-700': '#334155', 'bg-slate-300': '#cbd5e1', 'bg-slate-200': '#e2e8f0',
+                };
+                const current = matchingBuiltinTemplates.find(t => t.id === form.templateId);
+                const swatches = current?.swatches ?? ['bg-blue-900', 'bg-blue-200', 'bg-white'];
+                return (
+                  <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                    {swatches.map((cls, i) => (
+                      <div key={i} style={{
+                        width: 12, height: 12, borderRadius: '50%',
+                        background: tw[cls] ?? '#94a3b8',
+                        border: '1px solid rgba(0,0,0,0.1)',
+                      }} />
                     ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
+                  </div>
+                );
+              })()}
+              <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500, lineHeight: 1.2 }}>
+                  {isThai ? 'เทมเพลต' : 'Template'}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {form.templateId
+                    ? (matchingBuiltinTemplates.find(t => t.id === form.templateId)?.nameTh
+                        ?? filteredCustomTemplates.find(t => t.id === form.templateId)?.name
+                        ?? form.templateId)
+                    : (isThai ? 'มาตรฐาน' : 'Standard')}
+                </div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+            </button>
 
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* Updating badge */}
@@ -620,6 +662,16 @@ export default function InvoiceBuilder() {
         downloading={preview.downloading}
         onDownload={preview.handleDownloadPdf}
         onClose={preview.closePreview}
+      />
+
+      <TemplateMarketplace
+        isOpen={showMarketplace}
+        onClose={() => setShowMarketplace(false)}
+        selectedTemplateId={form.templateId}
+        onSelect={(id) => handleTemplateChange(id)}
+        docType={form.docType}
+        customTemplates={filteredCustomTemplates}
+        isThai={isThai}
       />
     </div>
   );
