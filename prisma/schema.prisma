@@ -73,6 +73,19 @@ enum SignupStatus {
   failed
 }
 
+enum AttachmentFileType {
+  image
+  pdf
+  link
+}
+
+enum EvidenceType {
+  receipt
+  chat
+  map
+  other
+}
+
 enum ExpenseVoucherStatus {
   draft
   submitted
@@ -645,18 +658,16 @@ model ExpenseItem {
 }
 
 model ExpenseAttachment {
-  id            String       @id @default(cuid())
+  id            String             @id @default(cuid())
   expenseItemId String
   fileName      String?
-  mimeType      String
-  fileSize      Int
-  fileBase64    String?
-  fileUrl       String?
-  storageKey    String?
+  fileType      AttachmentFileType @default(image)
+  url           String
+  evidenceType  EvidenceType       @default(receipt)
 
-  createdAt     DateTime     @default(now())
+  createdAt     DateTime           @default(now())
 
-  expenseItem   ExpenseItem  @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
+  expenseItem   ExpenseItem        @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
 
   @@index([expenseItemId])
   @@map("expense_attachments")

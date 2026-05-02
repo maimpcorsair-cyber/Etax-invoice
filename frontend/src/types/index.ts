@@ -257,13 +257,15 @@ export interface DocumentIntake {
 }
 
 export type ExpenseVoucherStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+export type AttachmentFileType = 'image' | 'pdf' | 'link';
+export type EvidenceType = 'receipt' | 'chat' | 'map' | 'other';
 
 export interface ExpenseAttachment {
   id: string;
   fileName?: string | null;
-  mimeType: string;
-  fileSize: number;
-  fileUrl?: string | null;
+  fileType: AttachmentFileType;
+  url: string;
+  evidenceType: EvidenceType;
   createdAt: string;
 }
 

@@ -221,6 +221,21 @@
       "utilities": "ค่าสาธารณูปโภค",
       "maintenance": "ค่าซ่อมแซมและบำรุงรักษา",
       "other": "อื่นๆ"
+    },
+    "addAttachment": "เพิ่มลิงก์หลักฐาน",
+    "fileName": "ชื่อไฟล์",
+    "fileType": "ประเภทไฟล์",
+    "evidenceTypeLabel": "ประเภทหลักฐาน",
+    "fileTypes": {
+      "image": "รูปภาพ",
+      "pdf": "PDF",
+      "link": "ลิงก์"
+    },
+    "evidenceType": {
+      "receipt": "ใบเสร็จ",
+      "chat": "แชท",
+      "map": "แผนที่",
+      "other": "อื่นๆ"
     }
   },
   "admin": {

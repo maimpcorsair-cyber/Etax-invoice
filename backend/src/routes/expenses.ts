@@ -13,8 +13,9 @@ export const expensesRouter = Router();
 
 const attachmentSchema = z.object({
   fileName: z.string().optional(),
-  mimeType: z.string().min(1),
-  fileBase64: z.string().min(1),
+  fileType: z.enum(['image', 'pdf', 'link']).default('image'),
+  url: z.string().url('Attachment URL must be a valid URL'),
+  evidenceType: z.enum(['receipt', 'chat', 'map', 'other']).default('receipt'),
 });
 
 const expenseItemSchema = z.object({
@@ -66,7 +67,7 @@ expensesRouter.get('/', async (req, res) => {
     const vouchers = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.expenseVoucher.findMany({
         where,
-        include: { items: { select: { id: true } } },
+        include: { items: { select: { id: true, attachments: { select: { id: true } } } } },
         orderBy: { voucherDate: 'desc' },
       });
     });
@@ -75,6 +76,7 @@ expensesRouter.get('/', async (req, res) => {
       ...v,
       totalAmount: Number(v.totalAmount),
       itemCount: v.items.length,
+      attachmentCount: v.items.reduce((sum, i) => sum + i.attachments.length, 0),
       items: undefined,
     }));
 
@@ -137,7 +139,9 @@ expensesRouter.get('/:id', async (req, res) => {
         include: {
           items: {
             include: {
-              attachments: { select: { id: true, fileName: true, mimeType: true, fileSize: true, fileUrl: true, createdAt: true } },
+              attachments: {
+                select: { id: true, fileName: true, fileType: true, url: true, evidenceType: true, createdAt: true },
+              },
             },
             orderBy: { date: 'asc' },
           },
@@ -160,6 +164,26 @@ expensesRouter.get('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to get expense voucher' });
   }
 });
+
+function buildItemCreate(items: z.infer<typeof expenseItemSchema>[]) {
+  return items.map((item) => ({
+    description: item.description,
+    category: item.category,
+    amount: item.amount,
+    date: new Date(item.date),
+    notes: item.notes,
+    attachments: item.attachments?.length
+      ? {
+          create: item.attachments.map((att) => ({
+            fileName: att.fileName,
+            fileType: att.fileType,
+            url: att.url,
+            evidenceType: att.evidenceType,
+          })),
+        }
+      : undefined,
+  }));
+}
 
 /* ─── Create ─── */
 expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
@@ -195,25 +219,7 @@ expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), asyn
           notes: body.notes,
           totalAmount,
           createdBy: req.user!.userId,
-          items: {
-            create: body.items.map((item) => ({
-              description: item.description,
-              category: item.category,
-              amount: item.amount,
-              date: new Date(item.date),
-              notes: item.notes,
-              attachments: item.attachments?.length
-                ? {
-                    create: item.attachments.map((att) => ({
-                      fileName: att.fileName,
-                      mimeType: att.mimeType,
-                      fileSize: Buffer.byteLength(att.fileBase64, 'base64'),
-                      fileBase64: att.fileBase64,
-                    })),
-                  }
-                : undefined,
-            })),
-          },
+          items: { create: buildItemCreate(body.items) },
         },
         include: { items: { include: { attachments: true } } },
       });
@@ -262,14 +268,8 @@ expensesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accountant'), 
     const existing = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId } });
     });
-    if (!existing) {
-      res.status(404).json({ error: 'Voucher not found' });
-      return;
-    }
-    if (existing.status !== 'draft') {
-      res.status(400).json({ error: 'Only draft vouchers can be edited' });
-      return;
-    }
+    if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
+    if (existing.status !== 'draft') { res.status(400).json({ error: 'Only draft vouchers can be edited' }); return; }
 
     const limit = await getExpenseLimit(companyId);
     if (limit !== null) {
@@ -292,25 +292,7 @@ expensesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accountant'), 
           description: body.description,
           notes: body.notes,
           totalAmount,
-          items: {
-            create: body.items.map((item) => ({
-              description: item.description,
-              category: item.category,
-              amount: item.amount,
-              date: new Date(item.date),
-              notes: item.notes,
-              attachments: item.attachments?.length
-                ? {
-                    create: item.attachments.map((att) => ({
-                      fileName: att.fileName,
-                      mimeType: att.mimeType,
-                      fileSize: Buffer.byteLength(att.fileBase64, 'base64'),
-                      fileBase64: att.fileBase64,
-                    })),
-                  }
-                : undefined,
-            })),
-          },
+          items: { create: buildItemCreate(body.items) },
         },
         include: { items: { include: { attachments: true } } },
       });
@@ -352,14 +334,8 @@ expensesRouter.delete('/:id', requireRole('admin', 'super_admin'), async (req, r
     const existing = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId } });
     });
-    if (!existing) {
-      res.status(404).json({ error: 'Voucher not found' });
-      return;
-    }
-    if (existing.status !== 'draft') {
-      res.status(400).json({ error: 'Only draft vouchers can be deleted' });
-      return;
-    }
+    if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
+    if (existing.status !== 'draft') { res.status(400).json({ error: 'Only draft vouchers can be deleted' }); return; }
 
     await prisma.expenseVoucher.delete({ where: { id: existing.id } });
 
@@ -472,35 +448,52 @@ expensesRouter.post('/:id/reject', requireRole('admin', 'super_admin'), async (r
   }
 });
 
-/* ─── Attachment file download ─── */
-expensesRouter.get('/:id/items/:itemId/attachments/:attachmentId/file', async (req, res) => {
+/* ─── Add attachment to an item ─── */
+expensesRouter.post('/:id/items/:itemId/attachments', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
   try {
     const voucher = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-      return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId }, select: { id: true } });
+      return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId }, select: { id: true, status: true } });
     });
     if (!voucher) { res.status(404).json({ error: 'Voucher not found' }); return; }
+    if (voucher.status !== 'draft') { res.status(400).json({ error: 'Only draft vouchers can be modified' }); return; }
+
+    const item = await prisma.expenseItem.findFirst({ where: { id: req.params.itemId, voucherId: voucher.id } });
+    if (!item) { res.status(404).json({ error: 'Expense item not found' }); return; }
+
+    const body = attachmentSchema.parse(req.body);
+    const attachment = await prisma.expenseAttachment.create({
+      data: { expenseItemId: item.id, fileName: body.fileName, fileType: body.fileType, url: body.url, evidenceType: body.evidenceType },
+    });
+
+    res.status(201).json({ data: attachment });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to add attachment', { error: err });
+    res.status(500).json({ error: 'Failed to add attachment' });
+  }
+});
+
+/* ─── Delete attachment ─── */
+expensesRouter.delete('/:id/items/:itemId/attachments/:attachmentId', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const voucher = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId }, select: { id: true, status: true } });
+    });
+    if (!voucher) { res.status(404).json({ error: 'Voucher not found' }); return; }
+    if (voucher.status !== 'draft') { res.status(400).json({ error: 'Only draft vouchers can be modified' }); return; }
 
     const attachment = await prisma.expenseAttachment.findFirst({
       where: { id: req.params.attachmentId, expenseItemId: req.params.itemId },
     });
     if (!attachment) { res.status(404).json({ error: 'Attachment not found' }); return; }
 
-    if (attachment.fileBase64) {
-      const buffer = Buffer.from(attachment.fileBase64, 'base64');
-      res.setHeader('Content-Type', attachment.mimeType);
-      res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName ?? 'attachment'}"`);
-      res.send(buffer);
-      return;
-    }
-
-    if (attachment.fileUrl) {
-      res.redirect(attachment.fileUrl);
-      return;
-    }
-
-    res.status(404).json({ error: 'File not available' });
+    await prisma.expenseAttachment.delete({ where: { id: attachment.id } });
+    res.json({ success: true });
   } catch (err) {
-    logger.error('Failed to download attachment', { error: err });
-    res.status(500).json({ error: 'Failed to download attachment' });
+    logger.error('Failed to delete attachment', { error: err });
+    res.status(500).json({ error: 'Failed to delete attachment' });
   }
 });

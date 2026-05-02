@@ -2,18 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, Wallet,
   AlertTriangle, Send, ThumbsUp, ThumbsDown,
-  Upload, Image as ImageIcon, FileText, PlusCircle, MinusCircle,
+  Link as LinkIcon, Image as ImageIcon, FileText, PlusCircle, MinusCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import type { ExpenseVoucher, ExpenseVoucherStatus } from '../types';
+import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType } from '../types';
 
 const CATEGORY_KEYS = [
   'transportation', 'office_supplies', 'meals', 'postage',
   'printing', 'utilities', 'maintenance', 'other',
 ] as const;
+
+interface AttachmentForm {
+  fileName: string;
+  fileType: AttachmentFileType;
+  url: string;
+  evidenceType: EvidenceType;
+}
 
 interface ItemForm {
   description: string;
@@ -21,7 +28,7 @@ interface ItemForm {
   amount: string;
   date: string;
   notes: string;
-  attachments: { fileName: string; mimeType: string; fileBase64: string }[];
+  attachments: AttachmentForm[];
 }
 
 const todayIso = () => new Date().toISOString().split('T')[0];
@@ -168,25 +175,36 @@ export default function Expenses() {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   }
 
-  async function addAttachment(index: number, file: File) {
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      setError('Only PDF, JPG, PNG, and WebP are supported');
-      return;
-    }
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [attachmentFileName, setAttachmentFileName] = useState('');
+  const [attachmentFileType, setAttachmentFileType] = useState<AttachmentFileType>('image');
+  const [attachmentEvidenceType, setAttachmentEvidenceType] = useState<EvidenceType>('receipt');
+  const [addingAttachmentForItem, setAddingAttachmentForItem] = useState<number | null>(null);
+
+  function openAddAttachment(idx: number) {
+    setAddingAttachmentForItem(idx);
+    setAttachmentUrl('');
+    setAttachmentFileName('');
+    setAttachmentFileType('image');
+    setAttachmentEvidenceType('receipt');
+  }
+
+  function confirmAddAttachment() {
+    if (!attachmentUrl.trim() || addingAttachmentForItem === null) return;
     setItems((prev) =>
       prev.map((item, i) =>
-        i === index
-          ? { ...item, attachments: [...item.attachments, { fileName: file.name, mimeType: file.type, fileBase64: base64 }] }
+        i === addingAttachmentForItem
+          ? {
+              ...item,
+              attachments: [
+                ...item.attachments,
+                { fileName: attachmentFileName.trim() || undefined as unknown as string, fileType: attachmentFileType, url: attachmentUrl.trim(), evidenceType: attachmentEvidenceType },
+              ],
+            }
           : item,
       ),
     );
+    setAddingAttachmentForItem(null);
   }
 
   function removeAttachment(itemIndex: number, attIndex: number) {
@@ -645,26 +663,25 @@ export default function Expenses() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-xs font-medium text-gray-500">{t('expenses.attachments')}</p>
-                        <label className="cursor-pointer inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-900">
-                          <Upload className="w-3.5 h-3.5" />
-                          <input
-                            type="file"
-                            accept="application/pdf,image/jpeg,image/png,image/webp"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              e.currentTarget.value = '';
-                              if (file) void addAttachment(idx, file);
-                            }}
-                          />
-                        </label>
+                        <button
+                          type="button"
+                          onClick={() => openAddAttachment(idx)}
+                          className="inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-900"
+                        >
+                          <LinkIcon className="w-3.5 h-3.5" />
+                          {t('expenses.addAttachment', 'Add URL')}
+                        </button>
                       </div>
                       {item.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-2">
                           {item.attachments.map((att, attIdx) => (
                             <span key={attIdx} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700">
-                              {att.mimeType.startsWith('image/') ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                              {att.fileName}
+                              {att.fileType === 'image' ? <ImageIcon className="w-3 h-3" /> : att.fileType === 'pdf' ? <FileText className="w-3 h-3" /> : <LinkIcon className="w-3 h-3" />}
+                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="hover:underline max-w-[120px] truncate">
+                                {att.fileName || att.url}
+                              </a>
+                              <span className="text-gray-400">·</span>
+                              <span className="text-gray-400">{t(`expenses.evidenceType.${att.evidenceType}`, att.evidenceType)}</span>
                               <button onClick={() => removeAttachment(idx, attIdx)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
                             </span>
                           ))}
@@ -688,6 +705,67 @@ export default function Expenses() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {t('common.save')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Attachment Modal */}
+      {addingAttachmentForItem !== null && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">{t('expenses.addAttachment', 'Add Attachment')}</h2>
+              <button onClick={() => setAddingAttachmentForItem(null)} className="p-1 rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">URL *</label>
+                <input
+                  type="url"
+                  value={attachmentUrl}
+                  onChange={(e) => setAttachmentUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.fileName', 'File Name')}</label>
+                <input
+                  type="text"
+                  value={attachmentFileName}
+                  onChange={(e) => setAttachmentFileName(e.target.value)}
+                  placeholder={t('common.optional', 'Optional')}
+                  className="input-field"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.fileType', 'File Type')}</label>
+                  <select value={attachmentFileType} onChange={(e) => setAttachmentFileType(e.target.value as AttachmentFileType)} className="input-field">
+                    <option value="image">{t('expenses.fileTypes.image', 'Image')}</option>
+                    <option value="pdf">{t('expenses.fileTypes.pdf', 'PDF')}</option>
+                    <option value="link">{t('expenses.fileTypes.link', 'Link')}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.evidenceTypeLabel', 'Evidence Type')}</label>
+                  <select value={attachmentEvidenceType} onChange={(e) => setAttachmentEvidenceType(e.target.value as EvidenceType)} className="input-field">
+                    <option value="receipt">{t('expenses.evidenceType.receipt', 'Receipt')}</option>
+                    <option value="chat">{t('expenses.evidenceType.chat', 'Chat')}</option>
+                    <option value="map">{t('expenses.evidenceType.map', 'Map')}</option>
+                    <option value="other">{t('expenses.evidenceType.other', 'Other')}</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setAddingAttachmentForItem(null)} className="btn-secondary">{t('common.cancel')}</button>
+                <button onClick={confirmAddAttachment} disabled={!attachmentUrl.trim()} className="btn-primary">
+                  <Plus className="w-4 h-4" /> {t('common.add', 'Add')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

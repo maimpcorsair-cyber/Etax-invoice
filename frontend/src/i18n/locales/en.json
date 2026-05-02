@@ -221,6 +221,21 @@
       "utilities": "Utilities",
       "maintenance": "Maintenance & Repairs",
       "other": "Other"
+    },
+    "addAttachment": "Add URL",
+    "fileName": "File Name",
+    "fileType": "File Type",
+    "evidenceTypeLabel": "Evidence Type",
+    "fileTypes": {
+      "image": "Image",
+      "pdf": "PDF",
+      "link": "Link"
+    },
+    "evidenceType": {
+      "receipt": "Receipt",
+      "chat": "Chat",
+      "map": "Map",
+      "other": "Other"
     }
   },
   "admin": {

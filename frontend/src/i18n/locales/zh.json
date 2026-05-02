@@ -222,6 +222,21 @@
       "utilities": "水电费",
       "maintenance": "维修保养",
       "other": "其他"
+    },
+    "addAttachment": "添加链接",
+    "fileName": "文件名",
+    "fileType": "文件类型",
+    "evidenceTypeLabel": "凭证类型",
+    "fileTypes": {
+      "image": "图片",
+      "pdf": "PDF",
+      "link": "链接"
+    },
+    "evidenceType": {
+      "receipt": "收据",
+      "chat": "聊天记录",
+      "map": "地图",
+      "other": "其他"
     }
   },
   "admin": {
