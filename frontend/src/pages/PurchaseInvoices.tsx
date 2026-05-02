@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, AlertTriangle, FileCheck2,
@@ -71,6 +71,93 @@ const VAT_TYPE_LABELS: Record<VatType, { th: string; en: string }> = {
   vatExempt: { th: 'ยกเว้น VAT', en: 'VAT Exempt' },
   vatZero: { th: 'VAT 0%', en: 'Zero-rated' },
 };
+
+interface DocumentThumbnailProps {
+  docId: string;
+  mimeType: string;
+  fileUrl?: string | null;
+  token: string;
+  isPdf: boolean;
+}
+
+function DocumentThumbnail({ docId, mimeType, fileUrl, token, isPdf }: DocumentThumbnailProps) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const blobRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(false);
+      try {
+        const isImage = mimeType.includes('image');
+        if (isImage && fileUrl && fileUrl.startsWith('http')) {
+          if (!cancelled) {
+            setBlobUrl(fileUrl);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const res = await fetch(`/api/purchase-invoices/document-intakes/${docId}/file`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('fetch failed');
+        const blob = await res.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        blobRef.current = url;
+        setBlobUrl(url);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+      if (blobRef.current) {
+        URL.revokeObjectURL(blobRef.current);
+        blobRef.current = null;
+      }
+    };
+  }, [docId, mimeType, fileUrl, token]);
+
+  const isImage = mimeType.includes('image');
+  const ext = isPdf ? 'PDF' : mimeType.split('/')[1]?.toUpperCase().slice(0, 4) ?? 'IMG';
+
+  return (
+    <div className="flex flex-col items-center gap-0.5 shrink-0">
+      {loading ? (
+        <div className="w-14 h-14 rounded-lg bg-gray-100 animate-pulse" />
+      ) : error || !blobUrl ? (
+        <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-lg ${isPdf ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
+          {isPdf ? <FileText className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />}
+        </span>
+      ) : isImage ? (
+        <img
+          src={blobUrl}
+          alt=""
+          className="w-14 h-14 rounded-lg object-cover border border-gray-200"
+        />
+      ) : (
+        <iframe
+          src={blobUrl}
+          title="pdf-preview"
+          scrolling="no"
+          className="w-14 h-14 rounded-lg border border-gray-200 overflow-hidden pointer-events-none"
+          style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
+        />
+      )}
+      <span className="text-[9px] font-medium text-gray-400 leading-none">{ext}</span>
+    </div>
+  );
+}
 
 export default function PurchaseInvoices() {
   const { isThai, formatCurrency, formatDate } = useLanguage();
@@ -716,9 +803,7 @@ export default function PurchaseInvoices() {
                   <div key={doc.id} className="rounded-lg border border-gray-200 bg-white p-3">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                       <div className="min-w-0 flex flex-1 items-start gap-3">
-                        <span className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isPdf ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
-                          {isPdf ? <FileText className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
-                        </span>
+                        <DocumentThumbnail docId={doc.id} mimeType={doc.mimeType} fileUrl={doc.fileUrl} token={token ?? ''} isPdf={isPdf} />
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-gray-900 truncate">{documentTitle(doc)}</p>
