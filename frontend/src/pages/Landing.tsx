@@ -1131,8 +1131,8 @@ export default function Landing() {
               </h2>
               <p className="text-green-100 mb-8 text-lg max-w-2xl mx-auto">
                 {isThai
-                  ? 'ให้ Billoy ช่วยจัดการบัญชีและภาษีให้คุณ ง่าย ครบ จบที่เดียว'
-                  : 'Let Billoy handle your accounting and tax — simple, complete, all in one place'}
+                  ? 'ให้ Billboy ช่วยจัดการบัญชีและภาษีให้คุณ ง่าย ครบ จบที่เดียว'
+                  : 'Let Billboy handle your accounting and tax — simple, complete, all in one place'}
               </p>
               <button
                 type="button"

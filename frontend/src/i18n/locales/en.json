@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "Billoy",
+    "name": "Billboy",
     "tagline": "Your Smart Accounting & Tax Assistant",
-    "shortName": "Billoy"
+    "shortName": "Billboy"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -23,7 +23,7 @@
   "landing": {
     "hero": {
       "title": "Accounting & Tax Made Simple",
-      "subtitle": "Billoy reads your documents automatically, issues correct tax invoices, and submits to Thailand's Revenue Department — all in one place.",
+      "subtitle": "Billboy reads your documents automatically, issues correct tax invoices, and submits to Thailand's Revenue Department — all in one place.",
       "cta": "Get Started Free",
       "ctaSecondary": "View Demo",
       "trustText": "Secure · Auto-backup · LINE connected"

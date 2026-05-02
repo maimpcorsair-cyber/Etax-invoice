@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "Billoy",
+    "name": "Billboy",
     "tagline": "您的智能会计与税务助手",
-    "shortName": "Billoy"
+    "shortName": "Billboy"
   },
   "nav": {
     "dashboard": "控制台",
@@ -24,7 +24,7 @@
   "landing": {
     "hero": {
       "title": "会计与税务，轻松搞定",
-      "subtitle": "Billoy 自动读取您的文件，生成正确的税务发票，并提交泰国税务局 — 一站式完成。",
+      "subtitle": "Billboy 自动读取您的文件，生成正确的税务发票，并提交泰国税务局 — 一站式完成。",
       "cta": "免费开始使用",
       "ctaSecondary": "查看套餐",
       "trustText": "安全 · 自动备份 · LINE 连接"
@@ -308,7 +308,7 @@
     "privacy": {
       "eyebrow": "隐私政策",
       "title": "隐私政策",
-      "description": "Billoy 说明我们如何收集、使用和保护客户数据。",
+      "description": "Billboy 说明我们如何收集、使用和保护客户数据。",
       "summary": "我们仅收集提供服务所需的信息，并采取适当措施保护该数据。",
       "sections": [
         {
@@ -351,13 +351,13 @@
     "terms": {
       "eyebrow": "服务条款",
       "title": "服务条款",
-      "description": "Billoy 作为月度 SaaS 税务发票平台的订阅、使用和计费条款。",
-      "summary": "订阅或使用 Billoy 即表示您同意这些服务条款，包括我们的7天退款政策。",
+      "description": "Billboy 作为月度 SaaS 税务发票平台的订阅、使用和计费条款。",
+      "summary": "订阅或使用 Billboy 即表示您同意这些服务条款，包括我们的7天退款政策。",
       "sections": [
         {
           "title": "1. 服务性质",
           "body": [
-            "Billoy 是一项订阅制软件服务，帮助企业在线管理税务发票工作流程和相关电子文件操作。",
+            "Billboy 是一项订阅制软件服务，帮助企业在线管理税务发票工作流程和相关电子文件操作。",
             "我们可能会随时间改进功能、安全性和集成，前提是不会不合理地删除客户订阅的核心服务。"
           ]
         },
@@ -371,7 +371,7 @@
         {
           "title": "3. 计费与周期性收费",
           "body": [
-            "Billoy 订阅费用按定价页面显示的套餐收取，通过 Stripe 等支付提供商处理，可能每月自动续费。",
+            "Billboy 订阅费用按定价页面显示的套餐收取，通过 Stripe 等支付提供商处理，可能每月自动续费。",
             "您授权我们按所选套餐收取相应费用、税款及相关费用。"
           ]
         },
@@ -400,7 +400,7 @@
     },
     "contact": {
       "eyebrow": "联系我们",
-      "title": "联系 Billoy",
+      "title": "联系 Billboy",
       "description": "直接联系我们的团队，解答套餐、计费、发票、退款和平台支持方面的问题。",
       "supportTitle": "支持团队",
       "supportDescription": "我们的团队可协助解决入职、公司设置、登录问题和账户权限等技术问题。",
