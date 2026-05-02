@@ -324,6 +324,18 @@ export const builtinDocumentTemplates: BuiltinDocumentTemplate[] = [
     supports: ALL_DOCUMENT_TYPES,
   },
   {
+    id: 'builtin:crayon',
+    nameTh: 'Crayon Drawing',
+    nameEn: 'Crayon Drawing 🖍️',
+    descriptionTh: 'สไตล์วาดด้วยมือ เหมือนเด็กวาด สีสันสดใสสนุกสนาน',
+    descriptionEn: 'Hand-drawn childlike style with playful crayon colors.',
+    tagTh: 'สนุก',
+    tagEn: 'Fun',
+    accentClass: 'bg-red-400',
+    swatches: ['bg-red-400', 'bg-yellow-300', 'bg-blue-400'],
+    supports: ALL_DOCUMENT_TYPES,
+  },
+  {
     id: 'builtin:pro-biz-clean',
     nameTh: 'Pro สะอาด',
     nameEn: 'Pro Biz Clean',
