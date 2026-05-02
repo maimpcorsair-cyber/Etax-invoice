@@ -290,6 +290,15 @@ export interface PettyCash {
   cashierId?: string | null;
 }
 
+export interface ApprovalLog {
+  id: string;
+  expenseId: string;
+  action: ExpenseVoucherStatus;
+  byUserId: string;
+  note?: string | null;
+  timestamp: string;
+}
+
 export interface ExpenseVoucher {
   id: string;
   voucherNumber: string;
@@ -300,6 +309,7 @@ export interface ExpenseVoucher {
   totalAmount: number;
   itemCount?: number;
   items?: ExpenseItem[];
+  approvalLogs?: ApprovalLog[];
   submittedBy?: string | null;
   submittedAt?: string | null;
   approvedBy?: string | null;

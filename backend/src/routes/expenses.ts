@@ -191,6 +191,9 @@ expensesRouter.get('/:id', async (req, res) => {
             },
             orderBy: { date: 'asc' },
           },
+          approvalLogs: {
+            orderBy: { timestamp: 'asc' },
+          },
         },
       });
     });
@@ -430,10 +433,15 @@ expensesRouter.post('/:id/submit', requireRole('admin', 'super_admin', 'accounta
     if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
     if (existing.status !== 'draft') { res.status(400).json({ error: 'Only draft vouchers can be submitted' }); return; }
 
-    const updated = await prisma.expenseVoucher.update({
-      where: { id: existing.id },
-      data: { status: 'submitted', submittedBy: req.user!.userId, submittedAt: new Date() },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.expenseVoucher.update({
+        where: { id: existing.id },
+        data: { status: 'submitted', submittedBy: req.user!.userId, submittedAt: new Date() },
+      }),
+      prisma.approvalLog.create({
+        data: { expenseId: existing.id, action: 'submitted', byUserId: req.user!.userId },
+      }),
+    ]);
 
     await auditLog({
       companyId: req.user!.companyId, userId: req.user!.userId, role: req.user!.role,
@@ -460,13 +468,16 @@ expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (
 
     const companyId = req.user!.companyId;
 
-    // Approve and deduct petty cash in one transaction
+    // Approve, log, and deduct petty cash in one transaction
     const [updated] = await prisma.$transaction([
       prisma.expenseVoucher.update({
         where: { id: existing.id },
         data: { status: 'approved', approvedBy: req.user!.userId, approvedAt: new Date() },
       }),
-      // Upsert petty cash record and deduct balance (clamps at 0)
+      prisma.approvalLog.create({
+        data: { expenseId: existing.id, action: 'approved', byUserId: req.user!.userId },
+      }),
+      // Upsert petty cash record and deduct balance
       prisma.$executeRaw`
         INSERT INTO petty_cash (id, company_id, balance, created_at, updated_at)
         VALUES (gen_random_uuid()::text, ${companyId}, 0 - ${existing.totalAmount}, now(), now())
@@ -499,10 +510,15 @@ expensesRouter.post('/:id/reject', requireRole('admin', 'super_admin'), async (r
     if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
     if (existing.status !== 'submitted') { res.status(400).json({ error: 'Only submitted vouchers can be rejected' }); return; }
 
-    const updated = await prisma.expenseVoucher.update({
-      where: { id: existing.id },
-      data: { status: 'rejected', rejectedBy: req.user!.userId, rejectedAt: new Date(), rejectionNote: body.rejectionNote },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.expenseVoucher.update({
+        where: { id: existing.id },
+        data: { status: 'rejected', rejectedBy: req.user!.userId, rejectedAt: new Date(), rejectionNote: body.rejectionNote },
+      }),
+      prisma.approvalLog.create({
+        data: { expenseId: existing.id, action: 'rejected', byUserId: req.user!.userId, note: body.rejectionNote },
+      }),
+    ]);
 
     await auditLog({
       companyId: req.user!.companyId, userId: req.user!.userId, role: req.user!.role,

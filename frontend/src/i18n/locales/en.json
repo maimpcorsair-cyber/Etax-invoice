@@ -222,6 +222,7 @@
       "maintenance": "Maintenance & Repairs",
       "other": "Other"
     },
+    "approvalTimeline": "Approval Timeline",
     "vendorName": "Vendor Name",
     "vendorTaxId": "Vendor Tax ID",
     "whtApplicable": "Withholding Tax (WHT)",

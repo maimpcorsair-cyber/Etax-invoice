@@ -3,12 +3,13 @@ import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, Wallet,
   AlertTriangle, Send, ThumbsUp, ThumbsDown,
   Link as LinkIcon, Image as ImageIcon, FileText, PlusCircle, MinusCircle,
+  Eye, CheckCircle2, XCircle, Clock, ArrowRight,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash } from '../types';
+import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash, ApprovalLog } from '../types';
 
 const CATEGORY_KEYS = [
   'transportation', 'office_supplies', 'meals', 'postage',
@@ -87,6 +88,9 @@ export default function Expenses() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectTargetId, setRejectTargetId] = useState('');
   const [rejectionNote, setRejectionNote] = useState('');
+
+  const [detailVoucher, setDetailVoucher] = useState<ExpenseVoucher | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const isFreePlan = policy?.plan === 'free';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -368,6 +372,20 @@ export default function Expenses() {
     }
   }
 
+  async function openDetail(v: ExpenseVoucher) {
+    setDetailLoading(true);
+    setDetailVoucher(v);
+    try {
+      const res = await fetch(`/api/expenses/${v.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      setDetailVoucher(json.data as ExpenseVoucher);
+    } catch {
+      // keep showing partial data
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   async function handleReject() {
     if (!rejectionNote.trim()) return;
     setError('');
@@ -518,6 +536,9 @@ export default function Expenses() {
                 <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{v.rejectionNote}</p>
               )}
               <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <button onClick={() => openDetail(v)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100">
+                  <Eye className="w-3.5 h-3.5" /> {t('common.view', 'View')}
+                </button>
                 {v.status === 'draft' && (
                   <>
                     <button onClick={() => openEdit(v)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100">
@@ -586,6 +607,9 @@ export default function Expenses() {
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center gap-1">
+                        <button onClick={() => openDetail(v)} className="p-1 text-gray-400 hover:text-gray-600" title={t('common.view', 'View')}>
+                          <Eye className="w-4 h-4" />
+                        </button>
                         {v.status === 'draft' && (
                           <>
                             <button onClick={() => openEdit(v)} className="p-1 text-primary-600 hover:text-primary-800" title={t('common.edit')}>
@@ -821,6 +845,160 @@ export default function Expenses() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Detail / Approval Timeline Drawer */}
+      {detailVoucher && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDetailVoucher(null)} />
+          <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <p className="font-mono text-xs text-gray-400">{detailVoucher.voucherNumber}</p>
+                <h2 className="text-base font-bold text-gray-900">{detailVoucher.description || t('expenses.voucher')}</h2>
+              </div>
+              <button onClick={() => setDetailVoucher(null)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              {detailLoading && <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-primary-500" /></div>}
+
+              {/* Approval Timeline */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('expenses.approvalTimeline', 'Approval Timeline')}</h3>
+                {(() => {
+                  const logs: ApprovalLog[] = detailVoucher.approvalLogs ?? [];
+                  // Always show "Created" as first node
+                  const nodes: { action: string; timestamp: string; note?: string | null; isFirst?: boolean }[] = [
+                    { action: 'draft', timestamp: detailVoucher.createdAt ?? '', isFirst: true },
+                    ...logs.map((l) => ({ action: l.action, timestamp: l.timestamp, note: l.note })),
+                  ];
+                  return (
+                    <div className="relative pl-6">
+                      {/* Vertical line */}
+                      <div className="absolute left-2.5 top-2 bottom-2 w-px bg-gray-200" />
+                      <div className="space-y-5">
+                        {nodes.map((node, i) => {
+                          const isLast = i === nodes.length - 1;
+                          const Icon = node.action === 'approved' ? CheckCircle2
+                            : node.action === 'rejected' ? XCircle
+                            : node.action === 'submitted' ? ArrowRight
+                            : Clock;
+                          const iconColor = node.action === 'approved' ? 'text-green-500'
+                            : node.action === 'rejected' ? 'text-red-500'
+                            : node.action === 'submitted' ? 'text-amber-500'
+                            : 'text-gray-400';
+                          const bgColor = node.action === 'approved' ? 'bg-green-50'
+                            : node.action === 'rejected' ? 'bg-red-50'
+                            : node.action === 'submitted' ? 'bg-amber-50'
+                            : 'bg-gray-50';
+                          return (
+                            <div key={i} className="relative flex gap-3">
+                              <div className={`absolute -left-6 w-5 h-5 rounded-full flex items-center justify-center ${bgColor} border-2 ${isLast ? 'border-current' : 'border-gray-200'}`}>
+                                <Icon className={`w-3 h-3 ${iconColor}`} strokeWidth={2.5} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-gray-800 capitalize">
+                                  {t(`expenses.status.${node.action}`, node.action)}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {node.timestamp ? formatDate(node.timestamp) : '—'}
+                                </p>
+                                {node.note && (
+                                  <p className="mt-1 text-xs text-red-600 bg-red-50 rounded px-2 py-1">{node.note}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Items summary */}
+              {detailVoucher.items && detailVoucher.items.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('expenses.expenseItem')}</h3>
+                  <div className="space-y-2">
+                    {detailVoucher.items.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{item.description}</p>
+                            {item.vendorName && <p className="text-xs text-gray-400">{item.vendorName}</p>}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.amount)}</p>
+                            {item.whtApplicable && item.netAmount != null && (
+                              <p className="text-xs text-amber-600">Net {formatCurrency(item.netAmount)}</p>
+                            )}
+                          </div>
+                        </div>
+                        {item.whtApplicable && item.whtRate != null && (
+                          <p className="text-[11px] text-gray-400 mt-1">WHT {item.whtRate}% = {formatCurrency(item.whtAmount ?? 0)}</p>
+                        )}
+                        {item.attachments?.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {item.attachments.map((att) => (
+                              <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-primary-600 hover:underline">
+                                <LinkIcon className="w-3 h-3" />
+                                {att.fileName || t(`expenses.evidenceType.${att.evidenceType}`, att.evidenceType)}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center mt-2 px-1">
+                    <span className="text-xs text-gray-500">{t('expenses.total')}</span>
+                    <span className="text-sm font-bold text-primary-700">{formatCurrency(detailVoucher.totalAmount)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            {detailVoucher.status === 'submitted' && isAdmin && (
+              <div className="border-t border-gray-100 px-5 py-4 flex gap-2">
+                <button
+                  onClick={() => { setDetailVoucher(null); handleApprove(detailVoucher.id); }}
+                  className="flex-1 btn-primary bg-green-600 hover:bg-green-700 border-green-600"
+                >
+                  <ThumbsUp className="w-4 h-4" /> {t('expenses.approve')}
+                </button>
+                <button
+                  onClick={() => { setDetailVoucher(null); openReject(detailVoucher.id); }}
+                  className="flex-1 btn-secondary text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  <ThumbsDown className="w-4 h-4" /> {t('expenses.reject')}
+                </button>
+              </div>
+            )}
+            {detailVoucher.status === 'draft' && (
+              <div className="border-t border-gray-100 px-5 py-4 flex gap-2">
+                <button
+                  onClick={() => { setDetailVoucher(null); openEdit(detailVoucher); }}
+                  className="flex-1 btn-secondary"
+                >
+                  <Edit2 className="w-4 h-4" /> {t('common.edit')}
+                </button>
+                <button
+                  onClick={() => { setDetailVoucher(null); handleSubmit(detailVoucher.id); }}
+                  className="flex-1 btn-primary"
+                >
+                  <Send className="w-4 h-4" /> {t('expenses.submit')}
+                </button>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Top Up Modal */}

@@ -629,6 +629,7 @@ model ExpenseVoucher {
   company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   creator       User                 @relation("ExpenseVoucherCreatedBy", fields: [createdBy], references: [id])
   items         ExpenseItem[]
+  approvalLogs  ApprovalLog[]
 
   @@unique([companyId, voucherNumber])
   @@index([companyId])
@@ -636,6 +637,20 @@ model ExpenseVoucher {
   @@index([companyId, voucherDate])
   @@index([createdBy])
   @@map("expense_vouchers")
+}
+
+model ApprovalLog {
+  id         String               @id @default(cuid())
+  expenseId  String
+  action     ExpenseVoucherStatus
+  byUserId   String
+  note       String?
+  timestamp  DateTime             @default(now())
+
+  expense    ExpenseVoucher @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+  @@map("approval_logs")
 }
 
 model ExpenseItem {
