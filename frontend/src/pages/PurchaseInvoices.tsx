@@ -904,14 +904,6 @@ export default function PurchaseInvoices() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        <button
-                          type="button"
-                          onClick={() => void openDocumentFile(doc)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          {isThai ? 'ไฟล์' : 'File'}
-                        </button>
                         {doc.status !== 'saved' && (
                           <>
                             {busy && (
