@@ -609,10 +609,10 @@ expensesRouter.post(
     }
 
     try {
-      const company = await prisma.company.findUnique({
-        where: { id: req.user!.companyId },
-        select: { nameTh: true, nameEn: true },
-      });
+      const [company, userRecord] = await Promise.all([
+        prisma.company.findUnique({ where: { id: req.user!.companyId }, select: { nameTh: true, nameEn: true } }),
+        prisma.user.findUnique({ where: { id: req.user!.userId }, select: { googleRefreshToken: true } }),
+      ]);
       const companyName = company?.nameEn ?? company?.nameTh ?? req.user!.companyId;
 
       const result = await uploadToDrive(
@@ -620,6 +620,7 @@ expensesRouter.post(
         req.file.originalname,
         req.file.mimetype,
         companyName,
+        userRecord?.googleRefreshToken,
       );
 
       res.json({ data: result });

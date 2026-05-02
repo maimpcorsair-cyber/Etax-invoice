@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
+import { useDriveStatus } from '../hooks/useDriveStatus';
 import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash, ApprovalLog } from '../types';
 
 const CATEGORY_KEYS = [
@@ -65,6 +66,7 @@ export default function Expenses() {
   const { formatCurrency, formatDate } = useLanguage();
   const { token, user } = useAuthStore();
   const { policy } = useCompanyAccessPolicy();
+  const { status: driveStatus, connecting: driveConnecting, connect: connectDrive, disconnect: disconnectDrive } = useDriveStatus();
 
   const [vouchers, setVouchers] = useState<ExpenseVoucher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -503,6 +505,40 @@ export default function Expenses() {
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
           <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Google Drive connect banner */}
+      {driveStatus?.configured && !driveStatus.connected && (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <HardDrive className="w-5 h-5 text-blue-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-800">{t('expenses.driveConnectTitle', 'Connect your Google Drive')}</p>
+            <p className="text-xs text-blue-600 mt-0.5">{t('expenses.driveConnectDesc', 'Upload attachments directly to your Drive — files stay in your account')}</p>
+          </div>
+          <button
+            onClick={connectDrive}
+            disabled={driveConnecting}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+          >
+            {driveConnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HardDrive className="w-3.5 h-3.5" />}
+            {t('expenses.driveConnect', 'Connect')}
+          </button>
+        </div>
+      )}
+
+      {driveStatus?.configured && driveStatus.connected && (
+        <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+          <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+          <p className="text-sm text-green-800 flex-1">
+            <span className="font-semibold">{t('expenses.driveConnected', 'Google Drive connected')}</span>
+            {driveStatus.linkedAt && (
+              <span className="text-xs text-green-600 ml-2">— {formatDate(driveStatus.linkedAt)}</span>
+            )}
+          </p>
+          <button onClick={disconnectDrive} className="text-xs text-green-700 hover:text-green-900 underline shrink-0">
+            {t('expenses.driveDisconnect', 'Disconnect')}
+          </button>
         </div>
       )}
 

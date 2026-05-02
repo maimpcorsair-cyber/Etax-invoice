@@ -20,6 +20,7 @@ import { billingRouter, stripeWebhookRouter } from './routes/billing';
 import { notificationsRouter } from './routes/notifications';
 import { purchaseInvoicesRouter } from './routes/purchaseInvoices';
 import { expensesRouter } from './routes/expenses';
+import { driveRouter } from './routes/drive';
 import { vatSummaryRouter } from './routes/vatSummary';
 import { pp30Router } from './routes/pp30';
 import { lineRouter, lineWebhookHandler } from './routes/line';
@@ -90,6 +91,7 @@ app.use('/api/company', authenticate, dashboardRouter);
 app.use('/api/notifications', authenticate, notificationsRouter);
 app.use('/api/purchase-invoices', purchaseInvoicesRouter);
 app.use('/api/expenses', authenticate, expensesRouter);
+app.use('/api/drive', driveRouter); // /callback is unauthenticated (OAuth redirect)
 app.use('/api/vat-summary', vatSummaryRouter);
 app.use('/api/pp30', pp30Router);
 app.use('/api/line', lineRouter);
