@@ -1285,7 +1285,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   if (['สวัสดี', 'help', 'ช่วยเหลือ'].includes(lower)) {
     await sendLineText(
       lineUserId,
-      `สวัสดีครับ! ผมพี่นุช ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\n` +
+      `สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\n` +
       `📥 บันทึกภาษีซื้อ:\n` +
       `• ส่งรูป .jpg/.png หรือ PDF ใบกำกับภาษีผู้ขาย\n\n` +
       `📊 ดูข้อมูลบัญชี:\n` +
@@ -1298,7 +1298,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
       `• "ค้นหา [ชื่อบริษัท]" — ค้นหาเอกสารตามผู้ขาย\n` +
       `• "ใบล่าสุด" — เอกสาร 5 รายการล่าสุด\n` +
       `• "ใบเดือนนี้" — สรุปเอกสารเดือนนี้\n\n` +
-      `💬 ถามพี่นุชได้เลย เช่น "ภาษีซื้อเดือนนี้เท่าไร"\n\n` +
+      `💬 ถาม Billboy ได้เลย เช่น "ภาษีซื้อเดือนนี้เท่าไร"\n\n` +
       `❌ พิมพ์ "ยกเลิก" เพื่อหยุดการกรอกข้อมูลกลางคัน`,
     );
     return;
@@ -1322,7 +1322,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   }
   if (lower === 'วิธีอัพโหลดเอกสาร' || lower === 'อัพโหลดเอกสาร') {
     await sendLineText(lineUserId,
-      '📁 วิธีอัพโหลดใบกำกับภาษีซื้อ\n\n1️⃣ ส่งรูปภาพ (.jpg .png) หรือไฟล์ PDF ใบกำกับภาษีผู้ขาย\n2️⃣ พี่นุชจะ OCR อ่านข้อมูลอัตโนมัติ\n3️⃣ ถ้าข้อมูลไม่ครบ พี่นุชจะถามเพิ่ม\n4️⃣ กดยืนยันเพื่อบันทึกภาษีซื้อ\n\n💡 รองรับทั้ง PDF ดิจิทัลและ PDF สแกน');
+      '📁 วิธีอัพโหลดใบกำกับภาษีซื้อ\n\n1️⃣ ส่งรูปภาพ (.jpg .png) หรือไฟล์ PDF ใบกำกับภาษีผู้ขาย\n2️⃣ Billboy จะ OCR อ่านข้อมูลอัตโนมัติ\n3️⃣ ถ้าข้อมูลไม่ครบ Billboy จะถามเพิ่ม\n4️⃣ กดยืนยันเพื่อบันทึกภาษีซื้อ\n\n💡 รองรับทั้ง PDF ดิจิทัลและ PDF สแกน');
     return;
   }
 
@@ -2164,7 +2164,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       if (event.type === 'follow') {
         await sendLineText(
           lineUserId,
-          'สวัสดีครับ! ผมพี่นุช ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\n' +
+          'สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\n' +
           'ส่ง OTP 6 หลักจากระบบ e-Tax Invoice เพื่อเชื่อมบัญชีก่อนเริ่มใช้งานนะครับ\n\n' +
           '📋 สิ่งที่ทำได้หลังเชื่อมบัญชี:\n' +
           '• ส่งรูป/PDF ใบกำกับภาษี → บันทึกภาษีซื้ออัตโนมัติ\n' +

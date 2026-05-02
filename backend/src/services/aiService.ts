@@ -806,7 +806,7 @@ export async function askPinuch(
     const messages: OpenRouterMessage[] = [
       {
         role: 'system',
-        content: `คุณคือ "พี่นุช" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
+        content: `คุณคือ "Billboy" ผู้ช่วยบัญชีอัจฉริยะสำหรับระบบ e-Tax Invoice ของไทย
 คุณช่วยเหลือพนักงานบัญชีในการตอบคำถามเกี่ยวกับภาษีมูลค่าเพิ่ม ใบกำกับภาษี และข้อมูลทางการเงิน
 ตอบเป็นภาษาไทยเสมอ เข้าใจง่าย และไม่ใส่อีโมจิเกินจำเป็น
 ${channelInstruction}
@@ -839,7 +839,7 @@ ${context}`,
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error('askPinuch failed', { error: msg, companyId });
-    return 'ขอโทษ ตอนนี้พี่นุชตอบช้า/ไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้งในอีกสักครู่';
+    return 'ขอโทษ ตอนนี้ Billboy ตอบช้า/ไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้งในอีกสักครู่';
   }
 }
 
