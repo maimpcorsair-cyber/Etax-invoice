@@ -28,6 +28,7 @@ const OwnerRenewals     = React.lazy(() => import('./pages/OwnerRenewals'));
 const PlanPage          = React.lazy(() => import('./pages/PlanPage'));
 const InvoiceVerify     = React.lazy(() => import('./pages/InvoiceVerify'));
 const PurchaseInvoices  = React.lazy(() => import('./pages/PurchaseInvoices'));
+const Expenses          = React.lazy(() => import('./pages/Expenses'));
 const VatSummary        = React.lazy(() => import('./pages/VatSummary'));
 const Pp30Filing        = React.lazy(() => import('./pages/Pp30Filing'));
 import { useAuthStore } from './store/authStore';
@@ -155,6 +156,7 @@ export default function App() {
           <Route path="customers/:id/statement" element={<CustomerStatementPage />} />
           <Route path="products" element={<Products />} />
           <Route path="purchase-invoices" element={<PurchaseInvoices />} />
+          <Route path="expenses" element={<Expenses />} />
           <Route path="vat-summary" element={<VatSummary />} />
           <Route path="pp30" element={<Pp30Filing />} />
           <Route path="admin" element={<AdminPanel />} />

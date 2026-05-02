@@ -73,6 +73,13 @@ enum SignupStatus {
   failed
 }
 
+enum ExpenseVoucherStatus {
+  draft
+  submitted
+  approved
+  rejected
+}
+
 model Company {
   id            String  @id @default(cuid())
   nameTh        String
@@ -97,6 +104,9 @@ model Company {
   rdClientSecret String?
   rdEnvironment  String  @default("sandbox")
 
+  // Expense settings
+  expenseLimit        Decimal?  @db.Decimal(12, 2)
+
   // Line OA settings
   lineNotifyEnabled   Boolean @default(false)
   overdueReminderDays Int     @default(3)
@@ -111,6 +121,7 @@ model Company {
   subscription CompanySubscription?
   billingTransactions BillingTransaction[]
   purchaseInvoices    PurchaseInvoice[]
+  expenseVouchers     ExpenseVoucher[]
 
   @@map("companies")
 }
@@ -134,6 +145,7 @@ model User {
   auditLogs        AuditLog[]
   fcmTokens        FcmToken[]
   purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
+  expenseVouchers  ExpenseVoucher[]  @relation("ExpenseVoucherCreatedBy")
   lineUserLink     LineUserLink?
 
   @@index([companyId])
@@ -574,4 +586,78 @@ model LineUserLink {
 
   @@index([lineUserId])
   @@map("line_user_links")
+}
+
+model ExpenseVoucher {
+  id            String               @id @default(cuid())
+  companyId     String
+  voucherNumber String
+  status        ExpenseVoucherStatus @default(draft)
+  voucherDate   DateTime
+  description   String?
+  notes         String?
+  metadata      Json?
+
+  totalAmount   Decimal              @default(0) @db.Decimal(12, 2)
+
+  submittedBy   String?
+  submittedAt   DateTime?
+  approvedBy    String?
+  approvedAt    DateTime?
+  rejectedBy    String?
+  rejectedAt    DateTime?
+  rejectionNote String?
+
+  createdBy     String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator       User                 @relation("ExpenseVoucherCreatedBy", fields: [createdBy], references: [id])
+  items         ExpenseItem[]
+
+  @@unique([companyId, voucherNumber])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, voucherDate])
+  @@index([createdBy])
+  @@map("expense_vouchers")
+}
+
+model ExpenseItem {
+  id            String         @id @default(cuid())
+  voucherId     String
+  description   String
+  category      String?
+  amount        Decimal        @db.Decimal(12, 2)
+  date          DateTime
+  notes         String?
+  metadata      Json?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  voucher       ExpenseVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  attachments   ExpenseAttachment[]
+
+  @@index([voucherId])
+  @@map("expense_items")
+}
+
+model ExpenseAttachment {
+  id            String       @id @default(cuid())
+  expenseItemId String
+  fileName      String?
+  mimeType      String
+  fileSize      Int
+  fileBase64    String?
+  fileUrl       String?
+  storageKey    String?
+
+  createdAt     DateTime     @default(now())
+
+  expenseItem   ExpenseItem  @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
+
+  @@index([expenseItemId])
+  @@map("expense_attachments")
 }

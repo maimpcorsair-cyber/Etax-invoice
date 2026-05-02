@@ -256,6 +256,49 @@ export interface DocumentIntake {
   updatedAt: string;
 }
 
+export type ExpenseVoucherStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
+export interface ExpenseAttachment {
+  id: string;
+  fileName?: string | null;
+  mimeType: string;
+  fileSize: number;
+  fileUrl?: string | null;
+  createdAt: string;
+}
+
+export interface ExpenseItem {
+  id: string;
+  description: string;
+  category?: string | null;
+  amount: number;
+  date: string;
+  notes?: string | null;
+  attachments: ExpenseAttachment[];
+}
+
+export interface ExpenseVoucher {
+  id: string;
+  voucherNumber: string;
+  status: ExpenseVoucherStatus;
+  voucherDate: string;
+  description?: string | null;
+  notes?: string | null;
+  totalAmount: number;
+  itemCount?: number;
+  items?: ExpenseItem[];
+  submittedBy?: string | null;
+  submittedAt?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  rejectedBy?: string | null;
+  rejectedAt?: string | null;
+  rejectionNote?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VatSummaryByType {
   vat7: { totalExclVat: number; vatAmount: number; count: number };
   vatExempt: { totalExclVat: number; vatAmount: number; count: number };

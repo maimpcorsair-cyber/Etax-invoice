@@ -10,6 +10,7 @@ import {
   Shield,
   ShieldAlert,
   ShoppingCart,
+  Wallet,
   Calculator,
   X,
 } from 'lucide-react';
@@ -43,6 +44,7 @@ export default function MobileBottomNav() {
   if (!isMobile) return null;
 
   const moreItems = [
+    { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
     { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'
