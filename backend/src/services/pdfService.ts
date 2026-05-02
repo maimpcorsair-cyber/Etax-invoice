@@ -134,6 +134,11 @@ const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   'builtin:credit-control': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:debit-adjustment': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:compliance-ledger': { name: 'ทางการ', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:minimal-white': { name: 'Minimal White', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:minimal-gray': { name: 'Minimal Gray', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:minimal-line': { name: 'Minimal Line', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:minimal-sans': { name: 'Minimal Sans', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:minimal-space': { name: 'Minimal Space', supportedTypes: ALL_DOCUMENT_TYPES },
 };
 
 function formatDateTh(date: Date): string {
@@ -206,6 +211,11 @@ function resolveDocumentTheme(templateId?: string | null) {
     'builtin:credit-control': { className: 'theme-credit', accent: '#d97706', accent2: '#92400e', soft: '#fffbeb', ink: '#4a2d08', label: 'Credit Control', mark: 'CREDIT' },
     'builtin:debit-adjustment': { className: 'theme-debit', accent: '#e11d48', accent2: '#9f1239', soft: '#fff1f2', ink: '#4c1020', label: 'Debit Adjustment', mark: 'DEBIT' },
     'builtin:compliance-ledger': { className: 'theme-ledger', accent: '#4f46e5', accent2: '#312e81', soft: '#eef2ff', ink: '#1f1b4d', label: 'Compliance Ledger', mark: 'AUDIT' },
+    'builtin:minimal-white': { className: 'theme-minimal-white', accent: '#374151', accent2: '#111827', soft: '#f9fafb', ink: '#111827', label: 'Minimal White', mark: '' },
+    'builtin:minimal-gray': { className: 'theme-minimal-gray', accent: '#6b7280', accent2: '#374151', soft: '#f3f4f6', ink: '#111827', label: 'Minimal Gray', mark: '' },
+    'builtin:minimal-line': { className: 'theme-minimal-line', accent: '#0d9488', accent2: '#0f766e', soft: '#f0fdfa', ink: '#134e4a', label: 'Minimal Line', mark: '' },
+    'builtin:minimal-sans': { className: 'theme-minimal-sans', accent: '#1f2937', accent2: '#111827', soft: '#f9fafb', ink: '#111827', label: 'Minimal Sans', mark: '' },
+    'builtin:minimal-space': { className: 'theme-minimal-space', accent: '#94a3b8', accent2: '#475569', soft: '#f8fafc', ink: '#1e293b', label: 'Minimal Space', mark: '' },
   };
 
   return themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
@@ -811,6 +821,51 @@ function buildHtml(data: PdfInvoiceData): string {
     background-image: linear-gradient(#eef2ff 1px, transparent 1px);
     background-size: 100% 28px;
   }
+  /* ── Minimal White ── */
+  .theme-minimal-white .document-shell { border: 1px solid #e5e7eb; border-radius: 4px; box-shadow: none; }
+  .theme-minimal-white .top-accent { background: #e5e7eb; height: 3px; }
+  .theme-minimal-white .title-card { background: white; border: 1px solid #e5e7eb; border-radius: 4px; }
+  .theme-minimal-white .hero { border-bottom: 1px solid #e5e7eb; }
+  .theme-minimal-white .eyebrow { color: #6b7280; }
+  .theme-minimal-white .totals-row.grand { background: #f3f4f6; }
+
+  /* ── Minimal Gray ── */
+  .theme-minimal-gray .document-shell { border: 1px solid #d1d5db; border-radius: 4px; box-shadow: none; }
+  .theme-minimal-gray .top-accent { background: #9ca3af; height: 4px; }
+  .theme-minimal-gray .hero { background: #f9fafb; padding: 20px; border-bottom: 1px solid #d1d5db; }
+  .theme-minimal-gray .title-card { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; }
+  .theme-minimal-gray .totals-row.grand { background: #e5e7eb; }
+
+  /* ── Minimal Line ── */
+  .theme-minimal-line .document-shell { border: 1px solid #ccfbf1; border-radius: 4px; box-shadow: none; }
+  .theme-minimal-line .top-accent { height: 4px; background: #0d9488; }
+  .theme-minimal-line .title-card { background: white; border: 1px solid #99f6e4; border-radius: 4px; }
+  .theme-minimal-line .title-card h1 { color: #0f766e; }
+  .theme-minimal-line .hero { border-bottom: 2px solid #0d9488; }
+  .theme-minimal-line .totals-row.grand { background: #0d9488; border-radius: 6px; }
+  .theme-minimal-line .totals-row.grand span,
+  .theme-minimal-line .totals-row.grand strong { color: white; }
+
+  /* ── Minimal Sans ── */
+  .theme-minimal-sans .document-shell { border: 1px solid #e5e7eb; border-radius: 4px; box-shadow: none; }
+  .theme-minimal-sans .top-accent { background: #1f2937; height: 5px; }
+  .theme-minimal-sans .title-card { background: white; border: 1px solid #e5e7eb; border-radius: 4px; }
+  .theme-minimal-sans .title-card h1 { color: #111827; font-size: 24px; }
+  .theme-minimal-sans .hero { border-bottom: 1px solid #1f2937; }
+  .theme-minimal-sans .totals-row.grand { background: #111827; border-radius: 4px; }
+  .theme-minimal-sans .totals-row.grand span,
+  .theme-minimal-sans .totals-row.grand strong { color: white; }
+  .theme-minimal-sans .company-name { font-size: 20px; font-weight: 800; }
+  .theme-minimal-sans table th { background: #1f2937; color: white; }
+
+  /* ── Minimal Space ── */
+  .theme-minimal-space .document-shell { border: none; border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .theme-minimal-space .top-accent { display: none; }
+  .theme-minimal-space .document-body { padding: 40px 44px 36px; }
+  .theme-minimal-space .title-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; }
+  .theme-minimal-space .hero { border-bottom: 1px solid #e2e8f0; padding-bottom: 28px; }
+  .theme-minimal-space .totals-row.grand { background: #f1f5f9; border-radius: 6px; }
+
   @media print { body { padding: 0; } }
 </style>
 </head>
