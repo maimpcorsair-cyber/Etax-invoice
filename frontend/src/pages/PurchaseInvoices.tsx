@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, AlertTriangle, FileCheck2,
-  Upload, Image as ImageIcon, FileText, ExternalLink,
+  Upload, Image as ImageIcon, FileText, ExternalLink, Eye,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -189,6 +189,9 @@ export default function PurchaseInvoices() {
   const [attachDoc, setAttachDoc] = useState<DocumentIntake | null>(null);
   const [attachTargetType, setAttachTargetType] = useState<'purchase_invoice' | 'sales_invoice'>('purchase_invoice');
   const [attachTargetId, setAttachTargetId] = useState('');
+  const [previewDoc, setPreviewDoc] = useState<DocumentIntake | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const isFreePlan = policy?.plan === 'free';
 
@@ -446,6 +449,36 @@ export default function PurchaseInvoices() {
     } catch (err) {
       setError(err instanceof Error ? err.message : (isThai ? 'เปิดไฟล์ไม่สำเร็จ' : 'Cannot open file'));
     }
+  }
+
+  async function openPreview(doc: DocumentIntake) {
+    setPreviewDoc(doc);
+    setPreviewUrl(null);
+    setPreviewLoading(true);
+    try {
+      if (doc.fileUrl && /^https?:\/\//i.test(doc.fileUrl)) {
+        setPreviewUrl(doc.fileUrl);
+        return;
+      }
+      const res = await fetch(`/api/purchase-invoices/document-intakes/${doc.id}/file`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch {
+      setPreviewUrl(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl && !previewUrl.startsWith('http')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewDoc(null);
+    setPreviewUrl(null);
   }
 
   function canReviewDocument(doc: DocumentIntake) {
@@ -803,7 +836,12 @@ export default function PurchaseInvoices() {
                   <div key={doc.id} className="rounded-lg border border-gray-200 bg-white p-3">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                       <div className="min-w-0 flex flex-1 items-start gap-3">
-                        <DocumentThumbnail docId={doc.id} mimeType={doc.mimeType} fileUrl={doc.fileUrl} token={token ?? ''} isPdf={isPdf} />
+                        <button type="button" onClick={() => void openPreview(doc)} className="group relative cursor-pointer" title={isThai ? 'ดูตัวอย่าง' : 'Preview'}>
+                          <DocumentThumbnail docId={doc.id} mimeType={doc.mimeType} fileUrl={doc.fileUrl} token={token ?? ''} isPdf={isPdf} />
+                          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 group-hover:bg-black/30 transition-colors">
+                            <Eye className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </span>
+                        </button>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-gray-900 truncate">{documentTitle(doc)}</p>
@@ -1416,6 +1454,51 @@ export default function PurchaseInvoices() {
                   {isThai ? 'แนบเอกสาร' : 'Attach'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={closePreview}>
+          <div className="relative w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${previewDoc.mimeType === 'application/pdf' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {previewDoc.mimeType === 'application/pdf' ? <FileText className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{previewDoc.fileName || previewDoc.id.slice(0, 8)}</p>
+                  <p className="text-xs text-gray-500">{previewDoc.mimeType} · {formatDate(previewDoc.createdAt)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => void openDocumentFile(previewDoc)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  {isThai ? 'เปิดแท็บใหม่' : 'Open in tab'}
+                </button>
+                <button onClick={closePreview} className="inline-flex items-center justify-center rounded-lg p-1.5 text-gray-500 hover:bg-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-100 p-4" style={{ minHeight: '60vh' }}>
+              {previewLoading ? (
+                <div className="flex flex-col items-center gap-3 text-gray-400">
+                  <Loader2 className="w-10 h-10 animate-spin" />
+                  <p className="text-sm">{isThai ? 'กำลังโหลดเอกสาร...' : 'Loading document...'}</p>
+                </div>
+              ) : !previewUrl ? (
+                <div className="flex flex-col items-center gap-3 text-gray-400">
+                  <AlertTriangle className="w-10 h-10" />
+                  <p className="text-sm">{isThai ? 'ไม่สามารถโหลดเอกสารได้' : 'Cannot load document'}</p>
+                </div>
+              ) : previewDoc.mimeType === 'application/pdf' ? (
+                <iframe src={previewUrl} className="w-full h-full rounded-lg border border-gray-200" style={{ minHeight: '60vh' }} title="PDF preview" />
+              ) : (
+                <img src={previewUrl} alt="Document preview" className="max-w-full max-h-[75vh] rounded-lg shadow-lg object-contain" />
+              )}
             </div>
           </div>
         </div>
