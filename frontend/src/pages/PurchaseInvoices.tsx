@@ -192,8 +192,16 @@ export default function PurchaseInvoices() {
   const [previewDoc, setPreviewDoc] = useState<DocumentIntake | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [storageUsage, setStorageUsage] = useState<{ usedBytes: number; quotaBytes: number; usedPercent: number } | null>(null);
 
   const isFreePlan = policy?.plan === 'free';
+
+  function formatBytes(b: number) {
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -202,7 +210,7 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes] = await Promise.all([
+      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes, storageRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -221,6 +229,9 @@ export default function PurchaseInvoices() {
         fetch('/api/purchase-invoices/document-intakes/stats/summary', {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        fetch('/api/purchase-invoices/storage/usage', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       const json = await res.json();
       const attachPurchasesJson = await attachPurchasesRes.json();
@@ -228,6 +239,8 @@ export default function PurchaseInvoices() {
       const intakeJson = await intakeRes.json();
       const libraryJson = await libraryRes.json();
       const statsJson = await statsRes.json();
+      const storageJson = await storageRes.json();
+      if (storageJson.data) setStorageUsage(storageJson.data);
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
       setItems(data);
@@ -790,6 +803,21 @@ export default function PurchaseInvoices() {
               {isThai
                 ? 'Storage ยังไม่พร้อม: ไฟล์ใหม่จะถูกเก็บใน database ชั่วคราว ควรตั้ง S3/R2 ก่อนขายจริง'
                 : 'Storage is not configured: new files are temporarily stored in the database. Configure S3/R2 before production.'}
+            </div>
+          )}
+
+          {storageUsage && (
+            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <span>{isThai ? 'พื้นที่เก็บข้อมูล' : 'Storage'}</span>
+                <span>{formatBytes(storageUsage.usedBytes)} / {formatBytes(storageUsage.quotaBytes)} ({storageUsage.usedPercent}%)</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${storageUsage.usedPercent >= 90 ? 'bg-rose-500' : storageUsage.usedPercent >= 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+                  style={{ width: `${Math.min(storageUsage.usedPercent, 100)}%` }}
+                />
+              </div>
             </div>
           )}
 

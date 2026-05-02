@@ -11,6 +11,8 @@ import {
 } from '../services/accessPolicyService';
 import { logger } from '../config/logger';
 import { downloadFromStorage, getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { checkStorageQuota, incrementStorageUsed } from '../services/storageQuotaService';
+import { migrateDocumentToStorage } from '../services/storageMigrationService';
 import { ocrSupplierInvoice, OcrResult } from '../services/aiService';
 
 export const purchaseInvoicesRouter = Router();
@@ -423,6 +425,12 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       return;
     }
 
+    const quota = await checkStorageQuota(req.user!.companyId, buffer.length);
+    if (!quota.allowed) {
+      res.status(413).json({ error: 'Storage quota exceeded / พื้นที่เก็บข้อมูลเต็ม' });
+      return;
+    }
+
     let fileUrl: string | undefined;
     let storageKey: string | undefined;
     const storageReady = isStorageConfigured();
@@ -446,6 +454,8 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
         status: 'processing',
       },
     });
+
+    await incrementStorageUsed(req.user!.companyId, buffer.length);
 
     try {
       const result = await analyzeDocumentBuffer(buffer, body.mimeType, req.user!.companyId);
@@ -632,6 +642,9 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
         processedAt: new Date(),
       },
     });
+
+    // Auto-migrate file from DB to R2 after confirmation
+    void migrateDocumentToStorage(item.id).catch(() => {});
 
     await auditLog({
       companyId: req.user!.companyId,
@@ -1007,4 +1020,17 @@ purchaseInvoicesRouter.post('/:id/mark-paid', requireRole('admin', 'super_admin'
     logger.error('Failed to mark purchase invoice paid', { error: err });
     res.status(500).json({ error: 'Failed to mark purchase invoice as paid' });
   }
+});
+
+// ─── Storage usage ──────────────────────────────────────────────
+purchaseInvoicesRouter.get('/storage/usage', async (req, res) => {
+  const { getStorageUsage } = await import('../services/storageQuotaService');
+  const usage = await getStorageUsage(req.user!.companyId);
+  res.json({ data: usage });
+});
+
+purchaseInvoicesRouter.post('/storage/migrate', requireRole('admin', 'super_admin'), async (req, res) => {
+  const { batchMigrateDbFiles } = await import('../services/storageMigrationService');
+  const result = await batchMigrateDbFiles(50);
+  res.json({ data: result });
 });

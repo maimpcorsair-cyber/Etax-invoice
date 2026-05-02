@@ -120,6 +120,10 @@ model Company {
   // Expense settings
   expenseLimit        Decimal?  @db.Decimal(12, 2)
 
+  // Storage quota
+  storageUsedBytes    BigInt  @default(0)
+  storageQuotaBytes   BigInt  @default(524288000)  // 500MB
+
   // Line OA settings
   lineNotifyEnabled   Boolean @default(false)
   overdueReminderDays Int     @default(3)
