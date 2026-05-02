@@ -853,11 +853,11 @@ export default function PurchaseInvoices() {
                             {sourceLabel(doc.source)} · {doc.ocrResult?.documentTypeLabel || doc.ocrResult?.documentType || doc.mimeType} · {formatDate(doc.createdAt)}
                             {doc.ocrResult?.total ? ` · ${formatCurrency(doc.ocrResult.total)}` : ''}
                           </p>
-                          {(doc.error || doc.warnings?.length) && (
+                          {(doc.error || (doc.warnings && doc.warnings.length > 0)) ? (
                             <p className="mt-1 text-xs text-rose-600 line-clamp-1">
                               {doc.error || doc.warnings?.join(', ')}
                             </p>
-                          )}
+                          ) : null}
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${confidenceClass(doc.ocrResult?.confidence)}`}>
                               {confidenceLabel(doc.ocrResult?.confidence)}
