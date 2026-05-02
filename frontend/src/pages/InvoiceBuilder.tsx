@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Eye, Save, FileCheck } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
@@ -110,37 +110,46 @@ export default function InvoiceBuilder() {
   });
 
   /* ── Preview validation + payload ── */
+  const buildPreviewPayload = useCallback((overrides?: { templateId?: string | null }) => ({
+    type: form.docType,
+    language: form.docLanguage,
+    invoiceDate: form.invoiceDate,
+    dueDate: form.dueDate || undefined,
+    items: form.items.map((item) => ({
+      nameTh: item.nameTh,
+      nameEn: item.nameEn || '',
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      discount: item.discount,
+      vatType: item.vatType,
+    })),
+    notes: form.notes || undefined,
+    logoUrl: form.logoUrl || undefined,
+    templateId: (overrides?.templateId !== undefined ? overrides.templateId : form.templateId) || undefined,
+    documentMode: form.documentMode,
+    bankPaymentInfo: form.bankPaymentInfo || undefined,
+    showCompanyLogo: form.showCompanyLogo,
+    signatureImageUrl: form.signatureImageUrl || undefined,
+    signerName: form.signerName || undefined,
+    signerTitle: form.signerTitle || undefined,
+  }), [form]);
+
   const handlePreviewClick = async () => {
     if (validationErrors.length > 0) {
       preview.clearPreviewError();
       return;
     }
-
-    await preview.openPreview({
-      type: form.docType,
-      language: form.docLanguage,
-      invoiceDate: form.invoiceDate,
-      dueDate: form.dueDate || undefined,
-      items: form.items.map((item) => ({
-        nameTh: item.nameTh,
-        nameEn: item.nameEn || '',
-        quantity: item.quantity,
-        unit: item.unit,
-        unitPrice: item.unitPrice,
-        discount: item.discount,
-        vatType: item.vatType,
-      })),
-      notes: form.notes || undefined,
-      logoUrl: form.logoUrl || undefined,
-      templateId: form.templateId || undefined,
-      documentMode: form.documentMode,
-      bankPaymentInfo: form.bankPaymentInfo || undefined,
-      showCompanyLogo: form.showCompanyLogo,
-      signatureImageUrl: form.signatureImageUrl || undefined,
-      signerName: form.signerName || undefined,
-      signerTitle: form.signerTitle || undefined,
-    });
+    await preview.openPreview(buildPreviewPayload());
   };
+
+  // Auto-refresh preview when template changes (if preview already shown)
+  const handleTemplateChange = useCallback(async (templateId: string | null) => {
+    form.setTemplateId(templateId);
+    if (preview.previewHtml !== null && validationErrors.length === 0) {
+      await preview.openPreview(buildPreviewPayload({ templateId }));
+    }
+  }, [form, preview, validationErrors, buildPreviewPayload]);
 
   useEffect(() => {
     const presetType = searchParams.get('type');
@@ -297,7 +306,7 @@ export default function InvoiceBuilder() {
         <DocumentAppearanceCard
           templates={templates}
           selectedTemplateId={form.templateId}
-          onTemplateChange={form.setTemplateId}
+          onTemplateChange={handleTemplateChange}
           documentMode={form.documentMode}
           onDocumentModeChange={form.setDocumentMode}
           bankPaymentInfo={form.bankPaymentInfo}
