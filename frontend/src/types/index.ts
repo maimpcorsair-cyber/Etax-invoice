@@ -276,7 +276,18 @@ export interface ExpenseItem {
   amount: number;
   date: string;
   notes?: string | null;
+  vendorName?: string | null;
+  vendorTaxId?: string | null;
+  whtApplicable: boolean;
+  whtRate?: number | null;
+  whtAmount?: number | null;
+  netAmount?: number | null;
   attachments: ExpenseAttachment[];
+}
+
+export interface PettyCash {
+  balance: number;
+  cashierId?: string | null;
 }
 
 export interface ExpenseVoucher {

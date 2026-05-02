@@ -135,6 +135,7 @@ model Company {
   billingTransactions BillingTransaction[]
   purchaseInvoices    PurchaseInvoice[]
   expenseVouchers     ExpenseVoucher[]
+  pettyCash           PettyCash?
 
   @@map("companies")
 }
@@ -647,6 +648,16 @@ model ExpenseItem {
   notes         String?
   metadata      Json?
 
+  // Vendor info
+  vendorName    String?
+  vendorTaxId   String?
+
+  // WHT
+  whtApplicable Boolean        @default(false)
+  whtRate       Decimal?       @db.Decimal(5, 2)
+  whtAmount     Decimal?       @db.Decimal(12, 2)
+  netAmount     Decimal?       @db.Decimal(12, 2)
+
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -655,6 +666,21 @@ model ExpenseItem {
 
   @@index([voucherId])
   @@map("expense_items")
+}
+
+model PettyCash {
+  id         String   @id @default(cuid())
+  companyId  String   @unique
+  cashierId  String?
+  balance    Decimal  @db.Decimal(12, 2) @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // cashierId is a soft reference — no Prisma relation to avoid one-to-one constraint issues
+
+  @@map("petty_cash")
 }
 
 model ExpenseAttachment {

@@ -18,12 +18,18 @@ const attachmentSchema = z.object({
   evidenceType: z.enum(['receipt', 'chat', 'map', 'other']).default('receipt'),
 });
 
+const WHT_RATES = [1, 3, 5] as const;
+
 const expenseItemSchema = z.object({
   description: z.string().min(1),
   category: z.string().optional(),
   amount: z.number().positive(),
   date: z.string().min(1),
   notes: z.string().optional(),
+  vendorName: z.string().optional(),
+  vendorTaxId: z.string().optional(),
+  whtApplicable: z.boolean().default(false),
+  whtRate: z.number().refine((v) => (WHT_RATES as readonly number[]).includes(v), { message: 'whtRate must be 1, 3 or 5' }).optional().nullable(),
   attachments: z.array(attachmentSchema).optional(),
 });
 
@@ -130,6 +136,46 @@ expensesRouter.patch('/settings', requireRole('admin', 'super_admin'), async (re
   }
 });
 
+/* ─── Petty Cash: get balance ─── */
+expensesRouter.get('/petty-cash', async (req, res) => {
+  try {
+    const record = await prisma.pettyCash.findUnique({ where: { companyId: req.user!.companyId } });
+    res.json({ data: { balance: record ? Number(record.balance) : 0, cashierId: record?.cashierId ?? null } });
+  } catch (err) {
+    logger.error('Failed to get petty cash', { error: err });
+    res.status(500).json({ error: 'Failed to get petty cash' });
+  }
+});
+
+/* ─── Petty Cash: top up ─── */
+expensesRouter.post('/petty-cash/topup', requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { amount, cashierId } = z.object({
+      amount: z.number().positive(),
+      cashierId: z.string().optional(),
+    }).parse(req.body);
+
+    const record = await prisma.pettyCash.upsert({
+      where: { companyId: req.user!.companyId },
+      create: { companyId: req.user!.companyId, balance: amount, cashierId: cashierId ?? null },
+      update: { balance: { increment: amount }, ...(cashierId ? { cashierId } : {}) },
+    });
+
+    await auditLog({
+      companyId: req.user!.companyId, userId: req.user!.userId, role: req.user!.role,
+      action: 'petty_cash.topup', resourceType: 'company', resourceId: req.user!.companyId,
+      details: { amount, newBalance: Number(record.balance) },
+      ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',
+    });
+
+    res.json({ data: { balance: Number(record.balance) } });
+  } catch (err) {
+    if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('Failed to top up petty cash', { error: err });
+    res.status(500).json({ error: 'Failed to top up petty cash' });
+  }
+});
+
 /* ─── Detail ─── */
 expensesRouter.get('/:id', async (req, res) => {
   try {
@@ -165,24 +211,40 @@ expensesRouter.get('/:id', async (req, res) => {
   }
 });
 
+function calcWht(amount: number, whtApplicable: boolean, whtRate?: number | null) {
+  if (!whtApplicable || !whtRate) return { whtAmount: null, netAmount: null };
+  const whtAmount = Math.round(amount * whtRate) / 100;
+  const netAmount = Math.round((amount - whtAmount) * 100) / 100;
+  return { whtAmount, netAmount };
+}
+
 function buildItemCreate(items: z.infer<typeof expenseItemSchema>[]) {
-  return items.map((item) => ({
-    description: item.description,
-    category: item.category,
-    amount: item.amount,
-    date: new Date(item.date),
-    notes: item.notes,
-    attachments: item.attachments?.length
-      ? {
-          create: item.attachments.map((att) => ({
-            fileName: att.fileName,
-            fileType: att.fileType,
-            url: att.url,
-            evidenceType: att.evidenceType,
-          })),
-        }
-      : undefined,
-  }));
+  return items.map((item) => {
+    const { whtAmount, netAmount } = calcWht(item.amount, item.whtApplicable, item.whtRate);
+    return {
+      description: item.description,
+      category: item.category,
+      amount: item.amount,
+      date: new Date(item.date),
+      notes: item.notes,
+      vendorName: item.vendorName,
+      vendorTaxId: item.vendorTaxId,
+      whtApplicable: item.whtApplicable,
+      whtRate: item.whtApplicable && item.whtRate ? item.whtRate : null,
+      whtAmount,
+      netAmount,
+      attachments: item.attachments?.length
+        ? {
+            create: item.attachments.map((att) => ({
+              fileName: att.fileName,
+              fileType: att.fileType,
+              url: att.url,
+              evidenceType: att.evidenceType,
+            })),
+          }
+        : undefined,
+    };
+  });
 }
 
 /* ─── Create ─── */
@@ -396,13 +458,25 @@ expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (
     if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
     if (existing.status !== 'submitted') { res.status(400).json({ error: 'Only submitted vouchers can be approved' }); return; }
 
-    const updated = await prisma.expenseVoucher.update({
-      where: { id: existing.id },
-      data: { status: 'approved', approvedBy: req.user!.userId, approvedAt: new Date() },
-    });
+    const companyId = req.user!.companyId;
+
+    // Approve and deduct petty cash in one transaction
+    const [updated] = await prisma.$transaction([
+      prisma.expenseVoucher.update({
+        where: { id: existing.id },
+        data: { status: 'approved', approvedBy: req.user!.userId, approvedAt: new Date() },
+      }),
+      // Upsert petty cash record and deduct balance (clamps at 0)
+      prisma.$executeRaw`
+        INSERT INTO petty_cash (id, company_id, balance, created_at, updated_at)
+        VALUES (gen_random_uuid()::text, ${companyId}, 0 - ${existing.totalAmount}, now(), now())
+        ON CONFLICT (company_id)
+        DO UPDATE SET balance = petty_cash.balance - ${existing.totalAmount}, updated_at = now()
+      `,
+    ]);
 
     await auditLog({
-      companyId: req.user!.companyId, userId: req.user!.userId, role: req.user!.role,
+      companyId, userId: req.user!.userId, role: req.user!.role,
       action: 'expense_voucher.approve', resourceType: 'expense_voucher', resourceId: updated.id,
       details: { voucherNumber: updated.voucherNumber, totalAmount: Number(updated.totalAmount) },
       ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',

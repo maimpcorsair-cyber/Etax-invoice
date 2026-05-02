@@ -8,12 +8,14 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType } from '../types';
+import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash } from '../types';
 
 const CATEGORY_KEYS = [
   'transportation', 'office_supplies', 'meals', 'postage',
   'printing', 'utilities', 'maintenance', 'other',
 ] as const;
+
+const WHT_RATES = [1, 3, 5] as const;
 
 interface AttachmentForm {
   fileName: string;
@@ -28,6 +30,10 @@ interface ItemForm {
   amount: string;
   date: string;
   notes: string;
+  vendorName: string;
+  vendorTaxId: string;
+  whtApplicable: boolean;
+  whtRate: string;
   attachments: AttachmentForm[];
 }
 
@@ -45,6 +51,10 @@ const emptyItem = (): ItemForm => ({
   amount: '',
   date: todayIso(),
   notes: '',
+  vendorName: '',
+  vendorTaxId: '',
+  whtApplicable: false,
+  whtRate: '3',
   attachments: [],
 });
 
@@ -61,6 +71,9 @@ export default function Expenses() {
   const [to, setTo] = useState(todayIso());
   const [statusFilter, setStatusFilter] = useState<ExpenseVoucherStatus | 'all'>('all');
   const [expenseLimit, setExpenseLimit] = useState<number | null>(null);
+  const [pettyCash, setPettyCash] = useState<PettyCash | null>(null);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ExpenseVoucher | null>(null);
@@ -87,14 +100,17 @@ export default function Expenses() {
       if (search) params.set('search', search);
       if (statusFilter !== 'all') params.set('status', statusFilter);
 
-      const [vRes, sRes] = await Promise.all([
+      const [vRes, sRes, pcRes] = await Promise.all([
         fetch(`/api/expenses?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/expenses/settings', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/expenses/petty-cash', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const vJson = await vRes.json();
       const sJson = await sRes.json();
+      const pcJson = await pcRes.json();
       setVouchers(vJson.data ?? []);
       setExpenseLimit(sJson.data?.expenseLimit ?? null);
+      setPettyCash(pcJson.data ?? null);
     } catch {
       setVouchers([]);
     } finally {
@@ -153,6 +169,10 @@ export default function Expenses() {
           amount: String(item.amount),
           date: item.date.split('T')[0],
           notes: item.notes ?? '',
+          vendorName: item.vendorName ?? '',
+          vendorTaxId: item.vendorTaxId ?? '',
+          whtApplicable: item.whtApplicable ?? false,
+          whtRate: item.whtRate != null ? String(item.whtRate) : '3',
           attachments: [],
         })),
       );
@@ -244,14 +264,22 @@ export default function Expenses() {
         voucherDate,
         description: voucherDesc.trim() || undefined,
         notes: voucherNotes.trim() || undefined,
-        items: items.map((item) => ({
-          description: item.description.trim(),
-          category: item.category || undefined,
-          amount: parseFloat(item.amount),
-          date: item.date,
-          notes: item.notes.trim() || undefined,
-          attachments: item.attachments.length > 0 ? item.attachments : undefined,
-        })),
+        items: items.map((item) => {
+          const amt = parseFloat(item.amount);
+          const whtRate = item.whtApplicable ? parseFloat(item.whtRate) : undefined;
+          return {
+            description: item.description.trim(),
+            category: item.category || undefined,
+            amount: amt,
+            date: item.date,
+            notes: item.notes.trim() || undefined,
+            vendorName: item.vendorName.trim() || undefined,
+            vendorTaxId: item.vendorTaxId.trim() || undefined,
+            whtApplicable: item.whtApplicable,
+            whtRate: item.whtApplicable && whtRate ? whtRate : undefined,
+            attachments: item.attachments.length > 0 ? item.attachments : undefined,
+          };
+        }),
       };
       const url = editing ? `/api/expenses/${editing.id}` : '/api/expenses';
       const method = editing ? 'PATCH' : 'POST';
@@ -322,6 +350,24 @@ export default function Expenses() {
     setShowRejectModal(true);
   }
 
+  async function handleTopUp() {
+    const amount = parseFloat(topUpAmount);
+    if (!amount || amount <= 0) return;
+    try {
+      const res = await fetch('/api/expenses/petty-cash/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Top up failed');
+      setShowTopUpModal(false);
+      setTopUpAmount('');
+      fetchVouchers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    }
+  }
+
   async function handleReject() {
     if (!rejectionNote.trim()) return;
     setError('');
@@ -357,10 +403,25 @@ export default function Expenses() {
               : t('expenses.noLimit')}
           </p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Petty cash balance chip */}
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
+            <Wallet className="w-4 h-4 text-emerald-600" />
+            <span className="font-semibold text-emerald-800">{formatCurrency(pettyCash?.balance ?? 0)}</span>
+            {isAdmin && (
+              <button
+                onClick={() => { setTopUpAmount(''); setShowTopUpModal(true); }}
+                className="ml-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 underline"
+              >
+                {t('expenses.topUp', 'Top Up')}
+              </button>
+            )}
+          </div>
         <button onClick={openCreate} className="btn-primary" disabled={isFreePlan}>
           <Plus className="w-4 h-4" />
           {t('expenses.newVoucher')}
         </button>
+        </div>
       </div>
 
       {error && (
@@ -657,6 +718,58 @@ export default function Expenses() {
                         <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.notes')}</label>
                         <input value={item.notes} onChange={(e) => updateItem(idx, 'notes', e.target.value)} className="input-field" />
                       </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.vendorName', 'Vendor Name')}</label>
+                        <input value={item.vendorName} onChange={(e) => updateItem(idx, 'vendorName', e.target.value)} className="input-field" placeholder={t('common.optional', 'Optional')} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.vendorTaxId', 'Vendor Tax ID')}</label>
+                        <input value={item.vendorTaxId} onChange={(e) => updateItem(idx, 'vendorTaxId', e.target.value)} className="input-field" placeholder="0000000000000" />
+                      </div>
+                    </div>
+
+                    {/* WHT */}
+                    <div className="rounded-lg bg-amber-50 border border-amber-100 p-3 space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={item.whtApplicable}
+                          onChange={(e) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, whtApplicable: e.target.checked } : it))}
+                          className="w-4 h-4 rounded accent-amber-600"
+                        />
+                        <span className="text-xs font-semibold text-amber-800">{t('expenses.whtApplicable', 'Withholding Tax (ภาษีหัก ณ ที่จ่าย)')}</span>
+                      </label>
+                      {item.whtApplicable && (
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.whtRate', 'WHT Rate')}</label>
+                            <select value={item.whtRate} onChange={(e) => updateItem(idx, 'whtRate', e.target.value)} className="input-field">
+                              {WHT_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.whtAmount', 'WHT Amount')}</label>
+                            <div className="input-field bg-gray-50 text-right text-gray-600">
+                              {(() => {
+                                const amt = parseFloat(item.amount) || 0;
+                                const rate = parseFloat(item.whtRate) || 0;
+                                return formatCurrency(Math.round(amt * rate) / 100);
+                              })()}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 mb-1 block">{t('expenses.netAmount', 'Net Amount')}</label>
+                            <div className="input-field bg-gray-50 text-right font-semibold text-gray-800">
+                              {(() => {
+                                const amt = parseFloat(item.amount) || 0;
+                                const rate = parseFloat(item.whtRate) || 0;
+                                const wht = Math.round(amt * rate) / 100;
+                                return formatCurrency(Math.round((amt - wht) * 100) / 100);
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Attachments */}
@@ -705,6 +818,42 @@ export default function Expenses() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {t('common.save')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Up Modal */}
+      {showTopUpModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">{t('expenses.topUp', 'Top Up Petty Cash')}</h2>
+              <button onClick={() => setShowTopUpModal(false)} className="p-1 rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-xs text-gray-500 mb-3">
+                  {t('expenses.currentBalance', 'Current Balance')}: <span className="font-bold text-emerald-700">{formatCurrency(pettyCash?.balance ?? 0)}</span>
+                </p>
+                <label className="label">{t('expenses.topUpAmount', 'Amount to Add')} *</label>
+                <input
+                  type="number" min="1" step="0.01"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  className="input-field text-right"
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowTopUpModal(false)} className="btn-secondary">{t('common.cancel')}</button>
+                <button onClick={handleTopUp} disabled={!topUpAmount || parseFloat(topUpAmount) <= 0} className="btn-primary">
+                  <Plus className="w-4 h-4" /> {t('expenses.topUp', 'Top Up')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
