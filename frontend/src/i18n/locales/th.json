@@ -223,6 +223,9 @@
       "other": "อื่นๆ"
     },
     "approvalTimeline": "ประวัติการอนุมัติ",
+    "exportSheets": "Export Google Sheets",
+    "uploadToDrive": "อัปโหลดไฟล์ → รับ URL อัตโนมัติ",
+    "chooseFile": "เลือกไฟล์",
     "vendorName": "ชื่อผู้ขาย/ผู้ให้บริการ",
     "vendorTaxId": "เลขประจำตัวผู้เสียภาษี",
     "whtApplicable": "ภาษีหัก ณ ที่จ่าย",

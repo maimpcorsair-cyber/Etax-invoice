@@ -170,3 +170,166 @@ export async function exportInvoicesToSheets(
   logger.info(`Google Sheets export created: ${url} (${invoices.length} rows)`);
   return url;
 }
+
+export interface ExpenseSheetRow {
+  voucherNumber: string;
+  voucherDate: Date;
+  description?: string | null;
+  totalAmount: number;
+  status: string;
+  itemCount: number;
+  // item-level (flattened for first item, or summary)
+  vendorName?: string | null;
+  vendorTaxId?: string | null;
+  whtAmount?: number | null;
+  netAmount?: number | null;
+}
+
+function getAuthWithDrive() {
+  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountKey) {
+    const credentials = JSON.parse(serviceAccountKey);
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file',
+      ],
+    });
+  }
+  return new google.auth.GoogleAuth({
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive.file',
+    ],
+  });
+}
+
+export function isSheetsConfigured(): boolean {
+  return !!(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+}
+
+/**
+ * Export expense vouchers to a new Google Sheet.
+ * Returns the spreadsheet URL.
+ */
+export async function exportExpensesToSheets(
+  expenses: ExpenseSheetRow[],
+  companyName: string,
+  dateRange: { from?: string; to?: string },
+): Promise<string> {
+  const auth = getAuthWithDrive();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const drive = google.drive({ version: 'v3', auth });
+
+  const label = [dateRange.from, dateRange.to].filter(Boolean).join(' → ') || new Date().toISOString().split('T')[0];
+  const title = `${companyName} - Expenses ${label}`;
+
+  const spreadsheet = await sheets.spreadsheets.create({
+    requestBody: {
+      properties: { title },
+      sheets: [
+        { properties: { title: 'ค่าใช้จ่าย (TH)', sheetId: 0 } },
+        { properties: { title: 'Expenses (EN)', sheetId: 1 } },
+      ],
+    },
+  });
+
+  const id = spreadsheet.data.spreadsheetId!;
+
+  const STATUS_TH: Record<string, string> = {
+    draft: 'ร่าง',
+    submitted: 'ส่งอนุมัติแล้ว',
+    approved: 'อนุมัติแล้ว',
+    rejected: 'ถูกปฏิเสธ',
+  };
+
+  const thHeaders = [
+    'เลขที่ใบสำคัญ', 'วันที่', 'รายละเอียด', 'รายการ', 'ผู้ขาย', 'เลขผู้เสียภาษี',
+    'ยอดรวม (฿)', 'ภาษีหัก ณ ที่จ่าย (฿)', 'ยอดสุทธิ (฿)', 'สถานะ',
+  ];
+  const enHeaders = [
+    'Voucher No.', 'Date', 'Description', 'Items', 'Vendor', 'Vendor Tax ID',
+    'Total (THB)', 'WHT (THB)', 'Net (THB)', 'Status',
+  ];
+
+  const rows = expenses.map((e) => [
+    e.voucherNumber,
+    e.voucherDate instanceof Date ? e.voucherDate.toLocaleDateString('en-GB') : String(e.voucherDate),
+    e.description ?? '',
+    e.itemCount,
+    e.vendorName ?? '',
+    e.vendorTaxId ?? '',
+    e.totalAmount,
+    e.whtAmount ?? '',
+    e.netAmount ?? '',
+    e.status,
+  ]);
+
+  const thRows = rows.map((r) => {
+    const copy = [...r];
+    copy[9] = STATUS_TH[String(copy[9])] ?? String(copy[9]);
+    return copy;
+  });
+
+  await Promise.all([
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'ค่าใช้จ่าย (TH)!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [thHeaders, ...thRows] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Expenses (EN)!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [enHeaders, ...rows] },
+    }),
+  ]);
+
+  // Bold header + freeze + column auto-resize for both sheets
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: id,
+    requestBody: {
+      requests: [0, 1].flatMap((sheetId) => [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.059, green: 0.463, blue: 0.369 }, // emerald-700
+                textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat)',
+          },
+        },
+        {
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+            fields: 'gridProperties.frozenRowCount',
+          },
+        },
+        {
+          autoResizeDimensions: {
+            dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 10 },
+          },
+        },
+      ]),
+    },
+  });
+
+  try {
+    await drive.permissions.create({
+      fileId: id,
+      requestBody: { role: 'reader', type: 'anyone' },
+    });
+  } catch {
+    logger.warn('Could not set expense sheet permissions to anyone-reader');
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${id}`;
+  logger.info(`Expense Sheets export created: ${url} (${expenses.length} rows)`);
+  return url;
+}

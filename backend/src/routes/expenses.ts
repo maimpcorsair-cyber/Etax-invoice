@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
 import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
@@ -7,7 +8,11 @@ import { requireRole } from '../middleware/auth';
 import { auditLog } from '../services/auditService';
 import { hasFeatureAccess, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 import { generateVoucherNumber, getExpenseLimit } from '../services/expenseService';
+import { uploadToDrive, isDriveConfigured } from '../services/googleDriveService';
+import { exportExpensesToSheets, isSheetsConfigured } from '../services/googleSheetsService';
 import { logger } from '../config/logger';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 export const expensesRouter = Router();
 
@@ -585,5 +590,122 @@ expensesRouter.delete('/:id/items/:itemId/attachments/:attachmentId', requireRol
   } catch (err) {
     logger.error('Failed to delete attachment', { error: err });
     res.status(500).json({ error: 'Failed to delete attachment' });
+  }
+});
+
+/* ─── Google Drive: upload file ─── */
+expensesRouter.post(
+  '/drive/upload',
+  requireRole('admin', 'super_admin', 'accountant'),
+  upload.single('file'),
+  async (req, res) => {
+    if (!isDriveConfigured()) {
+      res.status(503).json({ error: 'Google Drive is not configured on this server' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No file provided' });
+      return;
+    }
+
+    try {
+      const company = await prisma.company.findUnique({
+        where: { id: req.user!.companyId },
+        select: { nameTh: true, nameEn: true },
+      });
+      const companyName = company?.nameEn ?? company?.nameTh ?? req.user!.companyId;
+
+      const result = await uploadToDrive(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        companyName,
+      );
+
+      res.json({ data: result });
+    } catch (err) {
+      logger.error('Google Drive upload failed', { error: err });
+      res.status(500).json({ error: 'Failed to upload file to Google Drive' });
+    }
+  },
+);
+
+/* ─── Google Sheets: export expense list ─── */
+expensesRouter.post('/export/sheets', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  if (!isSheetsConfigured()) {
+    res.status(503).json({ error: 'Google Sheets is not configured on this server' });
+    return;
+  }
+
+  try {
+    const { dateFrom, dateTo, status } = z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      status: z.string().optional(),
+    }).parse(req.body);
+
+    const companyId = req.user!.companyId;
+
+    const where: Prisma.ExpenseVoucherWhereInput = { companyId };
+    if (status && status !== 'all') where.status = status as never;
+    if (dateFrom || dateTo) {
+      where.voucherDate = {};
+      if (dateFrom) where.voucherDate.gte = new Date(dateFrom);
+      if (dateTo) where.voucherDate.lte = new Date(dateTo);
+    }
+
+    const [company, vouchers] = await Promise.all([
+      prisma.company.findUnique({ where: { id: companyId }, select: { nameTh: true, nameEn: true } }),
+      withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+        tx.expenseVoucher.findMany({
+          where,
+          include: {
+            items: {
+              select: {
+                vendorName: true,
+                vendorTaxId: true,
+                whtAmount: true,
+                netAmount: true,
+              },
+              take: 1,
+              orderBy: { date: 'asc' },
+            },
+          },
+          orderBy: { voucherDate: 'desc' },
+        }),
+      ),
+    ]);
+
+    const companyName = company?.nameEn ?? company?.nameTh ?? companyId;
+
+    const rows = vouchers.map((v) => {
+      const first = v.items[0];
+      return {
+        voucherNumber: v.voucherNumber,
+        voucherDate: v.voucherDate,
+        description: v.description,
+        totalAmount: Number(v.totalAmount),
+        status: v.status,
+        itemCount: v.items.length,
+        vendorName: first?.vendorName ?? null,
+        vendorTaxId: first?.vendorTaxId ?? null,
+        whtAmount: first?.whtAmount != null ? Number(first.whtAmount) : null,
+        netAmount: first?.netAmount != null ? Number(first.netAmount) : null,
+      };
+    });
+
+    const url = await exportExpensesToSheets(rows, companyName, { from: dateFrom, to: dateTo });
+
+    await auditLog({
+      companyId, userId: req.user!.userId, role: req.user!.role,
+      action: 'expense.export_sheets', resourceType: 'company', resourceId: companyId,
+      details: { rows: rows.length, url },
+      ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',
+    });
+
+    res.json({ data: { url, rows: rows.length } });
+  } catch (err) {
+    logger.error('Google Sheets expense export failed', { error: err });
+    res.status(500).json({ error: 'Failed to export to Google Sheets' });
   }
 });

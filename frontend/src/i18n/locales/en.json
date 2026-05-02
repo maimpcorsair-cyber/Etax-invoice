@@ -223,6 +223,9 @@
       "other": "Other"
     },
     "approvalTimeline": "Approval Timeline",
+    "exportSheets": "Export to Sheets",
+    "uploadToDrive": "Upload file → auto-fill URL",
+    "chooseFile": "Choose File",
     "vendorName": "Vendor Name",
     "vendorTaxId": "Vendor Tax ID",
     "whtApplicable": "Withholding Tax (WHT)",

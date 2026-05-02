@@ -4,6 +4,7 @@ import {
   AlertTriangle, Send, ThumbsUp, ThumbsDown,
   Link as LinkIcon, Image as ImageIcon, FileText, PlusCircle, MinusCircle,
   Eye, CheckCircle2, XCircle, Clock, ArrowRight,
+  Upload, Sheet, HardDrive,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
@@ -91,6 +92,9 @@ export default function Expenses() {
 
   const [detailVoucher, setDetailVoucher] = useState<ExpenseVoucher | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const [driveUploading, setDriveUploading] = useState(false);
+  const [sheetsExporting, setSheetsExporting] = useState(false);
 
   const isFreePlan = policy?.plan === 'free';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -372,6 +376,49 @@ export default function Expenses() {
     }
   }
 
+  async function uploadFileToDrive(file: File) {
+    setDriveUploading(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/expenses/drive/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Upload failed');
+      // Auto-fill the attachment URL field with the Drive URL
+      setAttachmentUrl(json.data.url);
+      setAttachmentFileName(json.data.fileName ?? file.name);
+      setAttachmentFileType(file.type.startsWith('image/') ? 'image' : 'pdf');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Drive upload failed');
+    } finally {
+      setDriveUploading(false);
+    }
+  }
+
+  async function handleSheetsExport() {
+    setSheetsExporting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/expenses/export/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ dateFrom: from, dateTo: to, status: statusFilter !== 'all' ? statusFilter : undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Export failed');
+      window.open(json.data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sheets export failed');
+    } finally {
+      setSheetsExporting(false);
+    }
+  }
+
   async function openDetail(v: ExpenseVoucher) {
     setDetailLoading(true);
     setDetailVoucher(v);
@@ -435,6 +482,15 @@ export default function Expenses() {
               </button>
             )}
           </div>
+        <button
+          onClick={handleSheetsExport}
+          disabled={sheetsExporting || vouchers.length === 0}
+          className="btn-secondary hidden sm:inline-flex"
+          title={t('expenses.exportSheets', 'Export to Google Sheets')}
+        >
+          {sheetsExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sheet className="w-4 h-4 text-green-600" />}
+          {t('expenses.exportSheets', 'Export')}
+        </button>
         <button onClick={openCreate} className="btn-primary" disabled={isFreePlan}>
           <Plus className="w-4 h-4" />
           {t('expenses.newVoucher')}
@@ -1048,6 +1104,33 @@ export default function Expenses() {
               </button>
             </div>
             <div className="p-5 space-y-3">
+              {/* Drive upload strip */}
+              <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+                <HardDrive className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-xs text-blue-700 flex-1">{t('expenses.uploadToDrive', 'Upload file → auto-fill URL')}</span>
+                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors">
+                  {driveUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {t('expenses.chooseFile', 'Choose File')}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    disabled={driveUploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.currentTarget.value = '';
+                      if (file) void uploadFileToDrive(file);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex-1 h-px bg-gray-200" />
+                {t('common.or', 'or paste URL manually')}
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">URL *</label>
                 <input

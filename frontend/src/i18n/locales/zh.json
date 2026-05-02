@@ -224,6 +224,9 @@
       "other": "其他"
     },
     "approvalTimeline": "审批历史",
+    "exportSheets": "导出到 Google 表格",
+    "uploadToDrive": "上传文件 → 自动填写URL",
+    "chooseFile": "选择文件",
     "vendorName": "供应商名称",
     "vendorTaxId": "供应商税号",
     "whtApplicable": "预扣税",
