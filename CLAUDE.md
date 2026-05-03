@@ -1,156 +1,89 @@
-# Thai e-Tax Invoice System — Project Memory
+# Thai e-Tax Invoice System
 
-Full-stack e-Tax Invoice application compliant with **ETDA ขมธอ. 3-2560** (Thai Electronic Transactions Development Agency standard), submitting signed + timestamped XML documents to the **Revenue Department (กรมสรรพากร)** via their e-Tax API.
+ETDA ขมธอ. 3-2560 — submits XAdES-BES signed XML to Revenue Department API.
 
 ## Stack
+- **Frontend** `frontend/` — React 18 + Vite 5 + TypeScript 5 + Tailwind 3 + Zustand, port 3000
+- **Backend** `backend/` — Node 20 + Express 4 + TypeScript 5 + Zod + BullMQ 5, port 4000
+- **DB** — PostgreSQL 16 via Prisma 5 (`prisma/schema.prisma`)
+- **Queue** — Redis 7 via BullMQ
+- **Signing** — node-forge: XAdES-BES, PKCS#12, RSA-SHA256
+- **Timestamp** — RFC 3161 TSA (freetsa dev, TDID prod)
+- **PDF** — Puppeteer HTML→PDF
+- **Storage** — S3-compatible (AWS SDK v3)
 
-| Layer | Tech |
-|-------|------|
-| Frontend | React 18 + Vite 5 + TypeScript 5 + Tailwind 3 + Zustand + lucide-react |
-| Backend | Node 20 + Express 4 + TypeScript 5 + Zod + BullMQ 5 |
-| Database | PostgreSQL 16 via Prisma 5 |
-| Queue | Redis 7 (BullMQ) |
-| Signing | node-forge (XAdES-BES, PKCS#12, RSA-SHA256) |
-| Timestamp | RFC 3161 TSA (freetsa dev / TDID prod) |
-| Storage | S3-compatible (AWS SDK v3) |
-| Render | Puppeteer (PDF generation) |
-
-## Repo layout
-
+## Dev credentials
 ```
-/
-├── backend/        Express API + workers (port 4000)
-├── frontend/       React SPA (port 3000, Vite proxy → :4000)
-├── prisma/         schema.prisma (single source of truth)
-├── database/       Raw SQL migrations for reference
-├── docker-compose.yml  Postgres + Redis
-└── .claude/
-    ├── agents/     Specialized subagents (etax-specialist, cert-manager, etc.)
-    └── commands/   Slash commands (/typecheck, /sign-test, etc.)
+Admin:    admin@siamtech.co.th / Admin@123456
+Postgres: etax_user / etax_secret @ localhost:5432/etax_invoice
+Redis:    redis_secret @ localhost:6379
+Cert:     backend/certs/test-company.p12 / etax-dev-password
 ```
 
-## Quick index
-
-- **Full tools reference**: see [`.claude/TOOLS.md`](.claude/TOOLS.md) — agents, commands, skills, MCP servers with a task → best-fit tool matrix.
-
-## Team agents — when to invoke which
-
-| Task | Agent |
-|------|-------|
-| Anything Thai-e-Tax domain (ETDA, XAdES, RD API, XML schema, T01-T05) | `etax-specialist` |
-| Certificate / PKCS#12 / signing errors | `cert-manager` |
-| Prisma schema, migrations, raw SQL | `prisma-db` |
-| Express routes, services, BullMQ workers | `backend-dev` |
-| React pages, components, forms, Tailwind | `frontend-dev` |
-| TypeScript errors (`tsc --noEmit` fails) | `ts-fixer` |
-| End-to-end HTTP testing with curl | `api-tester` |
-| Pre-commit review, security audit | `code-reviewer` |
-
-Claude Code will auto-route to the right agent when a task matches; you can also invoke explicitly with the `Agent` tool.
-
-## Slash commands
-
-| Command | Purpose |
-|---------|---------|
-| `/typecheck` | Run `tsc --noEmit` on backend + frontend in parallel |
-| `/gen-cert` | Regenerate the self-signed dev .p12 |
-| `/sign-test` | Run full XAdES-BES + TSA signing pipeline test |
-| `/restart-backend` | Kill + restart tsx watch on :4000 |
-| `/restart-frontend` | Kill + restart Vite on :3000 |
-| `/health` | Probe all 4 services (backend, frontend, postgres, redis) |
-| `/db-shell "SQL"` | Run a raw query against etax_invoice db |
-| `/logs [pattern]` | Tail backend logs, optionally filtered |
-| `/rd-submit <invId>` | Queue an invoice for RD submission |
-| `/migrate [name]` | Apply or create a Prisma migration |
-| `/review [file]` | Invoke code-reviewer on uncommitted changes |
-
-## Official Anthropic skills (auto-discovered)
-
-| Skill | Used when |
-|-------|-----------|
-| `pdf` | Reading RD regulation PDFs, filling invoice templates, OCR of scanned receipts |
-| `xlsx` | Bulk-importing customers/invoices from Excel, exporting monthly VAT reports |
-| `docx` | Generating formal letters, contracts, reports |
-| `skill-creator` | Creating new project-specific skills |
-| `brand-guidelines` | Applying consistent branding to UI/docs |
-
-**Plus 18 Impeccable design skills** (`critique`, `polish`, `harden`, `clarify`, `distill`, `layout`, `typeset`, `colorize`, `shape`, `bolder`, `quieter`, `delight`, `animate`, `adapt`, `optimize`, `overdrive`, `audit`, `impeccable`) — auto-applied to frontend design tasks. See `.claude/TOOLS.md` for the full matrix.
-
-## MCP servers
-
-Project-scoped in `.mcp.json`:
-
-- ✅ **context7** — up-to-date library docs (Prisma, node-forge, etc.) — no auth
-- ✅ **playwright** — E2E browser testing of the React UI — no auth
-- 🔑 **tavily** — AI web search — needs `TAVILY_API_KEY`
-- 🔑 **firecrawl** — web scraping — needs `FIRECRAWL_API_KEY`
-
-Run `/mcp` in Claude Code to see live status.
-
-## Key conventions
-
-### Multi-tenancy
-Every query is scoped by `companyId` from the JWT. **Never trust `companyId` from request body** — always use `req.user!.companyId`.
-
-### Document type codes
-| Code | Type | When |
-|------|------|------|
-| T01 | Tax invoice / receipt (combined) | Cash sale |
-| T02 | Tax invoice | Credit sale (awaits payment) |
-| T03 | Receipt | Payment against a prior T02 |
-| T04 | Credit note | Refund / reduction |
-| T05 | Debit note | Additional charge |
-
-### Signing pipeline (invoice submission)
+## Key source files
 ```
-Invoice record
-  ↓ generateRDXml()               (src/services/xmlService.ts)
-UBL XML
-  ↓ signXml()                     (src/services/signatureService.ts)
-XAdES-BES signed XML
-  ↓ requestTimestamp() + embedTimestampInXml()   (src/services/tsaService.ts)
-Signed + timestamped XML
-  ↓ submitToRD()                  (src/services/rdApiService.ts)
-RD response → update DB
+backend/src/services/
+  xmlService.ts           UBL XML generation (generateRDXml)
+  signatureService.ts     XAdES-BES signing (signXml)
+  tsaService.ts           RFC 3161 timestamps
+  rdApiService.ts         RD API submission
+  pdfService.ts           HTML builders per template variant
+
+backend/src/queues/workers/rdSubmitWorker.ts   BullMQ signing pipeline
+
+frontend/src/pages/InvoiceBuilder.tsx                  Form + live preview split pane
+frontend/src/components/invoice/TemplateMarketplace.tsx Gallery panel
+frontend/src/lib/documentTemplatePresets.ts            51 template definitions
 ```
 
-All orchestrated by `src/queues/workers/rdSubmitWorker.ts` (BullMQ).
+## Document types
+| T-code | docType value | Description |
+|--------|---------------|-------------|
+| T01 | `tax_invoice_receipt` | Cash sale |
+| T02 | `tax_invoice` | Credit sale |
+| T03 | `receipt` | Payment on T02 |
+| T04 | `credit_note` | Refund |
+| T05 | `debit_note` | Extra charge |
 
-### Environments
-- `RD_ENVIRONMENT=sandbox` (default) → RD API returns mocked success, TSA falls back to mock if freetsa unreachable.
-- `RD_ENVIRONMENT=production` → Real RD call; requires `RD_CLIENT_ID`, `RD_CLIENT_SECRET`, and a real TDID/INET/TOT certificate (not the self-signed dev one).
-
-### Dev credentials
+## Signing pipeline
 ```
-Admin user:   admin@siamtech.co.th / Admin@123456
-Postgres:     etax_user / etax_secret @ localhost:5432/etax_invoice
-Redis:        redis_secret @ localhost:6379
-Cert:         backend/certs/test-company.p12 / etax-dev-password
+Invoice → generateRDXml() → signXml() → requestTimestamp() → submitToRD()
 ```
+Orchestrated by `rdSubmitWorker.ts`. `RD_ENVIRONMENT=sandbox` (default) → mock responses.
 
-## Gotchas (learned the hard way)
+## Template system
+- `pdfService.ts` routes by `templateId` prefix: `builtin:dark-*` → `buildHtmlDark(variant)`, `builtin:anime-*` → `buildHtmlAnime(variant)`
+- `documentTemplatePresets.ts` — each preset has `id, tagEn, swatches[]`; `tagEn` controls marketplace category
+- `TemplateMarketplace.tsx` CATEGORIES: Standard · Minimal · Pro · Cute · Dark · Anime · Fun
 
-1. **Prisma client sync**: the backend has its own `node_modules/@prisma/client`. After `prisma generate` at root, copy with:
+## Multi-tenancy rule
+Always use `req.user!.companyId` — **never trust companyId from request body**.
+
+## Gotchas
+1. **Prisma client sync** — after `prisma generate` at root:
    ```bash
    cp -r node_modules/.prisma/client/. backend/node_modules/.prisma/client/
    ```
+2. **Raw SQL casing** — Prisma camelCase columns need double-quotes: `SELECT "isActive" FROM users`
+3. **PKCS#12 on OpenSSL 3** — use `algorithm: 'aes256'` in `toPkcs12Asn1`, not `'3des'` (MAC verify fails)
+4. **JWT expiresIn** — jsonwebtoken v9 `StringValue` type, cast `as any` (see `routes/auth.ts`)
+5. **Certs never committed** — `backend/certs/` in `.gitignore`; upload real cert via `POST /api/admin/certificate`
+6. **seller JSON snapshot** — pass full company object as `seller` JSONB on invoice create; don't rely on join
 
-2. **Column casing in raw SQL**: Prisma emits camelCase columns. psql queries need double-quotes:
-   ```sql
-   SELECT "isActive" FROM users;  -- not is_active
-   ```
+## Common commands
+```bash
+# Type check
+cd frontend && npx tsc --noEmit
+cd backend  && npx tsc --noEmit
 
-3. **PKCS#12 MAC verify errors**: node-forge + `algorithm: '3des'` fails MAC verify on OpenSSL 3. Use `algorithm: 'aes256'` in `toPkcs12Asn1`.
+# Migration
+npx prisma migrate dev --name <name>
 
-4. **JWT expiresIn typing**: `jsonwebtoken` v9 uses a branded `StringValue` type. Cast `as any` with a comment (done in `routes/auth.ts`).
+# Restart backend
+pkill -f "tsx watch"; cd backend && npx tsx watch src/index.ts &
+```
 
-5. **Certificates are NEVER committed**: `backend/certs/` and `*.p12/*.pem/*.key` are in `.gitignore`. Real TDID certs must be uploaded via `POST /api/admin/certificate`.
-
-6. **Invoice must include `seller` JSON**: when creating an invoice, fetch the company and pass its data as `seller` JSONB. Don't rely on lazy join — the snapshot matters for audit.
-
-## Task hygiene
-
-- After any schema change: `/migrate` → `/typecheck` → `/restart-backend`
-- After any cert change: `/sign-test`
-- Before committing: `/typecheck` then `/review`
-- If backend misbehaves: `/logs error` first, then `/health`
+## Slash commands
+`/typecheck` `/health` `/db-shell "SQL"` `/logs [pattern]`
+`/restart-backend` `/restart-frontend` `/migrate [name]`
+`/gen-cert` `/sign-test` `/rd-submit <invoiceId>` `/review [file]`
