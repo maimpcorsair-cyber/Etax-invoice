@@ -1,4 +1,4 @@
-import { Save, Eye, FileCheck, FileText } from 'lucide-react';
+import { Save, Eye, FileCheck, FileText, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 
 interface Props {
@@ -140,15 +140,27 @@ export default function InvoiceBuilderHeader({
       </div>
 
       {hasValidationErrors && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
-          <p className="text-sm font-semibold text-rose-900">
-            {isThai ? 'กรุณาแก้ไขข้อมูลต่อไปนี้ก่อน' : 'Please fix these before continuing'}
-          </p>
-          <ul className="mt-2 space-y-1 text-sm text-rose-800">
-            {validationErrors.map((error) => (
-              <li key={error}>• {error}</li>
+        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 px-4 py-3.5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-3 h-3 text-white" />
+            </div>
+            <p className="text-sm font-semibold text-amber-900">
+              {isThai
+                ? `ยังขาดข้อมูล ${validationErrors.length} รายการ`
+                : `${validationErrors.length} item${validationErrors.length > 1 ? 's' : ''} need attention`}
+            </p>
+          </div>
+          <div className="space-y-1.5 pl-7">
+            {validationErrors.map((error, i) => (
+              <div key={error} className="flex items-center gap-2 text-sm text-amber-800">
+                <span className="w-4 h-4 rounded-full bg-amber-200 text-amber-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                  {i + 1}
+                </span>
+                {error}
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>
