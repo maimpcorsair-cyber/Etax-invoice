@@ -1,0 +1,31 @@
+name: Health Check
+
+# Runs every 10 minutes — checks Vercel frontend + Render backend
+# Reports status as GitHub Actions badge on README
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check All Services
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check Render backend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 20 \
+            https://etax-invoice-api.onrender.com/health)
+          echo "Backend: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ Backend healthy" || echo "❌ Backend down ($STATUS)"
+
+      - name: Check Vercel frontend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 10 \
+            https://etax-invoice.vercel.app)
+          echo "Frontend: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ Frontend healthy" || echo "❌ Frontend down ($STATUS)"

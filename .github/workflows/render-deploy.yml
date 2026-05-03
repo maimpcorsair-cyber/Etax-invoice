@@ -1,0 +1,56 @@
+name: Deploy to Render
+
+# Triggers Render backend deploy on every push to main
+# and reports pass/fail status back to GitHub commit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'prisma/**'
+      - 'package*.json'
+
+jobs:
+  deploy:
+    name: Trigger Render Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy hook
+        id: deploy
+        run: |
+          echo "🚀 Triggering Render deploy..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          STATUS=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "deploy_id=$(echo $BODY | jq -r '.deploy.id // empty')" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
+            echo "❌ Deploy hook failed: $STATUS"
+            exit 1
+          fi
+          echo "✅ Deploy triggered"
+
+      - name: Wait and check deploy status
+        if: steps.deploy.outputs.deploy_id != ''
+        run: |
+          DEPLOY_ID="${{ steps.deploy.outputs.deploy_id }}"
+          echo "⏳ Waiting for deploy $DEPLOY_ID..."
+          for i in $(seq 1 20); do
+            sleep 15
+            RESULT=$(curl -s \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              "https://api.render.com/v1/deploys/$DEPLOY_ID")
+            STATE=$(echo $RESULT | jq -r '.deploy.status')
+            echo "  Status: $STATE"
+            if [ "$STATE" = "live" ]; then
+              echo "✅ Deploy live!"
+              exit 0
+            elif [ "$STATE" = "deactivated" ] || [ "$STATE" = "build_failed" ]; then
+              echo "❌ Deploy failed: $STATE"
+              exit 1
+            fi
+          done
+          echo "⚠️ Timeout waiting for deploy (5 min)"
+          exit 1
