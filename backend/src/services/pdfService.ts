@@ -155,6 +155,26 @@ const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   'builtin:pro-classic-orange':{ name: 'Pro ส้มคลาสสิก', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:pro-biz-clean':     { name: 'Pro สะอาด',       supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:crayon':            { name: 'Crayon Drawing',   supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-king':    { name: 'Dark King',    supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-samurai': { name: 'Dark Samurai', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-carbon':  { name: 'Dark Carbon',  supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-wolf':    { name: 'Dark Wolf',    supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-shadow':  { name: 'Dark Shadow',  supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-matrix':  { name: 'Dark Matrix',  supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-graffiti':{ name: 'Dark Graffiti',supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-cyber':   { name: 'Dark Cyber',   supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-gold':    { name: 'Dark Gold',    supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:dark-mono':    { name: 'Dark Mono',    supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-ink':     { name: 'Anime Ink',     supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-flame':   { name: 'Anime Flame',   supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-energy':  { name: 'Anime Energy',  supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-shadow':  { name: 'Anime Shadow',  supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-mecha':   { name: 'Anime Mecha',   supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-chibi':   { name: 'Anime Chibi',   supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-idol':    { name: 'Anime Idol',    supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-fantasy': { name: 'Anime Fantasy', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-tokyo':   { name: 'Anime Tokyo',   supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:anime-pastel':  { name: 'Anime Pastel',  supportedTypes: ALL_DOCUMENT_TYPES },
 };
 
 function formatDateTh(date: Date): string {
@@ -248,6 +268,26 @@ function resolveDocumentTheme(templateId?: string | null) {
     'builtin:pro-classic-orange':{ className: 'theme-pro-classic-orange',accent: '#c2410c', accent2: '#c2410c', soft: '#ffedd5', ink: '#c2410c', label: 'Pro ส้มคลาสสิก', mark: '' },
     'builtin:pro-biz-clean':     { className: 'theme-pro-biz-clean',     accent: '#334155', accent2: '#334155', soft: '#f1f5f9', ink: '#334155', label: 'Pro สะอาด',       mark: '' },
     'builtin:crayon':            { className: 'theme-crayon', accent: '#f43f5e', accent2: '#8b5cf6', soft: '#fff7f0', ink: '#1a1a2e', label: 'Crayon', mark: '✏️' },
+    'builtin:dark-king':    { className: 'theme-dark-king',    accent: '#d4af37', accent2: '#b8960a', soft: '#111111', ink: '#ffffff', label: 'Dark King',    mark: '♛' },
+    'builtin:dark-samurai': { className: 'theme-dark-samurai', accent: '#c0392b', accent2: '#922b21', soft: '#111111', ink: '#e8e8e8', label: 'Dark Samurai', mark: '⚔' },
+    'builtin:dark-carbon':  { className: 'theme-dark-carbon',  accent: '#00bcd4', accent2: '#008fa1', soft: '#0f1f22', ink: '#cccccc', label: 'Dark Carbon',  mark: '◈' },
+    'builtin:dark-wolf':    { className: 'theme-dark-wolf',    accent: '#7c8db5', accent2: '#5a6d95', soft: '#0d1020', ink: '#d0d4e0', label: 'Dark Wolf',    mark: '◆' },
+    'builtin:dark-shadow':  { className: 'theme-dark-shadow',  accent: '#6c3483', accent2: '#512e75', soft: '#0f0018', ink: '#cccccc', label: 'Dark Shadow',  mark: '▲' },
+    'builtin:dark-matrix':  { className: 'theme-dark-matrix',  accent: '#00ff41', accent2: '#00cc33', soft: '#001500', ink: '#00ff41', label: 'Dark Matrix',  mark: '▶' },
+    'builtin:dark-graffiti':{ className: 'theme-dark-graffiti',accent: '#ff6b35', accent2: '#e05520', soft: '#151515', ink: '#ffffff', label: 'Dark Graffiti', mark: '★' },
+    'builtin:dark-cyber':   { className: 'theme-dark-cyber',   accent: '#00f5ff', accent2: '#00c4cc', soft: '#080020', ink: '#e0e0ff', label: 'Dark Cyber',   mark: '⬡' },
+    'builtin:dark-gold':    { className: 'theme-dark-gold',    accent: '#ffd700', accent2: '#ccac00', soft: '#0f0d00', ink: '#f0e0a0', label: 'Dark Gold',    mark: '✦' },
+    'builtin:dark-mono':    { className: 'theme-dark-mono',    accent: '#ffffff', accent2: '#cccccc', soft: '#151515', ink: '#e0e0e0', label: 'Dark Mono',    mark: '■' },
+    'builtin:anime-ink':     { className: 'theme-anime-ink',     accent: '#1a1a1a', accent2: '#333333', soft: '#f5f5f5', ink: '#111111', label: 'Anime Ink',     mark: '◼' },
+    'builtin:anime-flame':   { className: 'theme-anime-flame',   accent: '#e53e3e', accent2: '#c53030', soft: '#fff5f5', ink: '#1a0000', label: 'Anime Flame',   mark: '🔥' },
+    'builtin:anime-energy':  { className: 'theme-anime-energy',  accent: '#2b6cb0', accent2: '#2c5282', soft: '#ebf8ff', ink: '#1a2040', label: 'Anime Energy',  mark: '⚡' },
+    'builtin:anime-shadow':  { className: 'theme-anime-shadow',  accent: '#6b46c1', accent2: '#553c9a', soft: '#f3e8ff', ink: '#2d1b69', label: 'Anime Shadow',  mark: '◆' },
+    'builtin:anime-mecha':   { className: 'theme-anime-mecha',   accent: '#2d3748', accent2: '#1a202c', soft: '#edf2f7', ink: '#1a202c', label: 'Anime Mecha',   mark: '⚙' },
+    'builtin:anime-chibi':   { className: 'theme-anime-chibi',   accent: '#d53f8c', accent2: '#b83280', soft: '#fed7e2', ink: '#702459', label: 'Anime Chibi',   mark: '★' },
+    'builtin:anime-idol':    { className: 'theme-anime-idol',    accent: '#d69e2e', accent2: '#b7791f', soft: '#fefce8', ink: '#744210', label: 'Anime Idol',    mark: '✦' },
+    'builtin:anime-fantasy': { className: 'theme-anime-fantasy', accent: '#276749', accent2: '#1c4532', soft: '#e6fffa', ink: '#1c4532', label: 'Anime Fantasy', mark: '✿' },
+    'builtin:anime-tokyo':   { className: 'theme-anime-tokyo',   accent: '#e94560', accent2: '#c73652', soft: '#0f3460', ink: '#e0e0ff', label: 'Anime Tokyo',   mark: '◈' },
+    'builtin:anime-pastel':  { className: 'theme-anime-pastel',  accent: '#b794f4', accent2: '#9f7aea', soft: '#f5f0ff', ink: '#553c7b', label: 'Anime Pastel',  mark: '♡' },
   };
 
   return themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
@@ -1869,6 +1909,323 @@ function buildHtmlProfessional(data: PdfInvoiceData, variant: string): string {
 </html>`;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   GROUP 4: DARK / MAN / TECH  (10 variants)
+═══════════════════════════════════════════════════════════ */
+function buildHtmlDark(data: PdfInvoiceData, variant: string): string {
+  const isTh = data.language !== 'en';
+
+  type DarkTokens = {
+    bg: string; text: string; accent: string; headerBg: string;
+    tableBg: string; tableHeader: string; tableHeaderText: string;
+    borderColor: string; totalBg: string; totalText: string;
+  };
+
+  const tokenMap: Record<string, DarkTokens> = {
+    king:     { bg:'#050505', text:'#f0e6c8', accent:'#d4af37', headerBg:'#0d0d0d', tableBg:'#111111', tableHeader:'#d4af37', tableHeaderText:'#000', borderColor:'#2a2a2a', totalBg:'#d4af37', totalText:'#000' },
+    samurai:  { bg:'#0a0000', text:'#e8e0e0', accent:'#c0392b', headerBg:'#180000', tableBg:'#0f0808', tableHeader:'#c0392b', tableHeaderText:'#fff', borderColor:'#2a0000', totalBg:'#c0392b', totalText:'#fff' },
+    carbon:   { bg:'#060a0d', text:'#b0d0d8', accent:'#00bcd4', headerBg:'#001a1f', tableBg:'#0a1518', tableHeader:'#00bcd4', tableHeaderText:'#000', borderColor:'#003a42', totalBg:'#00bcd4', totalText:'#000' },
+    wolf:     { bg:'#060810', text:'#c8d0e8', accent:'#7c8db5', headerBg:'#080b18', tableBg:'#0b0e1c', tableHeader:'#1e2844', tableHeaderText:'#9aa8d0', borderColor:'#1a2040', totalBg:'#1e2844', totalText:'#9aa8d0' },
+    shadow:   { bg:'#08000f', text:'#d0c0e8', accent:'#9b59b6', headerBg:'#110020', tableBg:'#0c0018', tableHeader:'#6c3483', tableHeaderText:'#fff', borderColor:'#2a0050', totalBg:'#6c3483', totalText:'#fff' },
+    matrix:   { bg:'#000500', text:'#00ff41', accent:'#00ff41', headerBg:'#001000', tableBg:'#001500', tableHeader:'#002800', tableHeaderText:'#00ff41', borderColor:'#004000', totalBg:'#00ff41', totalText:'#000' },
+    graffiti: { bg:'#111111', text:'#f0f0f0', accent:'#ff6b35', headerBg:'#1a1a1a', tableBg:'#161616', tableHeader:'#ff6b35', tableHeaderText:'#000', borderColor:'#303030', totalBg:'#ff6b35', totalText:'#000' },
+    cyber:    { bg:'#05001a', text:'#d0d8ff', accent:'#00f5ff', headerBg:'#08002a', tableBg:'#080020', tableHeader:'#00f5ff', tableHeaderText:'#000014', borderColor:'#1a006a', totalBg:'#00f5ff', totalText:'#000' },
+    gold:     { bg:'#080600', text:'#f0e0a0', accent:'#ffd700', headerBg:'#140e00', tableBg:'#0f0d00', tableHeader:'#ffd700', tableHeaderText:'#000', borderColor:'#3a2800', totalBg:'#ffd700', totalText:'#000' },
+    mono:     { bg:'#0a0a0a', text:'#e0e0e0', accent:'#ffffff', headerBg:'#111111', tableBg:'#151515', tableHeader:'#222222', tableHeaderText:'#ffffff', borderColor:'#2a2a2a', totalBg:'#ffffff', totalText:'#000000' },
+  };
+
+  const t = tokenMap[variant] ?? tokenMap.king;
+
+  const sellerName = isTh ? data.seller.nameTh : (data.seller.nameEn ?? data.seller.nameTh);
+  const sellerAddr = isTh ? (data.seller.addressTh ?? '') : (data.seller.addressEn ?? data.seller.addressTh ?? '');
+  const buyerName  = isTh ? data.buyer.nameTh  : (data.buyer.nameEn  ?? data.buyer.nameTh);
+  const buyerAddr  = isTh ? (data.buyer.addressTh ?? '') : (data.buyer.addressEn ?? data.buyer.addressTh ?? '');
+  const buyerBranch = data.buyer.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : (data.buyer.branchCode ?? '');
+  const sellerBranch = data.seller.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : (data.seller.branchCode ?? '');
+  const dateStr = isTh ? formatDateTh(data.invoiceDate) : formatDateEn(data.invoiceDate);
+  const dueDateStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate)) : '-';
+  const totalWords = isTh ? amountInWordsThai(data.total) : amountInWordsEnglish(data.total);
+
+  const itemRows = data.items.map((item, idx) => {
+    const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
+    return `<tr>
+      <td style="text-align:center;color:${t.accent};font-weight:700">${idx + 1}</td>
+      <td>${escapeHtml(name)}</td>
+      <td style="text-align:center">${item.quantity}</td>
+      <td style="text-align:center">${escapeHtml(item.unit)}</td>
+      <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
+      <td style="text-align:right;font-weight:600;color:${t.accent}">${formatCurrency(item.totalAmount)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Rajdhani:wght@500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Sarabun',sans-serif;font-size:12px;background:${t.bg};color:${t.text}}
+  .page{width:794px;min-height:1123px;background:${t.bg}}
+  .header{background:${t.headerBg};padding:28px 40px;display:flex;justify-content:space-between;align-items:flex-start}
+  .accent-line{height:2px;background:${t.accent};opacity:0.8}
+  .company-name{font-family:'Rajdhani',sans-serif;font-size:19px;font-weight:700;color:${t.accent};letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+  .company-detail{font-size:10px;color:${t.text};opacity:0.6;line-height:1.6}
+  .doc-title{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:${t.accent};letter-spacing:3px;text-align:right}
+  .doc-subtitle{font-size:11px;color:${t.text};opacity:0.6;text-align:right;margin-top:2px}
+  .doc-meta{margin-top:10px;text-align:right;font-size:11px;color:${t.text};opacity:0.75;line-height:1.8}
+  .body{padding:24px 40px}
+  .bill-box{border:1px solid ${t.borderColor};padding:14px 16px;margin-bottom:20px;background:${t.tableBg}}
+  .bill-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${t.accent};margin-bottom:6px}
+  .buyer-name{font-size:14px;font-weight:600;color:${t.text}}
+  .buyer-detail{font-size:10px;color:${t.text};opacity:0.55;margin-top:3px;line-height:1.6}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th{background:${t.tableHeader};color:${t.tableHeaderText};padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-align:left}
+  td{padding:7px 10px;border-bottom:1px solid ${t.borderColor};font-size:11px;color:${t.text}}
+  tr:nth-child(even) td{background:${t.tableBg}}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
+  .totals-inner{width:260px;border:1px solid ${t.borderColor}}
+  .t-row{display:flex;justify-content:space-between;padding:5px 12px;font-size:11px;color:${t.text};opacity:0.8;border-bottom:1px solid ${t.borderColor}}
+  .t-row.grand{background:${t.totalBg};color:${t.totalText};opacity:1;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;border:none}
+  .words{padding:10px 14px;border:1px solid ${t.borderColor};font-size:10px;color:${t.text};opacity:0.65;margin-bottom:12px}
+  .notes{padding:10px 14px;border:1px solid ${t.borderColor};font-size:10px;color:${t.text};opacity:0.65;margin-bottom:12px}
+  .sig-row{display:flex;gap:16px;margin-top:20px}
+  .sig-box{flex:1;text-align:center;border-top:1px solid ${t.borderColor};padding-top:36px;font-size:10px;color:${t.text};opacity:0.5}
+</style></head><body><div class="page">
+
+<div class="header">
+  <div>
+    <div class="company-name">${escapeHtml(sellerName)}</div>
+    <div class="company-detail">
+      ${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br>
+      ${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br>
+      ${escapeHtml(sellerAddr)}<br>
+      ${data.seller.phone ? escapeHtml(data.seller.phone) : ''}${data.seller.email ? ' · ' + escapeHtml(data.seller.email) : ''}
+    </div>
+  </div>
+  <div>
+    <div class="doc-title">${isTh ? 'ใบกำกับภาษี' : 'TAX INVOICE'}</div>
+    <div class="doc-subtitle">${isTh ? 'TAX INVOICE / ใบเสร็จรับเงิน' : 'ใบกำกับภาษี / ใบเสร็จรับเงิน'}</div>
+    <div class="doc-meta">
+      ${isTh ? 'เลขที่' : 'No.'}: <strong style="color:${t.accent}">${escapeHtml(data.invoiceNumber)}</strong><br>
+      ${isTh ? 'วันที่' : 'Date'}: ${dateStr}<br>
+      ${data.dueDate ? `${isTh ? 'ครบกำหนด' : 'Due'}: ${dueDateStr}` : ''}
+    </div>
+  </div>
+</div>
+<div class="accent-line"></div>
+
+<div class="body">
+  <div class="bill-box">
+    <div class="bill-label">${isTh ? '▸ ผู้ซื้อ / BILL TO' : '▸ BILL TO / ผู้ซื้อ'}</div>
+    <div class="buyer-name">${escapeHtml(buyerName)}</div>
+    <div class="buyer-detail">
+      ${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.buyer.taxId)} &nbsp;|&nbsp;
+      ${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(buyerBranch)}<br>
+      ${escapeHtml(buyerAddr)}
+    </div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th style="width:36px;text-align:center">#</th>
+      <th>${isTh ? 'รายการ' : 'Description'}</th>
+      <th style="width:54px;text-align:center">${isTh ? 'จำนวน' : 'Qty'}</th>
+      <th style="width:54px;text-align:center">${isTh ? 'หน่วย' : 'Unit'}</th>
+      <th style="width:100px;text-align:right">${isTh ? 'ราคา/หน่วย' : 'Unit Price'}</th>
+      <th style="width:100px;text-align:right">${isTh ? 'จำนวนเงิน' : 'Amount'}</th>
+    </tr></thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+
+  <div class="totals-wrap"><div class="totals-inner">
+    <div class="t-row"><span>${isTh ? 'ยอดรวม' : 'Subtotal'}</span><span>${formatCurrency(data.subtotal)}</span></div>
+    <div class="t-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><span>${formatCurrency(data.vatAmount)}</span></div>
+    <div class="t-row grand"><span>${isTh ? 'ยอดรวมสุทธิ' : 'GRAND TOTAL'}</span><span>${formatCurrency(data.total)}</span></div>
+  </div></div>
+
+  <div class="words">${isTh ? 'จำนวนเงินเป็นตัวอักษร: ' : 'Amount in Words: '}${escapeHtml(totalWords)}</div>
+  ${data.notes ? `<div class="notes"><strong style="color:${t.accent}">${isTh ? 'หมายเหตุ' : 'Notes'}:</strong> ${escapeHtml(data.notes)}</div>` : ''}
+  ${data.bankPaymentInfo ? `<div class="notes"><strong style="color:${t.accent}">${isTh ? 'ข้อมูลบัญชี' : 'Bank Transfer'}:</strong><br><span style="white-space:pre-line">${escapeHtml(data.bankPaymentInfo)}</span></div>` : ''}
+
+  <div class="sig-row">
+    <div class="sig-box">
+      ${data.signatureImageUrl ? `<img src="${data.signatureImageUrl}" style="height:40px;margin-bottom:4px" alt="sig"/>` : ''}
+      <div style="border-top:1px solid ${t.borderColor};padding-top:6px;margin-top:4px">${isTh ? 'ผู้มีอำนาจลงนาม' : 'Authorized Signatory'}</div>
+      ${data.signerName ? `<div style="color:${t.accent};font-size:11px;font-weight:600">${escapeHtml(data.signerName)}</div>` : ''}
+      ${data.signerTitle ? `<div style="font-size:10px">${escapeHtml(data.signerTitle)}</div>` : ''}
+    </div>
+    <div class="sig-box">
+      <div style="border-top:1px solid ${t.borderColor};padding-top:6px;margin-top:40px">${isTh ? 'ผู้รับสินค้า' : 'Received by'}</div>
+    </div>
+    ${data.documentMode === 'electronic' && data.onlineQrDataUrl ? `
+    <div class="sig-box">
+      <img src="${data.onlineQrDataUrl}" style="width:60px;height:60px;margin-bottom:4px" alt="QR"/>
+      <div style="border-top:1px solid ${t.borderColor};padding-top:6px;font-size:9px">${isTh ? 'สแกนเพื่อตรวจสอบ' : 'Scan to verify'}</div>
+    </div>` : ''}
+  </div>
+</div>
+</div></body></html>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GROUP 5: ANIME / OTAKU  (10 variants)
+═══════════════════════════════════════════════════════════ */
+function buildHtmlAnime(data: PdfInvoiceData, variant: string): string {
+  const isTh = data.language !== 'en';
+
+  type AnimeTokens = {
+    bg: string; text: string; accent: string; headerBg: string; headerText: string;
+    tableBg: string; tableHeader: string; tableHeaderText: string;
+    borderColor: string; totalBg: string; totalText: string;
+    deco: string; isDark: boolean;
+  };
+
+  const tokenMap: Record<string, AnimeTokens> = {
+    ink:     { bg:'#ffffff', text:'#111111', accent:'#c0392b', headerBg:'#111111', headerText:'#ffffff', tableBg:'#f7f7f7', tableHeader:'#111111', tableHeaderText:'#ffffff', borderColor:'#222222', totalBg:'#111111', totalText:'#ffffff', deco:'◆', isDark:false },
+    flame:   { bg:'#fff5f5', text:'#1a0000', accent:'#e53e3e', headerBg:'#c53030', headerText:'#fff', tableBg:'#fff0f0', tableHeader:'#c53030', tableHeaderText:'#fff', borderColor:'#feb2b2', totalBg:'#c53030', totalText:'#fff', deco:'🔥', isDark:false },
+    energy:  { bg:'#f0f8ff', text:'#1a2040', accent:'#2b6cb0', headerBg:'#2c5282', headerText:'#fff', tableBg:'#ebf8ff', tableHeader:'#2c5282', tableHeaderText:'#fff', borderColor:'#90cdf4', totalBg:'#2c5282', totalText:'#fff', deco:'⚡', isDark:false },
+    shadow:  { bg:'#f8f5ff', text:'#2d1b69', accent:'#6b46c1', headerBg:'#553c9a', headerText:'#fff', tableBg:'#f3e8ff', tableHeader:'#553c9a', tableHeaderText:'#fff', borderColor:'#d6bcfa', totalBg:'#553c9a', totalText:'#fff', deco:'★', isDark:false },
+    mecha:   { bg:'#f0f4f8', text:'#1a202c', accent:'#2d3748', headerBg:'#1a202c', headerText:'#e2e8f0', tableBg:'#edf2f7', tableHeader:'#2d3748', tableHeaderText:'#e2e8f0', borderColor:'#a0aec0', totalBg:'#1a202c', totalText:'#e2e8f0', deco:'⬡', isDark:false },
+    chibi:   { bg:'#fff5f9', text:'#702459', accent:'#d53f8c', headerBg:'#ed64a6', headerText:'#fff', tableBg:'#ffe4f0', tableHeader:'#d53f8c', tableHeaderText:'#fff', borderColor:'#fbb6ce', totalBg:'#d53f8c', totalText:'#fff', deco:'♥', isDark:false },
+    idol:    { bg:'#fffff0', text:'#744210', accent:'#d69e2e', headerBg:'#d69e2e', headerText:'#fff', tableBg:'#fefce8', tableHeader:'#b7791f', tableHeaderText:'#fff', borderColor:'#f6e05e', totalBg:'#d69e2e', totalText:'#fff', deco:'✦', isDark:false },
+    fantasy: { bg:'#f0fff4', text:'#1c4532', accent:'#276749', headerBg:'#276749', headerText:'#fff', tableBg:'#e6fffa', tableHeader:'#276749', tableHeaderText:'#fff', borderColor:'#9ae6b4', totalBg:'#276749', totalText:'#fff', deco:'✿', isDark:false },
+    tokyo:   { bg:'#1a1a2e', text:'#e0e0ff', accent:'#e94560', headerBg:'#16213e', headerText:'#e94560', tableBg:'#0f3460', tableHeader:'#e94560', tableHeaderText:'#fff', borderColor:'#533483', totalBg:'#e94560', totalText:'#fff', deco:'⊕', isDark:true },
+    pastel:  { bg:'#fef9ff', text:'#553c7b', accent:'#9f7aea', headerBg:'#e9d8fd', headerText:'#553c7b', tableBg:'#f5f0ff', tableHeader:'#d6bcfa', tableHeaderText:'#553c7b', borderColor:'#d6bcfa', totalBg:'#9f7aea', totalText:'#fff', deco:'✧', isDark:false },
+  };
+
+  const t = tokenMap[variant] ?? tokenMap.ink;
+
+  const sellerName = isTh ? data.seller.nameTh : (data.seller.nameEn ?? data.seller.nameTh);
+  const sellerAddr = isTh ? (data.seller.addressTh ?? '') : (data.seller.addressEn ?? data.seller.addressTh ?? '');
+  const buyerName  = isTh ? data.buyer.nameTh  : (data.buyer.nameEn  ?? data.buyer.nameTh);
+  const buyerAddr  = isTh ? (data.buyer.addressTh ?? '') : (data.buyer.addressEn ?? data.buyer.addressTh ?? '');
+  const buyerBranch = data.buyer.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : (data.buyer.branchCode ?? '');
+  const sellerBranch = data.seller.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : (data.seller.branchCode ?? '');
+  const dateStr = isTh ? formatDateTh(data.invoiceDate) : formatDateEn(data.invoiceDate);
+  const dueDateStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate)) : '-';
+  const totalWords = isTh ? amountInWordsThai(data.total) : amountInWordsEnglish(data.total);
+
+  const itemRows = data.items.map((item, idx) => {
+    const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
+    return `<tr>
+      <td style="text-align:center;font-weight:700;color:${t.accent}">${idx + 1}</td>
+      <td>${escapeHtml(name)}</td>
+      <td style="text-align:center">${item.quantity}</td>
+      <td style="text-align:center">${escapeHtml(item.unit)}</td>
+      <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
+      <td style="text-align:right;font-weight:600">${formatCurrency(item.totalAmount)}</td>
+    </tr>`;
+  }).join('');
+
+  const lineColor = t.isDark ? `${t.accent}55` : t.borderColor;
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Sarabun',sans-serif;font-size:12px;background:${t.bg};color:${t.text}}
+  .page{width:794px;min-height:1123px;background:${t.bg}}
+  .header{background:${t.headerBg};color:${t.headerText};padding:24px 40px;display:flex;justify-content:space-between;align-items:flex-start}
+  .deco-strip{height:4px;background:${t.accent};opacity:0.6}
+  .company-name{font-size:16px;font-weight:700;margin-bottom:4px}
+  .company-detail{font-size:10px;opacity:0.75;line-height:1.6}
+  .deco-badge{font-size:22px;margin-bottom:6px;display:block;text-align:right}
+  .doc-title{font-size:20px;font-weight:700;text-align:right;letter-spacing:2px}
+  .doc-subtitle{font-size:10px;opacity:0.75;text-align:right;margin-top:2px}
+  .doc-meta{text-align:right;font-size:11px;opacity:0.85;margin-top:8px;line-height:1.8}
+  .body{padding:22px 40px}
+  .bill-box{border:2px solid ${t.accent};border-radius:8px;padding:12px 16px;margin-bottom:18px;background:${t.tableBg}}
+  .bill-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${t.accent};margin-bottom:5px}
+  .buyer-name{font-size:14px;font-weight:700;color:${t.text}}
+  .buyer-detail{font-size:10px;opacity:0.65;margin-top:3px;line-height:1.6}
+  table{width:100%;border-collapse:collapse;margin-bottom:14px}
+  th{background:${t.tableHeader};color:${t.tableHeaderText};padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:0.5px;text-align:left}
+  th:first-child{border-radius:6px 0 0 0} th:last-child{border-radius:0 6px 0 0}
+  td{padding:7px 10px;border-bottom:1px solid ${lineColor};font-size:11px}
+  tr:nth-child(even) td{background:${t.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'}}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-bottom:18px}
+  .totals-inner{width:270px;border:2px solid ${t.borderColor};border-radius:8px;overflow:hidden}
+  .t-row{display:flex;justify-content:space-between;padding:5px 14px;font-size:11px;border-bottom:1px solid ${lineColor}}
+  .t-row.grand{background:${t.totalBg};color:${t.totalText};font-size:14px;font-weight:700;border:none;padding:9px 14px}
+  .words{padding:10px 14px;border:1px solid ${t.borderColor};border-radius:6px;font-size:10px;opacity:0.7;margin-bottom:12px}
+  .notes{padding:10px 14px;border:1px solid ${t.borderColor};border-radius:6px;font-size:10px;opacity:0.7;margin-bottom:12px}
+  .sig-row{display:flex;gap:16px;margin-top:20px}
+  .sig-box{flex:1;text-align:center;padding-top:40px;border-top:2px dashed ${t.borderColor};font-size:10px;opacity:0.6}
+</style></head><body><div class="page">
+
+<div class="header">
+  <div>
+    <div class="company-name">${escapeHtml(sellerName)}</div>
+    <div class="company-detail">
+      ${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br>
+      ${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br>
+      ${escapeHtml(sellerAddr)}
+    </div>
+  </div>
+  <div>
+    <span class="deco-badge">${t.deco}</span>
+    <div class="doc-title">${isTh ? 'ใบกำกับภาษี' : 'TAX INVOICE'}</div>
+    <div class="doc-subtitle">${isTh ? 'TAX INVOICE / ใบเสร็จรับเงิน' : 'ใบกำกับภาษี'}</div>
+    <div class="doc-meta">
+      ${isTh ? 'เลขที่' : 'No.'}: <strong>${escapeHtml(data.invoiceNumber)}</strong><br>
+      ${isTh ? 'วันที่' : 'Date'}: ${dateStr}<br>
+      ${data.dueDate ? `${isTh ? 'ครบกำหนด' : 'Due'}: ${dueDateStr}` : ''}
+    </div>
+  </div>
+</div>
+<div class="deco-strip"></div>
+
+<div class="body">
+  <div class="bill-box">
+    <div class="bill-label">${t.deco} ${isTh ? 'ผู้ซื้อ / BILL TO' : 'BILL TO / ผู้ซื้อ'}</div>
+    <div class="buyer-name">${escapeHtml(buyerName)}</div>
+    <div class="buyer-detail">
+      ${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.buyer.taxId)} &nbsp;|&nbsp;
+      ${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(buyerBranch)}<br>
+      ${escapeHtml(buyerAddr)}
+    </div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th style="width:36px;text-align:center">#</th>
+      <th>${isTh ? 'รายการ' : 'Description'}</th>
+      <th style="width:54px;text-align:center">${isTh ? 'จำนวน' : 'Qty'}</th>
+      <th style="width:54px;text-align:center">${isTh ? 'หน่วย' : 'Unit'}</th>
+      <th style="width:100px;text-align:right">${isTh ? 'ราคา/หน่วย' : 'Unit Price'}</th>
+      <th style="width:100px;text-align:right">${isTh ? 'จำนวนเงิน' : 'Amount'}</th>
+    </tr></thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+
+  <div class="totals-wrap"><div class="totals-inner">
+    <div class="t-row"><span>${isTh ? 'ยอดรวม' : 'Subtotal'}</span><span>${formatCurrency(data.subtotal)}</span></div>
+    <div class="t-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><span>${formatCurrency(data.vatAmount)}</span></div>
+    <div class="t-row grand"><span>${isTh ? 'ยอดรวมสุทธิ' : 'GRAND TOTAL'}</span><span>${formatCurrency(data.total)}</span></div>
+  </div></div>
+
+  <div class="words">${isTh ? 'จำนวนเงินเป็นตัวอักษร: ' : 'Amount in Words: '}${escapeHtml(totalWords)}</div>
+  ${data.notes ? `<div class="notes"><strong style="color:${t.accent}">${isTh ? 'หมายเหตุ' : 'Notes'}:</strong> ${escapeHtml(data.notes)}</div>` : ''}
+  ${data.bankPaymentInfo ? `<div class="notes"><strong style="color:${t.accent}">${isTh ? 'ข้อมูลบัญชี' : 'Bank Transfer'}:</strong><br><span style="white-space:pre-line">${escapeHtml(data.bankPaymentInfo)}</span></div>` : ''}
+
+  <div class="sig-row">
+    <div class="sig-box">
+      ${data.signatureImageUrl ? `<img src="${data.signatureImageUrl}" style="height:36px;margin-bottom:4px" alt="sig"/>` : ''}
+      <div>${isTh ? 'ผู้มีอำนาจลงนาม' : 'Authorized Signatory'}</div>
+      ${data.signerName ? `<div style="color:${t.accent};font-weight:700;font-size:11px">${escapeHtml(data.signerName)}</div>` : ''}
+      ${data.signerTitle ? `<div style="font-size:10px">${escapeHtml(data.signerTitle)}</div>` : ''}
+    </div>
+    <div class="sig-box">
+      <div>${isTh ? 'ผู้รับสินค้า' : 'Received by'}</div>
+    </div>
+    ${data.documentMode === 'electronic' && data.onlineQrDataUrl ? `
+    <div class="sig-box">
+      <img src="${data.onlineQrDataUrl}" style="width:60px;height:60px;margin-bottom:6px" alt="QR"/>
+      <div style="font-size:9px">${isTh ? 'สแกนเพื่อตรวจสอบ' : 'Scan to verify'}</div>
+    </div>` : ''}
+  </div>
+</div>
+</div></body></html>`;
+}
+
 function buildHtmlCrayon(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
@@ -2237,6 +2594,16 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
 
   if (mergedData.templateId === 'builtin:crayon') {
     return buildHtmlCrayon(mergedData);
+  }
+
+  if (mergedData.templateId?.startsWith('builtin:dark-')) {
+    const variant = mergedData.templateId.replace('builtin:dark-', '');
+    return buildHtmlDark(mergedData, variant);
+  }
+
+  if (mergedData.templateId?.startsWith('builtin:anime-')) {
+    const variant = mergedData.templateId.replace('builtin:anime-', '');
+    return buildHtmlAnime(mergedData, variant);
   }
 
   return buildHtml(mergedData);
