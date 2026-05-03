@@ -128,7 +128,6 @@ function MockDocument({ swatches, tag }: {
   const isDark = tag === 'Dark';
   const isAnime = tag === 'Anime';
 
-  // Dark templates: body bg = first swatch (dark color), text lines are dim
   const bodyBg = isDark ? h : (b === '#ffffff' || b === '#f8fafc' ? '#fafafa' : b);
   const lineColor = isDark ? 'rgba(255,255,255,0.15)' : (isAnime ? a : '#1e293b');
   const lineOpacity = isDark ? 1 : (isAnime ? 0.5 : 0.5);
@@ -136,78 +135,96 @@ function MockDocument({ swatches, tag }: {
   return (
     <div
       style={{
-        width: 120,
-        height: 170,
+        width: '100%',
+        aspectRatio: '210/297',
         background: bodyBg,
-        borderRadius: isCute ? 10 : (isAnime ? 8 : 4),
+        borderRadius: isCute ? 8 : (isAnime ? 6 : 3),
         overflow: 'hidden',
         position: 'relative',
-        flexShrink: 0,
       }}
     >
       {/* Header band */}
       {isMinimal ? (
-        /* Minimal: just a thin accent bar + logo stub */
-        <div style={{ height: 28, background: '#fff', display: 'flex', alignItems: 'center', padding: '0 8px', gap: 5 }}>
-          <div style={{ width: 22, height: 22, borderRadius: 3, background: a, opacity: 0.15 }} />
+        <div style={{ height: '12%', background: '#fff', display: 'flex', alignItems: 'center', padding: '0 6%', gap: '4%' }}>
+          <div style={{ width: '16%', aspectRatio: '1', borderRadius: 2, background: a, opacity: 0.15 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ height: 4, width: '60%', background: a, borderRadius: 2, marginBottom: 2, opacity: 0.6 }} />
+            <div style={{ height: 3, width: '60%', background: a, borderRadius: 2, marginBottom: 2, opacity: 0.6 }} />
             <div style={{ height: 2, width: '40%', background: a, borderRadius: 2, opacity: 0.3 }} />
           </div>
-          <div style={{ width: 2, height: 24, background: a, borderRadius: 1, opacity: 0.9 }} />
+          <div style={{ width: 2, height: '70%', background: a, borderRadius: 1, opacity: 0.9 }} />
+          {/* INVOICE text stub */}
+          <div style={{ display: 'flex', gap: 1 }}>
+            {[4,3,4,3,4,3,4].map((w, i) => (
+              <span key={i} style={{ display: 'inline-block', width: w, height: 3, background: a, borderRadius: 1, opacity: 0.5, fontSize: 5 }} />
+            ))}
+          </div>
         </div>
       ) : (
         <div style={{
-          height: isCute ? 38 : 34,
-          background: h,
+          height: isCute ? '15%' : '13%',
+          background: isDark ? (toHex(swatches[1]) !== '#94a3b8' ? toHex(swatches[1]) : h) : h,
           display: 'flex',
           alignItems: 'center',
-          padding: '0 8px',
-          gap: 5,
+          padding: '0 6%',
+          gap: '4%',
         }}>
           {/* logo circle */}
           <div style={{
-            width: 18, height: 18,
+            width: '12%',
+            aspectRatio: '1',
             borderRadius: '50%',
             background: 'rgba(255,255,255,0.25)',
             flexShrink: 0,
           }} />
           <div style={{ flex: 1 }}>
-            <div style={{ height: 3, width: '55%', background: 'rgba(255,255,255,0.9)', borderRadius: 2, marginBottom: 3 }} />
-            <div style={{ height: 2, width: '35%', background: 'rgba(255,255,255,0.5)', borderRadius: 2 }} />
+            <div style={{ height: 2.5, width: '55%', background: 'rgba(255,255,255,0.9)', borderRadius: 2, marginBottom: 2 }} />
+            <div style={{ height: 1.5, width: '35%', background: 'rgba(255,255,255,0.5)', borderRadius: 2 }} />
           </div>
-          {/* invoice number block */}
+          {/* INVOICE label stubs */}
           <div style={{ textAlign: 'right' }}>
-            <div style={{ height: 3, width: 28, background: 'rgba(255,255,255,0.8)', borderRadius: 2, marginBottom: 2, marginLeft: 'auto' }} />
-            <div style={{ height: 2, width: 20, background: 'rgba(255,255,255,0.5)', borderRadius: 2, marginLeft: 'auto' }} />
+            <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', marginBottom: 2 }}>
+              {[3,4,3,4,4,3,4].map((w, i) => (
+                <span key={i} style={{ display: 'inline-block', width: w, height: 2, background: 'rgba(255,255,255,0.85)', borderRadius: 1, fontSize: 5 }} />
+              ))}
+            </div>
+            <div style={{ height: 1.5, width: '70%', background: 'rgba(255,255,255,0.5)', borderRadius: 2, marginLeft: 'auto' }} />
           </div>
         </div>
       )}
 
+      {/* Anime deco strip */}
+      {isAnime && (
+        <div style={{
+          height: '3%',
+          background: `repeating-linear-gradient(90deg, ${a} 0px, ${a} 6px, transparent 6px, transparent 10px)`,
+          opacity: 0.4,
+        }} />
+      )}
+
       {/* Content area */}
-      <div style={{ padding: '7px 8px', flex: 1 }}>
+      <div style={{ padding: '4% 6%', flex: 1 }}>
         {/* bill-to stub */}
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ height: 2, width: '45%', background: a, borderRadius: 2, opacity: 0.4, marginBottom: 2 }} />
-          <div style={{ height: 2.5, width: '70%', background: lineColor, borderRadius: 2, opacity: lineOpacity, marginBottom: 1.5 }} />
-          <div style={{ height: 2, width: '55%', background: isDark ? 'rgba(255,255,255,0.1)' : '#94a3b8', borderRadius: 2 }} />
+        <div style={{ marginBottom: '5%' }}>
+          <div style={{ height: 1.5, width: '45%', background: a, borderRadius: 2, opacity: 0.4, marginBottom: 2 }} />
+          <div style={{ height: 2, width: '70%', background: lineColor, borderRadius: 2, opacity: lineOpacity, marginBottom: 1.5 }} />
+          <div style={{ height: 1.5, width: '55%', background: isDark ? 'rgba(255,255,255,0.1)' : '#94a3b8', borderRadius: 2 }} />
         </div>
 
         {/* table header */}
         <div style={{
-          height: isCute ? 12 : 10,
+          height: isCute ? '6%' : '5%',
           background: isCute ? a : (isMinimal ? a : h),
           opacity: isCute ? 0.7 : (isMinimal ? 0.2 : 1),
-          borderRadius: isCute ? 4 : 2,
-          marginBottom: 3,
+          borderRadius: isCute ? 3 : 1.5,
+          marginBottom: '2%',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 4px',
-          gap: 4,
+          padding: '0 3%',
+          gap: '3%',
         }}>
           {[30, 15, 15, 20].map((w, i) => (
             <div key={i} style={{
-              height: 2,
+              height: 1.5,
               width: `${w}%`,
               background: isMinimal ? a : 'rgba(255,255,255,0.8)',
               borderRadius: 1,
@@ -216,36 +233,36 @@ function MockDocument({ swatches, tag }: {
           ))}
         </div>
 
-        {/* item rows */}
-        {[1, 2, 3].map((_, i) => (
+        {/* item rows — 4 rows */}
+        {[0, 1, 2, 3].map((i) => (
           <div key={i} style={{
             display: 'flex',
-            gap: 4,
-            padding: '3px 4px',
+            gap: '3%',
+            padding: '1.5% 3%',
             background: i % 2 === 1 ? (isDark ? 'rgba(255,255,255,0.05)' : isCute ? `${a}18` : 'rgba(0,0,0,0.03)') : 'transparent',
-            borderRadius: isCute ? 3 : 1,
-            marginBottom: 1,
+            borderRadius: isCute ? 2 : 1,
+            marginBottom: '1%',
           }}>
-            <div style={{ height: 2, width: '30%', background: '#475569', borderRadius: 2, opacity: 0.4 }} />
+            <div style={{ height: 1.5, width: '30%', background: isDark ? 'rgba(255,255,255,0.35)' : '#475569', borderRadius: 2, opacity: isDark ? 1 : 0.4 }} />
             <div style={{ flex: 1 }} />
-            <div style={{ height: 2, width: '15%', background: '#475569', borderRadius: 2, opacity: 0.35 }} />
-            <div style={{ height: 2, width: '15%', background: '#475569', borderRadius: 2, opacity: 0.35 }} />
-            <div style={{ height: 2, width: '20%', background: '#475569', borderRadius: 2, opacity: 0.4 }} />
+            <div style={{ height: 1.5, width: '15%', background: isDark ? 'rgba(255,255,255,0.3)' : '#475569', borderRadius: 2, opacity: isDark ? 1 : 0.35 }} />
+            <div style={{ height: 1.5, width: '15%', background: isDark ? 'rgba(255,255,255,0.3)' : '#475569', borderRadius: 2, opacity: isDark ? 1 : 0.35 }} />
+            <div style={{ height: 1.5, width: '20%', background: isDark ? 'rgba(255,255,255,0.4)' : '#475569', borderRadius: 2, opacity: isDark ? 1 : 0.4 }} />
           </div>
         ))}
 
         {/* total row */}
         <div style={{
-          marginTop: 5,
-          background: isCute ? `${a}30` : (isMinimal ? `${a}18` : `${a}22`),
-          borderRadius: isCute ? 6 : 3,
-          padding: '4px 5px',
+          marginTop: '4%',
+          background: isCute ? `${a}30` : (isMinimal ? `${a}18` : isDark ? `${a}40` : `${a}22`),
+          borderRadius: isCute ? 4 : 2,
+          padding: '2.5% 4%',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <div style={{ height: 2, width: '30%', background: a, borderRadius: 2, opacity: 0.5 }} />
-          <div style={{ height: 3, width: '25%', background: a, borderRadius: 2, opacity: 0.9 }} />
+          <div style={{ height: 1.5, width: '30%', background: isDark ? 'rgba(255,255,255,0.5)' : a, borderRadius: 2, opacity: 0.5 }} />
+          <div style={{ height: 2.5, width: '25%', background: isDark ? 'rgba(255,255,255,0.9)' : a, borderRadius: 2, opacity: 0.9 }} />
         </div>
       </div>
 
@@ -253,7 +270,7 @@ function MockDocument({ swatches, tag }: {
       {isCute && (
         <div style={{
           position: 'absolute',
-          bottom: 3,
+          bottom: '2%',
           left: 0, right: 0,
           display: 'flex',
           justifyContent: 'center',
@@ -266,6 +283,21 @@ function MockDocument({ swatches, tag }: {
           ))}
         </div>
       )}
+
+      {/* Footer accent line */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 2,
+        background: isDark
+          ? `linear-gradient(90deg, ${a} 0%, transparent 100%)`
+          : isAnime
+          ? `linear-gradient(90deg, ${a} 0%, ${h} 100%)`
+          : `linear-gradient(90deg, ${h} 0%, ${a} 50%, transparent 100%)`,
+        opacity: 0.7,
+      }} />
     </div>
   );
 }
@@ -280,6 +312,8 @@ function TemplateCard({
   selected: boolean; isThai: boolean;
   onSelect: () => void;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   const tagColors: Record<string, { bg: string; text: string }> = {
     Minimal: { bg: '#f1f5f9', text: '#475569' },
     Pro:     { bg: '#eff6ff', text: '#1e40af' },
@@ -306,37 +340,30 @@ function TemplateCard({
   return (
     <button
       onClick={onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        gap: 10,
-        padding: 12,
+        gap: 8,
+        padding: '12px 10px 10px',
         background: '#ffffff',
-        borderRadius: 16,
+        borderRadius: 14,
         border: selected
-          ? '2px solid #1e3a8a'
+          ? '2px solid #2563eb'
           : '2px solid transparent',
         boxShadow: selected
-          ? '0 0 0 3px rgba(30,58,138,0.12), 0 4px 20px rgba(30,58,138,0.1)'
+          ? '0 0 0 4px rgba(37,99,235,0.12), 0 4px 20px rgba(37,99,235,0.1)'
+          : hovered
+          ? '0 16px 40px rgba(0,0,0,0.15)'
           : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
         cursor: 'pointer',
         transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: hovered && !selected ? 'translateY(-4px)' : 'translateY(0)',
         position: 'relative',
         textAlign: 'left',
         width: '100%',
-      }}
-      onMouseEnter={(e) => {
-        if (!selected) {
-          (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-          (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) {
-          (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
-          (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)';
-        }
+        overflow: 'hidden',
       }}
     >
       {/* Selected checkmark */}
@@ -345,29 +372,65 @@ function TemplateCard({
           position: 'absolute',
           top: 8,
           right: 8,
-          width: 20,
-          height: 20,
+          width: 22,
+          height: 22,
           borderRadius: '50%',
-          background: '#1e3a8a',
+          background: '#2563eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2,
+          zIndex: 3,
+          boxShadow: '0 2px 6px rgba(37,99,235,0.4)',
         }}>
           <Check size={11} color="#fff" strokeWidth={3} />
         </div>
       )}
 
-      {/* Mock document */}
-      <MockDocument swatches={swatches} tag={tagEn} />
+      {/* Mock document wrapper with hover overlay */}
+      <div style={{ position: 'relative', width: '100%', borderRadius: 6, overflow: 'hidden' }}>
+        <MockDocument swatches={swatches} tag={tagEn} />
+        {/* Hover overlay */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(15,23,42,0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 0.18s ease',
+          borderRadius: 6,
+          padding: '0 12px',
+        }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onSelect(); }}
+            style={{
+              width: '100%',
+              padding: '5px 0',
+              background: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: 'pointer',
+              letterSpacing: '0.03em',
+            }}
+          >
+            {isThai ? 'ใช้ Template นี้' : 'Use Template'}
+          </button>
+        </div>
+      </div>
 
       {/* Card footer */}
       <div style={{ width: '100%' }}>
         {/* Name */}
         <div style={{
           fontSize: 12,
-          fontWeight: 600,
-          color: '#1e293b',
+          fontWeight: 700,
+          color: '#0f172a',
           lineHeight: 1.3,
           marginBottom: 5,
           whiteSpace: 'nowrap',
@@ -380,9 +443,9 @@ function TemplateCard({
         {/* Tag + swatches row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
           <span style={{
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: 600,
-            padding: '2px 7px',
+            padding: '2px 6px',
             borderRadius: 999,
             background: tagStyle.bg,
             color: tagStyle.text,
@@ -394,8 +457,8 @@ function TemplateCard({
           <div style={{ display: 'flex', gap: 3 }}>
             {swatches.map((cls, i) => (
               <div key={i} style={{
-                width: 10,
-                height: 10,
+                width: 8,
+                height: 8,
                 borderRadius: '50%',
                 background: toHex(cls),
                 border: '1px solid rgba(0,0,0,0.08)',
@@ -406,6 +469,32 @@ function TemplateCard({
         </div>
       </div>
     </button>
+  );
+}
+
+/* ─── Section divider with numbering ─────────────────────────── */
+function SectionDivider({ label, index, cat }: { label: string; index: number; cat: string }) {
+  const num = String(index + 1).padStart(2, '0');
+  const isDarkCat = cat === 'Dark';
+  const isAnimeCat = cat === 'Anime';
+  const labelColor = isDarkCat ? '#1e293b' : isAnimeCat ? '#7c3aed' : '#64748b';
+  const hrColor = isDarkCat ? '#1e293b' : isAnimeCat ? '#c4b5fd' : '#e2e8f0';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <hr style={{ flex: 1, border: 'none', borderTop: `1px solid ${hrColor}`, margin: 0 }} />
+      <span style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        color: labelColor,
+        whiteSpace: 'nowrap',
+      }}>
+        {num}. {label}
+      </span>
+      <hr style={{ flex: 1, border: 'none', borderTop: `1px solid ${hrColor}`, margin: 0 }} />
+    </div>
   );
 }
 
@@ -478,7 +567,7 @@ export default function TemplateMarketplace({
           right: 0,
           bottom: 0,
           width: 'min(780px, 88vw)',
-          background: '#f8fafc',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
           zIndex: 50,
           display: 'flex',
           flexDirection: 'column',
@@ -490,22 +579,21 @@ export default function TemplateMarketplace({
         {/* ── Panel header ── */}
         <div style={{
           flexShrink: 0,
-          padding: '20px 24px 16px',
-          background: '#ffffff',
-          borderBottom: '1px solid #e2e8f0',
+          padding: '24px 28px 18px',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
               <h2 style={{
-                fontSize: 17,
+                fontSize: 18,
                 fontWeight: 700,
-                color: '#0f172a',
+                color: '#ffffff',
                 margin: 0,
                 lineHeight: 1.3,
               }}>
                 {isThai ? 'เลือก Template เอกสาร' : 'Choose Document Template'}
               </h2>
-              <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', margin: '3px 0 0' }}>
                 {isThai
                   ? `กำลังใช้: ${selectedName}`
                   : `Current: ${selectedName}`}
@@ -517,22 +605,33 @@ export default function TemplateMarketplace({
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: '#f1f5f9',
+                background: 'rgba(255,255,255,0.15)',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#475569',
+                color: '#ffffff',
                 flexShrink: 0,
+                transition: 'background 0.15s ease',
               }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.25)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
             >
               <X size={16} />
             </button>
           </div>
+        </div>
 
-          {/* Category filter */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+        {/* Category filter */}
+        <div style={{
+          flexShrink: 0,
+          padding: '0 28px 16px',
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          paddingTop: 14,
+        }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {CATEGORIES.map(cat => (
               <button
                 key={cat.key}
@@ -557,17 +656,19 @@ export default function TemplateMarketplace({
         </div>
 
         {/* ── Grid ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
           {/* Default option */}
           {(activeCategory === 'all' || activeCategory === 'Standard') && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
-                {isThai ? 'ค่าเริ่มต้น' : 'Default'}
-              </div>
+            <div style={{ marginBottom: 32 }}>
+              <SectionDivider
+                label={isThai ? 'ค่าเริ่มต้น' : 'Default'}
+                index={0}
+                cat="Standard"
+              />
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
-                gap: 12,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: 16,
               }}>
                 <TemplateCard
                   id=""
@@ -588,7 +689,7 @@ export default function TemplateMarketplace({
           {(activeCategory === 'all'
             ? (['Standard', 'Minimal', 'Pro', 'Cute', 'Dark', 'Anime', 'Fun'] as const)
             : [activeCategory as string]
-          ).map(cat => {
+          ).map((cat, catIndex) => {
             const items = matching.filter(t => {
               if (cat === 'Standard') return !['Minimal','Pro','Cute','Kawaii','Fun','Clean','Bold','Spacious','Dark','Anime'].includes(t.tagEn);
               if (cat === 'Cute') return t.tagEn === 'Cute' || t.tagEn === 'Kawaii';
@@ -596,23 +697,20 @@ export default function TemplateMarketplace({
             });
             if (items.length === 0) return null;
             const catLabel = CATEGORIES.find(c => c.key === cat);
+            // offset by 1 because "Default" is section 0 when in 'all' view
+            const sectionIndex = activeCategory === 'all' ? catIndex + 1 : 0;
 
             return (
-              <div key={cat} style={{ marginBottom: 28 }}>
-                <div style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: '#94a3b8',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  marginBottom: 12,
-                }}>
-                  {isThai ? catLabel?.labelTh : catLabel?.labelEn}
-                </div>
+              <div key={cat} style={{ marginBottom: 32 }}>
+                <SectionDivider
+                  label={isThai ? (catLabel?.labelTh ?? cat) : (catLabel?.labelEn ?? cat)}
+                  index={sectionIndex}
+                  cat={cat}
+                />
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
-                  gap: 12,
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: 16,
                 }}>
                   {items.map(t => (
                     <TemplateCard
@@ -635,14 +733,16 @@ export default function TemplateMarketplace({
 
           {/* Custom templates */}
           {customTemplates.length > 0 && (activeCategory === 'all') && (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
-                {isThai ? 'แม่แบบบริษัท' : 'Company Templates'}
-              </div>
+            <div style={{ marginBottom: 32 }}>
+              <SectionDivider
+                label={isThai ? 'แม่แบบบริษัท' : 'Company Templates'}
+                index={8}
+                cat="Custom"
+              />
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
-                gap: 12,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: 16,
               }}>
                 {customTemplates.map(t => (
                   <TemplateCard
