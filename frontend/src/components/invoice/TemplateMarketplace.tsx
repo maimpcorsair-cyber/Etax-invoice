@@ -107,12 +107,14 @@ const toHex = (cls: string) => tw[cls] ?? '#94a3b8';
 
 /* ─── Category groups ─────────────────────────────────────────── */
 const CATEGORIES = [
-  { key: 'all',       labelTh: 'ทั้งหมด',   labelEn: 'All' },
-  { key: 'Standard',  labelTh: 'มาตรฐาน',   labelEn: 'Standard' },
-  { key: 'Minimal',   labelTh: 'Minimal',    labelEn: 'Minimal' },
-  { key: 'Pro',       labelTh: 'Professional', labelEn: 'Pro' },
-  { key: 'Cute',      labelTh: 'น่ารัก',     labelEn: 'Cute' },
-  { key: 'Fun',       labelTh: 'สนุก',       labelEn: 'Fun' },
+  { key: 'all',       labelTh: 'ทั้งหมด',      labelEn: 'All' },
+  { key: 'Standard',  labelTh: 'มาตรฐาน',      labelEn: 'Standard' },
+  { key: 'Minimal',   labelTh: 'Minimal',       labelEn: 'Minimal' },
+  { key: 'Pro',       labelTh: 'Professional',  labelEn: 'Pro' },
+  { key: 'Cute',      labelTh: 'น่ารัก',        labelEn: 'Cute' },
+  { key: 'Dark',      labelTh: 'Dark / Man',    labelEn: 'Dark' },
+  { key: 'Anime',     labelTh: 'Anime / Otaku', labelEn: 'Anime' },
+  { key: 'Fun',       labelTh: 'สนุก',          labelEn: 'Fun' },
 ] as const;
 
 /* ─── Mock document preview ───────────────────────────────────── */
@@ -123,14 +125,21 @@ function MockDocument({ swatches, tag }: {
   const [h, a, b] = [toHex(swatches[0]), toHex(swatches[1]), toHex(swatches[2])];
   const isCute = tag === 'Cute' || tag === 'Fun';
   const isMinimal = tag === 'Minimal';
+  const isDark = tag === 'Dark';
+  const isAnime = tag === 'Anime';
+
+  // Dark templates: body bg = first swatch (dark color), text lines are dim
+  const bodyBg = isDark ? h : (b === '#ffffff' || b === '#f8fafc' ? '#fafafa' : b);
+  const lineColor = isDark ? 'rgba(255,255,255,0.15)' : (isAnime ? a : '#1e293b');
+  const lineOpacity = isDark ? 1 : (isAnime ? 0.5 : 0.5);
 
   return (
     <div
       style={{
         width: 120,
         height: 170,
-        background: b === '#ffffff' || b === '#f8fafc' ? '#fafafa' : b,
-        borderRadius: isCute ? 10 : 4,
+        background: bodyBg,
+        borderRadius: isCute ? 10 : (isAnime ? 8 : 4),
         overflow: 'hidden',
         position: 'relative',
         flexShrink: 0,
@@ -180,8 +189,8 @@ function MockDocument({ swatches, tag }: {
         {/* bill-to stub */}
         <div style={{ marginBottom: 6 }}>
           <div style={{ height: 2, width: '45%', background: a, borderRadius: 2, opacity: 0.4, marginBottom: 2 }} />
-          <div style={{ height: 2.5, width: '70%', background: '#1e293b', borderRadius: 2, opacity: 0.5, marginBottom: 1.5 }} />
-          <div style={{ height: 2, width: '55%', background: '#94a3b8', borderRadius: 2 }} />
+          <div style={{ height: 2.5, width: '70%', background: lineColor, borderRadius: 2, opacity: lineOpacity, marginBottom: 1.5 }} />
+          <div style={{ height: 2, width: '55%', background: isDark ? 'rgba(255,255,255,0.1)' : '#94a3b8', borderRadius: 2 }} />
         </div>
 
         {/* table header */}
@@ -213,7 +222,7 @@ function MockDocument({ swatches, tag }: {
             display: 'flex',
             gap: 4,
             padding: '3px 4px',
-            background: i % 2 === 1 ? (isCute ? `${a}18` : 'rgba(0,0,0,0.03)') : 'transparent',
+            background: i % 2 === 1 ? (isDark ? 'rgba(255,255,255,0.05)' : isCute ? `${a}18` : 'rgba(0,0,0,0.03)') : 'transparent',
             borderRadius: isCute ? 3 : 1,
             marginBottom: 1,
           }}>
@@ -287,6 +296,8 @@ function TemplateCard({
     Warm:    { bg: '#fff7ed', text: '#9a3412' },
     Green:   { bg: '#f0fdf4', text: '#14532d' },
     Cyan:    { bg: '#ecfeff', text: '#155e75' },
+    Dark:    { bg: '#1a1a1a', text: '#d4af37' },
+    Anime:   { bg: '#fdf2f8', text: '#7c3aed' },
     default: { bg: '#f3f4f6', text: '#374151' },
   };
   const tagKey = tagEn in tagColors ? tagEn : 'default';
@@ -575,11 +586,11 @@ export default function TemplateMarketplace({
 
           {/* Builtin templates grouped by category */}
           {(activeCategory === 'all'
-            ? (['Standard', 'Minimal', 'Pro', 'Cute', 'Fun'] as const)
+            ? (['Standard', 'Minimal', 'Pro', 'Cute', 'Dark', 'Anime', 'Fun'] as const)
             : [activeCategory as string]
           ).map(cat => {
             const items = matching.filter(t => {
-              if (cat === 'Standard') return !['Minimal','Pro','Cute','Kawaii','Fun','Clean','Bold','Spacious'].includes(t.tagEn);
+              if (cat === 'Standard') return !['Minimal','Pro','Cute','Kawaii','Fun','Clean','Bold','Spacious','Dark','Anime'].includes(t.tagEn);
               if (cat === 'Cute') return t.tagEn === 'Cute' || t.tagEn === 'Kawaii';
               return t.tagEn === cat;
             });
