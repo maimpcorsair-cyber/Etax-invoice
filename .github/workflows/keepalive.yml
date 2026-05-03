@@ -15,12 +15,12 @@ jobs:
     steps:
       - name: Ping backend
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 30 \
-            https://etax-invoice-api.onrender.com/ping)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            https://etax-invoice-api.onrender.com/ping || echo "000")
           echo "Response: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "⚠️  Backend returned $STATUS — may be cold-starting"
-          else
+          if [ "$STATUS" = "200" ]; then
             echo "✅ Backend is alive"
+          else
+            echo "⚠️ Backend returned $STATUS — may be cold-starting (not a failure)"
           fi
+          exit 0
