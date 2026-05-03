@@ -25,15 +25,6 @@
       "env": {
         "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
       }
-    },
-    "minimax": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "my-minimax-mcp"],
-      "env": {
-        "MINIMAX_API_KEY": "sk-api-8tw-x7y5PDG2aSRmsLxiTeMocQ_FwC3TysjfncVJUZj1tEnzkLF4GjdR9Z1rThcc5Za19jGoEfkhnIPw3OZTqB9ywNKk3E-XzTOlW7JWFAr3E9QT436aSYE",
-        "MINIMAX_DEFAULT_MODEL": "MiniMax-M2.7"
-      }
     }
   }
 }

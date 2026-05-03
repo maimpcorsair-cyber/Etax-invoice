@@ -50,5 +50,8 @@ backend/node_modules/.prisma/
 # Playwright MCP dev tool artifacts
 .playwright-mcp/
 
+# Local agent worktrees
+.claude/worktrees/
+
 # Mobile dev screenshots (local only)
 mobile-*.png

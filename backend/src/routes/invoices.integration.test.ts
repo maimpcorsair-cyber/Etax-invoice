@@ -2,6 +2,7 @@ import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import prisma from '../config/database';
+import { withSystemRlsContext } from '../config/rls';
 
 const BASE_URL = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:4000';
 const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? 'admin@siamtech.co.th';
@@ -20,7 +21,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
   if (!response.ok) {
-    throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${response.status} ${JSON.stringify(body)}`);
+    throw new Error(
+      `${init?.method ?? 'GET'} ${path} failed: ${response.status} ${JSON.stringify(body)}`
+    );
   }
   return body as T;
 }
@@ -32,7 +35,7 @@ async function sleep(ms: number) {
 async function waitForInvoice(
   invoiceId: string,
   predicate: (inv: { rdSubmissionStatus?: string | null; status?: string | null }) => boolean,
-  opts?: { timeoutMs?: number; intervalMs?: number },
+  opts?: { timeoutMs?: number; intervalMs?: number }
 ) {
   const timeoutMs = opts?.timeoutMs ?? 15_000;
   const intervalMs = opts?.intervalMs ?? 400;
@@ -41,24 +44,40 @@ async function waitForInvoice(
   // Poll DB directly: we want deterministic reads unaffected by API caching.
   // The worker updates the invoice record as it progresses.
   while (Date.now() - start < timeoutMs) {
-    const inv = await prisma.invoice.findUnique({
-      where: { id: invoiceId },
-      select: {
-        id: true,
-        status: true,
-        rdSubmissionStatus: true,
-        rdDocId: true,
-        rdSubmittedAt: true,
-      },
-    });
+    const inv = await withSystemRlsContext(
+      prisma,
+      (tx) =>
+        tx.invoice.findUnique({
+          where: { id: invoiceId },
+          select: {
+            id: true,
+            status: true,
+            rdSubmissionStatus: true,
+            rdDocId: true,
+            rdSubmittedAt: true,
+          },
+        }),
+      { role: 'test' }
+    );
     if (inv && predicate(inv)) return inv;
     await sleep(intervalMs);
   }
 
-  const inv = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-    select: { id: true, status: true, rdSubmissionStatus: true, rdDocId: true, rdSubmittedAt: true },
-  });
+  const inv = await withSystemRlsContext(
+    prisma,
+    (tx) =>
+      tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: {
+          id: true,
+          status: true,
+          rdSubmissionStatus: true,
+          rdDocId: true,
+          rdSubmittedAt: true,
+        },
+      }),
+    { role: 'test' }
+  );
   throw new Error(`Timed out waiting for invoice ${invoiceId}. Last state: ${JSON.stringify(inv)}`);
 }
 
@@ -90,93 +109,147 @@ test('invoices API: issue receipt and submit RD (mock) flows', async (t) => {
       phone: true,
       email: true,
       logoUrl: true,
+      rdEnvironment: true,
     },
   });
   assert.ok(company, 'company fixture should exist');
+
+  await withSystemRlsContext(
+    prisma,
+    (tx) =>
+      tx.company.update({
+        where: { id: auth.user.companyId },
+        data: { rdEnvironment: 'sandbox' },
+        select: { id: true },
+      }),
+    { companyId: auth.user.companyId, userId: auth.user.id, role: 'test' }
+  );
+
+  t.after(async () => {
+    await withSystemRlsContext(
+      prisma,
+      (tx) =>
+        tx.company.update({
+          where: { id: auth.user.companyId },
+          data: { rdEnvironment: company.rdEnvironment },
+          select: { id: true },
+        }),
+      { companyId: auth.user.companyId, userId: auth.user.id, role: 'test' }
+    );
+  });
 
   let customerId: string | null = null;
   const invoiceIdsToCleanup: string[] = [];
 
   async function cleanup() {
     if (invoiceIdsToCleanup.length) {
-      await prisma.invoice.deleteMany({ where: { id: { in: invoiceIdsToCleanup } } });
+      await withSystemRlsContext(
+        prisma,
+        (tx) => tx.invoice.deleteMany({ where: { id: { in: invoiceIdsToCleanup } } }),
+        { role: 'test' }
+      );
     }
     if (customerId) {
-      await prisma.customer.deleteMany({ where: { id: customerId } });
+      const id = customerId;
+      await withSystemRlsContext(prisma, (tx) => tx.customer.deleteMany({ where: { id } }), {
+        role: 'test',
+      });
     }
   }
 
   await t.test('issue-receipt marks tax invoice paid and creates receipt doc', async () => {
     try {
       const taxId = `8${uniqueDigits(12)}`;
-      const customer = await prisma.customer.create({
-        data: {
-          companyId: auth.user.companyId,
-          nameTh: 'ลูกค้าทดสอบ Issue Receipt',
-          nameEn: 'Issue Receipt Customer',
-          taxId,
-          branchCode: '00000',
-          addressTh: 'Bangkok Test Address',
-          email: 'integration-issue-receipt@example.com',
-        },
-        select: { id: true },
-      });
+      const customer = await withSystemRlsContext(
+        prisma,
+        (tx) =>
+          tx.customer.create({
+            data: {
+              companyId: auth.user.companyId,
+              nameTh: 'ลูกค้าทดสอบ Issue Receipt',
+              nameEn: 'Issue Receipt Customer',
+              taxId,
+              branchCode: '00000',
+              addressTh: 'Bangkok Test Address',
+              email: 'integration-issue-receipt@example.com',
+            },
+            select: { id: true },
+          }),
+        { companyId: auth.user.companyId, userId: auth.user.id, role: 'test' }
+      );
       customerId = customer.id;
 
       const total = 1070;
       const taxInvoiceNumber = `IT-RCT-${Date.now()}`;
-      const taxInvoice = await prisma.invoice.create({
-        data: {
-          companyId: auth.user.companyId,
-          invoiceNumber: taxInvoiceNumber,
-          type: 'tax_invoice',
-          status: 'draft',
-          language: 'th',
-          invoiceDate: new Date('2026-04-23T00:00:00.000Z'),
-          buyerId: customer.id,
-          seller: {
-            nameTh: company!.nameTh,
-            nameEn: company!.nameEn,
-            taxId: company!.taxId,
-            branchCode: company!.branchCode,
-            branchNameTh: company!.branchNameTh,
-            addressTh: company!.addressTh,
-            addressEn: company!.addressEn,
-            phone: company!.phone,
-            email: company!.email,
-            logoUrl: company!.logoUrl,
-          },
-          subtotal: 1000,
-          vatAmount: 70,
-          discount: 0,
-          total,
-          isPaid: false,
-          createdBy: auth.user.id,
-          items: {
-            create: [{
-              nameTh: 'Issue Receipt Item',
-              nameEn: 'Issue Receipt Item',
-              quantity: 1,
-              unit: 'ชิ้น',
-              unitPrice: 1000,
-              discount: 0,
-              vatType: 'vat7',
-              amount: 1000,
+      const taxInvoice = await withSystemRlsContext(
+        prisma,
+        (tx) =>
+          tx.invoice.create({
+            data: {
+              companyId: auth.user.companyId,
+              invoiceNumber: taxInvoiceNumber,
+              type: 'tax_invoice',
+              status: 'draft',
+              language: 'th',
+              invoiceDate: new Date('2026-04-23T00:00:00.000Z'),
+              buyerId: customer.id,
+              seller: {
+                nameTh: company!.nameTh,
+                nameEn: company!.nameEn,
+                taxId: company!.taxId,
+                branchCode: company!.branchCode,
+                branchNameTh: company!.branchNameTh,
+                addressTh: company!.addressTh,
+                addressEn: company!.addressEn,
+                phone: company!.phone,
+                email: company!.email,
+                logoUrl: company!.logoUrl,
+              },
+              subtotal: 1000,
               vatAmount: 70,
-              totalAmount: total,
-            }],
-          },
-        },
-        select: { id: true },
-      });
+              discount: 0,
+              total,
+              isPaid: false,
+              createdBy: auth.user.id,
+              items: {
+                create: [
+                  {
+                    nameTh: 'Issue Receipt Item',
+                    nameEn: 'Issue Receipt Item',
+                    quantity: 1,
+                    unit: 'ชิ้น',
+                    unitPrice: 1000,
+                    discount: 0,
+                    vatType: 'vat7',
+                    amount: 1000,
+                    vatAmount: 70,
+                    totalAmount: total,
+                  },
+                ],
+              },
+            },
+            select: { id: true },
+          }),
+        { companyId: auth.user.companyId, userId: auth.user.id, role: 'test' }
+      );
       invoiceIdsToCleanup.push(taxInvoice.id);
 
       const result = await api<{
-        data: { id: string; type: string; isPaid: boolean; referenceInvoiceId?: string | null; referenceDocNumber?: string | null };
+        data: {
+          id: string;
+          type: string;
+          isPaid: boolean;
+          referenceInvoiceId?: string | null;
+          referenceDocNumber?: string | null;
+        };
       }>(`/api/invoices/${taxInvoice.id}/issue-receipt`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ paymentMethod: 'transfer', note: 'integration', paidAt: '2026-04-24' }),
+        body: JSON.stringify({
+          paymentMethod: 'transfer',
+          note: 'integration',
+          paidAt: '2026-04-24',
+        }),
       });
 
       const receiptId = result.data.id;
@@ -186,33 +259,47 @@ test('invoices API: issue receipt and submit RD (mock) flows', async (t) => {
       assert.equal(result.data.isPaid, true);
       assert.equal(result.data.referenceInvoiceId, taxInvoice.id);
 
-      const updatedTaxInvoice = await prisma.invoice.findUnique({
-        where: { id: taxInvoice.id },
-        select: { isPaid: true, paidAmount: true },
-      });
+      const updatedTaxInvoice = await withSystemRlsContext(
+        prisma,
+        (tx) =>
+          tx.invoice.findUnique({
+            where: { id: taxInvoice.id },
+            select: { isPaid: true, paidAmount: true },
+          }),
+        { role: 'test' }
+      );
       assert.equal(updatedTaxInvoice?.isPaid, true);
       assert.equal(updatedTaxInvoice?.paidAmount, total);
 
-      const receipt = await prisma.invoice.findUnique({
-        where: { id: receiptId },
-        select: {
-          type: true,
-          isPaid: true,
-          referenceInvoiceId: true,
-          referenceDocNumber: true,
-          total: true,
-          rdSubmissionStatus: true,
-        },
-      });
+      const receipt = await withSystemRlsContext(
+        prisma,
+        (tx) =>
+          tx.invoice.findUnique({
+            where: { id: receiptId },
+            select: {
+              type: true,
+              isPaid: true,
+              referenceInvoiceId: true,
+              referenceDocNumber: true,
+              total: true,
+              rdSubmissionStatus: true,
+            },
+          }),
+        { role: 'test' }
+      );
       assert.equal(receipt?.type, 'receipt');
       assert.equal(receipt?.isPaid, true);
       assert.equal(receipt?.referenceInvoiceId, taxInvoice.id);
       assert.equal(receipt?.referenceDocNumber, taxInvoiceNumber);
 
       // RD submission for receipt is queued; worker may finish quickly (mock).
-      const final = await waitForInvoice(receiptId, (inv) => inv.rdSubmissionStatus === 'success' || inv.rdSubmissionStatus === 'failed', {
-        timeoutMs: 20_000,
-      });
+      const final = await waitForInvoice(
+        receiptId,
+        (inv) => inv.rdSubmissionStatus === 'success' || inv.rdSubmissionStatus === 'failed',
+        {
+          timeoutMs: 20_000,
+        }
+      );
       assert.equal(final.rdSubmissionStatus, 'success');
       assert.ok(final.rdDocId);
     } finally {
@@ -224,65 +311,77 @@ test('invoices API: issue receipt and submit RD (mock) flows', async (t) => {
     try {
       // Fresh customer per subtest to avoid coupling.
       const taxId = `7${uniqueDigits(12)}`;
-      const customer = await prisma.customer.create({
-        data: {
-          companyId: auth.user.companyId,
-          nameTh: 'ลูกค้าทดสอบ Submit RD',
-          nameEn: 'Submit RD Customer',
-          taxId,
-          branchCode: '00000',
-          addressTh: 'Bangkok Test Address',
-          email: 'integration-submit-rd@example.com',
-        },
-        select: { id: true },
-      });
+      const customer = await withSystemRlsContext(
+        prisma,
+        (tx) =>
+          tx.customer.create({
+            data: {
+              companyId: auth.user.companyId,
+              nameTh: 'ลูกค้าทดสอบ Submit RD',
+              nameEn: 'Submit RD Customer',
+              taxId,
+              branchCode: '00000',
+              addressTh: 'Bangkok Test Address',
+              email: 'integration-submit-rd@example.com',
+            },
+            select: { id: true },
+          }),
+        { companyId: auth.user.companyId, userId: auth.user.id, role: 'test' }
+      );
       customerId = customer.id;
 
       const total = 1070;
-      const invoice = await prisma.invoice.create({
-        data: {
-          companyId: auth.user.companyId,
-          invoiceNumber: `IT-RD-${Date.now()}`,
-          type: 'tax_invoice',
-          status: 'draft',
-          language: 'th',
-          invoiceDate: new Date('2026-04-23T00:00:00.000Z'),
-          buyerId: customer.id,
-          seller: {
-            nameTh: company!.nameTh,
-            nameEn: company!.nameEn,
-            taxId: company!.taxId,
-            branchCode: company!.branchCode,
-            branchNameTh: company!.branchNameTh,
-            addressTh: company!.addressTh,
-            addressEn: company!.addressEn,
-            phone: company!.phone,
-            email: company!.email,
-            logoUrl: company!.logoUrl,
-          },
-          subtotal: 1000,
-          vatAmount: 70,
-          discount: 0,
-          total,
-          isPaid: false,
-          createdBy: auth.user.id,
-          items: {
-            create: [{
-              nameTh: 'Submit RD Item',
-              nameEn: 'Submit RD Item',
-              quantity: 1,
-              unit: 'ชิ้น',
-              unitPrice: 1000,
-              discount: 0,
-              vatType: 'vat7',
-              amount: 1000,
+      const invoice = await withSystemRlsContext(
+        prisma,
+        (tx) =>
+          tx.invoice.create({
+            data: {
+              companyId: auth.user.companyId,
+              invoiceNumber: `IT-RD-${Date.now()}`,
+              type: 'tax_invoice',
+              status: 'draft',
+              language: 'th',
+              invoiceDate: new Date('2026-04-23T00:00:00.000Z'),
+              buyerId: customer.id,
+              seller: {
+                nameTh: company!.nameTh,
+                nameEn: company!.nameEn,
+                taxId: company!.taxId,
+                branchCode: company!.branchCode,
+                branchNameTh: company!.branchNameTh,
+                addressTh: company!.addressTh,
+                addressEn: company!.addressEn,
+                phone: company!.phone,
+                email: company!.email,
+                logoUrl: company!.logoUrl,
+              },
+              subtotal: 1000,
               vatAmount: 70,
-              totalAmount: total,
-            }],
-          },
-        },
-        select: { id: true },
-      });
+              discount: 0,
+              total,
+              isPaid: false,
+              createdBy: auth.user.id,
+              items: {
+                create: [
+                  {
+                    nameTh: 'Submit RD Item',
+                    nameEn: 'Submit RD Item',
+                    quantity: 1,
+                    unit: 'ชิ้น',
+                    unitPrice: 1000,
+                    discount: 0,
+                    vatType: 'vat7',
+                    amount: 1000,
+                    vatAmount: 70,
+                    totalAmount: total,
+                  },
+                ],
+              },
+            },
+            select: { id: true },
+          }),
+        { companyId: auth.user.companyId, userId: auth.user.id, role: 'test' }
+      );
       invoiceIdsToCleanup.push(invoice.id);
 
       await api<{ message?: string }>(`/api/invoices/${invoice.id}/submit-rd`, {
@@ -291,14 +390,28 @@ test('invoices API: issue receipt and submit RD (mock) flows', async (t) => {
       });
 
       // queueRdSubmission updates status to approved and rdSubmissionStatus pending immediately.
-      const queued = await waitForInvoice(invoice.id, (inv) => inv.rdSubmissionStatus === 'pending' || inv.rdSubmissionStatus === 'in_progress' || inv.rdSubmissionStatus === 'success', {
-        timeoutMs: 10_000,
-      });
-      assert.ok(['pending', 'in_progress', 'success'].includes(queued.rdSubmissionStatus ?? ''), 'invoice should be queued');
+      const queued = await waitForInvoice(
+        invoice.id,
+        (inv) =>
+          inv.rdSubmissionStatus === 'pending' ||
+          inv.rdSubmissionStatus === 'in_progress' ||
+          inv.rdSubmissionStatus === 'success',
+        {
+          timeoutMs: 10_000,
+        }
+      );
+      assert.ok(
+        ['pending', 'in_progress', 'success'].includes(queued.rdSubmissionStatus ?? ''),
+        'invoice should be queued'
+      );
 
-      const final = await waitForInvoice(invoice.id, (inv) => inv.rdSubmissionStatus === 'success' || inv.rdSubmissionStatus === 'failed', {
-        timeoutMs: 20_000,
-      });
+      const final = await waitForInvoice(
+        invoice.id,
+        (inv) => inv.rdSubmissionStatus === 'success' || inv.rdSubmissionStatus === 'failed',
+        {
+          timeoutMs: 20_000,
+        }
+      );
       assert.equal(final.rdSubmissionStatus, 'success');
       assert.equal(final.status, 'submitted');
       assert.ok(final.rdDocId);

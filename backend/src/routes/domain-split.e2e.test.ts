@@ -116,13 +116,16 @@ async function installAuthState(page: Page, payload: AuthPayload) {
       };
     };
 
-    appWindow.localStorage.setItem('etax_auth', JSON.stringify({
-      state: {
-        token: authPayload.token,
-        user: authPayload.user,
-      },
-      version: 0,
-    }));
+    appWindow.localStorage.setItem(
+      'etax_auth',
+      JSON.stringify({
+        state: {
+          token: authPayload.token,
+          user: authPayload.user,
+        },
+        version: 0,
+      })
+    );
   }, payload);
 }
 
@@ -150,10 +153,10 @@ async function waitForExactUrl(page: Page, expectedUrl: string) {
 }
 
 async function submitLoginForm(page: Page, url: string, email: string, password: string) {
-  const origin = new URL(url).origin;
-  await page.goto(origin, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => {
-    (globalThis as unknown as { localStorage: { removeItem: (key: string) => void } }).localStorage.removeItem('etax_auth');
+  await page.evaluateOnNewDocument(() => {
+    (
+      globalThis as unknown as { localStorage: { removeItem: (key: string) => void } }
+    ).localStorage.removeItem('etax_auth');
   });
 
   await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -191,12 +194,22 @@ test('domain split routes users to the correct surface', async () => {
 
     const ctaPage = await createPage(browser);
     await openAnonymous(ctaPage, apexOrigin);
-    const links = await ctaPage.$$eval('a', (anchors) => anchors.map((anchor) => ({
-      text: anchor.textContent?.trim() ?? '',
-      href: anchor.href,
-    })));
-    assert.ok(links.some((link) => /Owner Login/i.test(link.text) && link.href === 'http://ops.localhost:3000/login'));
-    assert.ok(links.some((link) => /Sign In/i.test(link.text) && link.href === 'http://app.localhost:3000/login'));
+    const links = await ctaPage.$$eval('a', (anchors) =>
+      anchors.map((anchor) => ({
+        text: anchor.textContent?.trim() ?? '',
+        href: anchor.href,
+      }))
+    );
+    assert.ok(
+      links.some(
+        (link) => /Owner Login/i.test(link.text) && link.href === 'http://ops.localhost:3000/login'
+      )
+    );
+    assert.ok(
+      links.some(
+        (link) => /Sign In/i.test(link.text) && link.href === 'http://app.localhost:3000/login'
+      )
+    );
     await ctaPage.close();
 
     const appAnonymousPage = await createPage(browser);
@@ -247,13 +260,23 @@ test('domain split routes users to the correct surface', async () => {
 
     const opsLoginPage = await createPage(browser);
     await mockAuthApi(opsLoginPage);
-    await submitLoginForm(opsLoginPage, `${opsOrigin}/ops/login`, superAdminEmail, superAdminPassword);
+    await submitLoginForm(
+      opsLoginPage,
+      `${opsOrigin}/ops/login`,
+      superAdminEmail,
+      superAdminPassword
+    );
     await waitForExactUrl(opsLoginPage, `${opsOrigin}/ops/overview`);
     await opsLoginPage.close();
 
     const opsTenantLoginPage = await createPage(browser);
     await mockAuthApi(opsTenantLoginPage);
-    await submitLoginForm(opsTenantLoginPage, `${opsOrigin}/ops/login`, tenantEmail, tenantPassword);
+    await submitLoginForm(
+      opsTenantLoginPage,
+      `${opsOrigin}/ops/login`,
+      tenantEmail,
+      tenantPassword
+    );
     await waitForExactUrl(opsTenantLoginPage, `${appOrigin}/app/dashboard`);
     await opsTenantLoginPage.close();
   } finally {
