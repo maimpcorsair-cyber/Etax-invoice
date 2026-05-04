@@ -6,6 +6,18 @@ name: Manual Prisma DB Migration
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: 'Operation to run'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - resolve-rolled-back
+      migration:
+        description: 'Migration name for resolve-rolled-back'
+        required: false
+        default: '20260504_rls_remaining_tables'
       confirm:
         description: 'Type YES to confirm running Prisma migrations on production'
         required: true
@@ -31,11 +43,19 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Resolve failed migration as rolled back
+        if: ${{ github.event.inputs.operation == 'resolve-rolled-back' }}
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate resolve --rolled-back "${{ github.event.inputs.migration }}"
+
       - name: Run Prisma migration
+        if: ${{ github.event.inputs.operation == 'deploy' }}
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         working-directory: backend
         run: npx prisma migrate deploy
 
       - name: Verify migration
-        run: echo "Database migration completed successfully"
+        run: echo "Prisma migration operation completed successfully"
