@@ -6,6 +6,65 @@
 -- Keep this migration in backend/prisma/migrations so production deploys use
 -- one migration source through `prisma migrate deploy`.
 
+CREATE OR REPLACE FUNCTION public.app_current_company_id()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('app.current_company_id', true), '');
+$$;
+
+CREATE OR REPLACE FUNCTION public.app_current_user_id()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('app.current_user_id', true), '');
+$$;
+
+CREATE OR REPLACE FUNCTION public.app_current_role_name()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('app.current_role', true), '');
+$$;
+
+CREATE OR REPLACE FUNCTION public.app_system_mode_enabled()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(NULLIF(current_setting('app.system_mode', true), '') = 'on', false);
+$$;
+
+CREATE OR REPLACE FUNCTION public.app_tenant_access(target_company_id text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    public.app_system_mode_enabled()
+    OR (
+      public.app_current_company_id() IS NOT NULL
+      AND target_company_id IS NOT NULL
+      AND public.app_current_company_id() = target_company_id
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.app_invoice_access(target_invoice_id text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.invoices i
+    WHERE i.id = target_invoice_id
+      AND public.app_tenant_access(i."companyId")
+  );
+$$;
+
 ALTER TABLE public.purchase_invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_intakes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expense_vouchers ENABLE ROW LEVEL SECURITY;
