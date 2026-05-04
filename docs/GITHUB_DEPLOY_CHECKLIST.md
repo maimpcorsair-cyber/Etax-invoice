@@ -72,6 +72,13 @@ After that, configure:
 - `FRONTEND_URLS`
 - any optional mail / storage / RD variables you want enabled
 
+GitHub Actions secrets used by the deploy pipeline:
+
+- `PRODUCTION_DATABASE_URL`
+- `RENDER_DEPLOY_HOOK_URL`
+- `RENDER_API_KEY`
+- `RENDER_SERVICE_ID` (optional, but needed to poll deploy status through the Render API)
+
 ## 6. Deploy the frontend from GitHub
 
 Recommended:

@@ -1,15 +1,16 @@
-name: Apply Production DB Migration
+name: Legacy SQL DB Migration
 
-# Run this manually from GitHub Actions UI when you need to apply migrations
-# Requires DATABASE_URL secret set in GitHub → Settings → Secrets
+# Manual escape hatch for one-off SQL files in database/migrations.
+# Normal production schema changes should live in backend/prisma/migrations and
+# run through render-deploy.yml or Manual Prisma DB Migration.
 
 on:
   workflow_dispatch:
     inputs:
       migration:
-        description: 'Migration folder name (e.g. 20260425_add_scale_indexes)'
+        description: 'SQL filename in database/migrations (e.g. 016_rls_remaining_tables.sql)'
         required: true
-        default: '20260425_add_scale_indexes'
+        default: '016_rls_remaining_tables.sql'
       confirm:
         description: 'Type YES to confirm running on production'
         required: true
@@ -29,9 +30,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: |
-          MIGRATION="prisma/migrations/${{ github.event.inputs.migration }}/migration.sql"
+          MIGRATION="database/migrations/${{ github.event.inputs.migration }}"
           if [ ! -f "$MIGRATION" ]; then
             echo "❌ Migration file not found: $MIGRATION"
+            echo "Use a filename from database/migrations, for example 016_rls_remaining_tables.sql"
             exit 1
           fi
           echo "📦 Running: $MIGRATION"

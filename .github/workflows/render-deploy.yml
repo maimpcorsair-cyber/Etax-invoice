@@ -1,57 +1,98 @@
 name: Deploy to Render
 
-# Triggers Render backend deploy on every push to main
-# and reports pass/fail status back to GitHub commit
+# Applies production Prisma migrations first, then triggers Render backend deploy.
+# This keeps database shape and application code in the same release order.
 
 on:
   push:
     branches: [main]
     paths:
       - 'backend/**'
-      - 'prisma/**'
       - 'package*.json'
 
 jobs:
   deploy:
-    name: Trigger Render Deploy
+    name: Migrate and Deploy Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Verify backend types
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Apply production migrations
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate deploy
+
       - name: Trigger deploy hook
         id: deploy
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          echo "🚀 Triggering Render deploy..."
+          echo "Triggering Render deploy..."
           RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+            -X POST "$RENDER_DEPLOY_HOOK_URL")
           STATUS=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           DEPLOY_ID=$(echo "$BODY" | jq -r '.id // .deploy.id // empty' 2>/dev/null || echo "")
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "deploy_id=$DEPLOY_ID" >> $GITHUB_OUTPUT
           if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ] && [ "$STATUS" != "202" ]; then
-            echo "❌ Deploy hook failed: $STATUS"
+            echo "Deploy hook failed: $STATUS"
             exit 1
           fi
-          echo "✅ Deploy triggered"
+          echo "Deploy triggered"
 
       - name: Wait and check deploy status
         if: steps.deploy.outputs.deploy_id != ''
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
           DEPLOY_ID="${{ steps.deploy.outputs.deploy_id }}"
-          echo "⏳ Waiting for deploy $DEPLOY_ID..."
+          if [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "RENDER_SERVICE_ID is not set; skipping deploy status polling"
+            exit 0
+          fi
+          echo "Waiting for deploy $DEPLOY_ID..."
           for i in $(seq 1 20); do
             sleep 15
             RESULT=$(curl -s \
-              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-              "https://api.render.com/v1/deploys/$DEPLOY_ID")
-            STATE=$(echo $RESULT | jq -r '.deploy.status')
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$DEPLOY_ID")
+            STATE=$(echo "$RESULT" | jq -r '.deploy.status')
             echo "  Status: $STATE"
             if [ "$STATE" = "live" ]; then
-              echo "✅ Deploy live!"
+              echo "Deploy live"
               exit 0
             elif [ "$STATE" = "deactivated" ] || [ "$STATE" = "build_failed" ]; then
-              echo "❌ Deploy failed: $STATE"
+              echo "Deploy failed: $STATE"
               exit 1
             fi
           done
-          echo "⚠️ Timeout waiting for deploy (5 min)"
+          echo "Timeout waiting for deploy (5 min)"
           exit 1
+
+      - name: Smoke check backend health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            https://etax-invoice-api.onrender.com/health)
+          echo "Backend health: $STATUS"
+          [ "$STATUS" = "200" ]

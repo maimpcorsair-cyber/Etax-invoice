@@ -1,17 +1,18 @@
-name: Auto DB Migration
+name: Manual Prisma DB Migration
 
-# Automatically applies Prisma migrations on every push to main
-# This ensures new migrations are applied without manual intervention
+# Manual fallback for applying Prisma migrations without deploying the backend.
+# Normal production releases migrate through render-deploy.yml before deploy.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/prisma/migrations/**'
-      - 'backend/prisma/schema.prisma'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to confirm running Prisma migrations on production'
+        required: true
 
 jobs:
   migrate:
+    if: ${{ github.event.inputs.confirm == 'YES' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -37,4 +38,4 @@ jobs:
         run: npx prisma migrate deploy
 
       - name: Verify migration
-        run: echo "✅ Database migration completed successfully"
+        run: echo "Database migration completed successfully"
