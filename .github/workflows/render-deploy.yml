@@ -24,9 +24,10 @@ jobs:
             -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
           STATUS=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
+          DEPLOY_ID=$(echo "$BODY" | jq -r '.id // .deploy.id // empty' 2>/dev/null || echo "")
           echo "status=$STATUS" >> $GITHUB_OUTPUT
-          echo "deploy_id=$(echo $BODY | jq -r '.deploy.id // empty')" >> $GITHUB_OUTPUT
-          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
+          echo "deploy_id=$DEPLOY_ID" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ] && [ "$STATUS" != "202" ]; then
             echo "❌ Deploy hook failed: $STATUS"
             exit 1
           fi
