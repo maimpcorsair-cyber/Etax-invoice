@@ -10,6 +10,7 @@ on:
     paths:
       - 'backend/**'
       - 'package*.json'
+      - '.github/workflows/render-deploy.yml'
 
 jobs:
   deploy:
