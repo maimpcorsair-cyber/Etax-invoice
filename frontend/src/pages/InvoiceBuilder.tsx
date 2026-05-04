@@ -158,6 +158,14 @@ export default function InvoiceBuilder() {
     docType: form.docType,
     referenceDocNumber: form.referenceDocNumber,
   });
+  const previewValidationErrors = getInvoiceValidationErrors({
+    isThai,
+    invoiceDate: form.invoiceDate,
+    items: form.items,
+    customerId: 'preview-customer',
+    docType: form.docType,
+    referenceDocNumber: form.referenceDocNumber,
+  });
 
   /* ── IntersectionObserver to track active section ── */
   useEffect(() => {
@@ -249,25 +257,25 @@ export default function InvoiceBuilder() {
 
   /* ── Debounced trigger on any form change ── */
   const triggerDebouncedPreview = useCallback((overrides?: { templateId?: string | null }) => {
-    if (validationErrors.length > 0) return;
+    if (previewValidationErrors.length > 0) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       fetchInlinePreview(buildPreviewPayload(overrides));
     }, 600);
-  }, [validationErrors, fetchInlinePreview, buildPreviewPayload]);
+  }, [previewValidationErrors, fetchInlinePreview, buildPreviewPayload]);
 
   /* ── Immediate preview on template change ── */
   const handleTemplateChange = useCallback((templateId: string | null) => {
     form.setTemplateId(templateId);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    if (validationErrors.length === 0) {
+    if (previewValidationErrors.length === 0) {
       fetchInlinePreview(buildPreviewPayload({ templateId }));
     }
     // Also refresh modal if open
-    if (preview.previewHtml !== null && validationErrors.length === 0) {
+    if (preview.previewHtml !== null && previewValidationErrors.length === 0) {
       preview.openPreview(buildPreviewPayload({ templateId }));
     }
-  }, [form, validationErrors, fetchInlinePreview, buildPreviewPayload, preview]);
+  }, [form, previewValidationErrors, fetchInlinePreview, buildPreviewPayload, preview]);
 
   /* ── Compute scale when panel resizes ── */
   useEffect(() => {
@@ -295,7 +303,7 @@ export default function InvoiceBuilder() {
 
   /* ── Modal preview handler ── */
   const handlePreviewClick = async () => {
-    if (validationErrors.length > 0) {
+    if (previewValidationErrors.length > 0) {
       preview.clearPreviewError();
       return;
     }
@@ -572,8 +580,28 @@ export default function InvoiceBuilder() {
           {/* Color swatches of current template */}
           {(() => {
             const tw: Record<string, string> = {
-              'bg-white': '#fff', 'bg-blue-900': '#1e3a8a', 'bg-blue-200': '#bfdbfe',
+              'bg-white': '#fff',
+              'bg-blue-50': '#eff6ff',
+              'bg-blue-100': '#dbeafe',
+              'bg-blue-200': '#bfdbfe',
+              'bg-blue-700': '#1d4ed8',
+              'bg-blue-800': '#1e40af',
+              'bg-blue-900': '#1e3a8a',
+              'bg-blue-950': '#172554',
+              'bg-gray-100': '#f3f4f6',
+              'bg-gray-900': '#111827',
               'bg-slate-700': '#334155', 'bg-slate-300': '#cbd5e1', 'bg-slate-200': '#e2e8f0',
+              'bg-slate-500': '#64748b',
+              'bg-violet-200': '#ddd6fe',
+              'bg-violet-500': '#8b5cf6',
+              'bg-teal-100': '#ccfbf1',
+              'bg-teal-700': '#0f766e',
+              'bg-amber-200': '#fde68a',
+              'bg-amber-500': '#f59e0b',
+              'bg-orange-200': '#fed7aa',
+              'bg-orange-600': '#ea580c',
+              'bg-green-100': '#dcfce7',
+              'bg-green-800': '#166534',
             };
             const current = matchingBuiltinTemplates.find(t => t.id === form.templateId);
             const swatches = current?.swatches ?? ['bg-blue-900', 'bg-blue-200', 'bg-white'];
@@ -644,14 +672,14 @@ export default function InvoiceBuilder() {
           </div>
         )}
 
-        {validationErrors.length > 0 && !inlinePreviewHtml && !inlinePreviewLoading ? (
+        {previewValidationErrors.length > 0 && !inlinePreviewHtml && !inlinePreviewLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center text-slate-400 gap-3 py-16">
             <Eye className="w-12 h-12 opacity-20" />
             <p className="text-sm font-medium">
               {isThai ? 'กรอกข้อมูลให้ครบก่อนดูตัวอย่าง' : 'Complete the form to see a live preview'}
             </p>
             <ul className="text-xs text-slate-400 space-y-1">
-              {validationErrors.map((e) => <li key={e}>• {e}</li>)}
+              {previewValidationErrors.map((e) => <li key={e}>• {e}</li>)}
             </ul>
           </div>
         ) : inlinePreviewLoading && !inlinePreviewHtml ? (

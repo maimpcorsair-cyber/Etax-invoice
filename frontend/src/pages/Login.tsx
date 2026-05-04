@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { FileText, Eye, EyeOff, ArrowRight, Lock, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, FileText, Eye, EyeOff, ArrowRight, Lock, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useLanguage } from '../hooks/useLanguage';
@@ -28,6 +28,8 @@ export default function Login() {
   const [googleConfig, setGoogleConfig] = useState<GoogleConfigResponse | null>(null);
   const surface = detectSurface();
   const ownerMode = location.pathname.startsWith('/ops/') || surface === 'ops';
+  const isLocalSubdomain = window.location.hostname === 'app.localhost' || window.location.hostname === 'ops.localhost';
+  const localGoogleSafeUrl = `${window.location.protocol}//localhost${window.location.port ? `:${window.location.port}` : ''}${ownerMode ? '/ops/login' : '/app/login'}`;
 
   useEffect(() => {
     if (!authReady || !token || !user) {
@@ -275,6 +277,27 @@ export default function Login() {
                     : 'Your Google email must already be added by an administrator.'}
                 </p>
               </div>
+
+              {isLocalSubdomain && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-700" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-amber-900">
+                        {isThai ? 'Google อาจบล็อก app.localhost ในเครื่อง dev' : 'Google may block app.localhost in local dev'}
+                      </p>
+                      <p className="text-xs leading-5 text-amber-800">
+                        {isThai
+                          ? 'ถ้าขึ้น “การเข้าถึงถูกบล็อก” ให้เปิดผ่าน localhost หรือใช้รหัสผ่านด้านล่าง'
+                          : 'If access is blocked, open through localhost or use the password form below.'}
+                      </p>
+                      <a href={localGoogleSafeUrl} className="inline-flex text-xs font-semibold text-amber-900 underline underline-offset-2">
+                        {isThai ? 'เปิดหน้า login ผ่าน localhost' : 'Open login through localhost'}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div
                 ref={googleButtonRef}

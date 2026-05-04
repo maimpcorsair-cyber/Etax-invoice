@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import { withSystemRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
@@ -6,6 +7,47 @@ import { requireRole } from '../middleware/auth';
 export const systemRouter = Router();
 
 systemRouter.use(requireRole('super_admin'));
+
+function issueTenantToken(user: { id: string; companyId: string; role: string; email: string }) {
+  return jwt.sign(
+    { userId: user.id, companyId: user.companyId, role: user.role, email: user.email },
+    process.env.JWT_SECRET!,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any },
+  );
+}
+
+function serializeTenantUser(user: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  companyId: string;
+  passwordHash?: string | null;
+  googleSub?: string | null;
+  company: {
+    nameTh: string;
+    nameEn: string | null;
+    taxId: string;
+  };
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    companyId: user.companyId,
+    auth: {
+      hasPassword: !!user.passwordHash,
+      hasGoogle: !!user.googleSub,
+    },
+    company: {
+      nameTh: user.company.nameTh,
+      nameEn: user.company.nameEn,
+      taxId: user.company.taxId,
+    },
+  };
+}
 
 systemRouter.get('/overview', async (_req, res) => {
   try {
@@ -200,4 +242,45 @@ systemRouter.get('/session', (req, res) => {
       companyId: req.user!.companyId,
     },
   });
+});
+
+systemRouter.post('/tenants/:companyId/switch', async (req, res) => {
+  try {
+    const company = await withSystemRlsContext(prisma, (tx) => tx.company.findUnique({
+      where: { id: req.params.companyId },
+      select: { id: true },
+    }), { role: req.user!.role, userId: req.user!.userId });
+
+    if (!company) {
+      res.status(404).json({ error: 'Tenant company not found' });
+      return;
+    }
+
+    const tenantUser = await withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+      where: {
+        companyId: company.id,
+        isActive: true,
+        role: { in: ['admin', 'accountant', 'viewer'] },
+      },
+      orderBy: [
+        { role: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      include: { company: true },
+    }), { role: req.user!.role, userId: req.user!.userId });
+
+    if (!tenantUser) {
+      res.status(404).json({ error: 'This tenant has no active non-owner user to switch into' });
+      return;
+    }
+
+    res.json({
+      data: {
+        token: issueTenantToken(tenantUser),
+        user: serializeTenantUser(tenantUser),
+      },
+    });
+  } catch {
+    res.status(500).json({ error: 'Failed to switch tenant session' });
+  }
 });

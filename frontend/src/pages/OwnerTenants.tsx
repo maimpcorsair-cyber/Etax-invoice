@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { ArrowLeftRight, Search } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { buildPlaneUrl } from '../lib/platform';
 
 type OverviewResponse = {
   data?: {
@@ -37,6 +38,8 @@ export default function OwnerTenants() {
   const { token } = useAuthStore();
   const [data, setData] = useState<OverviewResponse['data'] | null>(null);
   const [query, setQuery] = useState('');
+  const [switchingCompanyId, setSwitchingCompanyId] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -63,6 +66,49 @@ export default function OwnerTenants() {
     });
   }, [data, query]);
 
+  async function switchToTenant(companyId: string) {
+    if (!token) return;
+
+    setSwitchingCompanyId(companyId);
+    setSwitchError('');
+
+    try {
+      const res = await fetch(`/api/system/tenants/${companyId}/switch`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json() as {
+        data?: {
+          token: string;
+          user: {
+            id: string;
+            email: string;
+            name: string;
+            role: 'admin' | 'accountant' | 'viewer' | 'super_admin';
+            companyId: string;
+            auth?: { hasPassword: boolean; hasGoogle: boolean };
+            company?: { nameTh: string; nameEn?: string | null; taxId: string };
+          };
+        };
+        error?: string;
+      };
+
+      if (!res.ok || !json.data) {
+        setSwitchError(json.error ?? 'Unable to switch to this tenant.');
+        return;
+      }
+
+      window.location.href = buildPlaneUrl('/app/dashboard', 'app', {
+        token: json.data.token,
+        user: json.data.user,
+      });
+    } catch {
+      setSwitchError('Unable to switch to this tenant.');
+    } finally {
+      setSwitchingCompanyId(null);
+    }
+  }
+
   if (!data) return <div className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-600 shadow-sm">Loading tenants...</div>;
 
   return (
@@ -70,6 +116,11 @@ export default function OwnerTenants() {
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold">Tenants</h1>
         <p className="text-sm text-slate-600">Monitor company footprint, invoice activity, revenue, and renewal risk side-by-side.</p>
+        {switchError && (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            {switchError}
+          </div>
+        )}
         <label className="mt-4 flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
           <Search className="h-4 w-4 text-slate-400" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search company name or tax ID" className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
@@ -86,6 +137,7 @@ export default function OwnerTenants() {
                 <th className="px-3 py-2">Revenue</th>
                 <th className="px-3 py-2">Renewal</th>
                 <th className="px-3 py-2">Latest</th>
+                <th className="px-3 py-2 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -113,6 +165,17 @@ export default function OwnerTenants() {
                       )}
                     </td>
                     <td className="px-3 py-3 text-xs text-slate-500">{company.latestInvoice ? `${company.latestInvoice.invoiceNumber} · ${new Date(company.latestInvoice.invoiceDate).toLocaleDateString('en-GB')}` : 'No invoices'}</td>
+                    <td className="px-3 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => switchToTenant(company.id)}
+                        disabled={switchingCompanyId === company.id}
+                        className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                        {switchingCompanyId === company.id ? 'Opening...' : 'Open App'}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}

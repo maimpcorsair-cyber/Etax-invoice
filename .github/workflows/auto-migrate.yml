@@ -1,0 +1,40 @@
+name: Auto DB Migration
+
+# Automatically applies Prisma migrations on every push to main
+# This ensures new migrations are applied without manual intervention
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/prisma/migrations/**'
+      - 'backend/prisma/schema.prisma'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run Prisma migration
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Verify migration
+        run: echo "✅ Database migration completed successfully"

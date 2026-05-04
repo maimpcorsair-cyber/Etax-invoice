@@ -1926,7 +1926,18 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       }
 
       const ocrData = JSON.parse(stored) as OcrResult & { companyId?: string };
-      const companyId = ocrData.companyId;
+
+      // SECURITY: Always derive companyId from the verified lineUserLink — never trust
+      // companyId from the OCR session JSON (attacker could inject any companyId there).
+      const link = await prisma.lineUserLink.findUnique({
+        where: { lineUserId },
+        include: { user: { select: { companyId: true } } },
+      });
+      if (!link) {
+        await sendLineText(lineUserId, 'ขอโทษ ไม่พบข้อมูลบริษัท กรุณาเชื่อมบัญชีใหม่');
+        return;
+      }
+      const companyId = link.user.companyId;
 
       if (!companyId) {
         await sendLineText(lineUserId, 'ขอโทษ ไม่พบข้อมูลบริษัท กรุณาเชื่อมบัญชีใหม่');

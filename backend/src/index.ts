@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
+import { rateLimitMiddleware } from './middleware/rateLimit';
 import { logger } from './config/logger';
 import { authRouter } from './routes/auth';
 import { invoicesRouter } from './routes/invoices';
@@ -56,12 +56,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 
-// 200 req/min per IP across all API routes
-const limiter = rateLimit({ windowMs: 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
-app.use('/api', limiter);
-
-// 10 req/min per IP on auth routes (brute-force protection)
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+// Redis-based rate limiting after body parsing
+// Apply per-companyId for authenticated requests, per-IP for unauthenticated
+app.use('/api/', rateLimitMiddleware);
 
 const healthHandler = (_req: express.Request, res: express.Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -73,10 +70,6 @@ app.get('/api/health', healthHandler);
 // Keep-alive endpoint — no auth required, used by UptimeRobot to prevent Render cold starts
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/logout', authLimiter);
-app.use('/api/auth/google', authLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/invoices', authenticate, invoicesRouter);

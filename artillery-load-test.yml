@@ -1,0 +1,159 @@
+config:
+  target: "{{ process.env.BASE_URL || 'http://localhost:4000' }}"
+  phases:
+    - name: "Baseline 100 VUs"
+      duration: 120
+      arrivalRate: 100
+    - name: "Scale up to 500 VUs"  
+      duration: 180
+      arrivalRate: 500
+    - name: "Sustained 1000 VUs"
+      duration: 300
+      arrivalRate: 1000
+    - name: "Spike to 5000"
+      duration: 60
+      arrivalRate: 5000
+    - name: "Target 10000 VUs"
+      duration: 600
+      arrivalRate: 10000
+  variables:
+    token: null
+    companyId: null
+  processor: "./artillery-functions.js"
+  plugins:
+    expect: {}
+  http:
+    pool: 10
+    timeout: 30
+    retries: 3
+    reuseCookies: true
+
+scenarios:
+  - name: "Full user journey"
+    weight: 70
+    flow:
+      - function: "loginAndSetToken"
+      - get:
+          url: "/api/invoices"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+          capture:
+            - json: "$.data"
+              as: "invoices"
+      - get:
+          url: "/api/dashboard/stats"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+          capture:
+            - json: "$.data"
+              as: "stats"
+      - get:
+          url: "/api/customers"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+          capture:
+            - json: "$.data"
+              as: "customers"
+
+  - name: "Invoice list heavy"
+    weight: 20
+    flow:
+      - function: "loginAndSetToken"
+      - get:
+          url: "/api/invoices"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+      - get:
+          url: "/api/invoices?page=2"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+      - get:
+          url: "/api/invoices?page=3"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+
+  - name: "Draft invoice creation (later phases)"
+    weight: 10
+    flow:
+      - function: "loginAndSetToken"
+      - post:
+          url: "/api/invoices"
+          beforeRequest: "addAuthHeader"
+          json:
+            type: "T01"
+            customerId: "{{ $loopItem.id }}"
+            items:
+              - description: "Load test item"
+                quantity: 1
+                unitPrice: 100
+                vatRate: 7
+            seller:
+              branchId: "00000"
+              taxId: "1234567890123"
+              name: "Test Company"
+              address: "123 Test Street"
+              phone: "021234567"
+              email: "test@company.com"
+          expect: 201
+          afterResponse: "handle401ReLogin"
+
+  - name: "Dashboard only"
+    weight: 10
+    flow:
+      - function: "loginAndSetToken"
+      - get:
+          url: "/api/dashboard/stats"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+          afterResponse: "handle401ReLogin"
+
+  - name: "Customers list"
+    weight: 10
+    flow:
+      - function: "loginAndSetToken"
+      - get:
+          url: "/api/customers"
+          beforeRequest: "addAuthHeader"
+          expect: 200
+          afterResponse: "handle401ReLogin"
+
+processor:
+  functions:
+    loginAndSetToken:
+      - code: |
+          const axios = require('axios');
+          const url = (torchContext.vars.BASE_URL || 'http://localhost:4000') + '/api/auth/login';
+          axios.post(url, {
+            email: torchContext.vars.EMAIL || 'admin@siamtech.co.th',
+            password: torchContext.vars.PASSWORD || 'Admin@123456'
+          })
+          .then(response => {
+            torchContext.events.emit('done', { token: response.data.token });
+          })
+          .catch(err => {
+            torchContext.events.emit('error', { message: 'Login failed' });
+          });
+
+  beforeRequest:
+    addAuthHeader:
+      - code: |
+          if (torchContext.vars.token) {
+            torchContext.request.headers['Authorization'] = 'Bearer ' + torchContext.vars.token;
+          }
+
+  afterResponse:
+    handle401ReLogin:
+      - code: |
+          if (torchContext.response.statusCode === 401) {
+            const axios = require('axios');
+            const url = (torchContext.vars.BASE_URL || 'http://localhost:4000') + '/api/auth/login';
+            return axios.post(url, {
+              email: torchContext.vars.EMAIL || 'admin@siamtech.co.th',
+              password: torchContext.vars.PASSWORD || 'Admin@123456'
+            }).then(response => {
+              torchContext.vars.token = response.data.token;
+              torchContext.request.headers['Authorization'] = 'Bearer ' + response.data.token;
+              return torchContext.response;
+            });
+          }
+          return torchContext.response;

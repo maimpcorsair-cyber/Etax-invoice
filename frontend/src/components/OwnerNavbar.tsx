@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Shield, Building2, ArrowLeftRight, LogOut, Receipt, TicketPercent, RefreshCw } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
-import { buildPlaneUrl } from '../lib/platform';
 
 const items = [
   { key: 'overview', href: '/ops/overview', label: 'Owner Overview', icon: Shield },
@@ -10,15 +9,12 @@ const items = [
   { key: 'transactions', href: '/ops/transactions', label: 'Transactions', icon: Receipt },
   { key: 'coupons', href: '/ops/coupons', label: 'Coupons', icon: TicketPercent },
   { key: 'renewals', href: '/ops/renewals', label: 'Renewals', icon: RefreshCw },
-  { key: 'tenant', href: '/app/dashboard', label: 'Tenant App', icon: Building2 },
+  { key: 'tenant', href: '/ops/tenants', label: 'Tenant App', icon: Building2 },
 ];
 
 export default function OwnerNavbar() {
   const location = useLocation();
-  const { token, user, clearAuth } = useAuthStore();
-  const tenantUrl = token && user
-    ? buildPlaneUrl('/app/dashboard', 'app', { token, user })
-    : '/app/dashboard';
+  const { user, clearAuth } = useAuthStore();
 
   return (
     <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/92 backdrop-blur">
@@ -40,7 +36,7 @@ export default function OwnerNavbar() {
             return (
               <Link
                 key={item.key}
-                to={item.key === 'tenant' ? tenantUrl : item.href}
+                to={item.href}
                 className={clsx(
                   'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
                   isActive
@@ -55,11 +51,11 @@ export default function OwnerNavbar() {
           })}
 
           <Link
-            to={tenantUrl}
+            to="/ops/tenants"
             className="hidden min-h-11 sm:inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           >
             <ArrowLeftRight className="w-4 h-4" />
-            <span className="hidden lg:inline">Switch To Tenant</span>
+            <span className="hidden lg:inline">Choose Tenant</span>
           </Link>
 
           <button

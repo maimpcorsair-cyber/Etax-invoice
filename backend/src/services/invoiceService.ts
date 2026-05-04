@@ -1,9 +1,10 @@
 import prisma from '../config/database';
-import { withRlsContext } from '../config/rls';
+import { withInvoiceLock } from '../config/rls';
 import { logger } from '../config/logger';
 
 const TYPE_PREFIX: Record<string, string> = {
   tax_invoice: 'INV',
+  tax_invoice_receipt: 'INV',
   receipt: 'RCT',
   credit_note: 'CN',
   debit_note: 'DN',
@@ -12,16 +13,29 @@ const TYPE_PREFIX: Record<string, string> = {
 export async function generateInvoiceNumber(companyId: string, type: string): Promise<string> {
   const prefix = TYPE_PREFIX[type] ?? 'DOC';
   const year = new Date().getFullYear();
-  const month = String(new Date().getMonth() + 1).padStart(2, '0');
 
-  const count = await withRlsContext(prisma, { companyId, role: 'tenant', systemMode: false }, async (tx) => {
-    return tx.invoice.count({
-      where: { companyId, type: type as never, invoiceDate: { gte: new Date(`${year}-${month}-01`) } },
+  // Use advisory lock to prevent duplicate invoice numbers under concurrent creation
+  return withInvoiceLock(prisma, companyId, async (tx) => {
+    // Find the latest invoice number for this company and type in current year
+    const latest = await tx.invoice.findFirst({
+      where: {
+        companyId,
+        invoiceNumber: { startsWith: `${prefix}-${year}` },
+      },
+      orderBy: { invoiceNumber: 'desc' },
     });
-  });
 
-  const seq = String(count + 1).padStart(6, '0');
-  return `${prefix}-${year}${month}-${seq}`;
+    // Extract sequence from last invoice number (format: PREFIX-YYYY-NNNNNN)
+    let seq = 0;
+    if (latest?.invoiceNumber) {
+      const parts = latest.invoiceNumber.split('-');
+      const lastSeq = parts[parts.length - 1];
+      seq = parseInt(lastSeq, 10) || 0;
+    }
+
+    const newSeq = seq + 1;
+    return `${prefix}-${year}-${newSeq.toString().padStart(6, '0')}`;
+  });
 }
 
 export function amountInWordsThai(amount: number): string {

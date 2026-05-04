@@ -46,12 +46,13 @@ export async function withRlsContext<T>(
   ctx: RlsContext,
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ) {
+  const timeout = parseInt(process.env.DB_TX_TIMEOUT ?? '60000', 10);
   return prisma.$transaction(async (tx) => {
     await applyRlsContext(tx, ctx);
     return fn(tx);
   }, {
     maxWait: 10_000,
-    timeout: 60_000,
+    timeout,
   });
 }
 
@@ -61,4 +62,39 @@ export async function withSystemRlsContext<T>(
   overrides: Omit<RlsContext, 'systemMode'> = {},
 ) {
   return withRlsContext(prisma, systemRlsContext(overrides), fn);
+}
+
+/** Simple string hash to generate a consistent positive integer for PostgreSQL advisory lock key */
+function hashStringToInt(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash) % 2147483647; // Keep within PostgreSQL int range
+}
+
+/**
+ * Acquire an advisory lock for the duration of the transaction.
+ * Uses pg_advisory_xact_lock which auto-releases at transaction end.
+ *
+ * companyId is hashed to create a consistent lock key per company.
+ * This prevents race conditions when multiple concurrent requests try to generate
+ * invoice numbers for the same company simultaneously.
+ */
+export async function withInvoiceLock<T>(
+  prisma: PrismaClient,
+  companyId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  const lockKey = hashStringToInt(companyId);
+  return prisma.$transaction(async (tx) => {
+    // pg_advisory_xact_lock auto-releases at commit/rollback
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+    return fn(tx);
+  }, {
+    maxWait: 5000,  // 5s max wait to acquire lock
+    timeout: 60000,
+  });
 }
