@@ -1,0 +1,75 @@
+name: Emergency Migration Repair
+
+# Use only after a production Prisma migration has failed and Prisma blocks
+# normal deploys with P3009. This is not part of the normal release path.
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: 'Failed migration name to mark rolled back'
+        required: true
+        default: '20260504_rls_remaining_tables'
+      confirm:
+        description: 'Type REPAIR to confirm touching _prisma_migrations'
+        required: true
+
+jobs:
+  repair:
+    if: ${{ github.event.inputs.confirm == 'REPAIR' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: production-database-migration
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Print current migration records
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c \
+            "SELECT migration_name, started_at, finished_at, rolled_back_at, logs FROM \"_prisma_migrations\" WHERE migration_name = '${{ github.event.inputs.migration }}' ORDER BY started_at DESC;"
+
+      - name: Mark failed migration as rolled back
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate resolve --rolled-back "${{ github.event.inputs.migration }}" || true
+
+      - name: Clear any remaining failed records for this migration
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c \
+            "UPDATE \"_prisma_migrations\" SET rolled_back_at = NOW() WHERE migration_name = '${{ github.event.inputs.migration }}' AND finished_at IS NULL AND rolled_back_at IS NULL;"
+
+      - name: Apply migrations normally
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Print final migration records
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          psql "$DATABASE_URL" -c \
+            "SELECT migration_name, started_at, finished_at, rolled_back_at, logs FROM \"_prisma_migrations\" WHERE migration_name = '${{ github.event.inputs.migration }}' ORDER BY started_at DESC;"

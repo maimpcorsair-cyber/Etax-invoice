@@ -13,12 +13,10 @@ on:
         type: choice
         options:
           - deploy
-          - resolve-rolled-back
-          - repair-and-deploy
       migration:
-        description: 'Migration name for resolve-rolled-back'
+        description: 'Reserved for emergency repair workflow; not used by normal deploy'
         required: false
-        default: '20260504_rls_remaining_tables'
+        default: ''
       confirm:
         description: 'Type YES to confirm running Prisma migrations on production'
         required: true
@@ -28,6 +26,9 @@ jobs:
     if: ${{ github.event.inputs.confirm == 'YES' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: production-database-migration
+      cancel-in-progress: false
     
     steps:
       - name: Checkout
@@ -44,47 +45,17 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Install PostgreSQL client
-        if: ${{ github.event.inputs.operation == 'repair-and-deploy' }}
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Print failed migration records
-        if: ${{ github.event.inputs.operation == 'repair-and-deploy' }}
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: |
-          psql "$DATABASE_URL" -c \
-            "SELECT migration_name, started_at, finished_at, rolled_back_at, logs FROM \"_prisma_migrations\" WHERE migration_name = '${{ github.event.inputs.migration }}' ORDER BY started_at DESC;"
-
-      - name: Resolve failed migration as rolled back
-        if: ${{ github.event.inputs.operation == 'resolve-rolled-back' || github.event.inputs.operation == 'repair-and-deploy' }}
+      - name: Check migration status
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         working-directory: backend
-        run: npx prisma migrate resolve --rolled-back "${{ github.event.inputs.migration }}" || true
-
-      - name: Force-clear remaining failed migration records
-        if: ${{ github.event.inputs.operation == 'repair-and-deploy' }}
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: |
-          psql "$DATABASE_URL" -c \
-            "UPDATE \"_prisma_migrations\" SET rolled_back_at = NOW() WHERE migration_name = '${{ github.event.inputs.migration }}' AND finished_at IS NULL AND rolled_back_at IS NULL;"
+        run: npx prisma migrate status
 
       - name: Run Prisma migration
-        if: ${{ github.event.inputs.operation == 'deploy' || github.event.inputs.operation == 'repair-and-deploy' }}
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         working-directory: backend
         run: npx prisma migrate deploy
-
-      - name: Print final migration records
-        if: ${{ github.event.inputs.operation == 'repair-and-deploy' }}
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: |
-          psql "$DATABASE_URL" -c \
-            "SELECT migration_name, started_at, finished_at, rolled_back_at, logs FROM \"_prisma_migrations\" WHERE migration_name = '${{ github.event.inputs.migration }}' ORDER BY started_at DESC;"
 
       - name: Verify migration
         run: echo "Prisma migration operation completed successfully"

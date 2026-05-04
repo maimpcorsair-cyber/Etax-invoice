@@ -15,6 +15,9 @@ jobs:
     name: Migrate and Deploy Backend
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: production-backend-deploy
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,6 +36,12 @@ jobs:
       - name: Verify backend types
         working-directory: backend
         run: npm run typecheck
+
+      - name: Check migration status
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate status
 
       - name: Apply production migrations
         env:
