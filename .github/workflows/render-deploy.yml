@@ -4,6 +4,7 @@ name: Deploy to Render
 # This keeps database shape and application code in the same release order.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
