@@ -141,26 +141,31 @@ export default function AiChatPanel({
   }
 
   return (
-    <section className={`flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm ${heightClass} ${className}`}>
+    <section className={`flex flex-col overflow-hidden rounded-2xl border border-primary-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] ${heightClass} ${className}`}>
       {showHeader && (
-        <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-950 px-4 py-3 text-white">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
+        <div className="relative flex items-center gap-3 overflow-hidden border-b border-primary-100 bg-[#f4f7fc] px-4 py-3 text-slate-900">
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(30,58,138,0.45),transparent)] animate-command-scan" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white shadow-sm">
             <Bot className="h-5 w-5" />
           </span>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-bold">{isThai ? 'พี่นุช AI' : 'Pinuch AI'}</p>
-            <p className="text-xs text-gray-300">{isThai ? 'คุยผ่านเว็บ ไม่กิน LINE quota' : 'Web chat, no LINE quota'}</p>
+            <p className="text-xs text-slate-500">{isThai ? 'คุยผ่านเว็บ ไม่กิน LINE quota' : 'Web chat, no LINE quota'}</p>
           </div>
+          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-command-pulse" />
+            {isThai ? 'พร้อมช่วย' : 'Ready'}
+          </span>
         </div>
       )}
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3">
+      <div className="flex-1 space-y-3 overflow-y-auto bg-[#f7f9fd] p-3">
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
           return (
             <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[84%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm ${
-                isUser ? 'bg-primary-600 text-white' : 'border border-gray-200 bg-white text-gray-800'
+              <div className={`max-w-[84%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm animate-message-rise ${
+                isUser ? 'bg-primary-700 text-white' : 'border border-primary-100 bg-white text-slate-800'
               }`}>
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
@@ -168,7 +173,7 @@ export default function AiChatPanel({
           );
         })}
         {(sending || uploading) && (
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-primary-100 bg-white px-3 py-2 text-sm text-slate-500 shadow-sm animate-message-rise">
             <Loader2 className="h-4 w-4 animate-spin" />
             {uploading ? (isThai ? 'กำลังอ่านเอกสาร...' : 'Reading document...') : (isThai ? 'กำลังคิด...' : 'Thinking...')}
           </div>
@@ -182,13 +187,13 @@ export default function AiChatPanel({
               key={q}
               onClick={() => void send(q)}
               disabled={sending || uploading}
-              className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-full border border-primary-100 bg-primary-50/40 px-2.5 py-1 text-xs font-medium text-primary-800 transition hover:border-primary-200 hover:bg-primary-50 disabled:opacity-50"
             >
               {q}
             </button>
           ))}
         </div>
-        <form onSubmit={submit} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2 py-1.5 focus-within:border-primary-300 focus-within:bg-white">
+        <form onSubmit={submit} className="flex items-center gap-2 rounded-xl border border-primary-100 bg-[#f7f9fd] px-2 py-1.5 transition focus-within:border-primary-300 focus-within:bg-white focus-within:shadow-glow">
           <input
             ref={fileRef}
             type="file"
@@ -204,7 +209,7 @@ export default function AiChatPanel({
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={sending || uploading}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-800 disabled:opacity-50"
             aria-label={isThai ? 'อัปโหลดเอกสาร' : 'Upload document'}
             title={isThai ? 'อัปโหลดเอกสาร' : 'Upload document'}
           >
@@ -218,7 +223,7 @@ export default function AiChatPanel({
             className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none"
             disabled={sending || uploading}
           />
-          <button type="submit" disabled={sending || uploading || !input.trim()} className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+          <button type="submit" disabled={sending || uploading || !input.trim()} className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-700 text-white transition hover:bg-primary-800 disabled:opacity-50">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </form>

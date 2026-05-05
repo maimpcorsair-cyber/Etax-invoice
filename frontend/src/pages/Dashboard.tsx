@@ -325,17 +325,19 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Command Center */}
-      <section className="overflow-hidden rounded-2xl border border-emerald-900/10 bg-slate-950 text-white shadow-sm">
+      <section className="relative overflow-hidden rounded-2xl border border-primary-100 bg-[#f4f7fc] text-slate-950 shadow-sm">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(30,58,138,0.5),transparent)] animate-command-scan" />
+        <div className="pointer-events-none absolute right-0 top-0 h-40 w-1/2 bg-[linear-gradient(135deg,rgba(30,58,138,0.08),transparent_58%)]" />
         <div className="grid gap-0 xl:grid-cols-[minmax(0,0.88fr)_minmax(420px,1.12fr)]">
-          <div className="p-5 sm:p-6 lg:p-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+          <div className="relative p-5 sm:p-6 lg:p-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-1 text-xs font-semibold text-primary-800 shadow-sm">
               <Bot className="h-3.5 w-3.5" />
               {isThai ? 'AI Tax Command Center' : 'AI Tax Command Center'}
             </div>
-            <h1 className="mt-4 max-w-xl text-2xl font-bold leading-tight text-white sm:text-3xl">
+            <h1 className="mt-4 max-w-xl text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
               {isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/75">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
               {isThai
                 ? `สวัสดี ${user?.name ?? ''} — ระบบรวมงานเอกสารเข้า, e-Tax, RD, VAT และลูกหนี้ไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
                 : `Hi ${user?.name ?? ''} — this workspace brings document intake, e-Tax, RD, VAT, and receivables into one daily operating view.`}
@@ -343,14 +345,14 @@ export default function Dashboard() {
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
                 to="/app/purchase-invoices"
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-bold text-white shadow-button transition hover:-translate-y-0.5 hover:bg-primary-800"
               >
                 <Inbox className="h-4 w-4" />
                 {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
               </Link>
               <Link
                 to="/app/invoices/new"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15"
+                className="inline-flex items-center gap-2 rounded-xl border border-primary-100 bg-white px-4 py-2.5 text-sm font-bold text-primary-800 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:bg-primary-50"
               >
                 <Plus className="h-4 w-4" />
                 {isThai ? 'สร้าง e-Tax ใหม่' : 'Create e-Tax'}
@@ -358,15 +360,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="border-t border-white/10 bg-white/[0.04] p-4 sm:p-5 xl:border-l xl:border-t-0">
+          <div className="relative border-t border-primary-100 bg-white/62 p-4 sm:p-5 xl:border-l xl:border-t-0">
             <div className="grid gap-3 sm:grid-cols-2">
-              {commandItems.map((item) => {
+              {commandItems.map((item, index) => {
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.key}
                     to={item.href}
-                    className={`group rounded-xl border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-lg ${item.tone}`}
+                    className={`group rounded-xl border px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg animate-command-card ${item.tone}`}
+                    style={{ animationDelay: `${index * 80}ms` }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/70 ring-1 ring-black/5">
