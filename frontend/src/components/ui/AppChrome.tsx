@@ -5,8 +5,8 @@ import { clsx } from 'clsx';
 
 export const mascotAssets = {
   hero: '/brand/billoy-hero-mascot.jpg',
-  poses: '/brand/mascot/billoy-product-poses.jpg',
-  spot: '/brand/mascot/billoy-receipt-phone.jpg',
+  poses: '/brand/mascot/billoy-product-poses.jpg?v=20260506b',
+  spot: '/brand/mascot/billoy-receipt-phone.jpg?v=20260506b',
 };
 
 interface PageHeaderProps {
