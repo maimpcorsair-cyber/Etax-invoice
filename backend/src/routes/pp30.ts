@@ -111,12 +111,24 @@ async function buildPp30(req: Express.Request extends never ? never : { user: No
   return {
     company: company ?? { nameTh: '', nameEn: '', taxId: '', branchCode: '' },
     sales: {
-      vat7: { totalExclVat: salesByVat.vat7.totalExclVat, vat: salesByVat.vat7.vat },
-      vatZero: { totalExclVat: salesByVat.vatZero.totalExclVat, vat: salesByVat.vatZero.vat },
-      vatExempt: { totalExclVat: salesByVat.vatExempt.totalExclVat },
+      byVatType: {
+        vat7: { totalExclVat: salesByVat.vat7.totalExclVat, vatAmount: salesByVat.vat7.vat },
+        vatZero: { totalExclVat: salesByVat.vatZero.totalExclVat, vatAmount: salesByVat.vatZero.vat },
+        vatExempt: { totalExclVat: salesByVat.vatExempt.totalExclVat, vatAmount: 0 },
+      },
+      totalExclVat: totalSalesExclVat,
+      outputVat,
+      totalInclVat: totalSalesExclVat + outputVat,
     },
     purchases: {
-      vat7: { totalExclVat: purchasesByVat.vat7.totalExclVat, vat: purchasesByVat.vat7.vat },
+      byVatType: {
+        vat7: { totalExclVat: purchasesByVat.vat7.totalExclVat, vatAmount: purchasesByVat.vat7.vat },
+        vatZero: { totalExclVat: purchasesByVat.vatZero.totalExclVat, vatAmount: purchasesByVat.vatZero.vat },
+        vatExempt: { totalExclVat: purchasesByVat.vatExempt.totalExclVat, vatAmount: 0 },
+      },
+      totalExclVat: purchasesByVat.vat7.totalExclVat + purchasesByVat.vatZero.totalExclVat + purchasesByVat.vatExempt.totalExclVat,
+      inputVat,
+      totalInclVat: (purchasesByVat.vat7.totalExclVat + purchasesByVat.vatZero.totalExclVat + purchasesByVat.vatExempt.totalExclVat) + inputVat,
     },
     summary: {
       totalSalesExclVat,
@@ -196,26 +208,29 @@ pp30Router.get('/wht', async (req, res) => {
 
     res.json({
       period: range.period,
-      totalCertificates,
-      totalWithheld,
-      totalAmount,
-      byRate: Object.entries(byRate).map(([rate, data]) => ({
-        rate,
-        label: incomeTypeLabels[rate] ?? rate,
-        count: data.count,
-        totalWithheld: Math.round(data.totalWithheld * 100) / 100,
-        totalAmount: Math.round(data.totalAmount * 100) / 100,
-      })),
-      certificates: certs.map((c) => ({
-        id: c.id,
-        certificateNumber: c.certificateNumber,
-        whtRate: c.whtRate,
-        whtAmount: c.whtAmount,
-        totalAmount: c.totalAmount,
-        recipientName: c.recipientName,
-        recipientTaxId: c.recipientTaxId,
-        paymentDate: c.paymentDate.toISOString(),
-      })),
+      data: {
+        period: range.period,
+        totalCertificates,
+        totalWithheld,
+        totalAmount,
+        byRate: Object.entries(byRate).map(([rate, data]) => ({
+          rate,
+          label: incomeTypeLabels[rate] ?? rate,
+          count: data.count,
+          totalWithheld: Math.round(data.totalWithheld * 100) / 100,
+          totalAmount: Math.round(data.totalAmount * 100) / 100,
+        })),
+        certificates: certs.map((c) => ({
+          id: c.id,
+          certificateNumber: c.certificateNumber,
+          whtRate: c.whtRate,
+          whtAmount: c.whtAmount,
+          totalAmount: c.totalAmount,
+          recipientName: c.recipientName,
+          recipientTaxId: c.recipientTaxId,
+          paymentDate: c.paymentDate.toISOString(),
+        })),
+      },
     });
   } catch (err) {
     logger.error('pp30/wht error', err);
@@ -271,12 +286,12 @@ pp30Router.get('/export', async (req, res) => {
     lines.push(['Branch Code', data.company.branchCode ?? ''].map(csvEscape).join(','));
     lines.push('');
     lines.push(['Sales — Category', 'Total Excl. VAT', 'VAT'].map(csvEscape).join(','));
-    lines.push(['VAT 7%', data.sales.vat7.totalExclVat, data.sales.vat7.vat].map(csvEscape).join(','));
-    lines.push(['VAT 0% (Zero-rated)', data.sales.vatZero.totalExclVat, data.sales.vatZero.vat].map(csvEscape).join(','));
-    lines.push(['VAT Exempt', data.sales.vatExempt.totalExclVat, ''].map(csvEscape).join(','));
+    lines.push(['VAT 7%', data.sales.byVatType.vat7.totalExclVat, data.sales.byVatType.vat7.vatAmount].map(csvEscape).join(','));
+    lines.push(['VAT 0% (Zero-rated)', data.sales.byVatType.vatZero.totalExclVat, data.sales.byVatType.vatZero.vatAmount].map(csvEscape).join(','));
+    lines.push(['VAT Exempt', data.sales.byVatType.vatExempt.totalExclVat, ''].map(csvEscape).join(','));
     lines.push('');
     lines.push(['Purchases — Category', 'Total Excl. VAT', 'VAT'].map(csvEscape).join(','));
-    lines.push(['VAT 7%', data.purchases.vat7.totalExclVat, data.purchases.vat7.vat].map(csvEscape).join(','));
+    lines.push(['VAT 7%', data.purchases.byVatType.vat7.totalExclVat, data.purchases.byVatType.vat7.vatAmount].map(csvEscape).join(','));
     lines.push('');
     lines.push(['Summary', 'Amount'].map(csvEscape).join(','));
     lines.push(['Total Sales Excl. VAT', data.summary.totalSalesExclVat].map(csvEscape).join(','));

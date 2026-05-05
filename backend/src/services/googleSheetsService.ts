@@ -340,12 +340,24 @@ export interface Pp30SheetData {
   period: string;
   company: { nameTh: string; nameEn: string | null; taxId: string; branchCode: string };
   sales: {
-    vat7: { totalExclVat: number; vat: number };
-    vatZero: { totalExclVat: number; vat: number };
-    vatExempt: { totalExclVat: number };
+    byVatType: {
+      vat7: { totalExclVat: number; vatAmount: number };
+      vatZero: { totalExclVat: number; vatAmount: number };
+      vatExempt: { totalExclVat: number; vatAmount: number };
+    };
+    totalExclVat: number;
+    outputVat: number;
+    totalInclVat: number;
   };
   purchases: {
-    vat7: { totalExclVat: number; vat: number };
+    byVatType: {
+      vat7: { totalExclVat: number; vatAmount: number };
+      vatZero: { totalExclVat: number; vatAmount: number };
+      vatExempt: { totalExclVat: number; vatAmount: number };
+    };
+    totalExclVat: number;
+    inputVat: number;
+    totalInclVat: number;
   };
   summary: {
     totalSalesExclVat: number;
@@ -396,13 +408,13 @@ export async function exportPp30ToSheets(data: Pp30SheetData): Promise<string> {
   // ── Sheet 2: Detail by VAT type ──────────────────────────────────────────
   const detailRows = [
     ['ประเภท', 'มูลค่าก่อน VAT', 'VAT'],
-    ['ยอดขาย VAT 7%', fmt(data.sales.vat7.totalExclVat), fmt(data.sales.vat7.vat)],
-    ['ยอดขาย VAT 0%', fmt(data.sales.vatZero.totalExclVat), '-'],
-    ['ยอดขาย VAT ยกเว้น', fmt(data.sales.vatExempt.totalExclVat), '-'],
+    ['ยอดขาย VAT 7%', fmt(data.sales.byVatType.vat7.totalExclVat), fmt(data.sales.byVatType.vat7.vatAmount)],
+    ['ยอดขาย VAT 0%', fmt(data.sales.byVatType.vatZero.totalExclVat), '-'],
+    ['ยอดขาย VAT ยกเว้น', fmt(data.sales.byVatType.vatExempt.totalExclVat), '-'],
     ['รวมยอดขาย', fmt(data.summary.totalSalesExclVat), fmt(data.summary.outputVat)],
     ['', '', ''],
     ['ประเภท', 'มูลค่าก่อน VAT', 'VAT'],
-    ['ยอดซื้อ VAT 7%', fmt(data.purchases.vat7.totalExclVat), fmt(data.purchases.vat7.vat)],
+    ['ยอดซื้อ VAT 7%', fmt(data.purchases.byVatType.vat7.totalExclVat), fmt(data.purchases.byVatType.vat7.vatAmount)],
   ];
 
   await Promise.all([
