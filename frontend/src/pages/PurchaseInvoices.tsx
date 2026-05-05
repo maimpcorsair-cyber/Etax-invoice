@@ -797,7 +797,7 @@ export default function PurchaseInvoices() {
               </button>
             </div>
             <div className="mt-6 hidden overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:block">
-              <img src={mascotAssets.poses} alt="" className="h-48 w-full object-cover object-top opacity-95" />
+              <img src={mascotAssets.spot} alt="" className="h-48 w-full object-contain object-center bg-white/95 opacity-95" />
             </div>
           </div>
 

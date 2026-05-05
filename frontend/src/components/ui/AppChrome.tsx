@@ -6,6 +6,7 @@ import { clsx } from 'clsx';
 export const mascotAssets = {
   hero: '/brand/billoy-hero-mascot.jpg',
   poses: '/brand/mascot/billoy-product-poses.jpg',
+  spot: '/brand/mascot/billoy-receipt-phone.jpg',
 };
 
 interface PageHeaderProps {
@@ -14,7 +15,7 @@ interface PageHeaderProps {
   description?: string;
   icon?: ReactNode;
   actions?: ReactNode;
-  mascot?: 'hero' | 'poses' | false;
+  mascot?: 'hero' | 'poses' | 'spot' | false;
   tone?: 'navy' | 'light' | 'teal';
 }
 
@@ -52,7 +53,7 @@ export function PageHeader({
           <img
             src={mascotAssets[mascot]}
             alt=""
-            className={clsx(mascot === 'hero' ? 'object-cover object-center' : 'object-cover object-top')}
+            className={clsx(mascot === 'hero' ? 'object-cover object-center' : 'object-contain object-center bg-white')}
           />
         </div>
       )}
@@ -96,7 +97,7 @@ export function EmptyState({ title, description, actionLabel, actionHref, action
   return (
     <div className={clsx('empty-state-premium', `empty-state-${variant}`)}>
       <div className="empty-state-art" aria-hidden="true">
-        <img src={mascotAssets.poses} alt="" />
+        <img src={mascotAssets.spot} alt="" />
       </div>
       <div className="min-w-0">
         <h3 className="text-base font-bold text-slate-950">{title}</h3>
@@ -125,7 +126,7 @@ export function MascotHelperCard({ title, description, children }: HelperCardPro
     <aside className="mascot-helper-card">
       <div className="flex items-start gap-4">
         <div className="mascot-helper-art" aria-hidden="true">
-          <img src={mascotAssets.poses} alt="" />
+          <img src={mascotAssets.spot} alt="" />
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-slate-950">{title}</h3>

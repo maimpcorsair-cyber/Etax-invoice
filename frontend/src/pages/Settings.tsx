@@ -13,7 +13,7 @@ export default function Settings() {
         eyebrow={isThai ? 'Workspace settings' : 'Workspace settings'}
         title={t('settings.title')}
         description={isThai ? 'ตั้งค่าภาษา การแจ้งเตือน และการเชื่อมต่อให้ทีมทำงานได้ชัดเจนขึ้น' : 'Tune language, notifications, and access settings for a calmer team workspace.'}
-        mascot="poses"
+        mascot="spot"
       />
 
       <MascotHelperCard

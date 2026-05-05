@@ -466,7 +466,7 @@ export default function Expenses() {
           ? `${t('expenses.expenseLimit')}: ${formatCurrency(expenseLimit)}`
           : t('expenses.noLimit')}
         icon={<Wallet className="h-3.5 w-3.5" />}
-        mascot="poses"
+        mascot="spot"
         tone="teal"
         actions={(
           <>

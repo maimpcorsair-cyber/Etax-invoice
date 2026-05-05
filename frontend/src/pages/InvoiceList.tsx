@@ -306,7 +306,7 @@ export default function InvoiceList() {
         title={t('invoice.list')}
         description={isThai ? 'ออกเอกสาร T01-T05, ตรวจสถานะชำระเงิน และส่ง RD จากมุมมองเดียวที่อ่านง่าย' : 'Issue T01-T05 documents, track payment state, and submit to RD from one readable workspace.'}
         icon={<FileText className="h-3.5 w-3.5" />}
-        mascot="poses"
+        mascot="spot"
         actions={(
           <Link to="/app/invoices/new" className={`btn-primary shrink-0 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
             <Plus className="w-4 h-4" />
