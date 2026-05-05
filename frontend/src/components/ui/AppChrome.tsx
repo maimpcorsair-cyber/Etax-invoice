@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, BarChart3, FileCheck2, ReceiptText, Smartphone, Sparkles, Stamp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 
@@ -7,6 +7,7 @@ export const mascotAssets = {
   hero: '/brand/billoy-hero-mascot.jpg',
   poses: '/brand/mascot/billoy-product-poses.jpg?v=20260506b',
   spot: '/brand/mascot/billoy-receipt-phone.jpg?v=20260506b',
+  doodle: '/brand/doodles/billoy-float-doodle.png?v=20260506c',
 };
 
 interface PageHeaderProps {
@@ -29,7 +30,12 @@ export function PageHeader({
   tone = 'light',
 }: PageHeaderProps) {
   return (
-    <section className={clsx('premium-hero', tone === 'navy' && 'premium-hero-dark', tone === 'teal' && 'premium-hero-teal')}>
+    <section className={clsx(
+      'premium-hero',
+      mascot !== 'hero' && 'premium-hero-no-art',
+      tone === 'navy' && 'premium-hero-dark',
+      tone === 'teal' && 'premium-hero-teal',
+    )}>
       <div className="relative z-10 min-w-0">
         {eyebrow && (
           <div className="premium-eyebrow">
@@ -48,16 +54,45 @@ export function PageHeader({
         {actions && <div className="mt-5 flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
 
-      {mascot && (
+      {mascot === 'hero' && (
         <div className="premium-mascot-panel" aria-hidden="true">
           <img
-            src={mascotAssets[mascot]}
+            src={mascotAssets.hero}
             alt=""
-            className={clsx(mascot === 'hero' ? 'object-cover object-center' : 'object-contain object-center bg-white')}
+            className="object-cover object-center"
           />
         </div>
       )}
     </section>
+  );
+}
+
+export function ProductDoodleField() {
+  const items = [
+    { key: 'receipt', icon: ReceiptText, className: 'left-[3%] top-[9rem] hidden xl:flex', delay: '0ms' },
+    { key: 'phone', icon: Smartphone, className: 'right-[7%] top-[11rem] hidden lg:flex', delay: '900ms' },
+    { key: 'check', icon: FileCheck2, className: 'left-[8%] top-[34rem] hidden lg:flex', delay: '1400ms' },
+    { key: 'chart', icon: BarChart3, className: 'right-[4%] top-[40rem] hidden xl:flex', delay: '450ms' },
+    { key: 'stamp', icon: Stamp, className: 'left-[2%] bottom-[10rem] hidden 2xl:flex', delay: '1700ms' },
+  ];
+
+  return (
+    <div className="product-doodle-field" aria-hidden="true">
+      <img src={mascotAssets.doodle} alt="" className="product-doodle-mascot product-doodle-mascot-a" />
+      <img src={mascotAssets.doodle} alt="" className="product-doodle-mascot product-doodle-mascot-b" />
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <span
+            key={item.key}
+            className={clsx('product-doodle-icon', item.className)}
+            style={{ animationDelay: item.delay }}
+          >
+            <Icon className="h-5 w-5" />
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -97,7 +132,7 @@ export function EmptyState({ title, description, actionLabel, actionHref, action
   return (
     <div className={clsx('empty-state-premium', `empty-state-${variant}`)}>
       <div className="empty-state-art" aria-hidden="true">
-        <img src={mascotAssets.spot} alt="" />
+        <img src={mascotAssets.doodle} alt="" />
       </div>
       <div className="min-w-0">
         <h3 className="text-base font-bold text-slate-950">{title}</h3>
@@ -126,7 +161,7 @@ export function MascotHelperCard({ title, description, children }: HelperCardPro
     <aside className="mascot-helper-card">
       <div className="flex items-start gap-4">
         <div className="mascot-helper-art" aria-hidden="true">
-          <img src={mascotAssets.spot} alt="" />
+          <img src={mascotAssets.doodle} alt="" />
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-slate-950">{title}</h3>

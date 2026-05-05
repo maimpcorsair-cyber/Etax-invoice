@@ -10,7 +10,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { DocumentIntake, Invoice, PurchaseInvoice } from '../types';
-import { EmptyState, mascotAssets } from '../components/ui/AppChrome';
+import { EmptyState } from '../components/ui/AppChrome';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
 type DocumentStatusFilter = 'action' | 'all' | 'saved' | 'failed';
@@ -795,9 +795,6 @@ export default function PurchaseInvoices() {
                 <Plus className="h-4 w-4" />
                 {isThai ? 'กรอกเอง' : 'Manual entry'}
               </button>
-            </div>
-            <div className="mt-6 hidden overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:block">
-              <img src={mascotAssets.spot} alt="" className="h-48 w-full object-contain object-center bg-white/95 opacity-95" />
             </div>
           </div>
 

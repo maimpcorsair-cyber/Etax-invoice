@@ -19,7 +19,8 @@ This folder contains the shared product UI primitives for the premium SaaS redes
 ## Assets
 
 - `/brand/billoy-hero-mascot.jpg`: hero mascot used in landing/auth/dashboard.
-- `/brand/mascot/billoy-receipt-phone.jpg`: preferred single mascot style for helper and empty states, based on the provided reference.
+- `/brand/doodles/billoy-float-doodle.png`: transparent doodle mascot used for floating backgrounds, helper cards, and empty states.
+- `/brand/mascot/billoy-receipt-phone.jpg`: reference-style single mascot kept as a brand asset, not used as a large product panel.
 - `/brand/mascot/billoy-product-poses.jpg`: generated pose sheet library for future contextual states.
 
 Keep future mascot files under `frontend/public/brand/mascot/` using names like:
