@@ -347,7 +347,7 @@ html, body {
     position: absolute;
     width: clamp(110px, 12vw, 180px);
     height: auto;
-    opacity: 0.11;
+    opacity: 0.2;
     filter: drop-shadow(0 18px 28px rgba(15, 23, 42, 0.08));
     transform-origin: center;
     will-change: transform;
@@ -364,9 +364,27 @@ html, body {
     left: clamp(-56px, 1vw, 16px);
     bottom: 6rem;
     width: clamp(96px, 10vw, 150px);
-    opacity: 0.075;
+    opacity: 0.14;
     rotate: 11deg;
     animation-delay: 1.6s;
+  }
+
+  .product-doodle-mascot-c {
+    right: clamp(-40px, 7vw, 120px);
+    bottom: 13rem;
+    width: clamp(92px, 9vw, 142px);
+    opacity: 0.13;
+    rotate: 8deg;
+    animation-delay: 2.1s;
+  }
+
+  .product-doodle-mascot-d {
+    left: clamp(110px, 14vw, 260px);
+    top: 58vh;
+    width: clamp(82px, 8vw, 128px);
+    opacity: 0.11;
+    rotate: -12deg;
+    animation-delay: 2.8s;
   }
 
   .product-doodle-icon {
@@ -543,10 +561,26 @@ html, body {
   }
 
   @media (max-width: 767px) {
-    .product-doodle-mascot,
     .product-doodle-icon,
     .product-doodle-field::before,
     .product-doodle-field::after {
+      display: none;
+    }
+
+    .product-doodle-mascot {
+      width: 104px;
+      opacity: 0.12;
+    }
+
+    .product-doodle-mascot-a {
+      display: block;
+      right: -18px;
+      top: 5.5rem;
+    }
+
+    .product-doodle-mascot-b,
+    .product-doodle-mascot-c,
+    .product-doodle-mascot-d {
       display: none;
     }
   }

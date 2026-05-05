@@ -8,6 +8,9 @@ export const mascotAssets = {
   poses: '/brand/mascot/billoy-product-poses.jpg?v=20260506b',
   spot: '/brand/mascot/billoy-receipt-phone.jpg?v=20260506b',
   doodle: '/brand/doodles/billoy-float-doodle.png?v=20260506c',
+  wave: '/brand/doodles/billoy-wave-doodle.png?v=20260506d',
+  approval: '/brand/doodles/billoy-approval-doodle.png?v=20260506d',
+  analytics: '/brand/doodles/billoy-analytics-doodle.png?v=20260506d',
 };
 
 interface PageHeaderProps {
@@ -68,6 +71,12 @@ export function PageHeader({
 }
 
 export function ProductDoodleField() {
+  const mascotItems = [
+    { key: 'wave', src: mascotAssets.wave, className: 'product-doodle-mascot-a' },
+    { key: 'scan', src: mascotAssets.doodle, className: 'product-doodle-mascot-b' },
+    { key: 'analytics', src: mascotAssets.analytics, className: 'product-doodle-mascot-c' },
+    { key: 'approval', src: mascotAssets.approval, className: 'product-doodle-mascot-d' },
+  ];
   const items = [
     { key: 'receipt', icon: ReceiptText, className: 'left-[3%] top-[9rem] hidden xl:flex', delay: '0ms' },
     { key: 'phone', icon: Smartphone, className: 'right-[7%] top-[11rem] hidden lg:flex', delay: '900ms' },
@@ -78,8 +87,9 @@ export function ProductDoodleField() {
 
   return (
     <div className="product-doodle-field" aria-hidden="true">
-      <img src={mascotAssets.doodle} alt="" className="product-doodle-mascot product-doodle-mascot-a" />
-      <img src={mascotAssets.doodle} alt="" className="product-doodle-mascot product-doodle-mascot-b" />
+      {mascotItems.map((item) => (
+        <img key={item.key} src={item.src} alt="" className={clsx('product-doodle-mascot', item.className)} />
+      ))}
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -129,10 +139,17 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ title, description, actionLabel, actionHref, action, variant = 'empty' }: EmptyStateProps) {
+  const artByVariant = {
+    empty: mascotAssets.wave,
+    success: mascotAssets.approval,
+    error: mascotAssets.approval,
+    waiting: mascotAssets.doodle,
+  };
+
   return (
     <div className={clsx('empty-state-premium', `empty-state-${variant}`)}>
       <div className="empty-state-art" aria-hidden="true">
-        <img src={mascotAssets.doodle} alt="" />
+        <img src={artByVariant[variant]} alt="" />
       </div>
       <div className="min-w-0">
         <h3 className="text-base font-bold text-slate-950">{title}</h3>
@@ -161,7 +178,7 @@ export function MascotHelperCard({ title, description, children }: HelperCardPro
     <aside className="mascot-helper-card">
       <div className="flex items-start gap-4">
         <div className="mascot-helper-art" aria-hidden="true">
-          <img src={mascotAssets.doodle} alt="" />
+          <img src={mascotAssets.wave} alt="" />
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-slate-950">{title}</h3>

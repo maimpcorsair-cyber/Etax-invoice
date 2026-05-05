@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { FileText, ArrowRight } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import { getApexOrigin, getPlanePath } from '../lib/platform';
+import { ProductDoodleField } from './ui/AppChrome';
 
 type PublicPageLayoutProps = {
   eyebrow: string;
@@ -22,7 +23,8 @@ export default function PublicPageLayout({
   const isThai = i18n.language === 'th';
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)]">
+    <div className="app-shell">
+      <ProductDoodleField />
       <header className="fixed top-0 w-full bg-white/80 backdrop-blur-xl border-b border-gray-100/50 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <a href={getApexOrigin()} className="flex items-center gap-2.5 group">
@@ -44,7 +46,7 @@ export default function PublicPageLayout({
         </div>
       </header>
 
-      <main className="pt-28 pb-16">
+      <main className="relative z-10 pt-28 pb-16">
         <section className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="mb-10 text-center">
             <p className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-primary-700 shadow-sm">

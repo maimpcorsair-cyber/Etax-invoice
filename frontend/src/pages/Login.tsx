@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, FileText, Eye, EyeOff, ArrowRight, Lock, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import LanguageSwitcher from '../components/LanguageSwitcher';
-import { mascotAssets } from '../components/ui/AppChrome';
+import { mascotAssets, ProductDoodleField } from '../components/ui/AppChrome';
 import { useLanguage } from '../hooks/useLanguage';
 import { buildPlaneUrl, detectSurface, getApexOrigin, getPlanePath } from '../lib/platform';
 
@@ -187,6 +187,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen app-shell flex flex-col">
+      <ProductDoodleField />
       <div className="relative z-10 flex items-center justify-between p-4 sm:p-6">
         <a href={getApexOrigin()} className="flex items-center gap-2 group">
           <FileText className="w-6 h-6 text-primary-700" strokeWidth={2} />
