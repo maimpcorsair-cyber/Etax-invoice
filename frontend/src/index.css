@@ -28,7 +28,7 @@ html, body {
   :root {
     --font-thai: 'Sarabun', sans-serif;
     --font-en: 'Inter', system-ui, sans-serif;
-    --color-primary: 37, 99, 235;
+    --color-primary: 30, 58, 138;
     --color-success: 16, 185, 129;
     --color-warning: 245, 158, 11;
     --color-danger: 239, 68, 68;
@@ -49,7 +49,7 @@ html, body {
   body {
     @apply antialiased text-gray-900 bg-gray-50;
     font-weight: 400;
-    letter-spacing: 0.4px;
+    letter-spacing: 0;
   }
 
   * {
@@ -88,13 +88,13 @@ html, body {
 @layer components {
   /* Buttons */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-button;
-    background: linear-gradient(135deg, #16a34a 0%, #059669 100%);
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-700 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-button;
   }
 
   .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(22,163,74,0.4);
+    background: #172f70;
+    box-shadow: 0 8px 25px rgba(30,58,138,0.28);
   }
 
   .btn-primary.sm {
@@ -167,7 +167,7 @@ html, body {
   }
 
   .input-field:focus {
-    box-shadow: 0 0 0 3px rgba(22,163,74,0.1);
+    box-shadow: 0 0 0 3px rgba(30,58,138,0.1);
   }
 
   .input-field:disabled {

@@ -459,12 +459,12 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)]">
+    <div className="min-h-screen bg-[#f5f8fd]">
       {/* Header */}
-      <header className="fixed top-0 w-full bg-white/80 backdrop-blur-xl border-b border-gray-100/50 z-50 shadow-sm">
+      <header className="fixed top-0 z-50 w-full border-b border-slate-200/70 bg-white/88 shadow-sm backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+            <div className="w-9 h-9 rounded-lg bg-primary-700 flex items-center justify-center shadow-sm group-hover:bg-primary-800 transition-colors">
               <FileText className="w-5 h-5 text-white" strokeWidth={2.5} />
             </div>
             <span className="font-bold text-lg text-gray-900 group-hover:text-primary-600 transition-colors">{t('app.shortName')}</span>
@@ -474,7 +474,7 @@ export default function Landing() {
             <a href={getPlanePath('/login', 'app')} className="btn-secondary sm">
               {t('auth.login')}
             </a>
-            <a href={getPlanePath('/login', 'ops')} className="hidden rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:inline-flex">
+            <a href={getPlanePath('/login', 'ops')} className="hidden rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:inline-flex">
               {isThai ? 'Owner Login' : 'Owner Login'}
             </a>
             <button type="button" onClick={() => openCheckout('free')} className="btn-primary sm hidden sm:flex">
@@ -485,149 +485,27 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-24 relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(22,163,74,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_30%)]" />
+      <section className="relative overflow-hidden bg-[#f5f8fd] pt-28 lg:pt-32">
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(245,248,253,0.98)_0%,rgba(245,248,253,0.92)_42%,rgba(245,248,253,0.35)_72%,rgba(245,248,253,0.12)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-slate-200" />
 
-        {/* Floating doodle background — scroll with page, sketch-style e-Tax illustrations */}
-
-        {/* Receipt with zigzag bottom — top left */}
-        <div className="pointer-events-none absolute left-4 top-28 opacity-[0.18] hidden lg:block rotate-[-10deg]" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
-          <svg width="100" height="140" viewBox="0 0 100 140" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="8" y="6" width="84" height="110" rx="5"/>
-            <line x1="20" y1="28" x2="80" y2="28"/>
-            <line x1="20" y1="42" x2="66" y2="42"/>
-            <line x1="20" y1="56" x2="74" y2="56"/>
-            <line x1="20" y1="70" x2="58" y2="70"/>
-            <line x1="20" y1="84" x2="72" y2="84"/>
-            <line x1="20" y1="100" x2="80" y2="100" strokeWidth="3"/>
-            {/* Zigzag bottom tear */}
-            <path d="M8 116 L16 106 L24 116 L32 106 L40 116 L48 106 L56 116 L64 106 L72 116 L80 106 L88 106 L92 116" strokeWidth="2"/>
-          </svg>
-        </div>
-
-        {/* Mini Billy face doodle — left middle */}
-        <div className="pointer-events-none absolute left-8 top-[42%] opacity-[0.16] hidden xl:block rotate-[6deg]" style={{animation:'float 8.5s ease-in-out infinite', animationDelay:'1.2s'}}>
-          <svg width="72" height="96" viewBox="0 0 72 96" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {/* Mini receipt body */}
-            <rect x="4" y="16" width="64" height="72" rx="4"/>
-            {/* Zigzag top */}
-            <path d="M4,16 L10,8 L16,16 L22,8 L28,16 L34,8 L40,16 L46,8 L52,16 L58,8 L64,16 L68,16" strokeWidth="2"/>
-            {/* Eyes */}
-            <circle cx="26" cy="38" r="7" strokeWidth="2.5"/>
-            <circle cx="46" cy="38" r="7" strokeWidth="2.5"/>
-            <circle cx="28" cy="36" r="2.5" fill="#059669" stroke="none"/>
-            <circle cx="48" cy="36" r="2.5" fill="#059669" stroke="none"/>
-            {/* Smile */}
-            <path d="M22 52 Q36 64 50 52"/>
-            {/* Scarf hint */}
-            <path d="M10 75 Q36 84 62 75" strokeWidth="3"/>
-          </svg>
-        </div>
-
-        {/* Squiggly arrow — bottom left */}
-        <div className="pointer-events-none absolute left-10 bottom-20 opacity-[0.22] hidden xl:block" style={{animation:'float 9s ease-in-out infinite', animationDelay:'1.5s'}}>
-          <svg width="100" height="80" viewBox="0 0 100 80" fill="none" stroke="#86efac" strokeWidth="3" strokeLinecap="round">
-            <path d="M8 68 C18 48, 28 58, 38 38 C48 18, 58 33, 68 18 C78 6, 86 10, 88 6"/>
-            <path d="M80 4 L88 6 L84 14"/>
-          </svg>
-        </div>
-
-        {/* Invoice / A4 doc with folded corner — top right */}
-        <div className="pointer-events-none absolute right-4 top-24 opacity-[0.18] hidden lg:block rotate-[10deg]" style={{animation:'float 8s ease-in-out infinite', animationDelay:'0.8s'}}>
-          <svg width="96" height="124" viewBox="0 0 96 124" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 4 L68 4 L90 26 L90 120 Q90 122 88 122 L6 122 Q4 122 4 120 L4 6 Q4 4 6 4Z"/>
-            <path d="M68 4 L68 26 L90 26" strokeWidth="2"/>
-            {/* Content lines */}
-            <line x1="16" y1="44" x2="78" y2="44"/>
-            <line x1="16" y1="56" x2="58" y2="56"/>
-            <line x1="16" y1="68" x2="70" y2="68"/>
-            <line x1="16" y1="80" x2="50" y2="80"/>
-            <line x1="16" y1="92" x2="64" y2="92"/>
-            {/* Total box */}
-            <rect x="16" y="104" width="60" height="12" rx="2" strokeWidth="2"/>
-          </svg>
-        </div>
-
-        {/* Sparkle stars — right side */}
-        <div className="pointer-events-none absolute right-12 top-[45%] opacity-[0.25] hidden lg:block" style={{animation:'float 6s ease-in-out infinite', animationDelay:'0.4s'}}>
-          <svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round">
-            {/* 4-point star */}
-            <path d="M35 8 L38 28 L58 31 L38 34 L35 54 L32 34 L12 31 L32 28 Z"/>
-            {/* Small star */}
-            <path d="M58 12 L59.5 18 L66 19.5 L59.5 21 L58 27 L56.5 21 L50 19.5 L56.5 18 Z"/>
-            {/* Dot */}
-            <circle cx="14" cy="52" r="3" fill="#4ade80" stroke="none" opacity="0.5"/>
-          </svg>
-        </div>
-
-        {/* QR Code sketch — bottom right */}
-        <div className="pointer-events-none absolute right-8 bottom-16 opacity-[0.20] hidden xl:block rotate-[-6deg]" style={{animation:'float 6.5s ease-in-out infinite', animationDelay:'2s'}}>
-          <svg width="84" height="84" viewBox="0 0 80 80" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="6" y="6" width="26" height="26" rx="3"/>
-            <rect x="14" y="14" width="10" height="10"/>
-            <rect x="48" y="6" width="26" height="26" rx="3"/>
-            <rect x="56" y="14" width="10" height="10"/>
-            <rect x="6" y="48" width="26" height="26" rx="3"/>
-            <rect x="14" y="56" width="10" height="10"/>
-            <line x1="48" y1="48" x2="56" y2="48"/>
-            <line x1="60" y1="48" x2="74" y2="48"/>
-            <line x1="48" y1="56" x2="48" y2="68"/>
-            <line x1="60" y1="56" x2="74" y2="56"/>
-            <line x1="60" y1="64" x2="60" y2="74"/>
-            <line x1="68" y1="64" x2="74" y2="64"/>
-          </svg>
-        </div>
-
-        {/* Stamp circle — mid left lower */}
-        <div className="pointer-events-none absolute left-6 top-[65%] opacity-[0.16] hidden xl:block" style={{animation:'float 10s ease-in-out infinite', animationDelay:'3s'}}>
-          <svg width="82" height="82" viewBox="0 0 90 90" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round">
-            <circle cx="45" cy="45" r="38" strokeDasharray="6 4"/>
-            <circle cx="45" cy="45" r="30"/>
-            <text x="45" y="40" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#16a34a" fill="#16a34a" strokeWidth="0.3">กรมสรรพากร</text>
-            <text x="45" y="54" textAnchor="middle" fontSize="8" fontFamily="sans-serif" stroke="#16a34a" fill="#16a34a" strokeWidth="0.3">e-TAX ✓</text>
-          </svg>
-        </div>
-
-        {/* Calculator sketch — top center-left */}
-        <div className="pointer-events-none absolute left-[18%] top-32 opacity-[0.14] hidden xl:block rotate-[4deg]" style={{animation:'float 7.5s ease-in-out infinite', animationDelay:'2.5s'}}>
-          <svg width="64" height="80" viewBox="0 0 60 76" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="4" width="52" height="68" rx="6"/>
-            <rect x="10" y="10" width="40" height="18" rx="3"/>
-            {/* Keypad dots */}
-            <circle cx="18" cy="42" r="3"/> <circle cx="30" cy="42" r="3"/> <circle cx="42" cy="42" r="3"/>
-            <circle cx="18" cy="54" r="3"/> <circle cx="30" cy="54" r="3"/> <circle cx="42" cy="54" r="3"/>
-            <circle cx="18" cy="66" r="3"/> <circle cx="30" cy="66" r="3"/>
-            <rect x="36" y="60" width="10" height="10" rx="2"/>
-          </svg>
-        </div>
-
-        {/* Pencil sketch — right center */}
-        <div className="pointer-events-none absolute right-[14%] top-[35%] opacity-[0.18] hidden xl:block rotate-[-30deg]" style={{animation:'float 11s ease-in-out infinite', animationDelay:'4s'}}>
-          <svg width="32" height="100" viewBox="0 0 32 100" fill="none" stroke="#86efac" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="8" y="10" width="16" height="72" rx="3"/>
-            {/* Eraser */}
-            <rect x="8" y="6" width="16" height="8" rx="2" stroke="#4ade80"/>
-            {/* Tip */}
-            <path d="M8 82 L16 96 L24 82"/>
-            {/* Lines on pencil */}
-            <line x1="8" y1="30" x2="24" y2="30"/>
-            <line x1="8" y1="50" x2="24" y2="50"/>
-          </svg>
-        </div>
-
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="max-w-6xl mx-auto px-4 pb-16 lg:pb-20">
           <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-            <div className="max-w-3xl">
+            <div className="max-w-2xl py-8 lg:py-14">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-primary-700 shadow-sm">
+                <ShieldCheck className="h-4 w-4" />
+                {isThai ? 'ETDA-ready e-Tax workflow' : 'ETDA-ready e-Tax workflow'}
+              </div>
 
-              <h1 className="animate-slide-in-left max-w-4xl text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl leading-tight mb-6" style={{animationDelay:'0.15s'}}>
+              <h1 className="animate-slide-in-left max-w-4xl text-4xl font-semibold leading-[1.08] tracking-tight text-slate-950 sm:text-5xl lg:text-[3.9rem]" style={{animationDelay:'0.15s'}}>
                 {t('landing.hero.title')}
               </h1>
 
-              <p className="animate-slide-in-left max-w-3xl text-lg leading-8 text-slate-600 sm:text-xl mb-10" style={{animationDelay:'0.3s'}}>
+              <p className="animate-slide-in-left mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg" style={{animationDelay:'0.3s'}}>
                 {t('landing.hero.subtitle')}
               </p>
 
-              <div className="animate-slide-in-left flex flex-col sm:flex-row gap-4 mb-8" style={{animationDelay:'0.45s'}}>
+              <div className="animate-slide-in-left mt-9 flex flex-col gap-3 sm:flex-row" style={{animationDelay:'0.45s'}}>
                 <button type="button" onClick={() => openCheckout('free')} className="btn-primary lg">
                   {t('landing.hero.cta')}
                   <ArrowRight className="w-5 h-5" />
@@ -638,25 +516,48 @@ export default function Landing() {
                 </a>
               </div>
 
-              <p className="animate-fade-in text-sm font-medium text-slate-500" style={{animationDelay:'0.55s'}}>{t('landing.hero.trustText')}</p>
+              <p className="animate-fade-in mt-5 text-sm font-medium text-slate-500" style={{animationDelay:'0.55s'}}>{t('landing.hero.trustText')}</p>
 
               <div className="animate-slide-up mt-10 grid gap-3 sm:grid-cols-3" style={{animationDelay:'0.6s'}}>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
                   <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'เหมาะกับ' : 'Best for'}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'ทีมบัญชีและธุรกิจ SME' : 'Accounting teams and SME operators'}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
                   <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'รองรับ' : 'Supports'}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'RD submit, PDF, XML, audit logs' : 'RD submit, PDF, XML, and audit logs'}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
                   <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'ชำระเงิน' : 'Payments'}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'บัตรเครดิต, Stripe PromptPay, QR' : 'Card, Stripe PromptPay, and QR'}</div>
                 </div>
               </div>
             </div>
 
-            <aside className="animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
+            <aside className="relative min-h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.12)] lg:min-h-[560px]">
+              <img
+                src="/brand/billoy-hero-mascot.jpg"
+                alt={isThai ? 'Billoy ผู้ช่วยเอกสาร e-Tax' : 'Billoy e-Tax document assistant'}
+                className="absolute inset-0 h-full w-full object-cover object-[64%_50%]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_48%,rgba(15,23,42,0.72)_100%)]" />
+              <div className="absolute bottom-0 left-0 right-0 p-5 text-white sm:p-6">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-primary-800 shadow-sm">
+                  <FileCheck className="h-4 w-4" />
+                  Billoy Mascot
+                </div>
+                <h2 className="mt-4 max-w-sm text-2xl font-semibold leading-tight">
+                  {isThai ? 'ผู้ช่วยเอกสารที่ดูเป็นมิตร แต่ทำงานแบบทีมบัญชีจริง' : 'A friendly document assistant with accounting-grade discipline'}
+                </h2>
+                <div className="mt-5 grid grid-cols-3 gap-2 text-xs font-semibold text-white/90">
+                  <span className="rounded-md bg-white/14 px-3 py-2 backdrop-blur">{isThai ? 'XML' : 'XML'}</span>
+                  <span className="rounded-md bg-white/14 px-3 py-2 backdrop-blur">{isThai ? 'Sign' : 'Sign'}</span>
+                  <span className="rounded-md bg-white/14 px-3 py-2 backdrop-blur">{isThai ? 'RD' : 'RD'}</span>
+                </div>
+              </div>
+            </aside>
+
+            <aside className="hidden animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
               {/* Billy mascot — faithful SVG of the 3D receipt character */}
               <div className="flex justify-center mb-2">
                 <svg viewBox="0 0 200 280" width="160" height="224" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -834,19 +735,19 @@ export default function Landing() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {features.map(({ icon: Icon, key }, i) => {
-            const gradients = [
-              'from-primary-600 to-primary-dark',
-              'from-accent-500 to-accent-dark',
-              'from-emerald-500 to-emerald-700',
-              'from-violet-500 to-violet-700',
+            const iconStyles = [
+              'bg-primary-700',
+              'bg-emerald-700',
+              'bg-slate-800',
+              'bg-amber-600',
             ];
             return (
               <div
                 key={key}
-                className="animate-slide-up group rounded-2xl border border-slate-200 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-2 hover:shadow-card-hover hover:border-primary-200 card-hover"
+                className="animate-slide-up group rounded-lg border border-slate-200 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary-200 hover:shadow-card-hover"
                 style={{animationDelay: `${0.1 + i * 0.1}s`}}
               >
-                <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${gradients[i % gradients.length]} shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+                <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-lg ${iconStyles[i % iconStyles.length]} shadow-sm transition-transform duration-300 group-hover:-translate-y-0.5`}>
                   <Icon className="w-7 h-7 text-white" strokeWidth={2} />
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2 text-base">
@@ -883,10 +784,10 @@ export default function Landing() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               {documentOpsPillars.map(({ icon: Icon, th, en, descTh, descEn }, i) => {
-                const iconBgs = ['from-primary-600 to-primary-dark','from-accent-500 to-accent-dark','from-emerald-500 to-emerald-700','from-violet-500 to-violet-700'];
+                const iconBgs = ['bg-primary-700','bg-emerald-700','bg-slate-800','bg-amber-600'];
                 return (
-                  <div key={en} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${iconBgs[i % iconBgs.length]} shadow-sm`}>
+                  <div key={en} className="rounded-lg border border-slate-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${iconBgs[i % iconBgs.length]} shadow-sm`}>
                       <Icon className="h-5 w-5 text-white" />
                     </div>
                     <h3 className="mt-4 text-base font-bold text-slate-950">{isThai ? th : en}</h3>
@@ -899,7 +800,7 @@ export default function Landing() {
 
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             {marketingArticles.map((article) => (
-              <article key={article.en} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <article key={article.en} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {isThai ? 'คู่มือใช้งานจริง' : 'Playbook'}
                 </p>
@@ -916,7 +817,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing-checkout" className="py-24 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_30%)]">
+      <section id="pricing-checkout" className="bg-white py-24">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-16">
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary-700">
@@ -936,7 +837,7 @@ export default function Landing() {
             {pricingPlans.map((plan, pi) => (
               <div
                 key={plan.key}
-                className={`animate-slide-up relative flex h-full flex-col rounded-[28px] border bg-white p-6 shadow-sm transition-all duration-300 ${
+                className={`animate-slide-up relative flex h-full flex-col rounded-lg border bg-white p-6 shadow-sm transition-all duration-300 ${
                   plan.popular
                     ? 'md:scale-105 border-primary-300 ring-2 ring-primary-500 ring-offset-2 shadow-xl'
                     : 'border-slate-200 hover:shadow-md'
@@ -945,8 +846,8 @@ export default function Landing() {
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1.5 text-white text-xs font-bold rounded-full shadow-lg whitespace-nowrap" style={{background: 'linear-gradient(135deg,#16a34a,#059669)'}}>
-                      ⭐ {isThai ? 'ยอดนิยม' : 'MOST POPULAR'}
+                    <span className="rounded-md bg-primary-700 px-4 py-1.5 text-xs font-bold text-white shadow-sm whitespace-nowrap">
+                      {isThai ? 'แนะนำสำหรับทีมบัญชี' : 'RECOMMENDED'}
                     </span>
                   </div>
                 )}
@@ -1017,7 +918,7 @@ export default function Landing() {
             ))}
           </div>
 
-          <div className="mt-10 overflow-x-auto rounded-[28px] border border-gray-200 bg-white shadow-sm">
+          <div className="mt-10 overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="grid min-w-[860px] grid-cols-[1.25fr_repeat(4,minmax(0,1fr))] border-b border-gray-200 bg-gray-50/80">
               <div className="px-5 py-4 text-sm font-semibold text-gray-900">
                 {isThai ? 'เปรียบเทียบสิทธิ์การใช้งาน' : 'Feature comparison'}
@@ -1053,7 +954,7 @@ export default function Landing() {
       {/* CTA Section */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="relative overflow-hidden rounded-3xl p-12 text-center text-white" style={{background: 'linear-gradient(135deg,#16a34a 0%,#059669 50%,#047857 100%)'}}>
+          <div className="relative overflow-hidden rounded-xl bg-primary-800 p-12 text-center text-white">
             {/* Floating doodles inside CTA — Billy themed */}
             {/* Mini Billy face — top left */}
             <div className="pointer-events-none absolute left-8 top-6 opacity-20" style={{animation:'float 7s ease-in-out infinite', animationDelay:'0s'}}>
