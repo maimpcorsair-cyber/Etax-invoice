@@ -143,11 +143,17 @@ const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   'builtin:minimal-dark-accent': { name: 'Minimal Dark Accent', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:minimal-sans': { name: 'Minimal Sans', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:minimal-space': { name: 'Minimal Space', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:minimal-fine-line': { name: 'Minimal Fine Line', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:cute-pink':   { name: 'Cute Pink',   supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:cute-blue':   { name: 'Cute Blue',   supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:cute-yellow': { name: 'Cute Yellow', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:cute-green':  { name: 'Cute Green',  supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:cute-kawaii': { name: 'Cute Kawaii', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:cute-pastel-pink': { name: 'Cute Pastel Pink', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:cute-baby-blue': { name: 'Cute Baby Blue', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:cute-soft-green': { name: 'Cute Soft Green', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:cute-yellow-sunshine': { name: 'Cute Yellow Sunshine', supportedTypes: ALL_DOCUMENT_TYPES },
+  'builtin:cute-lovely-purple': { name: 'Cute Lovely Purple', supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:pro-blue-modern':   { name: 'Pro สีน้ำเงิน',    supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:pro-bw':            { name: 'Pro ขาวดำ',        supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:pro-navy':          { name: 'Pro กรมท่า',       supportedTypes: ALL_DOCUMENT_TYPES },
@@ -2943,7 +2949,10 @@ type MarketplaceTemplateTokens = {
   border: string;
   tableHead: string;
   totalBg: string;
-  decor: 'minimal' | 'cube' | 'leaf' | 'gold' | 'tech' | 'mono' | 'seal' | 'gradient' | 'truck' | 'anime';
+  decor:
+    | 'minimal' | 'gray' | 'line' | 'sans' | 'space' | 'mint' | 'beige' | 'darkAccent'
+    | 'bunny' | 'cloudBear' | 'sunflower' | 'leafMascot' | 'cat' | 'cactus' | 'rainbow'
+    | 'cube' | 'leaf' | 'gold' | 'tech' | 'mono' | 'seal' | 'gradient' | 'truck' | 'anime';
   dark?: boolean;
 };
 
@@ -2952,46 +2961,150 @@ const MARKETPLACE_TEMPLATE_TOKENS: Record<string, MarketplaceTemplateTokens> = {
     id: '01', name: 'Minimal White', bg: '#f7f8fa', paper: '#ffffff', accent: '#111827', accent2: '#e6e8ed',
     text: '#111827', muted: '#5d6878', border: '#d6dbe4', tableHead: '#eef1f5', totalBg: '#f4f6f9', decor: 'minimal',
   },
-  'builtin:pro-blue-modern': {
-    id: '02', name: 'Corporate Blue', bg: '#e8f1ff', paper: '#ffffff', accent: '#0f4ea3', accent2: '#082d63',
-    text: '#0e2444', muted: '#566b86', border: '#b8cae8', tableHead: '#0b3778', totalBg: '#0f4ea3', decor: 'cube',
+  'builtin:minimal-gray': {
+    id: '02', name: 'Minimal Gray', bg: '#eef0f4', paper: '#fafafa', accent: '#5f6875', accent2: '#d7dbe1',
+    text: '#172033', muted: '#687385', border: '#cfd5dd', tableHead: '#eceff3', totalBg: '#e7ebf0', decor: 'gray',
   },
-  'builtin:pro-green-eco': {
-    id: '03', name: 'Green e-Tax', bg: '#eef8ea', paper: '#ffffff', accent: '#2f8736', accent2: '#bfe4b4',
-    text: '#183c1e', muted: '#667d63', border: '#bddab6', tableHead: '#2f8736', totalBg: '#e6f4df', decor: 'leaf',
+  'builtin:minimal-line': {
+    id: '03', name: 'Minimal Line', bg: '#ffffff', paper: '#ffffff', accent: '#111827', accent2: '#f1f3f5',
+    text: '#111827', muted: '#667085', border: '#bfc6d1', tableHead: '#111827', totalBg: '#111827', decor: 'line',
   },
-  'builtin:dark-gold': {
-    id: '04', name: 'Luxury Gold', bg: '#0e0b06', paper: '#11100d', accent: '#f0b737', accent2: '#8e681b',
-    text: '#fff1c4', muted: '#bda66c', border: '#5a4216', tableHead: '#d89f28', totalBg: '#f0b737', decor: 'gold', dark: true,
+  'builtin:minimal-sans': {
+    id: '04', name: 'Minimal Sans', bg: '#f8fafc', paper: '#ffffff', accent: '#1f2937', accent2: '#eef1f5',
+    text: '#111827', muted: '#667085', border: '#d7dde6', tableHead: '#1f2937', totalBg: '#f3f4f6', decor: 'sans',
   },
-  'builtin:dark-carbon': {
-    id: '05', name: 'Dark Tech', bg: '#02070b', paper: '#071017', accent: '#00b7f0', accent2: '#0d2b3d',
-    text: '#e8faff', muted: '#87a7b7', border: '#113748', tableHead: '#006ea2', totalBg: '#00a9e2', decor: 'tech', dark: true,
+  'builtin:minimal-space': {
+    id: '05', name: 'Minimal Space', bg: '#fafafa', paper: '#ffffff', accent: '#475569', accent2: '#f1f5f9',
+    text: '#1e293b', muted: '#728095', border: '#e2e8f0', tableHead: '#f8fafc', totalBg: '#f1f5f9', decor: 'space',
   },
   'builtin:minimal-light-gray': {
-    id: '06', name: 'Soft Gray', bg: '#eef0f4', paper: '#f9fafc', accent: '#5c6a7f', accent2: '#d9dee7',
-    text: '#1d2735', muted: '#6e7a8d', border: '#d0d6e0', tableHead: '#69778c', totalBg: '#e6ebf2', decor: 'mono',
+    id: '11', name: 'Minimal Light Gray', bg: '#f1f3f6', paper: '#ffffff', accent: '#6b7280', accent2: '#eef1f5',
+    text: '#111827', muted: '#6b7280', border: '#d9dee7', tableHead: '#f1f3f6', totalBg: '#f4f6f9', decor: 'gray',
   },
-  'builtin:pro-navy': {
-    id: '07', name: 'Thai Official', bg: '#f3f6fb', paper: '#ffffff', accent: '#143e75', accent2: '#d7e4f5',
-    text: '#102745', muted: '#61758e', border: '#bdd0e8', tableHead: '#143e75', totalBg: '#eaf1fb', decor: 'seal',
+  'builtin:minimal-fine-line': {
+    id: '12', name: 'Minimal Fine Line', bg: '#ffffff', paper: '#ffffff', accent: '#1f2937', accent2: '#f8fafc',
+    text: '#111827', muted: '#667085', border: '#c6ccd5', tableHead: '#111827', totalBg: '#f5f6f8', decor: 'line',
   },
-  'builtin:pro-gradient': {
-    id: '08', name: 'Modern Gradient', bg: '#eef2ff', paper: '#ffffff', accent: '#6c36e8', accent2: '#28a9ff',
-    text: '#1d2452', muted: '#697093', border: '#d8dcff', tableHead: '#6337df', totalBg: '#6c36e8', decor: 'gradient',
+  'builtin:minimal-mint': {
+    id: '13', name: 'Minimal Mint', bg: '#effdf8', paper: '#ffffff', accent: '#66c7ad', accent2: '#d9f4eb',
+    text: '#164b42', muted: '#6c817b', border: '#c9eadf', tableHead: '#e8f7f1', totalBg: '#dff4ec', decor: 'mint',
   },
-  'builtin:pro-classic-orange': {
-    id: '09', name: 'Logistics Orange', bg: '#fff1e9', paper: '#ffffff', accent: '#f05a1a', accent2: '#ffd0b7',
-    text: '#3b2015', muted: '#8a6555', border: '#f3c6b1', tableHead: '#f05a1a', totalBg: '#ffe5d8', decor: 'truck',
+  'builtin:minimal-beige': {
+    id: '14', name: 'Minimal Beige', bg: '#fff8ea', paper: '#fffdf8', accent: '#c09a4a', accent2: '#f3e5c3',
+    text: '#3f2b16', muted: '#826e52', border: '#ead8b6', tableHead: '#f7ecd1', totalBg: '#f1e0b7', decor: 'beige',
+  },
+  'builtin:minimal-dark-accent': {
+    id: '15', name: 'Minimal Dark Accent', bg: '#f7f8fa', paper: '#ffffff', accent: '#111827', accent2: '#e8eaef',
+    text: '#111827', muted: '#6b7280', border: '#d5dae3', tableHead: '#111827', totalBg: '#111827', decor: 'darkAccent',
   },
   'builtin:cute-pink': {
-    id: '10', name: 'Anime Friendly', bg: '#fff1f7', paper: '#fff9fc', accent: '#ec5f9c', accent2: '#ffd5e8',
-    text: '#5a2440', muted: '#9d6b83', border: '#f5c6dc', tableHead: '#ec6da4', totalBg: '#ffe2ef', decor: 'anime',
+    id: '06', name: 'Cute Pink', bg: '#fff1f6', paper: '#fff9fc', accent: '#ec6b9d', accent2: '#ffd8e8',
+    text: '#5a2440', muted: '#9d6b83', border: '#f5c6dc', tableHead: '#ee7eaa', totalBg: '#ffe2ef', decor: 'bunny',
+  },
+  'builtin:cute-blue': {
+    id: '07', name: 'Cute Blue', bg: '#eff8ff', paper: '#fbfdff', accent: '#64aee9', accent2: '#d8efff',
+    text: '#213f62', muted: '#6a829d', border: '#c8e2f7', tableHead: '#6fb8eb', totalBg: '#e3f3ff', decor: 'cloudBear',
+  },
+  'builtin:cute-yellow': {
+    id: '08', name: 'Cute Yellow', bg: '#fff9db', paper: '#fffdf4', accent: '#f6b51d', accent2: '#fff0a8',
+    text: '#5b3b0b', muted: '#8a754b', border: '#f3dda1', tableHead: '#f3bd2f', totalBg: '#fff1a8', decor: 'sunflower',
+  },
+  'builtin:cute-green': {
+    id: '09', name: 'Cute Green', bg: '#f0fbeb', paper: '#fbfff8', accent: '#6bbd5d', accent2: '#dff3d3',
+    text: '#24451f', muted: '#71836d', border: '#cde7c6', tableHead: '#72bf65', totalBg: '#e5f6d9', decor: 'leafMascot',
+  },
+  'builtin:cute-kawaii': {
+    id: '10', name: 'Cute Kawaii', bg: '#f8f2ff', paper: '#fffaff', accent: '#9a72de', accent2: '#eadcff',
+    text: '#45226c', muted: '#7b6b92', border: '#ddcdf4', tableHead: '#9a72de', totalBg: '#eee2ff', decor: 'cat',
+  },
+  'builtin:cute-pastel-pink': {
+    id: '16', name: 'Cute Pastel Pink', bg: '#fff4f8', paper: '#fffafd', accent: '#ee8ab1', accent2: '#ffe1ec',
+    text: '#642945', muted: '#9a7085', border: '#f4c9db', tableHead: '#ef91b9', totalBg: '#ffe4ef', decor: 'bunny',
+  },
+  'builtin:cute-baby-blue': {
+    id: '17', name: 'Cute Baby Blue', bg: '#f0f9ff', paper: '#fbfdff', accent: '#86c9ef', accent2: '#ddf4ff',
+    text: '#264863', muted: '#718aa0', border: '#cfe8f6', tableHead: '#8bcaf0', totalBg: '#e5f6ff', decor: 'cloudBear',
+  },
+  'builtin:cute-soft-green': {
+    id: '18', name: 'Cute Soft Green', bg: '#f2fae9', paper: '#fdfff9', accent: '#9ac660', accent2: '#e8f3d2',
+    text: '#41521f', muted: '#77845c', border: '#dcecc4', tableHead: '#98c660', totalBg: '#ebf5d7', decor: 'cactus',
+  },
+  'builtin:cute-yellow-sunshine': {
+    id: '19', name: 'Cute Yellow Sunshine', bg: '#fff8dc', paper: '#fffdf5', accent: '#f5bd22', accent2: '#ffeaa0',
+    text: '#664810', muted: '#8b784f', border: '#f0daa1', tableHead: '#f2bd29', totalBg: '#fff0a0', decor: 'rainbow',
+  },
+  'builtin:cute-lovely-purple': {
+    id: '20', name: 'Cute Lovely Purple', bg: '#faf2ff', paper: '#fffaff', accent: '#b48be9', accent2: '#f0e1ff',
+    text: '#543078', muted: '#877298', border: '#e4d0f5', tableHead: '#b48be9', totalBg: '#f1e4ff', decor: 'cat',
   },
 };
 
 function marketplaceDecorSvg(tokens: MarketplaceTemplateTokens) {
   const color = tokens.dark ? tokens.accent : tokens.accent;
+  if (tokens.decor === 'bunny') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <ellipse cx="88" cy="90" rx="34" ry="29" fill="${color}" opacity=".14"/>
+      <ellipse cx="68" cy="48" rx="10" ry="25" fill="${color}" opacity=".14"/>
+      <ellipse cx="108" cy="48" rx="10" ry="25" fill="${color}" opacity=".14"/>
+      <circle cx="78" cy="86" r="3.2" fill="${tokens.text}" opacity=".68"/>
+      <circle cx="98" cy="86" r="3.2" fill="${tokens.text}" opacity=".68"/>
+      <path d="M80 99 Q88 106 97 99" stroke="${tokens.text}" stroke-width="3" fill="none" stroke-linecap="round" opacity=".58"/>
+      <path d="M42 130 C29 116 45 101 58 114 C70 101 86 116 73 130 L58 146 Z" fill="${color}" opacity=".15"/>
+    </svg>`;
+  }
+  if (tokens.decor === 'cloudBear') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <path d="M34 76 C22 76 16 66 21 56 C25 47 37 47 42 55 C50 39 73 46 72 64 C91 64 96 88 77 92 H34 Z" fill="${color}" opacity=".15"/>
+      <circle cx="108" cy="92" r="24" fill="${color}" opacity=".15"/>
+      <circle cx="90" cy="72" r="11" fill="${color}" opacity=".16"/>
+      <circle cx="126" cy="72" r="11" fill="${color}" opacity=".16"/>
+      <circle cx="100" cy="90" r="3" fill="${tokens.text}" opacity=".62"/>
+      <circle cx="116" cy="90" r="3" fill="${tokens.text}" opacity=".62"/>
+      <path d="M101 104 Q108 110 115 104" stroke="${tokens.text}" stroke-width="3" fill="none" stroke-linecap="round" opacity=".52"/>
+    </svg>`;
+  }
+  if (tokens.decor === 'sunflower') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <circle cx="102" cy="62" r="22" fill="${color}" opacity=".2"/>
+      <path d="M102 24 V10 M102 114 V130 M64 62 H48 M156 62 H170 M75 35 L64 24 M130 35 L142 24 M75 90 L64 102 M130 90 L142 102" stroke="${color}" stroke-width="5" stroke-linecap="round" opacity=".22"/>
+      <path d="M36 140 C49 108 62 108 76 140 M70 140 C84 108 100 108 114 140 M106 140 C120 108 134 108 146 140" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity=".18"/>
+    </svg>`;
+  }
+  if (tokens.decor === 'leafMascot') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <path d="M48 142 C76 84 124 86 146 36 C101 42 66 70 48 142 Z" fill="${color}" opacity=".16"/>
+      <path d="M57 128 C84 102 112 72 138 44" stroke="${color}" stroke-width="4" opacity=".22" stroke-linecap="round"/>
+      <circle cx="95" cy="76" r="20" fill="${color}" opacity=".13"/>
+      <circle cx="88" cy="74" r="2.7" fill="${tokens.text}" opacity=".62"/>
+      <circle cx="102" cy="74" r="2.7" fill="${tokens.text}" opacity=".62"/>
+    </svg>`;
+  }
+  if (tokens.decor === 'cat') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <path d="M66 78 L54 48 L82 67 M118 78 L130 48 L102 67" fill="${color}" opacity=".15"/>
+      <circle cx="92" cy="94" r="36" fill="${color}" opacity=".15"/>
+      <circle cx="82" cy="90" r="3.2" fill="${tokens.text}" opacity=".62"/>
+      <circle cx="102" cy="90" r="3.2" fill="${tokens.text}" opacity=".62"/>
+      <path d="M85 104 Q92 110 99 104" stroke="${tokens.text}" stroke-width="3" fill="none" stroke-linecap="round" opacity=".58"/>
+      <path d="M52 108 H78 M106 108 H132" stroke="${color}" stroke-width="3" stroke-linecap="round" opacity=".22"/>
+    </svg>`;
+  }
+  if (tokens.decor === 'cactus') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <path d="M90 146 V70 C90 56 110 56 110 70 V88 C124 84 134 92 134 106 V124 H120 V108 C120 100 110 100 110 110 V146 Z" fill="${color}" opacity=".17"/>
+      <path d="M80 98 C65 88 52 98 52 114 V128 H66 V116 C66 106 76 106 80 114 Z" fill="${color}" opacity=".14"/>
+      <circle cx="94" cy="84" r="2.6" fill="${tokens.text}" opacity=".62"/>
+      <circle cx="106" cy="84" r="2.6" fill="${tokens.text}" opacity=".62"/>
+    </svg>`;
+  }
+  if (tokens.decor === 'rainbow') {
+    return `<svg class="decor-svg cute-art" viewBox="0 0 180 180" aria-hidden="true">
+      <path d="M38 122 C56 70 124 70 142 122" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" opacity=".18"/>
+      <path d="M56 122 C70 90 110 90 124 122" fill="none" stroke="${tokens.accent2}" stroke-width="9" stroke-linecap="round" opacity=".42"/>
+      <circle cx="122" cy="54" r="19" fill="${color}" opacity=".19"/>
+      <path d="M36 144 C22 144 18 130 29 124 C33 109 54 114 54 130 C69 130 70 144 56 144 Z" fill="${tokens.accent2}" opacity=".45"/>
+    </svg>`;
+  }
   if (tokens.decor === 'anime') {
     return `<svg class="decor-svg anime-art" viewBox="0 0 180 180" aria-hidden="true">
       <path d="M52 118 C25 96 42 52 76 70 C92 34 148 54 132 98 C124 124 82 139 52 118 Z" fill="${color}" opacity=".15"/>
@@ -3046,8 +3159,9 @@ function buildHtmlMarketplace(data: PdfInvoiceData, tokens: MarketplaceTemplateT
     ? amountInWordsThai(data.total)
     : isEn ? amountInWordsEnglish(data.total) : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
   const dark = !!tokens.dark;
-  const tableHeadText = dark || ['cube', 'leaf', 'seal', 'gradient', 'truck', 'anime'].includes(tokens.decor) ? '#ffffff' : tokens.text;
-  const totalText = dark || ['cube', 'gradient'].includes(tokens.decor) ? '#ffffff' : tokens.text;
+  const coloredTableDecor = ['cube', 'leaf', 'seal', 'gradient', 'truck', 'anime', 'line', 'darkAccent', 'bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'];
+  const tableHeadText = dark || coloredTableDecor.includes(tokens.decor) ? '#ffffff' : tokens.text;
+  const totalText = dark || ['cube', 'gradient', 'line', 'darkAccent'].includes(tokens.decor) ? '#ffffff' : tokens.text;
   const headerBg = tokens.decor === 'gradient'
     ? `linear-gradient(135deg, ${tokens.accent} 0%, ${tokens.accent2} 100%)`
     : dark ? tokens.paper : tokens.paper;

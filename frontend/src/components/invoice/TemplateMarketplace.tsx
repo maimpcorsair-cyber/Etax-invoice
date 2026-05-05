@@ -3,10 +3,10 @@ import type { CSSProperties } from 'react';
 import { Check, Search, Sparkles, X } from 'lucide-react';
 import type { DocumentTemplateOption, InvoiceType } from '../../types';
 
-type CatalogGroup = 'all' | 'corporate' | 'official' | 'dark' | 'playful';
+type CatalogGroup = 'all' | 'minimal' | 'cute';
 type DecorKind =
-  | 'crown' | 'samurai' | 'carbon' | 'moon' | 'shadow' | 'matrix' | 'graffiti' | 'cyber' | 'gold' | 'mono'
-  | 'line' | 'mint' | 'beige' | 'darkAccent' | 'cloud' | 'bear' | 'leaf' | 'sun' | 'heart' | 'cube' | 'seal' | 'truck' | 'anime';
+  | 'minimal' | 'gray' | 'line' | 'sans' | 'space' | 'mint' | 'beige' | 'darkAccent'
+  | 'bunny' | 'cloudBear' | 'sunflower' | 'leafMascot' | 'cat' | 'cactus' | 'rainbow';
 
 type TemplatePreset = {
   id: string;
@@ -29,24 +29,32 @@ type TemplatePreset = {
 };
 
 const templatePresets: TemplatePreset[] = [
-  { id: 'builtin:minimal-white', no: '01', name: 'Minimal White', group: 'corporate', tags: ['Minimal', 'White'], decor: 'line', variables: { bg: '#f7f8fa', paper: '#ffffff', accent: '#111827', accent2: '#e6e8ed', text: '#111827', muted: '#5d6878', border: '#d6dbe4', tableHead: '#eef1f5', totalBg: '#f4f6f9' } },
-  { id: 'builtin:pro-blue-modern', no: '02', name: 'Corporate Blue', group: 'corporate', tags: ['Corporate', 'Blue'], decor: 'cube', variables: { bg: '#e8f1ff', paper: '#ffffff', accent: '#0f4ea3', accent2: '#082d63', text: '#0e2444', muted: '#566b86', border: '#b8cae8', tableHead: '#0b3778', totalBg: '#0f4ea3' } },
-  { id: 'builtin:pro-green-eco', no: '03', name: 'Green e-Tax', group: 'corporate', tags: ['Green', 'e-Tax'], decor: 'leaf', variables: { bg: '#eef8ea', paper: '#ffffff', accent: '#2f8736', accent2: '#bfe4b4', text: '#183c1e', muted: '#667d63', border: '#bddab6', tableHead: '#2f8736', totalBg: '#e6f4df' } },
-  { id: 'builtin:dark-gold', no: '04', name: 'Luxury Gold', group: 'dark', tags: ['Luxury', 'Gold'], decor: 'gold', variables: { bg: '#0e0b06', paper: '#11100d', accent: '#f0b737', accent2: '#8e681b', text: '#fff1c4', muted: '#bda66c', border: '#5a4216', tableHead: '#d89f28', totalBg: '#f0b737' } },
-  { id: 'builtin:dark-carbon', no: '05', name: 'Dark Tech', group: 'dark', tags: ['Dark', 'Tech'], decor: 'cyber', variables: { bg: '#02070b', paper: '#071017', accent: '#00b7f0', accent2: '#0d2b3d', text: '#e8faff', muted: '#87a7b7', border: '#113748', tableHead: '#006ea2', totalBg: '#00a9e2' } },
-  { id: 'builtin:minimal-light-gray', no: '06', name: 'Soft Gray', group: 'corporate', tags: ['Soft', 'Gray'], decor: 'mono', variables: { bg: '#eef0f4', paper: '#f9fafc', accent: '#5c6a7f', accent2: '#d9dee7', text: '#1d2735', muted: '#6e7a8d', border: '#d0d6e0', tableHead: '#69778c', totalBg: '#e6ebf2' } },
-  { id: 'builtin:pro-navy', no: '07', name: 'Thai Official', group: 'official', tags: ['Official', 'Thai'], decor: 'seal', variables: { bg: '#f3f6fb', paper: '#ffffff', accent: '#143e75', accent2: '#d7e4f5', text: '#102745', muted: '#61758e', border: '#bdd0e8', tableHead: '#143e75', totalBg: '#eaf1fb' } },
-  { id: 'builtin:pro-gradient', no: '08', name: 'Modern Gradient', group: 'corporate', tags: ['Modern', 'Gradient'], decor: 'cube', variables: { bg: '#eef2ff', paper: '#ffffff', accent: '#6c36e8', accent2: '#28a9ff', text: '#1d2452', muted: '#697093', border: '#d8dcff', tableHead: '#6337df', totalBg: '#6c36e8' } },
-  { id: 'builtin:pro-classic-orange', no: '09', name: 'Logistics Orange', group: 'corporate', tags: ['Logistics', 'Orange'], decor: 'truck', variables: { bg: '#fff1e9', paper: '#ffffff', accent: '#f05a1a', accent2: '#ffd0b7', text: '#3b2015', muted: '#8a6555', border: '#f3c6b1', tableHead: '#f05a1a', totalBg: '#ffe5d8' } },
-  { id: 'builtin:cute-pink', no: '10', name: 'Anime Friendly', group: 'playful', tags: ['Anime', 'Friendly'], decor: 'anime', variables: { bg: '#fff1f7', paper: '#fff9fc', accent: '#ec5f9c', accent2: '#ffd5e8', text: '#5a2440', muted: '#9d6b83', border: '#f5c6dc', tableHead: '#ec6da4', totalBg: '#ffe2ef' } },
+  { id: 'builtin:minimal-white', no: '01', name: 'Minimal White', group: 'minimal', tags: ['Minimal', 'White'], decor: 'minimal', variables: { bg: '#f7f8fa', paper: '#ffffff', accent: '#111827', accent2: '#e6e8ed', text: '#111827', muted: '#5d6878', border: '#d6dbe4', tableHead: '#eef1f5', totalBg: '#f4f6f9' } },
+  { id: 'builtin:minimal-gray', no: '02', name: 'Minimal Gray', group: 'minimal', tags: ['Minimal', 'Gray'], decor: 'gray', variables: { bg: '#eef0f4', paper: '#fafafa', accent: '#5f6875', accent2: '#d7dbe1', text: '#172033', muted: '#687385', border: '#cfd5dd', tableHead: '#eceff3', totalBg: '#e7ebf0' } },
+  { id: 'builtin:minimal-line', no: '03', name: 'Minimal Line', group: 'minimal', tags: ['Line', 'Classic'], decor: 'line', variables: { bg: '#ffffff', paper: '#ffffff', accent: '#111827', accent2: '#f1f3f5', text: '#111827', muted: '#667085', border: '#bfc6d1', tableHead: '#111827', totalBg: '#111827' } },
+  { id: 'builtin:minimal-sans', no: '04', name: 'Minimal Sans', group: 'minimal', tags: ['Bold', 'Sans'], decor: 'sans', variables: { bg: '#f8fafc', paper: '#ffffff', accent: '#1f2937', accent2: '#eef1f5', text: '#111827', muted: '#667085', border: '#d7dde6', tableHead: '#1f2937', totalBg: '#f3f4f6' } },
+  { id: 'builtin:minimal-space', no: '05', name: 'Minimal Space', group: 'minimal', tags: ['Airy', 'Clean'], decor: 'space', variables: { bg: '#fafafa', paper: '#ffffff', accent: '#475569', accent2: '#f1f5f9', text: '#1e293b', muted: '#728095', border: '#e2e8f0', tableHead: '#f8fafc', totalBg: '#f1f5f9' } },
+  { id: 'builtin:cute-pink', no: '06', name: 'Cute Pink', group: 'cute', tags: ['Bunny', 'Pastel'], decor: 'bunny', variables: { bg: '#fff1f6', paper: '#fff9fc', accent: '#ec6b9d', accent2: '#ffd8e8', text: '#5a2440', muted: '#9d6b83', border: '#f5c6dc', tableHead: '#ee7eaa', totalBg: '#ffe2ef' } },
+  { id: 'builtin:cute-blue', no: '07', name: 'Cute Blue', group: 'cute', tags: ['Cloud', 'Bear'], decor: 'cloudBear', variables: { bg: '#eff8ff', paper: '#fbfdff', accent: '#64aee9', accent2: '#d8efff', text: '#213f62', muted: '#6a829d', border: '#c8e2f7', tableHead: '#6fb8eb', totalBg: '#e3f3ff' } },
+  { id: 'builtin:cute-yellow', no: '08', name: 'Cute Yellow', group: 'cute', tags: ['Sun', 'Flower'], decor: 'sunflower', variables: { bg: '#fff9db', paper: '#fffdf4', accent: '#f6b51d', accent2: '#fff0a8', text: '#5b3b0b', muted: '#8a754b', border: '#f3dda1', tableHead: '#f3bd2f', totalBg: '#fff1a8' } },
+  { id: 'builtin:cute-green', no: '09', name: 'Cute Green', group: 'cute', tags: ['Leaf', 'Fresh'], decor: 'leafMascot', variables: { bg: '#f0fbeb', paper: '#fbfff8', accent: '#6bbd5d', accent2: '#dff3d3', text: '#24451f', muted: '#71836d', border: '#cde7c6', tableHead: '#72bf65', totalBg: '#e5f6d9' } },
+  { id: 'builtin:cute-kawaii', no: '10', name: 'Cute Kawaii', group: 'cute', tags: ['Cat', 'Purple'], decor: 'cat', variables: { bg: '#f8f2ff', paper: '#fffaff', accent: '#9a72de', accent2: '#eadcff', text: '#45226c', muted: '#7b6b92', border: '#ddcdf4', tableHead: '#9a72de', totalBg: '#eee2ff' } },
+  { id: 'builtin:minimal-light-gray', no: '11', name: 'Minimal Light Gray', group: 'minimal', tags: ['Light', 'Gray'], decor: 'gray', variables: { bg: '#f1f3f6', paper: '#ffffff', accent: '#6b7280', accent2: '#eef1f5', text: '#111827', muted: '#6b7280', border: '#d9dee7', tableHead: '#f1f3f6', totalBg: '#f4f6f9' } },
+  { id: 'builtin:minimal-fine-line', no: '12', name: 'Minimal Fine Line', group: 'minimal', tags: ['Thin', 'Line'], decor: 'line', variables: { bg: '#ffffff', paper: '#ffffff', accent: '#1f2937', accent2: '#f8fafc', text: '#111827', muted: '#667085', border: '#c6ccd5', tableHead: '#ffffff', totalBg: '#f5f6f8' } },
+  { id: 'builtin:minimal-mint', no: '13', name: 'Minimal Mint', group: 'minimal', tags: ['Mint', 'Soft'], decor: 'mint', variables: { bg: '#effdf8', paper: '#ffffff', accent: '#66c7ad', accent2: '#d9f4eb', text: '#164b42', muted: '#6c817b', border: '#c9eadf', tableHead: '#e8f7f1', totalBg: '#dff4ec' } },
+  { id: 'builtin:minimal-beige', no: '14', name: 'Minimal Beige', group: 'minimal', tags: ['Beige', 'Warm'], decor: 'beige', variables: { bg: '#fff8ea', paper: '#fffdf8', accent: '#c09a4a', accent2: '#f3e5c3', text: '#3f2b16', muted: '#826e52', border: '#ead8b6', tableHead: '#f7ecd1', totalBg: '#f1e0b7' } },
+  { id: 'builtin:minimal-dark-accent', no: '15', name: 'Minimal Dark Accent', group: 'minimal', tags: ['Dark', 'Accent'], decor: 'darkAccent', variables: { bg: '#f7f8fa', paper: '#ffffff', accent: '#111827', accent2: '#e8eaef', text: '#111827', muted: '#6b7280', border: '#d5dae3', tableHead: '#111827', totalBg: '#111827' } },
+  { id: 'builtin:cute-pastel-pink', no: '16', name: 'Cute Pastel Pink', group: 'cute', tags: ['Heart', 'Pink'], decor: 'bunny', variables: { bg: '#fff4f8', paper: '#fffafd', accent: '#ee8ab1', accent2: '#ffe1ec', text: '#642945', muted: '#9a7085', border: '#f4c9db', tableHead: '#ef91b9', totalBg: '#ffe4ef' } },
+  { id: 'builtin:cute-baby-blue', no: '17', name: 'Cute Baby Blue', group: 'cute', tags: ['Baby Blue', 'Bear'], decor: 'cloudBear', variables: { bg: '#f0f9ff', paper: '#fbfdff', accent: '#86c9ef', accent2: '#ddf4ff', text: '#264863', muted: '#718aa0', border: '#cfe8f6', tableHead: '#8bcaf0', totalBg: '#e5f6ff' } },
+  { id: 'builtin:cute-soft-green', no: '18', name: 'Cute Soft Green', group: 'cute', tags: ['Cactus', 'Soft'], decor: 'cactus', variables: { bg: '#f2fae9', paper: '#fdfff9', accent: '#9ac660', accent2: '#e8f3d2', text: '#41521f', muted: '#77845c', border: '#dcecc4', tableHead: '#98c660', totalBg: '#ebf5d7' } },
+  { id: 'builtin:cute-yellow-sunshine', no: '19', name: 'Cute Yellow Sunshine', group: 'cute', tags: ['Sunshine', 'Rainbow'], decor: 'rainbow', variables: { bg: '#fff8dc', paper: '#fffdf5', accent: '#f5bd22', accent2: '#ffeaa0', text: '#664810', muted: '#8b784f', border: '#f0daa1', tableHead: '#f2bd29', totalBg: '#fff0a0' } },
+  { id: 'builtin:cute-lovely-purple', no: '20', name: 'Cute Lovely Purple', group: 'cute', tags: ['Lovely', 'Cat'], decor: 'cat', variables: { bg: '#faf2ff', paper: '#fffaff', accent: '#b48be9', accent2: '#f0e1ff', text: '#543078', muted: '#877298', border: '#e4d0f5', tableHead: '#b48be9', totalBg: '#f1e4ff' } },
 ];
 
 const groups = [
   { key: 'all', labelTh: 'ทั้งหมด', labelEn: 'All' },
-  { key: 'corporate', labelTh: 'Corporate', labelEn: 'Corporate' },
-  { key: 'official', labelTh: 'Official', labelEn: 'Official' },
-  { key: 'dark', labelTh: 'Dark', labelEn: 'Dark' },
-  { key: 'playful', labelTh: 'Anime / Cute', labelEn: 'Anime / Cute' },
+  { key: 'minimal', labelTh: 'Minimal', labelEn: 'Minimal' },
+  { key: 'cute', labelTh: 'Cute Pastel', labelEn: 'Cute Pastel' },
 ] as const;
 
 interface Props {
@@ -72,7 +80,7 @@ function InvoiceTemplate({ preset }: { preset: TemplatePreset }) {
     '--totalBg': preset.variables.totalBg,
   } as CSSProperties;
 
-  const dark = preset.group === 'dark';
+  const dark = preset.decor === 'darkAccent';
 
   return (
     <div className={`invoiceTemplate invoiceTemplate-${preset.group} decor-${preset.decor}`} style={style}>
@@ -150,11 +158,77 @@ function InvoiceTemplate({ preset }: { preset: TemplatePreset }) {
             <path d="M28 68 L62 38 L92 58 L150 28" fill="none" stroke="currentColor" strokeWidth="3" opacity=".42" />
             <circle cx="132" cy="54" r="28" fill="currentColor" opacity=".14" />
           </>
-        ) : preset.group === 'playful' ? (
+        ) : preset.group === 'cute' ? (
           <>
-            <path d="M52 110 C22 86 42 44 76 64 C94 24 148 48 130 94 C122 120 82 132 52 110 Z" fill="currentColor" opacity=".16" />
-            <circle cx="54" cy="58" r="12" fill="currentColor" opacity=".2" />
-            <path d="M96 54 L103 68 L119 70 L108 82 L111 98 L96 90 L81 98 L84 82 L73 70 L89 68 Z" fill="currentColor" opacity=".23" />
+            {preset.decor === 'cloudBear' && (
+              <>
+                <path d="M36 74 C26 74 20 66 24 58 C27 50 36 50 40 56 C47 44 66 48 66 62 C82 62 86 82 70 86 H36 Z" fill="currentColor" opacity=".15" />
+                <circle cx="100" cy="82" r="20" fill="currentColor" opacity=".18" />
+                <circle cx="86" cy="66" r="9" fill="currentColor" opacity=".18" />
+                <circle cx="114" cy="66" r="9" fill="currentColor" opacity=".18" />
+                <circle cx="94" cy="82" r="2.5" fill="currentColor" opacity=".72" />
+                <circle cx="106" cy="82" r="2.5" fill="currentColor" opacity=".72" />
+                <path d="M95 91 Q100 95 105 91" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" opacity=".7" />
+              </>
+            )}
+            {preset.decor === 'sunflower' && (
+              <>
+                <circle cx="88" cy="62" r="22" fill="currentColor" opacity=".2" />
+                {Array.from({ length: 8 }).map((_, i) => {
+                  const angle = (i * Math.PI) / 4;
+                  const x1 = 88 + Math.cos(angle) * 31;
+                  const y1 = 62 + Math.sin(angle) * 31;
+                  return <line key={i} x1={88} y1={62} x2={x1} y2={y1} stroke="currentColor" strokeWidth="5" strokeLinecap="round" opacity=".22" />;
+                })}
+                <path d="M44 128 C54 106 64 106 72 128 M64 128 C74 104 88 104 98 128 M92 128 C102 104 116 106 124 128" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" opacity=".22" />
+              </>
+            )}
+            {preset.decor === 'leafMascot' && (
+              <>
+                <path d="M56 128 C82 82 120 84 138 44 C102 48 72 70 56 128 Z" fill="currentColor" opacity=".17" />
+                <path d="M62 118 C86 96 106 78 130 52" stroke="currentColor" strokeWidth="4" opacity=".22" strokeLinecap="round" />
+                <circle cx="94" cy="72" r="18" fill="currentColor" opacity=".16" />
+                <circle cx="88" cy="70" r="2.5" fill="currentColor" opacity=".75" />
+                <circle cx="100" cy="70" r="2.5" fill="currentColor" opacity=".75" />
+              </>
+            )}
+            {preset.decor === 'cat' && (
+              <>
+                <path d="M64 74 L54 48 L78 65 M116 74 L126 48 L102 65" fill="currentColor" opacity=".16" />
+                <circle cx="90" cy="88" r="34" fill="currentColor" opacity=".16" />
+                <circle cx="80" cy="84" r="3" fill="currentColor" opacity=".75" />
+                <circle cx="100" cy="84" r="3" fill="currentColor" opacity=".75" />
+                <path d="M83 96 Q90 101 97 96" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" opacity=".75" />
+                <path d="M52 102 H76 M104 102 H128" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity=".24" />
+              </>
+            )}
+            {preset.decor === 'cactus' && (
+              <>
+                <path d="M90 128 V66 C90 54 108 54 108 66 V82 C120 78 128 84 128 96 V112 H116 V98 C116 92 108 92 108 100 V128 Z" fill="currentColor" opacity=".17" />
+                <path d="M80 90 C66 82 54 90 54 105 V116 H66 V106 C66 98 74 98 80 104 Z" fill="currentColor" opacity=".14" />
+                <circle cx="94" cy="78" r="2.2" fill="currentColor" opacity=".75" />
+                <circle cx="104" cy="78" r="2.2" fill="currentColor" opacity=".75" />
+              </>
+            )}
+            {preset.decor === 'rainbow' && (
+              <>
+                <path d="M42 118 C58 72 122 72 138 118" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" opacity=".2" />
+                <path d="M56 118 C68 88 112 88 124 118" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" opacity=".15" />
+                <circle cx="118" cy="54" r="18" fill="currentColor" opacity=".2" />
+                <path d="M36 138 C22 138 18 124 28 118 C32 104 52 108 52 124 C66 124 68 138 54 138 Z" fill="currentColor" opacity=".13" />
+              </>
+            )}
+            {(preset.decor === 'bunny' || !['cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'].includes(preset.decor)) && (
+              <>
+                <ellipse cx="88" cy="88" rx="30" ry="26" fill="currentColor" opacity=".15" />
+                <ellipse cx="70" cy="50" rx="9" ry="22" fill="currentColor" opacity=".15" />
+                <ellipse cx="104" cy="50" rx="9" ry="22" fill="currentColor" opacity=".15" />
+                <circle cx="78" cy="84" r="2.8" fill="currentColor" opacity=".75" />
+                <circle cx="98" cy="84" r="2.8" fill="currentColor" opacity=".75" />
+                <path d="M80 96 Q88 102 96 96" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" opacity=".75" />
+                <path d="M44 124 C34 112 46 100 56 110 C66 100 78 112 68 124 L56 136 Z" fill="currentColor" opacity=".16" />
+              </>
+            )}
           </>
         ) : (
           <>
@@ -361,7 +435,7 @@ const catalogCss = `
   background: radial-gradient(circle, rgba(232, 185, 93, .34), transparent 62%);
 }
 .catalogHero::after {
-  content: "10";
+  content: "20";
   position: absolute;
   right: 82px;
   bottom: -46px;
@@ -822,10 +896,11 @@ const catalogCss = `
 }
 .decor-graffiti .tableHead,
 .decor-gold .tableHead,
-.invoiceTemplate-minimal .tableHead,
-.invoiceTemplate-playful .tableHead {
+.invoiceTemplate-minimal .tableHead {
   color: var(--text);
 }
+.invoiceTemplate-cute .tableHead,
+.decor-line .tableHead,
 .decor-darkAccent .tableHead {
   color: #fff;
 }
@@ -1094,14 +1169,60 @@ const catalogCss = `
 .decor-mono.invoiceTemplate-dark .tableHead {
   color: #fff;
 }
-.invoiceTemplate-playful {
+.invoiceTemplate-cute {
   border-radius: 14px;
 }
-.invoiceTemplate-playful::after {
+.invoiceTemplate-cute::after {
   border-radius: 48% 52% 44% 56%;
 }
 .invoiceTemplate-minimal::after {
   opacity: .22;
+}
+.decor-gray::before,
+.decor-space::before {
+  background:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--border) 56%, transparent) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--border) 34%, transparent) 0 1px, transparent 1px 26px);
+  opacity: .22;
+}
+.decor-sans .invoiceTitle b {
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.decor-space .invoiceTemplate,
+.decor-space {
+  background: var(--paper);
+}
+.decor-mint::after,
+.decor-beige::after {
+  opacity: .25;
+  border-radius: 999px;
+}
+.decor-bunny::before,
+.decor-cloudBear::before,
+.decor-sunflower::before,
+.decor-leafMascot::before,
+.decor-cat::before,
+.decor-cactus::before,
+.decor-rainbow::before {
+  background:
+    radial-gradient(circle at 13% 12%, color-mix(in srgb, var(--accent2) 72%, transparent) 0 18px, transparent 19px),
+    radial-gradient(circle at 84% 14%, color-mix(in srgb, var(--accent) 22%, transparent) 0 12px, transparent 13px),
+    radial-gradient(circle at 18% 92%, color-mix(in srgb, var(--accent) 18%, transparent) 0 18px, transparent 19px),
+    radial-gradient(circle at 88% 88%, color-mix(in srgb, var(--accent2) 60%, transparent) 0 22px, transparent 23px);
+  opacity: .82;
+}
+.decor-bunny::after,
+.decor-cloudBear::after,
+.decor-sunflower::after,
+.decor-leafMascot::after,
+.decor-cat::after,
+.decor-cactus::after,
+.decor-rainbow::after {
+  right: -12%;
+  top: 9%;
+  width: 48%;
+  opacity: .34;
 }
 .emptyState {
   padding: 42px;
