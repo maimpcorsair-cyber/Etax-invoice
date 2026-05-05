@@ -312,6 +312,11 @@ function buildOnlineViewUrl(invoiceNumber: string) {
   return `${baseUrl.replace(/\/$/, '')}/verify/${encodeURIComponent(invoiceNumber)}`;
 }
 
+function frontendPublicAssetUrl(path: string) {
+  const baseUrl = process.env.FRONTEND_URL ?? process.env.APP_URL ?? 'https://etax-invoice.vercel.app';
+  return `${baseUrl.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 async function enrichElectronicDocument(data: PdfInvoiceData): Promise<PdfInvoiceData> {
   if (data.documentMode !== 'electronic' || data.onlineQrDataUrl) return data;
 
@@ -3168,6 +3173,13 @@ function buildHtmlMarketplace(data: PdfInvoiceData, tokens: MarketplaceTemplateT
   const topAccent = tokens.decor === 'gradient'
     ? `linear-gradient(135deg, ${tokens.accent} 0%, ${tokens.accent2} 100%)`
     : tokens.accent;
+  const cuteTemplateDecor = ['bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'].includes(tokens.decor);
+  const generatedBackgroundUrl = frontendPublicAssetUrl(
+    cuteTemplateDecor
+      ? '/brand/templates/tax-template-cute-pastel.png?v=20260506a'
+      : '/brand/templates/tax-template-minimal-line.png?v=20260506a',
+  );
+  const generatedBackgroundOpacity = cuteTemplateDecor ? 0.34 : 0.22;
   const itemRows = data.items.map((item, idx) => {
     const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
     return `<tr>
@@ -3193,7 +3205,8 @@ body{font-family:'Sarabun',sans-serif;background:${tokens.bg};color:${tokens.tex
 .page{width:794px;min-height:1123px;background:${tokens.bg};padding:24px;position:relative;overflow:hidden}
 .page::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 88% 8%,${tokens.accent}38,transparent 210px),radial-gradient(circle at 10% 92%,${tokens.accent2}55,transparent 220px),repeating-linear-gradient(135deg,transparent 0 18px,${tokens.border}26 18px 19px);pointer-events:none}
 .sheet{min-height:1075px;border:1px solid ${tokens.border};border-radius:20px;background:${tokens.paper};overflow:hidden;position:relative;box-shadow:0 26px 70px rgba(15,23,42,.16)}
-.sheet::after{content:'';position:absolute;right:-48px;top:110px;width:230px;height:230px;border-radius:34px;background:${tokens.accent}18;transform:rotate(16deg)}
+.sheet::before{content:'';position:absolute;inset:0;background:url("${generatedBackgroundUrl}") center/cover no-repeat;opacity:${generatedBackgroundOpacity};z-index:0;pointer-events:none}
+.sheet::after{content:'';position:absolute;right:-48px;top:110px;width:230px;height:230px;border-radius:34px;background:${tokens.accent}18;transform:rotate(16deg);z-index:0}
 .header{position:relative;z-index:1;display:grid;grid-template-columns:1fr 245px;gap:28px;padding:28px 32px 24px;background:${headerBg};color:${dark ? tokens.text : tokens.text}}
 .brand{display:flex;gap:14px;align-items:flex-start}.logo{display:grid;place-items:center;width:60px;height:60px;border-radius:16px;background:${topAccent};color:${tableHeadText};font-weight:800;font-size:13px;box-shadow:0 14px 28px ${tokens.accent}33}
 .company-name{font-size:18px;line-height:1.25;font-weight:800}.company-detail{margin-top:7px;color:${tokens.muted};font-size:10.5px;line-height:1.65}
