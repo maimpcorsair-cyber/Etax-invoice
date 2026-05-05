@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const apiProxyTarget = process.env.API_PROXY_TARGET || 'http://localhost:4000';
 
 export default defineConfig({
   plugins: [react()],
@@ -18,7 +19,7 @@ export default defineConfig({
     allowedHosts: ['app.localhost', 'ops.localhost', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: apiProxyTarget,
         changeOrigin: true,
       },
     },

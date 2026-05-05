@@ -32,6 +32,7 @@ frontend.dev.log
 tmp/
 temp/
 coverage/
+.tools/
 
 # Local certificates and secrets
 backend/certs/

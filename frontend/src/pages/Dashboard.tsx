@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, CheckCircle2, XCircle, Clock, AlertTriangle, Bot, Table2, HardDrive, UserCheck } from 'lucide-react';
+import {
+  Plus,
+  ArrowRight,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertTriangle,
+  Bot,
+  Table2,
+  HardDrive,
+  UserCheck,
+  Inbox,
+  Send,
+  Calculator,
+  CreditCard,
+  FileCheck2,
+  Sparkles,
+  ShieldCheck,
+} from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus } from '../types';
@@ -64,6 +82,20 @@ interface IntegrationStatus {
   googleDrive: { connected: boolean; mode: string };
 }
 
+interface DocumentIntakeStats {
+  windowDays: number;
+  totalLast30Days: number;
+  failedLast30Days: number;
+  duplicateWarnings: number;
+  storage: {
+    configured: boolean;
+    storageBacked: number;
+    databaseBacked: number;
+  };
+  byStatus: Record<string, number>;
+  bySource: Record<string, number>;
+}
+
 function SkeletonCard() {
   return (
     <div className="card animate-pulse">
@@ -109,6 +141,7 @@ export default function Dashboard() {
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [compliance, setCompliance] = useState<RdComplianceMonth[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationStatus | null>(null);
+  const [documentStats, setDocumentStats] = useState<DocumentIntakeStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,10 +155,11 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [statsRes, invRes, integrationRes] = await Promise.all([
+        const [statsRes, invRes, integrationRes, docStatsRes] = await Promise.all([
           fetch('/api/dashboard/stats', { headers }),
           fetch('/api/invoices?limit=5', { headers }),
           fetch('/api/dashboard/integration-status', { headers }),
+          fetch('/api/purchase-invoices/document-intakes/stats/summary', { headers }),
         ]);
 
         if (!statsRes.ok) throw new Error(isThai ? 'โหลดสถิติไม่สำเร็จ' : 'Failed to load stats');
@@ -136,10 +170,14 @@ export default function Dashboard() {
         const integrationJson = integrationRes.ok
           ? await integrationRes.json() as { data: IntegrationStatus }
           : { data: null };
+        const docStatsJson = docStatsRes.ok
+          ? await docStatsRes.json() as { data: DocumentIntakeStats }
+          : { data: null };
 
         setStats(statsJson.data);
         setRecentInvoices(invJson.data ?? []);
         setIntegrations(integrationJson.data);
+        setDocumentStats(docStatsJson.data);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -178,21 +216,177 @@ export default function Dashboard() {
   // Current month compliance (last item)
   const currentMonth = compliance[compliance.length - 1];
   const hasComplianceIssue = currentMonth && (currentMonth.failed > 0 || currentMonth.unsubmitted > 0);
+  const pendingRdCount = currentMonth ? currentMonth.failed + currentMonth.unsubmitted : stats?.rdPendingCount ?? 0;
+  const aiReviewCount = documentStats
+    ? ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed']
+        .reduce((sum, status) => sum + (documentStats.byStatus[status] ?? 0), 0)
+    : 0;
+  const readyIntegrations = integrations
+    ? [
+        integrations.lineAi.connected,
+        integrations.googleAccount.connected,
+        integrations.googleSheets.connected,
+        integrations.googleDrive.connected,
+      ].filter(Boolean).length
+    : 0;
+  const commandCount = [
+    aiReviewCount > 0,
+    pendingRdCount > 0,
+    (stats?.receivables.overdueOutstanding ?? 0) > 0,
+    integrations ? readyIntegrations < 4 : false,
+  ].filter(Boolean).length;
+
+  const commandItems = [
+    {
+      key: 'ai-inbox',
+      icon: Inbox,
+      href: '/app/purchase-invoices',
+      value: documentStats ? aiReviewCount.toLocaleString() : '—',
+      title: isThai ? 'เอกสารรอ AI ตรวจ' : 'AI documents to review',
+      detail: isThai
+        ? `รับเข้า ${documentStats?.totalLast30Days ?? 0} ไฟล์ใน 30 วันล่าสุด`
+        : `${documentStats?.totalLast30Days ?? 0} files received in the last 30 days`,
+      tone: aiReviewCount > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      action: isThai ? 'เปิด AI Inbox' : 'Open AI Inbox',
+    },
+    {
+      key: 'rd',
+      icon: Send,
+      href: '/app/invoices',
+      value: complianceLoading ? '—' : pendingRdCount.toLocaleString(),
+      title: isThai ? 'เอกสารยังไม่ส่ง RD' : 'RD submissions pending',
+      detail: currentMonth
+        ? (isThai ? `${currentMonth.month} · เหลือ ${currentMonth.daysLeft} วัน` : `${currentMonth.month} · ${currentMonth.daysLeft} days left`)
+        : (isThai ? 'ยังไม่มีรอบเดือนที่ต้องจัดการ' : 'No active filing month yet'),
+      tone: pendingRdCount > 0 ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      action: isThai ? 'ตรวจรายการส่ง' : 'Review queue',
+    },
+    {
+      key: 'ar',
+      icon: CreditCard,
+      href: '/app/invoices',
+      value: stats ? formatCurrency(stats.receivables.overdueOutstanding) : '—',
+      title: isThai ? 'ลูกหนี้เกินกำหนด' : 'Overdue receivables',
+      detail: stats && stats.receivables.overdueOutstanding > 0
+        ? (isThai ? 'ควรตามชำระหรือออกใบเสร็จเมื่อจ่ายแล้ว' : 'Needs collection follow-up or receipt after payment')
+        : (isThai ? 'ไม่มีลูกหนี้เกินกำหนด' : 'No overdue balance'),
+      tone: stats && stats.receivables.overdueOutstanding > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-900',
+      action: isThai ? 'ดูใบค้างชำระ' : 'View invoices',
+    },
+    {
+      key: 'tax',
+      icon: Calculator,
+      href: '/app/vat-summary',
+      value: currentMonth ? `${currentMonth.complianceRate}%` : '—',
+      title: isThai ? 'ความพร้อมยื่น VAT' : 'VAT filing readiness',
+      detail: isThai ? 'รวมขาย ซื้อ และสถานะ RD ไว้ในมุมมองเดียว' : 'Sales, purchase VAT, and RD readiness in one view',
+      tone: currentMonth && currentMonth.complianceRate < 100 ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      action: isThai ? 'เปิดสรุป VAT' : 'Open VAT summary',
+    },
+  ];
+
+  const autopilotLanes = [
+    {
+      key: 'capture',
+      icon: Sparkles,
+      label: isThai ? 'รับเอกสาร' : 'Capture',
+      title: isThai ? 'LINE / เว็บ / ไฟล์ PDF' : 'LINE, web, and PDF intake',
+      status: documentStats && documentStats.totalLast30Days > 0
+        ? (isThai ? `${documentStats.totalLast30Days} ไฟล์` : `${documentStats.totalLast30Days} files`)
+        : (isThai ? 'พร้อมรับไฟล์' : 'Ready'),
+    },
+    {
+      key: 'review',
+      icon: Bot,
+      label: isThai ? 'AI อ่านและตรวจ' : 'AI extraction',
+      title: isThai ? 'แยก VAT, ผู้ขาย, เลขเอกสาร' : 'VAT, vendor, and document fields',
+      status: aiReviewCount > 0
+        ? (isThai ? `${aiReviewCount} รอยืนยัน` : `${aiReviewCount} to confirm`)
+        : (isThai ? 'ไม่มีงานค้าง' : 'Clear'),
+    },
+    {
+      key: 'issue',
+      icon: FileCheck2,
+      label: isThai ? 'ออก e-Tax' : 'Issue e-Tax',
+      title: isThai ? 'สร้าง PDF/XML พร้อมตรวจ' : 'Generate PDF/XML with preview',
+      status: stats ? `${stats.pendingCount}` : '—',
+    },
+    {
+      key: 'comply',
+      icon: ShieldCheck,
+      label: isThai ? 'ส่ง RD / ภาษี' : 'RD and filing',
+      title: isThai ? 'ติดตามกำหนดวันที่ 15' : 'Track the 15th deadline',
+      status: pendingRdCount > 0
+        ? (isThai ? `${pendingRdCount} ต้องจัดการ` : `${pendingRdCount} pending`)
+        : (isThai ? 'พร้อม' : 'Ready'),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Welcome Banner */}
-      <div className="rounded-2xl p-6 text-white flex items-center justify-between" style={{background: 'linear-gradient(135deg,#16a34a 0%,#059669 100%)'}}>
-        <div>
-          <p className="text-blue-200 text-sm font-medium mb-1">{t('dashboard.welcome')}</p>
-          <h1 className="text-xl sm:text-2xl font-bold">{user?.name}</h1>
-          <p className="text-blue-100 text-sm mt-1">{t('dashboard.title')}</p>
+      {/* Command Center */}
+      <section className="overflow-hidden rounded-2xl border border-emerald-900/10 bg-slate-950 text-white shadow-sm">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,0.88fr)_minmax(420px,1.12fr)]">
+          <div className="p-5 sm:p-6 lg:p-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+              <Bot className="h-3.5 w-3.5" />
+              {isThai ? 'AI Tax Command Center' : 'AI Tax Command Center'}
+            </div>
+            <h1 className="mt-4 max-w-xl text-2xl font-bold leading-tight text-white sm:text-3xl">
+              {isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/75">
+              {isThai
+                ? `สวัสดี ${user?.name ?? ''} — ระบบรวมงานเอกสารเข้า, e-Tax, RD, VAT และลูกหนี้ไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
+                : `Hi ${user?.name ?? ''} — this workspace brings document intake, e-Tax, RD, VAT, and receivables into one daily operating view.`}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                to="/app/purchase-invoices"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300"
+              >
+                <Inbox className="h-4 w-4" />
+                {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
+              </Link>
+              <Link
+                to="/app/invoices/new"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15"
+              >
+                <Plus className="h-4 w-4" />
+                {isThai ? 'สร้าง e-Tax ใหม่' : 'Create e-Tax'}
+              </Link>
+            </div>
+          </div>
+
+          <div className="border-t border-white/10 bg-white/[0.04] p-4 sm:p-5 xl:border-l xl:border-t-0">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {commandItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.key}
+                    to={item.href}
+                    className={`group rounded-xl border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-lg ${item.tone}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/70 ring-1 ring-black/5">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="text-right text-xl font-bold leading-none">{item.value}</span>
+                    </div>
+                    <p className="mt-3 text-sm font-bold">{item.title}</p>
+                    <p className="mt-1 min-h-[34px] text-xs leading-5 opacity-75">{item.detail}</p>
+                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold">
+                      {item.action}
+                      <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </div>
-        <Link to="/app/invoices/new" className="hidden lg:inline-flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-blue-50 transition-all duration-200 hover:-translate-y-0.5 shadow-lg text-sm">
-          <Plus className="w-4 h-4" />
-          {t('dashboard.createNew')}
-        </Link>
-      </div>
+      </section>
 
       {/* Error banner */}
       {error && (
@@ -217,6 +411,44 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Autopilot lanes */}
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+              {isThai ? 'Workflow อัตโนมัติ' : 'Automation workflow'}
+            </p>
+            <h2 className="mt-1 text-lg font-bold text-gray-950">
+              {isThai ? 'จากเอกสารเข้า ไปจนถึงภาษีพร้อมยื่น' : 'From document intake to tax-ready filing'}
+            </h2>
+          </div>
+          <Link to="/app/admin" className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800">
+            {isThai ? 'ตั้งค่าการเชื่อมต่อ' : 'Configure integrations'}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+          {autopilotLanes.map((lane, index) => {
+            const Icon = lane.icon;
+            return (
+              <div key={lane.key} className="relative rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-primary-700 ring-1 ring-gray-200">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-xs font-bold text-gray-400">0{index + 1}</span>
+                </div>
+                <p className="mt-3 text-xs font-bold uppercase tracking-wide text-gray-500">{lane.label}</p>
+                <p className="mt-1 text-sm font-bold text-gray-950">{lane.title}</p>
+                <p className="mt-3 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                  {lane.status}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

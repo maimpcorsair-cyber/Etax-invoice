@@ -1,33 +1,61 @@
 {
-  "mcpServers": {
-    "context7": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@upstash/context7-mcp"
-      ],
-      "env": {
-        "DEFAULT_MINIMUM_TOKENS": ""
-      }
-    },
-    "filesystem": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--mount",
-        "type=bind,src=/User/chuvit/documents,dst=/projects",
-        "mcp/filesystem",
-        "/projects"
-      ]
-    },
-    "playwright": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@0.0.38"
-      ]
-    }
-  }
+	"mcpServers": {
+		"github": {
+			"command": "docker",
+			"args": [
+				"run",
+				"-i",
+				"--rm",
+				"-e",
+				"GITHUB_PERSONAL_ACCESS_TOKEN",
+				"-e",
+				"GITHUB_TOOLSETS",
+				"-e",
+				"GITHUB_READ_ONLY",
+				"ghcr.io/github/github-mcp-server"
+			],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "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",
+				"GITHUB_TOOLSETS": "repos,issues,pull_requests",
+				"GITHUB_READ_ONLY": "1"
+			},
+			"disabled": false,
+			"alwaysAllow": []
+		},
+		"playwright": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@playwright/mcp@0.0.38"
+			],
+			"alwaysAllow": [
+				"browser_click",
+				"browser_wait_for",
+				"browser_navigate",
+				"browser_handle_dialog",
+				"browser_snapshot",
+				"browser_file_upload",
+				"browser_resize",
+				"browser_close"
+			]
+		},
+		"context7": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@upstash/context7-mcp"
+			],
+			"env": {
+				"DEFAULT_MINIMUM_TOKENS": ""
+			}
+		},
+		"filesystem": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-filesystem",
+				"/Users/domdom/Documents/Github/Etax-invoice"
+			]
+		}
+	}
 }

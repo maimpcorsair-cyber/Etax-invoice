@@ -6,18 +6,22 @@
  * Usage:
  *   k6 run load-test.js
  *   k6 run load-test.js -e BASE_URL=http://localhost:4000
- *   k6 run load-test.js -e RD_ENVIRONMENT=sandbox
+ *   k6 run load-test.js -e LOAD_PROFILE=baseline
+ *   k6 run load-test.js -e LOAD_PROFILE=sustained -e WRITE_TESTS=true
  *
  * Environment variables:
  *   BASE_URL         - API base URL (default: http://localhost:4000)
  *   ADMIN_EMAIL     - Admin login email (default: admin@siamtech.co.th)
  *   ADMIN_PASSWORD  - Admin login password (default: Admin@123456)
  *   DURATION_MULT   - Speed multiplier for faster test runs (default: 1)
+ *   LOAD_PROFILE    - smoke | baseline | scale | sustained | spike | target | all (default: smoke)
+ *   WRITE_TESTS     - Set true to create draft invoices during the test (default: false)
  */
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Counter, Gauge, Rate, Trend } from 'k6/metrics';
+import encoding from 'k6/encoding';
+import { Counter, Rate, Trend } from 'k6/metrics';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 
@@ -25,11 +29,13 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:4000';
 const ADMIN_EMAIL = __ENV.ADMIN_EMAIL || 'admin@siamtech.co.th';
 const ADMIN_PASSWORD = __ENV.ADMIN_PASSWORD || 'Admin@123456';
 const DURATION_MULT = parseFloat(__ENV.DURATION_MULT || '1');
+const LOAD_PROFILE = __ENV.LOAD_PROFILE || 'smoke';
+const WRITE_TESTS = (__ENV.WRITE_TESTS || '').toLowerCase() === 'true';
 
 // ─── Custom Metrics ────────────────────────────────────────────────────────────
 
-const httpReqDuration = new Trend('http_req_duration');
-const httpReqFailed = new Rate('http_req_failed');
+const appHttpReqDuration = new Trend('app_http_req_duration');
+const appHttpReqFailed = new Rate('app_http_req_failed');
 const loginDuration = new Trend('login_duration');
 const invoicesListDuration = new Trend('invoices_list_duration');
 const dashboardStatsDuration = new Trend('dashboard_stats_duration');
@@ -83,7 +89,9 @@ function ensureAuth() {
 function parseJwt(token) {
   const parts = token.split('.');
   if (parts.length !== 3) return {};
-  const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+  const payloadSegment = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const paddedPayload = payloadSegment.padEnd(payloadSegment.length + ((4 - payloadSegment.length % 4) % 4), '=');
+  const payload = JSON.parse(encoding.b64decode(paddedPayload, 'std', 's'));
   return payload;
 }
 
@@ -97,8 +105,8 @@ function authGet(path, metrics) {
   });
 
   metrics.add(res.timings.duration);
-  httpReqDuration.add(res.timings.duration);
-  httpReqFailed.add(res.status >= 400 ? 1 : 0);
+  appHttpReqDuration.add(res.timings.duration);
+  appHttpReqFailed.add(res.status >= 400 ? 1 : 0);
 
   // Handle token expiration
   if (res.status === 401) {
@@ -128,8 +136,8 @@ function authPost(path, body, metrics) {
   );
 
   metrics.add(res.timings.duration);
-  httpReqDuration.add(res.timings.duration);
-  httpReqFailed.add(res.status >= 400 ? 1 : 0);
+  appHttpReqDuration.add(res.timings.duration);
+  appHttpReqFailed.add(res.status >= 400 ? 1 : 0);
 
   // Handle token expiration
   if (res.status === 401) {
@@ -143,6 +151,18 @@ function authPost(path, body, metrics) {
 }
 
 // ─── Test Scenarios ───────────────────────────────────────────────────────────
+
+/**
+ * Default smoke test.
+ * Low traffic, read-only, safe enough for a quick local/deployment health check.
+ */
+export const smokeScenario = {
+  executor: 'shared-iterations',
+  vus: 1,
+  iterations: 1,
+  maxDuration: `${30 * DURATION_MULT}s`,
+  tags: { phase: 'smoke' },
+};
 
 /**
  * Phase 1: Baseline
@@ -228,15 +248,42 @@ export const targetScenario = {
 
 // ─── Per-VU Logic ─────────────────────────────────────────────────────────────
 
-export const options = {
-  scenarios: {
-    baseline: baselineScenario,
-    scale_up: scaleUpScenario,
-    sustained: sustainedScenario,
-    spike: spikeScenario,
-    target: targetScenario,
-  },
-  thresholds: {
+function getScenarios() {
+  switch (LOAD_PROFILE) {
+    case 'smoke':
+      return { smoke: smokeScenario };
+    case 'baseline':
+      return { baseline: baselineScenario };
+    case 'scale':
+    case 'scale_up':
+      return { scale_up: scaleUpScenario };
+    case 'sustained':
+      return { sustained: sustainedScenario };
+    case 'spike':
+      return { spike: spikeScenario };
+    case 'target':
+      return { target: targetScenario };
+    case 'all':
+      return {
+        baseline: baselineScenario,
+        scale_up: scaleUpScenario,
+        sustained: sustainedScenario,
+        spike: spikeScenario,
+        target: targetScenario,
+      };
+    default:
+      throw new Error(`Unknown LOAD_PROFILE "${LOAD_PROFILE}". Use smoke, baseline, scale, sustained, spike, target, or all.`);
+  }
+}
+
+function getThresholds() {
+  if (LOAD_PROFILE === 'smoke') {
+    return {
+      'http_req_failed': ['rate<0.01'],
+    };
+  }
+
+  return {
     // Global thresholds
     'http_req_duration{cr:false}': ['p(95)<500'],
     'http_req_duration': ['p(95)<800'],
@@ -246,17 +293,20 @@ export const options = {
     'dashboard_stats_duration': ['p(95)<500', 'p(99)<1000'],
     'customers_list_duration': ['p(95)<500', 'p(99)<1000'],
     'invoice_create_duration': ['p(95)<1000', 'p(99)<2000'],
-  },
-  summaryTrendCols: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)', 'count'],
-  noConnectors: true,
-  userAgents: [
-    'k6-load-test/1.0',
-  ],
+  };
+}
+
+export const options = {
+  scenarios: getScenarios(),
+  thresholds: getThresholds(),
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)', 'count'],
 };
 
 export function setup() {
   console.log(`[setup] Connecting to: ${BASE_URL}`);
   console.log(`[setup] Duration multiplier: ${DURATION_MULT}x`);
+  console.log(`[setup] Load profile: ${LOAD_PROFILE}`);
+  console.log(`[setup] Write tests: ${WRITE_TESTS ? 'enabled' : 'disabled'}`);
 
   // Initial login to verify credentials and obtain token
   const res = http.post(
@@ -282,11 +332,6 @@ export function setup() {
 }
 
 export function handleSummary(data) {
-  const summary = {
-    ...data,
-    '# Phase Summary': '\n═══════════════════════════════════════════════════',
-  };
-
   // Build pass/fail summary per endpoint
   const endpointSummary = {};
   for (const [key, value] of Object.entries(data.metrics)) {
@@ -323,16 +368,20 @@ export function handleSummary(data) {
   console.log(`  ⚠️  unauthorized_errors: ${data.metrics['unauthorized_errors']?.values?.count ?? 0}`);
   console.log('═══════════════════════════════════════════════════\n');
 
-  return summary;
+  return {};
 }
 
-export default function() {
+export default function(data) {
+  authToken = data.token;
+  userId = data.userId;
+  companyId = data.companyId;
+
   // ── GET /api/invoices (list) ──────────────────────────────────────────────
 
   const invoiceRes = authGet('/api/invoices', invoicesListDuration);
   check(invoiceRes, {
     'invoices list: status is 200': (r) => r.status === 200,
-    'invoices list: has data array': (r) => Array.isArray(r.json()),
+    'invoices list: has data array': (r) => Array.isArray(r.json().data),
     'invoices list: response time < 1s': (r) => r.timings.duration < 1000,
   });
 
@@ -354,17 +403,16 @@ export default function() {
   const customersRes = authGet('/api/customers', customersListDuration);
   check(customersRes, {
     'customers list: status is 200': (r) => r.status === 200,
-    'customers list: has data array': (r) => Array.isArray(r.json()),
+    'customers list: has data array': (r) => Array.isArray(r.json().data),
     'customers list: response time < 1s': (r) => r.timings.duration < 1000,
   });
 
   sleep(Math.random() * 1 + 0.5); // 0.5–1.5s think time
 
-  // ── Phase 3+ only: POST /api/invoices (create draft) ────────────────────
-  // Only executed during sustained and target phases
+  // ── Optional write test: POST /api/invoices (create draft) ───────────────
+  // Disabled by default so a quick smoke/deployment test never creates data.
 
-  const tags = __ITER === 0 ? {} : null; // tag first iteration for debugging
-  if (authToken) {
+  if (WRITE_TESTS && authToken) {
     const invoiceBody = {
       type: 'T01',
       customerId: null, // Will use first available customer

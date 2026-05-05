@@ -3,6 +3,29 @@ import type { NavigateFunction } from 'react-router-dom';
 import type { Invoice, InvoiceItem, InvoiceType, Language } from '../types';
 import { emptyItem, calculateItem, translateZodMessage } from '../utils/invoiceHelpers';
 
+const DRAFT_STORAGE_KEY = 'etax_invoice_draft';
+
+/** Shape of the draft saved in localStorage — mirrors form state fields */
+interface DraftPayload {
+  docType: InvoiceType;
+  language: Language;
+  invoiceDate: string;
+  dueDate: string;
+  referenceDocNumber: string;
+  items: InvoiceItem[];
+  notes: string;
+  paymentMethod: string;
+  documentLogoUrl: string | null;
+  showCompanyLogo: boolean;
+  templateId: string | null;
+  documentMode: 'ordinary' | 'electronic';
+  bankPaymentInfo: string;
+  signatureImageUrl: string | null;
+  signerName: string;
+  signerTitle: string;
+  savedAt: number;
+}
+
 interface Options {
   token: string | null;
   clearAuth: () => void;
@@ -32,6 +55,89 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [signerTitle, setSignerTitle] = useState('');
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
+  const [recoveredDraft, setRecoveredDraft] = useState(false);
+
+  /* ── Auto-save draft to localStorage ── */
+  const saveDraftToStorage = useCallback(() => {
+    try {
+      const draft = {
+        docType, docLanguage, invoiceDate, dueDate, referenceDocNumber,
+        items, notes, paymentMethod, documentLogoUrl: logoUrl, showCompanyLogo, templateId,
+        documentMode, bankPaymentInfo, signatureImageUrl, signerName, signerTitle,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch {
+      // localStorage may be unavailable (private browsing, full quota)
+    }
+  }, [docType, docLanguage, invoiceDate, dueDate, referenceDocNumber, items, notes,
+      paymentMethod, logoUrl, showCompanyLogo, templateId, documentMode,
+      bankPaymentInfo, signatureImageUrl, signerName, signerTitle]);
+
+  const clearDraftFromStorage = useCallback(() => {
+    try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* ignore */ }
+  }, []);
+
+  /* ── Load draft from localStorage (only for NEW invoices, not edit mode) ── */
+  const loadDraftFromStorage = useCallback((): boolean => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return false;
+      const draft = JSON.parse(raw) as DraftPayload;
+      // Only recover if draft is less than 7 days old
+      if (draft.savedAt && Date.now() - draft.savedAt > 7 * 24 * 60 * 60 * 1000) {
+        clearDraftFromStorage();
+        return false;
+      }
+      if (draft.docType) setDocType(draft.docType);
+      if (draft.language) setDocLanguage(draft.language);
+      if (draft.invoiceDate) setInvoiceDate(new Date(draft.invoiceDate).toISOString().split('T')[0]);
+      if (draft.dueDate) setDueDate(new Date(draft.dueDate).toISOString().split('T')[0]);
+      if (draft.referenceDocNumber) setReferenceDocNumber(draft.referenceDocNumber);
+      if (Array.isArray(draft.items) && draft.items.length > 0) {
+        setItems(draft.items.map((item) => ({
+          ...item,
+          nameEn: item.nameEn ?? '',
+          descriptionTh: item.descriptionTh ?? '',
+          descriptionEn: item.descriptionEn ?? '',
+        })));
+      }
+      if (draft.notes != null) setNotes(draft.notes);
+      if (draft.paymentMethod != null) setPaymentMethod(draft.paymentMethod);
+      if (draft.templateId != null) setTemplateId(draft.templateId);
+      if (draft.documentMode != null) setDocumentMode(draft.documentMode);
+      if (draft.bankPaymentInfo != null) setBankPaymentInfo(draft.bankPaymentInfo);
+      if (draft.showCompanyLogo != null) setShowCompanyLogo(draft.showCompanyLogo);
+      if (draft.documentLogoUrl != null) setLogoUrl(draft.documentLogoUrl);
+      if (draft.signatureImageUrl != null) setSignatureImageUrl(draft.signatureImageUrl);
+      if (draft.signerName != null) setSignerName(draft.signerName);
+      if (draft.signerTitle != null) setSignerTitle(draft.signerTitle);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [clearDraftFromStorage]);
+
+  /* ── Check if there is a recoverable draft (without actually loading it) ── */
+  const hasRecoverableDraft = useCallback((): boolean => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return false;
+      const draft = JSON.parse(raw) as { savedAt?: number };
+      if (draft.savedAt && Date.now() - draft.savedAt > 7 * 24 * 60 * 60 * 1000) {
+        clearDraftFromStorage();
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, [clearDraftFromStorage]);
+
+  const discardRecoveredDraft = useCallback(() => {
+    clearDraftFromStorage();
+    setRecoveredDraft(false);
+  }, [clearDraftFromStorage]);
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (i: number) =>
@@ -262,6 +368,13 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     totalVat,
     total,
     hydrateFromInvoice,
+    saveDraftToStorage,
+    clearDraftFromStorage,
+    loadDraftFromStorage,
+    hasRecoverableDraft,
+    discardRecoveredDraft,
+    recoveredDraft,
+    setRecoveredDraft,
     handleSave,
     handleSaveDraft,
     handleIssue,

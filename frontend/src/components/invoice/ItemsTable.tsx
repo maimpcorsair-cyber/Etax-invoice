@@ -237,8 +237,8 @@ function ItemCard({
         )}
       </div>
 
-      {/* Row 3: numeric fields */}
-      <div className="pl-7 grid grid-cols-4 gap-2">
+      {/* Row 3: numeric fields — responsive: 4-col on md+, 2-col on mobile */}
+      <div className="pl-7 grid grid-cols-2 sm:grid-cols-4 gap-2">
         {/* Qty */}
         <div>
           <label className="block text-[10px] font-medium text-gray-500 mb-1">
@@ -375,10 +375,10 @@ export default function ItemsTable({
         ))}
       </div>
 
-      {/* Summary */}
+      {/* Summary — responsive width */}
       <div className="mt-4 pt-4 border-t border-gray-100">
         <div className="flex justify-end">
-          <div className="w-64 space-y-2">
+          <div className="w-full sm:w-64 space-y-2">
             <div className="flex justify-between text-sm text-gray-600">
               <span>{t('invoice.subtotal')}</span>
               <span className="font-medium tabular-nums">{formatCurrency(subtotal)}</span>

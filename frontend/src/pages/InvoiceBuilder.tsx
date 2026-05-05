@@ -366,6 +366,41 @@ export default function InvoiceBuilder() {
     return () => { active = false; };
   }, [token]);
 
+  /* ── Draft recovery — on new invoice, offer to restore from localStorage ── */
+  useEffect(() => {
+    if (isEdit || !token) return;
+    if (form.hasRecoverableDraft()) {
+      const recovered = window.confirm(
+        isThai
+          ? 'พบฉบับร่างที่ยังไม่ได้บันทึก ต้องการกู้คืนข้อมูลหรือไม่?'
+          : 'A draft was found. Do you want to restore it?',
+      );
+      if (recovered) {
+        form.loadDraftFromStorage();
+      } else {
+        form.discardRecoveredDraft();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, token]);
+
+  /* ── Auto-save form to localStorage every 5 seconds (new invoices only) ── */
+  useEffect(() => {
+    if (isEdit || form.saving) return;
+    const interval = setInterval(() => {
+      form.saveDraftToStorage();
+    }, 5000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, form.saving]);
+
+  /* ── Auto-clear draft when successfully issued ── */
+  useEffect(() => {
+    if (issuedInvoiceId) {
+      form.clearDraftFromStorage();
+    }
+  }, [issuedInvoiceId, form.clearDraftFromStorage]);
+
   useEffect(() => {
     if (!isEdit || !id || !token) return;
     let active = true;
@@ -436,8 +471,8 @@ export default function InvoiceBuilder() {
   const formPanel = (
     <div className="flex flex-col h-full min-h-0">
       {/* Stepper strip */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5 overflow-x-auto">
-        <div className="flex gap-1 min-w-max">
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5">
+        <div className="flex gap-1 min-w-max overflow-x-auto pb-1 scrollbar-hide">
           {STEPPER_STEPS.map(({ key, labelTh, labelEn }, idx) => {
             const isActive = activeSection === key;
             return (

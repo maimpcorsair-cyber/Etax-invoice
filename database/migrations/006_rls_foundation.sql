@@ -61,7 +61,7 @@ AS $$
     SELECT 1
     FROM public.invoices i
     WHERE i.id = target_invoice_id
-      AND public.app_tenant_access(i."companyId")
+      AND public.app_tenant_access(i.company_id)
   );
 $$;
 
@@ -75,8 +75,8 @@ COMMENT ON FUNCTION public.app_invoice_access(text) IS 'Returns true when the cu
 -- Next phase reference:
 --   ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 --   CREATE POLICY customers_tenant_policy ON public.customers
---     USING (public.app_tenant_access("companyId"))
---     WITH CHECK (public.app_tenant_access("companyId"));
+--     USING (public.app_tenant_access(company_id))
+--     WITH CHECK (public.app_tenant_access(company_id));
 --
 -- Similar activation can then be staged for:
 --   users, products, invoices, audit_logs, document_templates, company_subscriptions

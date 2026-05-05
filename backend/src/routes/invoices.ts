@@ -9,6 +9,7 @@ import { generateInvoiceNumber } from '../services/invoiceService';
 import { generateInvoiceExcel } from '../services/exportService';
 import { exportInvoicesToSheets } from '../services/googleSheetsService';
 import { sendInvoiceToCustomer } from '../services/emailService';
+import { sendInvoiceIssuedNotification, sendInvoiceIssuedLineNotification } from '../services/notificationService';
 import { generatePdf, generatePdfFromHtml, buildHtmlForCompany } from '../services/pdfService';
 import {
   getLimitErrorMessage,
@@ -706,6 +707,21 @@ invoicesRouter.post('/:id/issue', requireRole('admin', 'super_admin', 'accountan
 
     // Queue PDF generation
     await enqueueInvoicePdf(updatedInvoice.id, updatedInvoice.language);
+
+    // ── Push notifications (FCM + LINE) ────────────────────────────────────────
+    const notifPromise = sendInvoiceIssuedNotification(
+      updatedInvoice.id,
+      realInvoiceNumber,
+      req.user!.companyId,
+    ).catch((e: Error) => console.warn(`[Issue] FCM notification failed: ${e.message}`));
+    const lineNotifPromise = sendInvoiceIssuedLineNotification(
+      updatedInvoice.id,
+      realInvoiceNumber,
+      updatedInvoice.total,
+      req.user!.companyId,
+    ).catch((e: Error) => console.warn(`[Issue] LINE notification failed: ${e.message}`));
+    void notifPromise;
+    void lineNotifPromise;
 
     // Auto-submit to RD for T01 and T02 if policy allows
     const autoSubmitTypes = ['tax_invoice_receipt', 'tax_invoice'];

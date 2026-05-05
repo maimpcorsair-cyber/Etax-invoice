@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, AlertTriangle, FileCheck2,
   Upload, Image as ImageIcon, FileText, ExternalLink, Eye,
+  Bot, ShieldCheck, ArrowRight, Inbox,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -723,26 +725,102 @@ export default function PurchaseInvoices() {
     return s + (isNaN(v) ? 0 : v);
   })();
 
+  const aiInboxSteps = [
+    {
+      key: 'capture',
+      icon: Upload,
+      label: isThai ? 'รับไฟล์' : 'Capture',
+      title: isThai ? 'อัปโหลด PDF/รูป หรือส่งผ่าน LINE' : 'Upload PDFs/images or send via LINE',
+      value: documentStats ? documentStats.totalLast30Days : documentLibrary.length,
+    },
+    {
+      key: 'extract',
+      icon: Bot,
+      label: isThai ? 'AI อ่าน' : 'AI reads',
+      title: isThai ? 'ดึงผู้ขาย เลขภาษี ยอด VAT และหมวดค่าใช้จ่าย' : 'Extract vendor, tax ID, VAT, and expense category',
+      value: awaitingDocuments.length,
+    },
+    {
+      key: 'approve',
+      icon: FileCheck2,
+      label: isThai ? 'ตรวจ/ยืนยัน' : 'Review',
+      title: isThai ? 'กดผ่านเมื่อมั่นใจ หรือเติมช่องที่ AI ขาด' : 'Approve confident results or fill missing fields',
+      value: actionDocuments.length,
+    },
+    {
+      key: 'tax',
+      icon: ShieldCheck,
+      label: isThai ? 'พร้อมยื่น VAT' : 'Tax ready',
+      title: isThai ? 'บันทึกเป็นภาษีซื้อและไปต่อที่ ภ.พ.30' : 'Record input VAT and continue to PP.30',
+      value: documentStats?.byStatus.saved ?? items.length,
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <ShoppingCart className="w-6 h-6 text-primary-600" />
-            {isThai ? 'บันทึกซื้อ / Input VAT' : 'Purchase Invoices / Input VAT'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {isThai
-              ? 'บันทึกใบกำกับภาษีซื้อจากผู้ขายเพื่อใช้ในการยื่น ภ.พ.30'
-              : 'Record supplier tax invoices for monthly PP.30 filing'}
-          </p>
+      {/* AI Inbox Hero */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-sm">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">
+          <div className="p-5 sm:p-6 lg:p-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+              <Inbox className="h-3.5 w-3.5" />
+              {isThai ? 'AI Document Inbox' : 'AI Document Inbox'}
+            </div>
+            <h1 className="mt-4 max-w-2xl text-2xl font-bold leading-tight text-white sm:text-3xl">
+              {isThai ? 'โยนเอกสารเข้า แล้วให้ AI เตรียมภาษีซื้อให้' : 'Drop documents in. Let AI prepare input VAT.'}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/75">
+              {isThai
+                ? 'ระบบอ่านใบกำกับ/ใบเสร็จจาก PDF หรือรูปภาพ ตรวจช่องสำคัญ แจ้งสิ่งที่ขาด แล้วบันทึกเป็นรายการซื้อเพื่อใช้ยื่น ภ.พ.30'
+                : 'The system reads supplier invoices and receipts from PDFs or images, flags missing fields, and turns approved documents into PP.30-ready purchase records.'}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {isThai ? 'อัปโหลดเข้า AI' : 'Upload to AI'}
+                <input
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  disabled={uploading || isFreePlan}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.currentTarget.value = '';
+                    if (file) void uploadDocument(file);
+                  }}
+                />
+              </label>
+              <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50" disabled={isFreePlan}>
+                <Plus className="h-4 w-4" />
+                {isThai ? 'กรอกเอง' : 'Manual entry'}
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-white/10 bg-white/[0.04] p-4 sm:p-5 xl:border-l xl:border-t-0">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {aiInboxSteps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.key} className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-emerald-100 ring-1 ring-white/10">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="text-right text-xl font-bold leading-none text-white">{step.value}</span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs font-bold text-emerald-200">0{index + 1}</span>
+                      <p className="text-xs font-bold uppercase tracking-wide text-emerald-100/80">{step.label}</p>
+                    </div>
+                    <p className="mt-1 text-sm leading-5 text-white/85">{step.title}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-        <button onClick={openCreate} className="btn-primary" disabled={isFreePlan}>
-          <Plus className="w-4 h-4" />
-          {isThai ? 'เพิ่มรายการซื้อ' : 'Add Purchase'}
-        </button>
-      </div>
+      </section>
 
       {isFreePlan && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -757,16 +835,18 @@ export default function PurchaseInvoices() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary-600" />
-                {isThai ? 'งานเอกสารเข้า' : 'Document Inbox'}
+                <Bot className="w-4 h-4 text-primary-600" />
+                {isThai ? 'AI Inbox: เอกสารที่ต้องจัดการ' : 'AI Inbox: documents needing action'}
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                {isThai ? `${actionDocuments.length} รายการต้องจัดการ` : `${actionDocuments.length} items need action`}
+                {isThai
+                  ? `${actionDocuments.length} รายการต้องจัดการ · AI จะช่วยอ่านและเตรียมข้อมูลภาษีซื้อ`
+                  : `${actionDocuments.length} items need action · AI reads and prepares input VAT data`}
               </p>
             </div>
             <label className={`btn-primary cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {isThai ? 'อัปโหลด' : 'Upload'}
+              {isThai ? 'อัปโหลดเข้า AI' : 'Upload to AI'}
               <input
                 type="file"
                 accept="application/pdf,image/jpeg,image/png,image/webp"
@@ -956,7 +1036,7 @@ export default function PurchaseInvoices() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
-                {isThai ? 'รายการรอตรวจ' : 'Review Queue'}
+                {isThai ? 'คิวตรวจผล AI' : 'AI Review Queue'}
               </h2>
               <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
                 {aiReviewItems.length + reviewIntakes.length}
@@ -1003,7 +1083,7 @@ export default function PurchaseInvoices() {
           <div className="card space-y-3">
             <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <Receipt className="w-4 h-4 text-blue-600" />
-              {isThai ? 'สรุปภาษีซื้อ' : 'Input VAT Summary'}
+              {isThai ? 'ผลลัพธ์หลังยืนยัน' : 'Approved input VAT'}
             </h2>
             <div className="grid grid-cols-1 gap-2">
               <div className="rounded-lg bg-blue-50 px-3 py-2">
@@ -1025,6 +1105,20 @@ export default function PurchaseInvoices() {
 
       {/* Filters */}
       <div className="card">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">
+              {isThai ? 'รายการซื้อที่บันทึกแล้ว' : 'Recorded purchase invoices'}
+            </h2>
+            <p className="text-xs text-gray-500">
+              {isThai ? 'ข้อมูลชุดนี้คือเอกสารที่ผ่านการตรวจหรือกรอกเองแล้ว ใช้ต่อใน VAT Summary และ ภ.พ.30' : 'These reviewed or manually entered records feed VAT Summary and PP.30.'}
+            </p>
+          </div>
+          <Link to="/app/vat-summary" className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800">
+            {isThai ? 'ดู VAT Summary' : 'View VAT Summary'}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-500 mb-1">{isThai ? 'จาก' : 'From'}</label>

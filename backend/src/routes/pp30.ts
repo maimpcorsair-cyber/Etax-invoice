@@ -6,6 +6,7 @@ import {
   hasFeatureAccess,
   resolveCompanyAccessPolicy,
 } from '../services/accessPolicyService';
+import { exportPp30ToSheets } from '../services/googleSheetsService';
 import { logger } from '../config/logger';
 
 export const pp30Router = Router();
@@ -151,6 +152,29 @@ pp30Router.get('/', async (req, res) => {
 });
 
 /* ─── PP.30 CSV export ─── */
+pp30Router.get('/export/sheets', async (req, res) => {
+  try {
+    const range = parseYearMonth(req.query.year, req.query.month);
+    if (!range) {
+      res.status(400).json({ error: '`year` and `month` query parameters are required' });
+      return;
+    }
+
+    const policy = await resolveCompanyAccessPolicy(req.user!.companyId);
+    if (!hasFeatureAccess(policy, 'export_google_sheets')) {
+      res.status(403).json({ error: 'Upgrade to Business or Enterprise to export PP.30 to Google Sheets' });
+      return;
+    }
+
+    const data = await buildPp30({ user: req.user! }, range.from, range.to);
+    const url = await exportPp30ToSheets({ period: range.period, ...data });
+    res.json({ url });
+  } catch (err) {
+    logger.error('Failed to export PP.30 to Google Sheets', { error: err });
+    res.status(500).json({ error: 'Failed to export PP.30 to Google Sheets' });
+  }
+});
+
 pp30Router.get('/export', async (req, res) => {
   try {
     const range = parseYearMonth(req.query.year, req.query.month);
@@ -164,9 +188,6 @@ pp30Router.get('/export', async (req, res) => {
       res.status(403).json({ error: 'Upgrade your plan to export PP.30 reports' });
       return;
     }
-
-    const format = (req.query.format === 'csv' || !req.query.format ? 'csv' : 'csv') as 'csv';
-    void format;
 
     const data = await buildPp30({ user: req.user! }, range.from, range.to);
 

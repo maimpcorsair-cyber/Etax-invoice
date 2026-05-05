@@ -90,3 +90,100 @@ export async function sendRdResultNotification(
     success: String(success),
   });
 }
+
+/**
+ * Notify admins (via FCM push) when a new invoice is officially issued.
+ * Triggers right after the invoice number is upgraded from DRAFT-.
+ */
+export async function sendInvoiceIssuedNotification(
+  invoiceId: string,
+  invoiceNumber: string,
+  companyId: string,
+): Promise<void> {
+  const { default: prisma } = await import('../config/database');
+
+  // Find admin/super_admin users with active FCM tokens in this company
+  const tokens = await prisma.fcmToken.findMany({
+    where: {
+      user: { companyId, isActive: true, role: { in: ['admin', 'super_admin', 'accountant'] } },
+      isActive: true,
+    },
+    select: { token: true },
+  });
+  if (tokens.length === 0) return;
+
+  await Promise.allSettled(
+    tokens.map(({ token }) =>
+      sendPushNotification({
+        token,
+        title: '📄 ออกเอกสารสำเร็จ',
+        body: `${invoiceNumber} พร้อมใช้งานแล้ว`,
+        data: { invoiceId, type: 'invoice_issued' },
+      }),
+    ),
+  );
+}
+
+/**
+ * Notify admins (via LINE push) when a new invoice is officially issued.
+ * Triggers right after the invoice number is upgraded from DRAFT-.
+ */
+export async function sendInvoiceIssuedLineNotification(
+  invoiceId: string,
+  invoiceNumber: string,
+  total: number,
+  companyId: string,
+): Promise<void> {
+  const { default: prisma } = await import('../config/database');
+  const { sendLineFlexMessage } = await import('./lineService');
+
+  const lineLinks = await prisma.lineUserLink.findMany({
+    where: {
+      isActive: true,
+      user: { companyId, isActive: true, role: { in: ['admin', 'super_admin', 'accountant'] } },
+    },
+    select: { lineUserId: true },
+  });
+  if (lineLinks.length === 0) return;
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+
+  const card = {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: '#2563eb',
+      contents: [
+        { type: 'text', text: '📄 ออกเอกสารสำเร็จ', color: '#ffffff', size: 'sm' },
+        { type: 'text', text: invoiceNumber, color: '#ffffff', size: 'lg', weight: 'bold' },
+      ],
+    },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        {
+          type: 'box', layout: 'horizontal',
+          contents: [
+            { type: 'text', text: 'ยอดรวม', size: 'sm', color: '#888888', flex: 3 },
+            { type: 'text', text: fmt(total), size: 'sm', color: '#333333', flex: 4, align: 'end', weight: 'bold' },
+          ],
+        },
+      ],
+    },
+    footer: {
+      type: 'box', layout: 'vertical',
+      contents: [
+        {
+          type: 'button', style: 'primary', color: '#2563eb',
+          action: { type: 'uri', label: '🌐 ดูในระบบ', uri: 'https://etax-invoice.vercel.app/app/invoices' },
+        },
+      ],
+    },
+  };
+
+  await Promise.allSettled(
+    lineLinks.map(({ lineUserId }) =>
+      sendLineFlexMessage(lineUserId, `📄 ออกเอกสารสำเร็จ: ${invoiceNumber}`, card),
+    ),
+  );
+}

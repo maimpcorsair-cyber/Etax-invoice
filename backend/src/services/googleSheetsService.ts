@@ -333,3 +333,128 @@ export async function exportExpensesToSheets(
   logger.info(`Expense Sheets export created: ${url} (${expenses.length} rows)`);
   return url;
 }
+
+/* ── PP.30 / VAT summary sheet ─────────────────────────────────────────────── */
+
+export interface Pp30SheetData {
+  period: string;
+  company: { nameTh: string; nameEn: string | null; taxId: string; branchCode: string };
+  sales: {
+    vat7: { totalExclVat: number; vat: number };
+    vatZero: { totalExclVat: number; vat: number };
+    vatExempt: { totalExclVat: number };
+  };
+  purchases: {
+    vat7: { totalExclVat: number; vat: number };
+  };
+  summary: {
+    totalSalesExclVat: number;
+    outputVat: number;
+    inputVat: number;
+    vatPayable: number;
+    vatRefundable: number;
+  };
+}
+
+export async function exportPp30ToSheets(data: Pp30SheetData): Promise<string> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const drive = google.drive({ version: 'v3', auth });
+
+  const title = `${data.company.nameTh} - PP.30 ${data.period}`;
+
+  const spreadsheet = await sheets.spreadsheets.create({
+    requestBody: {
+      properties: { title },
+      sheets: [
+        { properties: { title: 'สรุป PP.30', sheetId: 0 } },
+        { properties: { title: 'รายละเอียด', sheetId: 1 } },
+      ],
+    },
+  });
+
+  const id = spreadsheet.data.spreadsheetId!;
+  const fmt = (n: number) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2 }).format(n);
+
+  // ── Sheet 1: Summary ──────────────────────────────────────────────────────
+  const summaryRows = [
+    ['แบบแสดงรายการภาษีมูลค่าษี สินค้าและบริการ ส่งมอบ (PP.30)', '', ''],
+    ['', '', ''],
+    ['ชื่อผู้ประกอบการ:', data.company.nameTh, data.company.nameEn],
+    ['เลขประจำตัวผู้เสียภาษี:', data.company.taxId, `สาขา: ${data.company.branchCode}`],
+    ['งวดบัญชี:', data.period, ''],
+    ['', '', ''],
+    ['รายการ', 'มูลค่าภาษี', ''],
+    ['ยอดขายรวม ก่อน VAT', fmt(data.summary.totalSalesExclVat), ''],
+    ['ภาษีขาย (Output VAT)', fmt(data.summary.outputVat), ''],
+    ['ภาษีซื้อ (Input VAT)', fmt(data.summary.inputVat), ''],
+    ['', '', ''],
+    ['ภาษีมูลค่าสุทธิ', data.summary.vatPayable > 0 ? fmt(data.summary.vatPayable) : '-', data.summary.vatPayable > 0 ? '(ต้องชำระ)' : ''],
+    ['ภาษีมูลค่าขอคืน', data.summary.vatRefundable > 0 ? fmt(data.summary.vatRefundable) : '-', data.summary.vatRefundable > 0 ? '(ขอคืนได้)' : ''],
+  ];
+
+  // ── Sheet 2: Detail by VAT type ──────────────────────────────────────────
+  const detailRows = [
+    ['ประเภท', 'มูลค่าก่อน VAT', 'VAT'],
+    ['ยอดขาย VAT 7%', fmt(data.sales.vat7.totalExclVat), fmt(data.sales.vat7.vat)],
+    ['ยอดขาย VAT 0%', fmt(data.sales.vatZero.totalExclVat), '-'],
+    ['ยอดขาย VAT ยกเว้น', fmt(data.sales.vatExempt.totalExclVat), '-'],
+    ['รวมยอดขาย', fmt(data.summary.totalSalesExclVat), fmt(data.summary.outputVat)],
+    ['', '', ''],
+    ['ประเภท', 'มูลค่าก่อน VAT', 'VAT'],
+    ['ยอดซื้อ VAT 7%', fmt(data.purchases.vat7.totalExclVat), fmt(data.purchases.vat7.vat)],
+  ];
+
+  await Promise.all([
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id, range: 'สรุป PP.30!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: summaryRows },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id, range: 'รายละเอียด!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: detailRows },
+    }),
+  ]);
+
+  // Bold + freeze header row on both sheets
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: id,
+    requestBody: {
+      requests: [0, 1].flatMap((sheetId) => [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.078, green: 0.302, blue: 0.565 },
+                textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat)',
+          },
+        },
+        {
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+            fields: 'gridProperties.frozenRowCount',
+          },
+        },
+      ]),
+    },
+  });
+
+  try {
+    await drive.permissions.create({
+      fileId: id,
+      requestBody: { role: 'reader', type: 'anyone' },
+    });
+  } catch {
+    logger.warn('Could not set PP.30 sheet permissions');
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${id}`;
+  logger.info(`PP.30 Google Sheets export created: ${url}`);
+  return url;
+}

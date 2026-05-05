@@ -10,7 +10,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-etax_secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d
+    # Raw SQL migrations removed - use Prisma migrations instead
+    # volumes: ./database/migrations:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
