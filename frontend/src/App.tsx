@@ -32,6 +32,7 @@ const PurchaseInvoices = React.lazy(() => import('./pages/PurchaseInvoices'));
 const Expenses = React.lazy(() => import('./pages/Expenses'));
 const VatSummary = React.lazy(() => import('./pages/VatSummary'));
 const Pp30Filing = React.lazy(() => import('./pages/Pp30Filing'));
+const WhtCertificateList = React.lazy(() => import('./pages/WhtCertificateList'));
 import { useAuthStore } from './store/authStore';
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
 import { usePushNotifications } from './hooks/usePushNotifications';
@@ -174,6 +175,7 @@ export default function App() {
             <Route path="expenses" element={<Expenses />} />
             <Route path="vat-summary" element={<VatSummary />} />
             <Route path="pp30" element={<Pp30Filing />} />
+            <Route path="wht-certificates" element={<WhtCertificateList />} />
             <Route path="admin" element={<AdminPanel />} />
             <Route path="audit" element={<AuditLogs />} />
             <Route path="plan" element={<PlanPage />} />

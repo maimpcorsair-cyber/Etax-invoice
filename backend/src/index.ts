@@ -23,6 +23,7 @@ import { expensesRouter } from './routes/expenses';
 import { driveRouter } from './routes/drive';
 import { vatSummaryRouter } from './routes/vatSummary';
 import { pp30Router } from './routes/pp30';
+import { whtCertificatesRouter } from './routes/whtCertificates';
 import { lineRouter, lineWebhookHandler } from './routes/line';
 import { aiChatRouter } from './routes/aiChat';
 
@@ -87,6 +88,7 @@ app.use('/api/expenses', authenticate, expensesRouter);
 app.use('/api/drive', driveRouter); // /callback is unauthenticated (OAuth redirect)
 app.use('/api/vat-summary', vatSummaryRouter);
 app.use('/api/pp30', pp30Router);
+app.use('/api/wht-certificates', authenticate, whtCertificatesRouter);
 app.use('/api/line', lineRouter);
 app.use('/api/ai-chat', authenticate, aiChatRouter);
 

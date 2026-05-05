@@ -915,6 +915,89 @@ invoicesRouter.post('/:id/submit-rd', requireRole('admin', 'accountant'), async 
   }
 });
 
+/* ─── WHT Certificate (50 ทวิ) — auto-create from invoice ─── */
+invoicesRouter.post('/:id/wht-certificate', requireRole('admin', 'accountant'), async (req, res) => {
+  try {
+    const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.invoice.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        include: { items: true, buyer: true, company: true },
+      });
+    });
+    if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
+    if (invoice.status === 'draft') {
+      res.status(400).json({ error: 'Cannot create WHT certificate for a draft invoice' });
+      return;
+    }
+    if (invoice.whtCertificateId) {
+      res.status(409).json({ error: 'Invoice already has a WHT certificate', certificateId: invoice.whtCertificateId });
+      return;
+    }
+
+    const { whtRate, paymentDate, incomeType } = req.body as {
+      whtRate: string;
+      paymentDate: string;
+      incomeType?: string;
+    };
+    if (!['1', '3', '5'].includes(whtRate)) {
+      res.status(400).json({ error: 'whtRate must be 1, 3, or 5' }); return;
+    }
+
+    const rate = parseFloat(whtRate) / 100;
+    const whtAmount = Math.round(invoice.total * rate * 100) / 100;
+    const netAmount = Math.round((invoice.total - whtAmount) * 100) / 100;
+
+    const company = invoice.company ?? await prisma.company.findUnique({ where: { id: req.user!.companyId } });
+    if (!company) { res.status(404).json({ error: 'Company not found' }); return; }
+
+    const yearMonth = new Date(paymentDate).toISOString().slice(0, 7).replace('-', '');
+    const seqKey = `wht_seq_${company.taxId}_${yearMonth}`;
+    const raw = await prisma.$queryRaw<{ seq: bigint }[]>`SELECT nextval(${seqKey})`;
+    const seq = Number(raw[0].seq);
+    const certNumber = `WHT-${company.taxId}-${yearMonth}-${String(seq).padStart(4, '0')}`;
+
+    const cert = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const created = await tx.whtCertificate.create({
+        data: {
+          companyId: req.user!.companyId,
+          invoiceId: invoice.id,
+          certificateNumber: certNumber,
+          whtRate,
+          whtAmount,
+          totalAmount: invoice.total,
+          netAmount,
+          recipientName: invoice.buyer.nameTh,
+          recipientTaxId: invoice.buyer.taxId,
+          recipientBranch: invoice.buyer.branchCode ?? '00000',
+          incomeType: incomeType ?? whtRate,
+          paymentDate: new Date(paymentDate),
+          createdBy: req.user!.userId,
+        },
+      });
+      await tx.invoice.update({ where: { id: invoice.id }, data: { whtAmount, whtRate, whtCertificateId: created.id } });
+      return created;
+    });
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'wht_certificate.create_from_invoice',
+      resourceType: 'wht_certificate',
+      resourceId: cert.id,
+      details: { invoiceNumber: invoice.invoiceNumber, certNumber, whtRate, whtAmount },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.status(201).json({ data: cert });
+  } catch (err) {
+    console.error('wht-certificate create error:', err);
+    res.status(500).json({ error: 'Failed to create WHT certificate' });
+  }
+});
+
 /* ─── Send invoice email to customer ─── */
 invoicesRouter.post('/:id/send-email', requireRole('admin', 'accountant'), async (req, res) => {
   try {

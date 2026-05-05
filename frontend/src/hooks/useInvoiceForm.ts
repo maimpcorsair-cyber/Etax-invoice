@@ -23,6 +23,7 @@ interface DraftPayload {
   signatureImageUrl: string | null;
   signerName: string;
   signerTitle: string;
+  whtRate: string; // "1" | "3" | "5" | ""
   savedAt: number;
 }
 
@@ -53,6 +54,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null);
   const [signerName, setSignerName] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
+  // WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ)
+  const [whtRate, setWhtRate] = useState<string>(''); // "1" | "3" | "5" | ""
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState(false);
@@ -64,6 +67,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
         docType, docLanguage, invoiceDate, dueDate, referenceDocNumber,
         items, notes, paymentMethod, documentLogoUrl: logoUrl, showCompanyLogo, templateId,
         documentMode, bankPaymentInfo, signatureImageUrl, signerName, signerTitle,
+        whtRate,
         savedAt: Date.now(),
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -72,7 +76,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     }
   }, [docType, docLanguage, invoiceDate, dueDate, referenceDocNumber, items, notes,
       paymentMethod, logoUrl, showCompanyLogo, templateId, documentMode,
-      bankPaymentInfo, signatureImageUrl, signerName, signerTitle]);
+      bankPaymentInfo, signatureImageUrl, signerName, signerTitle, whtRate]);
 
   const clearDraftFromStorage = useCallback(() => {
     try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* ignore */ }
@@ -112,6 +116,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       if (draft.signatureImageUrl != null) setSignatureImageUrl(draft.signatureImageUrl);
       if (draft.signerName != null) setSignerName(draft.signerName);
       if (draft.signerTitle != null) setSignerTitle(draft.signerTitle);
+      if (draft.whtRate) setWhtRate(draft.whtRate);
       return true;
     } catch {
       return false;
@@ -364,6 +369,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setSignerName,
     signerTitle,
     setSignerTitle,
+    whtRate,
+    setWhtRate,
     subtotal,
     totalVat,
     total,

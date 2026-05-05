@@ -184,9 +184,57 @@ export interface Invoice {
   rdSubmittedAt?: string;
   pdfUrl?: string;
   xmlUrl?: string;
+  // WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ)
+  whtAmount?: number;
+  whtRate?: '1' | '3' | '5' | null;
+  whtCertificateId?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+}
+
+export interface WhtCertificate {
+  id: string;
+  companyId: string;
+  invoiceId?: string | null;
+  certificateNumber: string;
+  whtRate: '1' | '3' | '5';
+  whtAmount: number;
+  totalAmount: number;
+  netAmount: number;
+  recipientName: string;
+  recipientTaxId: string;
+  recipientBranch: string;
+  incomeType: '1' | '2' | '4';
+  paymentDate: string;
+  pdfUrl?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WhtSummaryData {
+  period: string;
+  totalCertificates: number;
+  totalWithheld: number;
+  totalAmount: number;
+  byRate: Array<{
+    rate: string;
+    label: string;
+    count: number;
+    totalWithheld: number;
+    totalAmount: number;
+  }>;
+  certificates: Array<{
+    id: string;
+    certificateNumber: string;
+    whtRate: string;
+    whtAmount: number;
+    totalAmount: number;
+    recipientName: string;
+    recipientTaxId: string;
+    paymentDate: string;
+  }>;
 }
 
 export interface PurchaseInvoice {

@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Download, Printer, Loader2, FileText, Calendar } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
-import type { Pp30Data } from '../types';
+import type { Pp30Data, WhtSummaryData } from '../types';
+import { Receipt } from 'lucide-react';
 
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -28,6 +29,8 @@ export default function Pp30Filing() {
   const [data, setData] = useState<Pp30Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'vat' | 'wht'>('vat');
+  const [whtData, setWhtData] = useState<WhtSummaryData | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -37,6 +40,17 @@ export default function Pp30Filing() {
       });
       const json = await res.json();
       setData(json.data ?? null);
+
+      // Also fetch WHT summary
+      try {
+        const whtRes = await fetch(`/api/pp30/wht?year=${year}&month=${month}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const whtJson = await whtRes.json();
+        setWhtData(whtJson.data ?? null);
+      } catch {
+        setWhtData(null);
+      }
     } catch {
       setData(null);
     } finally {
@@ -117,6 +131,13 @@ export default function Pp30Filing() {
           <button onClick={handlePrint} className="btn-primary">
             <Printer className="w-4 h-4" />
             {isThai ? 'พิมพ์รายงาน' : 'Print'}
+          </button>
+          <button
+            onClick={() => setActiveTab('wht')}
+            className={`btn-secondary ${activeTab === 'wht' ? 'ring-2 ring-red-400' : ''}`}
+          >
+            <Receipt className="w-4 h-4" />
+            {isThai ? 'ภาษีหัก ณ ที่จ่าย' : 'WHT Summary'}
           </button>
         </div>
       </div>
@@ -293,6 +314,85 @@ export default function Pp30Filing() {
                 : 'File PP.30 by the 15th of the following month (23rd for e-filing).'}
             </p>
           </div>
+
+          {/* WHT Section (shown when WHT tab is active) */}
+          {activeTab === 'wht' && (
+            <div className="space-y-4">
+              <div className="card pp30-card border-red-200 bg-red-50/30">
+                <div className="flex items-center gap-2 mb-4">
+                  <Receipt className="w-5 h-5 text-red-600" />
+                  <h2 className="font-bold text-gray-900">
+                    {isThai ? 'สรุปภาษีหัก ณ ที่จ่าย' : 'Withholding Tax Summary'}
+                  </h2>
+                </div>
+                {whtData ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="bg-white rounded-lg p-4 text-center border border-red-100">
+                        <p className="text-xs text-gray-500 mb-1">{isThai ? 'จำนวนใบรับรอง' : 'Total Certificates'}</p>
+                        <p className="text-2xl font-bold text-gray-900">{whtData.totalCertificates}</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 text-center border border-red-100">
+                        <p className="text-xs text-gray-500 mb-1">{isThai ? 'ภาษีหักรวม' : 'Total Withheld'}</p>
+                        <p className="text-2xl font-bold text-red-600">{formatCurrency(whtData.totalWithheld)}</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 text-center border border-red-100">
+                        <p className="text-xs text-gray-500 mb-1">{isThai ? 'ยอดเงินได้รวม' : 'Total Income'}</p>
+                        <p className="text-2xl font-bold text-gray-700">{formatCurrency(whtData.totalAmount)}</p>
+                      </div>
+                    </div>
+                    {/* By-rate breakdown */}
+                    <div className="overflow-hidden rounded-lg border border-red-100">
+                      <table className="w-full">
+                        <thead className="bg-red-50">
+                          <tr>
+                            <th className="table-header">{isThai ? 'อัตราภาษี' : 'Rate'}</th>
+                            <th className="table-header">{isThai ? 'ประเภทเงินได้' : 'Income Type'}</th>
+                            <th className="table-header text-right">{isThai ? 'จำนวนใบ' : 'Count'}</th>
+                            <th className="table-header text-right">{isThai ? 'ยอดเงินได้' : 'Total Income'}</th>
+                            <th className="table-header text-right">{isThai ? 'ภาษีหัก' : 'Withheld'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-red-100">
+                          {whtData.byRate.filter(r => r.count > 0).map((rate) => (
+                            <tr key={rate.rate}>
+                              <td className="table-cell font-semibold text-red-700">{rate.rate}%</td>
+                              <td className="table-cell text-sm text-gray-600">{rate.label}</td>
+                              <td className="table-cell text-right">{rate.count}</td>
+                              <td className="table-cell text-right">{formatCurrency(rate.totalAmount)}</td>
+                              <td className="table-cell text-right font-semibold text-red-600">{formatCurrency(rate.totalWithheld)}</td>
+                            </tr>
+                          ))}
+                          {whtData.byRate.filter(r => r.count > 0).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="text-center py-6 text-gray-400">
+                                {isThai ? 'ไม่มีข้อมูลภาษีหัก ณ ที่จ่ายในงวดนี้' : 'No WHT records for this period'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {whtData.totalCertificates > 0 && (
+                      <div className="mt-4 flex gap-3">
+                        <a
+                          href={`/app/wht-certificates?year=${year}&month=${month}`}
+                          className="btn-secondary"
+                        >
+                          <Receipt className="w-4 h-4" />
+                          {isThai ? 'ดูใบรับรองทั้งหมด' : 'View All Certificates'}
+                        </a>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    {isThai ? 'กำลังโหลด...' : 'Loading...'}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

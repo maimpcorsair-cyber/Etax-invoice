@@ -15,6 +15,7 @@ import SellerCard from '../components/invoice/SellerCard';
 import BuyerCard from '../components/invoice/BuyerCard';
 import ItemsTable from '../components/invoice/ItemsTable';
 import NotesPaymentCard from '../components/invoice/NotesPaymentCard';
+import WhtCard from '../components/invoice/WhtCard';
 import PreviewModal from '../components/invoice/PreviewModal';
 import TemplateMarketplace from '../components/invoice/TemplateMarketplace';
 import type { DocumentTemplateOption } from '../types';
@@ -574,6 +575,13 @@ export default function InvoiceBuilder() {
             onNotesChange={form.setNotes}
             paymentMethod={form.paymentMethod}
             onPaymentMethodChange={form.setPaymentMethod}
+          />
+          <WhtCard
+            whtRate={form.whtRate}
+            onWhtRateChange={form.setWhtRate}
+            subtotal={form.subtotal}
+            totalVat={form.totalVat}
+            total={form.total}
           />
         </div>
         {/* bottom padding so last card isn't flush */}

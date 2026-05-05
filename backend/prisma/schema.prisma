@@ -140,6 +140,7 @@ model Company {
   purchaseInvoices    PurchaseInvoice[]
   expenseVouchers     ExpenseVoucher[]
   pettyCash           PettyCash?
+  whtCertificates     WhtCertificate[]
 
   @@map("companies")
 }
@@ -252,6 +253,11 @@ model Invoice {
   notes         String?
   paymentMethod String?
 
+  // WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ)
+  whtAmount         Float?  @default(0)
+  whtRate           String? // "1" | "3" | "5" | null — percentage stored as string for JSONB safety
+  whtCertificateId  String? // FK → WhtCertificate
+
   // RD submission
   rdSubmissionStatus RDSubmissionStatus?
   rdDocId            String?
@@ -282,6 +288,7 @@ model Invoice {
   referenceInvoice Invoice?      @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
   relatedDocuments Invoice[]     @relation("InvoiceReference")
   payments         Payment[]
+  whtCertificate   WhtCertificate?
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
@@ -718,4 +725,47 @@ model ExpenseAttachment {
 
   @@index([expenseItemId])
   @@map("expense_attachments")
+}
+
+// ─── WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ) ─────────────────────
+model WhtCertificate {
+  id              String   @id @default(cuid())
+  companyId       String
+  invoiceId       String?
+
+  // Certificate number: WHT-{COMPANY_TAXID}-{YYYYMM}-{SEQ}
+  certificateNumber String @unique
+
+  // WHT details
+  whtRate         String   // "1" | "3" | "5" — อัตราหักภาษี ตามมาตรา 40
+  whtAmount       Float
+  totalAmount     Float    // ยอดรายได้ก่อนหักภาษี (ก่อน WHT)
+  netAmount       Float    // ยอดสุทธิหลังหัก WHT = totalAmount - whtAmount
+
+  // Recipient (ผู้ถูกหักภาษี)
+  recipientName   String
+  recipientTaxId  String
+  recipientBranch String  @default("00000")
+
+  // Income type — ประเภทของเงินได้ (Thai tax law section 40)
+  // 1 = ค่าจ้าง (m40(1)), 2 = ค่าเช่า/ดอกเบี้ย (m40(2)), 4 = ค่าบริการ/นายหน้า (m40(4)(ก))
+  incomeType      String   // "1" | "2" | "4" | null
+
+  paymentDate     DateTime
+
+  // PDF storage
+  pdfUrl          String?
+
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice        Invoice?   @relation(fields: [invoiceId], references: [id])
+
+  @@unique([invoiceId])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@index([invoiceId])
+  @@map("wht_certificates")
 }

@@ -151,6 +151,78 @@ pp30Router.get('/', async (req, res) => {
   }
 });
 
+/* ─── PP.30 WHT Summary ─── */
+pp30Router.get('/wht', async (req, res) => {
+  try {
+    const range = parseYearMonth(req.query.year, req.query.month);
+    if (!range) {
+      res.status(400).json({ error: '`year` and `month` query parameters are required' });
+      return;
+    }
+
+    const certs = await prisma.whtCertificate.findMany({
+      where: {
+        companyId: req.user!.companyId,
+        paymentDate: { gte: range.from, lte: range.to },
+      },
+      orderBy: { paymentDate: 'asc' },
+    });
+
+    // Group by rate
+    const byRate: Record<string, { count: number; totalWithheld: number; totalAmount: number }> = {
+      '1': { count: 0, totalWithheld: 0, totalAmount: 0 },
+      '3': { count: 0, totalWithheld: 0, totalAmount: 0 },
+      '5': { count: 0, totalWithheld: 0, totalAmount: 0 },
+    };
+    for (const cert of certs) {
+      const r = cert.whtRate;
+      if (byRate[r]) {
+        byRate[r].count += 1;
+        byRate[r].totalWithheld += cert.whtAmount;
+        byRate[r].totalAmount += cert.totalAmount;
+      }
+    }
+
+    const totalCertificates = certs.length;
+    const totalWithheld = certs.reduce<number>((s, c) => s + c.whtAmount, 0);
+    const totalAmount = certs.reduce<number>((s, c) => s + c.totalAmount, 0);
+
+    // Income type labels (มาตรา 40)
+    const incomeTypeLabels: Record<string, string> = {
+      '1': 'มาตรา 40(1) — เงินได้จากการจ้าง',
+      '2': 'มาตรา 40(2) — เงินได้จากทรัพย์สิน',
+      '4': 'มาตรา 40(4) — เงินได้จากการรับจ้าง/นายหน้า',
+    };
+
+    res.json({
+      period: range.period,
+      totalCertificates,
+      totalWithheld,
+      totalAmount,
+      byRate: Object.entries(byRate).map(([rate, data]) => ({
+        rate,
+        label: incomeTypeLabels[rate] ?? rate,
+        count: data.count,
+        totalWithheld: Math.round(data.totalWithheld * 100) / 100,
+        totalAmount: Math.round(data.totalAmount * 100) / 100,
+      })),
+      certificates: certs.map((c) => ({
+        id: c.id,
+        certificateNumber: c.certificateNumber,
+        whtRate: c.whtRate,
+        whtAmount: c.whtAmount,
+        totalAmount: c.totalAmount,
+        recipientName: c.recipientName,
+        recipientTaxId: c.recipientTaxId,
+        paymentDate: c.paymentDate.toISOString(),
+      })),
+    });
+  } catch (err) {
+    logger.error('pp30/wht error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /* ─── PP.30 CSV export ─── */
 pp30Router.get('/export/sheets', async (req, res) => {
   try {
