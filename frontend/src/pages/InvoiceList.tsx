@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus, InvoiceType, Payment } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { isNative, savePdfNative, sharePdfNative } from '../hooks/useNative';
+import { EmptyState, MetricCard, PageHeader } from '../components/ui/AppChrome';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -298,23 +299,30 @@ export default function InvoiceList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('invoice.list')}</h1>
-        <Link to="/app/invoices/new" className={`btn-primary shrink-0 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">{t('invoice.create')}</span>
-          <span className="sm:hidden">{isThai ? 'สร้าง' : 'New'}</span>
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow={isThai ? 'Revenue document workspace' : 'Revenue document workspace'}
+        title={t('invoice.list')}
+        description={isThai ? 'ออกเอกสาร T01-T05, ตรวจสถานะชำระเงิน และส่ง RD จากมุมมองเดียวที่อ่านง่าย' : 'Issue T01-T05 documents, track payment state, and submit to RD from one readable workspace.'}
+        icon={<FileText className="h-3.5 w-3.5" />}
+        mascot="poses"
+        actions={(
+          <Link to="/app/invoices/new" className={`btn-primary shrink-0 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('invoice.create')}</span>
+            <span className="sm:hidden">{isThai ? 'สร้าง' : 'New'}</span>
+          </Link>
+        )}
+      />
 
       {policy && (
-        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900">
-          {isThai
-            ? `แพ็กเกจปัจจุบัน: ${policy.planLabel} • ใช้เอกสารเดือนนี้ ${policy.usage.documentsThisMonth}${policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''}`
-            : `Current plan: ${policy.planLabel} • Documents this month: ${policy.usage.documentsThisMonth}${policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''}`}
-        </div>
+        <MetricCard
+          label={isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}
+          value={`${policy.usage.documentsThisMonth}${policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''}`}
+          detail={isThai ? 'เอกสารที่ใช้ในเดือนนี้' : 'Documents used this month'}
+          tone="primary"
+        />
       )}
 
       {/* Filters */}
@@ -368,10 +376,12 @@ export default function InvoiceList() {
             <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
           </div>
         ) : invoices.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-gray-400">
-            <FileText className="w-10 h-10 mb-2 text-gray-300" />
-            <span className="text-sm">{t('common.noData')}</span>
-          </div>
+          <EmptyState
+            title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
+            description={isThai ? 'เริ่มจากสร้างใบกำกับภาษีใบแรก แล้วใช้หน้านี้ติดตามสถานะชำระเงินและ RD' : 'Create your first invoice, then use this page to track payment and RD state.'}
+            actionLabel={t('invoice.create')}
+            actionHref="/app/invoices/new"
+          />
         ) : (
           invoices.map((inv) => {
             const typeInfo = TYPE_LABELS[inv.type];
@@ -499,9 +509,13 @@ export default function InvoiceList() {
                   <Loader2 className="w-8 h-8 mx-auto animate-spin text-gray-300" />
                 </td></tr>
               ) : invoices.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-12 text-gray-500">
-                  <FileText className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                  {t('common.noData')}
+                <tr><td colSpan={9} className="py-12">
+                  <EmptyState
+                    title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
+                    description={isThai ? 'สร้างเอกสารแรกเพื่อเริ่ม tracking การชำระเงินและการส่ง RD' : 'Create the first document to start tracking payment and RD submissions.'}
+                    actionLabel={t('invoice.create')}
+                    actionHref="/app/invoices/new"
+                  />
                 </td></tr>
               ) : (
                 invoices.map((inv) => {

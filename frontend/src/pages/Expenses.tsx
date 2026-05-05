@@ -12,6 +12,7 @@ import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { useDriveStatus } from '../hooks/useDriveStatus';
 import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash, ApprovalLog } from '../types';
+import { EmptyState, MetricCard, PageHeader } from '../components/ui/AppChrome';
 
 const CATEGORY_KEYS = [
   'transportation', 'office_supplies', 'meals', 'postage',
@@ -63,7 +64,7 @@ const emptyItem = (): ItemForm => ({
 
 export default function Expenses() {
   const { t } = useTranslation();
-  const { formatCurrency, formatDate } = useLanguage();
+  const { isThai, formatCurrency, formatDate } = useLanguage();
   const { token, user } = useAuthStore();
   const { policy } = useCompanyAccessPolicy();
   const { status: driveStatus, connecting: driveConnecting, connect: connectDrive, disconnect: disconnectDrive } = useDriveStatus();
@@ -456,21 +457,19 @@ export default function Expenses() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-primary-600" />
-            {t('expenses.title')}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {expenseLimit !== null
-              ? `${t('expenses.expenseLimit')}: ${formatCurrency(expenseLimit)}`
-              : t('expenses.noLimit')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <PageHeader
+        eyebrow={isThai ? 'Approval workflow' : 'Approval workflow'}
+        title={t('expenses.title')}
+        description={expenseLimit !== null
+          ? `${t('expenses.expenseLimit')}: ${formatCurrency(expenseLimit)}`
+          : t('expenses.noLimit')}
+        icon={<Wallet className="h-3.5 w-3.5" />}
+        mascot="poses"
+        tone="teal"
+        actions={(
+          <>
           {/* Petty cash balance chip */}
           <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
             <Wallet className="w-4 h-4 text-emerald-600" />
@@ -497,8 +496,9 @@ export default function Expenses() {
           <Plus className="w-4 h-4" />
           {t('expenses.newVoucher')}
         </button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
@@ -543,18 +543,14 @@ export default function Expenses() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: t('common.total'), value: vouchers.length, amount: formatCurrency(totalAmount), tone: 'bg-blue-50 text-blue-700' },
-          { label: t('expenses.status.draft'), value: draftCount, tone: 'bg-gray-50 text-gray-700' },
-          { label: t('expenses.status.submitted'), value: submittedCount, tone: 'bg-amber-50 text-amber-700' },
-          { label: t('expenses.status.approved'), value: approvedCount, tone: 'bg-green-50 text-green-700' },
+          { label: t('common.total'), value: vouchers.length, amount: formatCurrency(totalAmount), tone: 'primary' as const },
+          { label: t('expenses.status.draft'), value: draftCount, tone: 'neutral' as const },
+          { label: t('expenses.status.submitted'), value: submittedCount, tone: 'warning' as const },
+          { label: t('expenses.status.approved'), value: approvedCount, tone: 'success' as const },
         ].map((stat) => (
-          <div key={stat.label} className={`rounded-lg px-3 py-2 ${stat.tone}`}>
-            <p className="text-[11px] font-medium opacity-80">{stat.label}</p>
-            <p className="text-lg font-bold">{stat.value}</p>
-            {stat.amount && <p className="text-xs font-medium mt-0.5">{stat.amount}</p>}
-          </div>
+          <MetricCard key={stat.label} label={stat.label} value={stat.value} detail={stat.amount} tone={stat.tone} />
         ))}
       </div>
 
@@ -602,10 +598,13 @@ export default function Expenses() {
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary-500" /></div>
         ) : vouchers.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-gray-500">
-            <Wallet className="w-10 h-10 mb-2 text-gray-300" />
-            {t('expenses.noItems')}
-          </div>
+          <EmptyState
+            title={t('expenses.noItems')}
+            description={isThai ? 'สร้าง voucher แรกเพื่อเริ่ม workflow ส่งอนุมัติและแนบหลักฐานค่าใช้จ่าย' : 'Create the first voucher to start approval and evidence tracking.'}
+            actionLabel={t('expenses.newVoucher')}
+            actionHref=""
+            action={<button onClick={openCreate} className="mt-4 text-sm font-bold text-primary-700">{t('expenses.newVoucher')}</button>}
+          />
         ) : (
           vouchers.map((v) => (
             <div key={v.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-2">
@@ -679,9 +678,12 @@ export default function Expenses() {
               {loading ? (
                 <tr><td colSpan={7} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-500" /></td></tr>
               ) : vouchers.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-500">
-                  <Wallet className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                  {t('expenses.noItems')}
+                <tr><td colSpan={7} className="py-12">
+                  <EmptyState
+                    title={t('expenses.noItems')}
+                    description={isThai ? 'สร้าง voucher แรกเพื่อเริ่ม workflow ส่งอนุมัติและแนบหลักฐานค่าใช้จ่าย' : 'Create the first voucher to start approval and evidence tracking.'}
+                    action={<button onClick={openCreate} className="mt-4 text-sm font-bold text-primary-700">{t('expenses.newVoucher')}</button>}
+                  />
                 </td></tr>
               ) : (
                 vouchers.map((v) => (

@@ -1,14 +1,25 @@
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { MascotHelperCard, PageHeader } from '../components/ui/AppChrome';
 
 export default function Settings() {
   const { t } = useTranslation();
   const { isThai } = useLanguage();
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{t('settings.title')}</h1>
+    <div className="max-w-5xl space-y-6">
+      <PageHeader
+        eyebrow={isThai ? 'Workspace settings' : 'Workspace settings'}
+        title={t('settings.title')}
+        description={isThai ? 'ตั้งค่าภาษา การแจ้งเตือน และการเชื่อมต่อให้ทีมทำงานได้ชัดเจนขึ้น' : 'Tune language, notifications, and access settings for a calmer team workspace.'}
+        mascot="poses"
+      />
+
+      <MascotHelperCard
+        title={isThai ? 'Billoy แนะนำ' : 'Billoy tip'}
+        description={isThai ? 'เปิดแจ้งเตือน RD failed และ daily summary ไว้เสมอ เพื่อไม่พลาดเอกสารที่ต้องแก้ก่อนกำหนดยื่น' : 'Keep RD failed and daily summary alerts on so the team catches documents before filing deadlines.'}
+      />
 
       {/* Language */}
       <div className="card">

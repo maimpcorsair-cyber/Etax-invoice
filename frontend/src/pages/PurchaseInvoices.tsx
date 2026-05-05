@@ -10,6 +10,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { DocumentIntake, Invoice, PurchaseInvoice } from '../types';
+import { EmptyState, mascotAssets } from '../components/ui/AppChrome';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
 type DocumentStatusFilter = 'action' | 'all' | 'saved' | 'failed';
@@ -759,7 +760,7 @@ export default function PurchaseInvoices() {
   return (
     <div className="space-y-4">
       {/* AI Inbox Hero */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-sm">
+      <section className="premium-hero premium-hero-dark overflow-hidden text-white">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">
           <div className="p-5 sm:p-6 lg:p-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
@@ -794,6 +795,9 @@ export default function PurchaseInvoices() {
                 <Plus className="h-4 w-4" />
                 {isThai ? 'กรอกเอง' : 'Manual entry'}
               </button>
+            </div>
+            <div className="mt-6 hidden overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:block">
+              <img src={mascotAssets.poses} alt="" className="h-48 w-full object-cover object-top opacity-95" />
             </div>
           </div>
 
@@ -932,9 +936,27 @@ export default function PurchaseInvoices() {
           </div>
 
           {filteredDocumentLibrary.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500">
-              {isThai ? 'ไม่มีเอกสารในมุมมองนี้' : 'No documents in this view'}
-            </div>
+            <EmptyState
+              title={isThai ? 'ยังไม่มีเอกสารในมุมมองนี้' : 'No documents in this view'}
+              description={isThai ? 'อัปโหลด PDF หรือรูปภาพ แล้ว Billoy จะช่วยอ่านข้อมูลภาษีซื้อให้' : 'Upload a PDF or image and Billoy will help read the input VAT fields.'}
+              action={(
+                <label className={`mt-4 inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-primary-700 hover:text-primary-900 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {isThai ? 'อัปโหลดเอกสาร' : 'Upload document'}
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={uploading || isFreePlan}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.currentTarget.value = '';
+                      if (file) void uploadDocument(file);
+                    }}
+                  />
+                </label>
+              )}
+            />
           ) : (
             <div className="space-y-2">
               {filteredDocumentLibrary.slice(0, 12).map((doc) => {

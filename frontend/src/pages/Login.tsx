@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, FileText, Eye, EyeOff, ArrowRight, Lock, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { mascotAssets } from '../components/ui/AppChrome';
 import { useLanguage } from '../hooks/useLanguage';
 import { buildPlaneUrl, detectSurface, getApexOrigin, getPlanePath } from '../lib/platform';
 
@@ -185,8 +186,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="flex items-center justify-between p-4 sm:p-6">
+    <div className="min-h-screen app-shell flex flex-col">
+      <div className="relative z-10 flex items-center justify-between p-4 sm:p-6">
         <a href={getApexOrigin()} className="flex items-center gap-2 group">
           <FileText className="w-6 h-6 text-primary-700" strokeWidth={2} />
           <span className="font-bold text-lg text-gray-900 group-hover:text-primary-600 transition-colors hidden sm:inline">{t('app.shortName')}</span>
@@ -207,8 +208,43 @@ export default function Login() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-12 z-10">
-        <div className="w-full max-w-md animate-fade-in">
+      <div className="relative z-10 flex-1 px-4 py-8 sm:py-12">
+        <div className="mx-auto grid w-full max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.75fr)]">
+          <section className="premium-hero premium-hero-dark hidden min-h-[620px] grid-cols-1 content-between lg:grid">
+            <div>
+              <div className="premium-eyebrow">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {isThai ? 'ETDA-ready workspace' : 'ETDA-ready workspace'}
+              </div>
+              <h1 className="mt-5 max-w-2xl text-4xl font-bold leading-tight text-white">
+                {isThai ? 'ระบบเอกสารภาษีที่ดูเป็นมืออาชีพตั้งแต่หน้าแรก' : 'A polished tax document cockpit for serious finance teams'}
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200">
+                {isThai
+                  ? 'จัดการ e-Tax, ภาษีซื้อ, เอกสารเข้า, RD และทีมในที่เดียว พร้อมผู้ช่วย Billoy ที่คอยชี้จุดสำคัญโดยไม่รบกวนงานบัญชี'
+                  : 'Manage e-Tax, purchase VAT, document intake, RD submission, and team workflows in one calm, premium operating surface.'}
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="overflow-hidden rounded-3xl border border-white/15 bg-white/10 shadow-2xl">
+                <img src={mascotAssets.hero} alt="" className="h-72 w-full object-cover object-center" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  isThai ? 'XAdES + TSA' : 'XAdES + TSA',
+                  isThai ? 'RD-ready' : 'RD-ready',
+                  isThai ? 'AI intake' : 'AI intake',
+                ].map((item) => (
+                  <div key={item} className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center text-xs font-bold text-white/90">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <div className="w-full animate-fade-in">
           <div className="card shadow-2xl">
             <div className="mb-8">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em]">
@@ -234,20 +270,20 @@ export default function Login() {
               </p>
             </div>
 
-            <div className={`mb-6 rounded-2xl px-4 py-3 ${ownerMode ? 'border border-amber-200 bg-amber-50' : 'border border-emerald-200 bg-emerald-50'}`}>
+            <div className={`mb-6 rounded-2xl px-4 py-3 ${ownerMode ? 'border border-amber-200 bg-amber-50/90' : 'border border-teal-200 bg-teal-50/90'}`}>
               <div className="flex items-start gap-3">
                 {ownerMode ? (
                   <ShieldCheck className="mt-0.5 h-4 w-4 text-amber-700" />
                 ) : (
-                  <Lock className="mt-0.5 h-4 w-4 text-emerald-700" />
+                  <Lock className="mt-0.5 h-4 w-4 text-teal-700" />
                 )}
                 <div className="space-y-1">
-                  <p className={`text-sm font-semibold ${ownerMode ? 'text-amber-900' : 'text-emerald-900'}`}>
+                  <p className={`text-sm font-semibold ${ownerMode ? 'text-amber-900' : 'text-teal-900'}`}>
                     {ownerMode
                       ? (isThai ? 'ใช้เฉพาะบัญชีเจ้าของระบบ' : 'Use only with owner accounts')
                       : (isThai ? 'เจ้าของระบบ / Super Admin' : 'Owner / Super Admin')}
                   </p>
-                  <p className={`text-xs leading-5 ${ownerMode ? 'text-amber-800' : 'text-emerald-800'}`}>
+                  <p className={`text-xs leading-5 ${ownerMode ? 'text-amber-800' : 'text-teal-800'}`}>
                     {ownerMode
                       ? (isThai
                         ? 'ถ้าบัญชีนี้ไม่ใช่ super_admin ระบบจะไม่อนุญาตให้เข้า Owner Plane จากหน้านี้'
@@ -400,7 +436,7 @@ export default function Login() {
 
             <div className="my-6 border-t border-gray-200" />
 
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-2">
               <p className="text-xs font-semibold text-gray-600">{isThai ? 'แนวทางการเข้าใช้งาน' : 'How access works'}</p>
               <div className="space-y-1 text-xs text-gray-600">
                 <p>{isThai ? '1. ผู้ดูแลเพิ่มอีเมลผู้ใช้ในหน้า Admin > User Management' : '1. Admin adds the user email in Admin > User Management'}</p>
@@ -421,6 +457,7 @@ export default function Login() {
                 {ownerMode ? (isThai ? 'ไปหน้า Customer Login' : 'Go to Customer Login') : (isThai ? 'ไปหน้า Owner Login' : 'Go to Owner Login')}
               </a>
             </div>
+          </div>
           </div>
         </div>
       </div>

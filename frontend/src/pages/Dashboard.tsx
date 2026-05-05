@@ -20,6 +20,7 @@ import {
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
+import { EmptyState, MetricCard, PageHeader, MascotHelperCard } from '../components/ui/AppChrome';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus } from '../types';
@@ -98,7 +99,7 @@ interface DocumentIntakeStats {
 
 function SkeletonCard() {
   return (
-    <div className="card animate-pulse">
+    <div className="metric-card animate-pulse">
       <div className="w-28 h-3 rounded bg-gray-200 mb-3" />
       <div className="w-20 h-7 rounded bg-gray-200" />
     </div>
@@ -325,71 +326,56 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Command Center */}
-      <section className="relative overflow-hidden rounded-2xl border border-primary-100 bg-[#f4f7fc] text-slate-950 shadow-sm">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(30,58,138,0.5),transparent)] animate-command-scan" />
-        <div className="pointer-events-none absolute right-0 top-0 h-40 w-1/2 bg-[linear-gradient(135deg,rgba(30,58,138,0.08),transparent_58%)]" />
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,0.88fr)_minmax(420px,1.12fr)]">
-          <div className="relative p-5 sm:p-6 lg:p-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-1 text-xs font-semibold text-primary-800 shadow-sm">
-              <Bot className="h-3.5 w-3.5" />
-              {isThai ? 'AI Tax Command Center' : 'AI Tax Command Center'}
-            </div>
-            <h1 className="mt-4 max-w-xl text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
-              {isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              {isThai
-                ? `สวัสดี ${user?.name ?? ''} — ระบบรวมงานเอกสารเข้า, e-Tax, RD, VAT และลูกหนี้ไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
-                : `Hi ${user?.name ?? ''} — this workspace brings document intake, e-Tax, RD, VAT, and receivables into one daily operating view.`}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link
-                to="/app/purchase-invoices"
-                className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-bold text-white shadow-button transition hover:-translate-y-0.5 hover:bg-primary-800"
-              >
-                <Inbox className="h-4 w-4" />
-                {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
-              </Link>
-              <Link
-                to="/app/invoices/new"
-                className="inline-flex items-center gap-2 rounded-xl border border-primary-100 bg-white px-4 py-2.5 text-sm font-bold text-primary-800 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:bg-primary-50"
-              >
-                <Plus className="h-4 w-4" />
-                {isThai ? 'สร้าง e-Tax ใหม่' : 'Create e-Tax'}
-              </Link>
-            </div>
-          </div>
+      <PageHeader
+        eyebrow={isThai ? 'AI Tax Command Center' : 'AI Tax Command Center'}
+        title={isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
+        description={isThai
+          ? `สวัสดี ${user?.name ?? ''} ระบบรวมงานเอกสารเข้า, e-Tax, RD, VAT และลูกหนี้ไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
+          : `Hi ${user?.name ?? ''}. This workspace brings document intake, e-Tax, RD, VAT, and receivables into one daily operating view.`}
+        icon={<Bot className="h-3.5 w-3.5" />}
+        mascot="hero"
+        actions={(
+          <>
+            <Link to="/app/purchase-invoices" className="btn-primary">
+              <Inbox className="h-4 w-4" />
+              {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
+            </Link>
+            <Link to="/app/invoices/new" className="btn-secondary">
+              <Plus className="h-4 w-4" />
+              {isThai ? 'สร้าง e-Tax ใหม่' : 'Create e-Tax'}
+            </Link>
+          </>
+        )}
+      />
 
-          <div className="relative border-t border-primary-100 bg-white/62 p-4 sm:p-5 xl:border-l xl:border-t-0">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {commandItems.map((item, index) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.key}
-                    to={item.href}
-                    className={`group rounded-xl border px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg animate-command-card ${item.tone}`}
-                    style={{ animationDelay: `${index * 80}ms` }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/70 ring-1 ring-black/5">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="text-right text-xl font-bold leading-none">{item.value}</span>
-                    </div>
-                    <p className="mt-3 text-sm font-bold">{item.title}</p>
-                    <p className="mt-1 min-h-[34px] text-xs leading-5 opacity-75">{item.detail}</p>
-                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold">
-                      {item.action}
-                      <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {commandItems.map((item) => {
+          const Icon = item.icon;
+          const tone = item.key === 'rd' && pendingRdCount > 0
+            ? 'danger'
+            : item.key === 'ar' && (stats?.receivables.overdueOutstanding ?? 0) > 0
+              ? 'warning'
+              : item.key === 'tax'
+                ? 'success'
+                : 'primary';
+          return (
+            <Link key={item.key} to={item.href} className="group block">
+              <MetricCard
+                label={item.title}
+                value={item.value}
+                detail={(
+                  <span className="inline-flex items-center gap-1">
+                    {item.detail}
+                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                )}
+                icon={<Icon className="h-5 w-5" />}
+                tone={tone}
+              />
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Error banner */}
       {error && (
@@ -400,7 +386,7 @@ export default function Dashboard() {
 
       {/* RD Compliance Alert (if there are issues) */}
       {!complianceLoading && hasComplianceIssue && (
-        <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 shadow-sm">
           <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
             <p className="font-semibold text-amber-800">
@@ -416,10 +402,10 @@ export default function Dashboard() {
       )}
 
       {/* Autopilot lanes */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="card">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
               {isThai ? 'Workflow อัตโนมัติ' : 'Automation workflow'}
             </p>
             <h2 className="mt-1 text-lg font-bold text-gray-950">
@@ -431,13 +417,13 @@ export default function Dashboard() {
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+        <div className="mt-5 grid gap-3 lg:grid-cols-4">
           {autopilotLanes.map((lane, index) => {
             const Icon = lane.icon;
             return (
-              <div key={lane.key} className="relative rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+              <div key={lane.key} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-primary-700 ring-1 ring-gray-200">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary-700 ring-1 ring-slate-200">
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="text-xs font-bold text-gray-400">0{index + 1}</span>
@@ -454,16 +440,16 @@ export default function Dashboard() {
       </section>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {loading
           ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
-          : statCards.map((stat) => (
-              <div key={stat.key} className="card p-4 sm:p-6 text-center card-hover">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
-                  {t(`dashboard.summary.${stat.key}`)}
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold text-primary-600">{stat.value}</p>
-              </div>
+          : statCards.map((stat, index) => (
+              <MetricCard
+                key={stat.key}
+                label={t(`dashboard.summary.${stat.key}`)}
+                value={stat.value}
+                tone={index === 3 ? 'success' : index === 2 ? 'warning' : 'primary'}
+              />
             ))}
       </div>
 
@@ -520,7 +506,7 @@ export default function Dashboard() {
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <div key={item.key} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                <div key={item.key} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
                       <Icon className="w-4 h-4 text-primary-600" />
@@ -552,7 +538,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-4">
               <p className="text-sm font-medium text-rose-700">{isThai ? 'ยอดค้างรวม' : 'Total outstanding'}</p>
               <p className="mt-2 text-2xl font-bold text-rose-900">{formatCurrency(stats.receivables.totalOutstanding)}</p>
             </div>
@@ -573,7 +559,7 @@ export default function Dashboard() {
               { label: '61-90', value: stats.receivables.aging.days61To90 },
               { label: '90+', value: stats.receivables.aging.days90Plus },
             ].map((bucket) => (
-              <div key={bucket.label} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+              <div key={bucket.label} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{bucket.label}</p>
                 <p className="mt-2 text-sm font-semibold text-gray-900">{formatCurrency(bucket.value)}</p>
               </div>
@@ -583,26 +569,28 @@ export default function Dashboard() {
       )}
 
       {/* Quick Actions */}
-      <div className="card">
-        <h2 className="font-semibold text-gray-900 mb-4">{t('dashboard.quickActions')}</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <MascotHelperCard
+        title={isThai ? 'Billoy พร้อมช่วยปิดงานเอกสารวันนี้' : 'Billoy is ready to help close today’s paperwork'}
+        description={isThai ? 'เลือก workflow ที่ใช้บ่อยได้จากที่นี่ ระบบจะพาไปหน้าที่ถูกต้องโดยไม่ต้องจำเมนู' : 'Jump into the common workflows without remembering where each menu lives.'}
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: isThai ? 'ใบกำกับภาษี' : 'Tax Invoice', href: '/app/invoices/new', color: 'bg-blue-500' },
-            { label: isThai ? 'ใบเสร็จรับเงิน' : 'Receipt', href: '/app/invoices/new?type=receipt', color: 'bg-green-500' },
-            { label: isThai ? 'ใบลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note', color: 'bg-orange-500' },
-            { label: isThai ? 'รายการ/ส่งออก' : 'List / Export', href: '/app/invoices', color: 'bg-purple-500' },
+            { label: isThai ? 'ใบกำกับภาษี' : 'Tax Invoice', href: '/app/invoices/new' },
+            { label: isThai ? 'ใบเสร็จรับเงิน' : 'Receipt', href: '/app/invoices/new?type=receipt' },
+            { label: isThai ? 'ใบลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note' },
+            { label: isThai ? 'รายการ/ส่งออก' : 'List / Export', href: '/app/invoices' },
           ].map((action) => (
             <Link
               key={action.label}
               to={action.href}
-              className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-primary-200 hover:text-primary-800 hover:shadow-sm"
             >
-              <div className={`w-2 h-2 rounded-full ${action.color}`} />
-              <span className="text-sm font-medium text-gray-700 truncate">{action.label}</span>
+              <span className="truncate">{action.label}</span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
             </Link>
           ))}
         </div>
-      </div>
+      </MascotHelperCard>
 
       {/* RD Compliance Panel */}
       <div className="card">
@@ -627,9 +615,11 @@ export default function Dashboard() {
             ))}
           </div>
         ) : compliance.length === 0 ? (
-          <p className="text-sm text-gray-400 py-6 text-center">
-            {isThai ? 'ยังไม่มีข้อมูล' : 'No data yet'}
-          </p>
+          <EmptyState
+            title={isThai ? 'ยังไม่มีข้อมูล RD' : 'No RD data yet'}
+            description={isThai ? 'เมื่อเริ่มออกเอกสารและส่ง RD ระบบจะแสดงสถานะรายเดือนที่นี่' : 'Monthly RD submission readiness will appear here after documents are issued.'}
+            variant="waiting"
+          />
         ) : (
           <div className="space-y-5">
             {compliance.map((m) => (
@@ -739,10 +729,12 @@ export default function Dashboard() {
               ) : recentInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="table-cell text-center py-10">
-                    <p className="text-gray-400 mb-2">{isThai ? 'ยังไม่มีใบกำกับภาษี' : 'No invoices yet'}</p>
-                    <Link to="/app/invoices/new" className="text-sm text-primary-600 hover:underline font-medium">
-                      {isThai ? 'กด "สร้างใบใหม่" เพื่อเริ่มต้น →' : 'Create your first invoice →'}
-                    </Link>
+                    <EmptyState
+                      title={isThai ? 'ยังไม่มีใบกำกับภาษี' : 'No invoices yet'}
+                      description={isThai ? 'สร้างเอกสารใบแรก แล้ว Billoy จะช่วยติดตามสถานะ RD และการชำระเงินให้' : 'Create the first document and Billoy will help track RD and payment status.'}
+                      actionLabel={isThai ? 'สร้างใบใหม่' : 'Create invoice'}
+                      actionHref="/app/invoices/new"
+                    />
                   </td>
                 </tr>
               ) : (
