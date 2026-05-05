@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
-  ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X,
+  ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -70,6 +70,11 @@ export default function InvoiceList() {
   const [paymentForm, setPaymentForm] = useState({ amount: 0, method: 'transfer', reference: '', paidAt: new Date().toISOString().split('T')[0], note: '' });
   const [savingPayment, setSavingPayment] = useState(false);
   const [submittingRD, setSubmittingRD] = useState<string | null>(null);
+
+  // Cancel modal
+  const [cancelModal, setCancelModal] = useState<{ invoice: Invoice } | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const fetchInvoices = useCallback(async (page = 1) => {
     setLoading(true);
@@ -274,6 +279,11 @@ export default function InvoiceList() {
     !!policy?.canSubmitToRD &&
     (user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant');
 
+  const canCancelInvoice = (inv: Invoice) =>
+    inv.status !== 'cancelled' &&
+    inv.status !== 'draft' &&
+    (user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant');
+
   async function handleSubmitRD(inv: Invoice) {
     const msg = isThai
       ? `ยืนยันส่งใบกำกับ ${inv.invoiceNumber} ให้กรมสรรพากร?`
@@ -295,6 +305,32 @@ export default function InvoiceList() {
       alert(isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}`);
     } finally {
       setSubmittingRD(null);
+    }
+  }
+
+  async function handleCancelInvoice() {
+    if (!cancelModal || !cancelReason.trim()) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/invoices/${cancelModal.invoice.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      const json = await res.json() as { message?: string; rdError?: string };
+      if (!res.ok) throw new Error((json as { error?: string }).error ?? 'Failed');
+
+      setCancelModal(null);
+      setCancelReason('');
+      fetchInvoices(pagination.page);
+
+      // Show toast-style success message
+      const rdWarning = json.rdError ? `\n\n${isThai ? 'หมายเหตุ: ' : 'Note: '}${json.rdError}` : '';
+      alert(`${json.message ?? (isThai ? 'ยกเลิกสำเร็จ' : 'Cancelled successfully')}${rdWarning}`);
+    } catch (e) {
+      alert(isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}`);
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -626,6 +662,16 @@ export default function InvoiceList() {
                               <span className="hidden sm:inline">{isThai ? 'รับชำระ' : 'Pay'}</span>
                             </button>
                           )}
+                          {canCancelInvoice(inv) && (
+                            <button
+                              onClick={() => { setCancelModal({ invoice: inv }); setCancelReason(''); }}
+                              className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
+                              title={isThai ? 'ยกเลิกเอกสาร' : 'Cancel Invoice'}
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">{isThai ? 'ยกเลิก' : 'Cancel'}</span>
+                            </button>
+                          )}
                           {inv.pdfUrl && (
                             <a
                               href={inv.pdfUrl}
@@ -864,6 +910,76 @@ export default function InvoiceList() {
               </button>
               <button onClick={handleSavePayment} className="btn-primary flex-1" disabled={savingPayment}>
                 {savingPayment ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isThai ? 'บันทึก' : 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Invoice Modal ── */}
+      {cancelModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-600" />
+              {isThai ? 'ยกเลิกเอกสาร' : 'Cancel Invoice'}
+            </h2>
+
+            <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-500">{isThai ? 'เลขที่เอกสาร' : 'Document No.'}</span>
+                <span className="font-mono font-medium">{cancelModal.invoice.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">{isThai ? 'ประเภท' : 'Type'}</span>
+                <span className="font-medium">
+                  {isThai ? TYPE_LABELS[cancelModal.invoice.type].th : TYPE_LABELS[cancelModal.invoice.type].en}
+                </span>
+              </div>
+              <div className="flex justify-between text-base font-semibold">
+                <span>{isThai ? 'ยอดรวม' : 'Total'}</span>
+                <span className="text-primary-600">{formatCurrency(cancelModal.invoice.total)}</span>
+              </div>
+            </div>
+
+            {cancelModal.invoice.rdSubmissionStatus === 'success' && (
+              <div className={`flex items-start gap-2 p-3 rounded-xl text-sm ${
+                isThai ? 'bg-amber-50 text-amber-800' : 'bg-amber-50 text-amber-800'
+              }`}>
+                <Ban className="w-4 h-4 mt-0.5 shrink-0" />
+                <p>
+                  {isThai
+                    ? 'เอกสารนี้ส่งไป กรมสรรพากร แล้ว ระบบจะแจ้งยกเลิกไปยัง กรมสรรพากร ด้วย'
+                    : 'This document was submitted to the Revenue Department. A cancellation will also be sent to RD.'}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {isThai ? 'เหตุผลในการยกเลิก' : 'Reason for Cancellation'} *
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={3}
+                className="input-field resize-none"
+                placeholder={isThai ? 'ระบุเหตุผล เช่น ลูกค้าขอยกเลิก / สินค้าชำรุด' : 'Enter reason, e.g. customer requested cancellation'}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setCancelModal(null)} className="btn-secondary flex-1" disabled={cancelling}>
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleCancelInvoice}
+                className="btn-primary flex-1 bg-red-600 hover:bg-red-700 focus:ring-red-500"
+                disabled={cancelling || !cancelReason.trim()}
+              >
+                {cancelling
+                  ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  : (isThai ? 'ยกเลิกเอกสาร' : 'Cancel Invoice')}
               </button>
             </div>
           </div>

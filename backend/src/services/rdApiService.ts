@@ -255,3 +255,95 @@ export async function checkDocumentStatus(docId: string, config?: RDClientConfig
     return { status: 'ERROR', message: (err as Error).message };
   }
 }
+
+// ── Document cancellation ────────────────────────────────────────────────────
+
+export interface RDCancelResult {
+  success: boolean;
+  message: string;
+  isMock: boolean;
+  rawResponse?: unknown;
+}
+
+/** Mock cancel response (sandbox / dev mode) */
+function mockCancel(docId: string, docNum: string): RDCancelResult {
+  logger.warn(`RD: MOCK cancel — docId=${docId}, docNum=${docNum}`);
+  return {
+    success: true,
+    message: `[SANDBOX MOCK] ยกเลิกเอกสาร ${docNum} แล้ว (dev mode)`,
+    isMock: true,
+    rawResponse: { docId, docNum, cancelledAt: new Date().toISOString() },
+  };
+}
+
+/**
+ * ยกเลิกเอกสารที่ส่งไปแล้วที่ กรมสรรพากร
+ * POST /document/cancel
+ *
+ * Flow:
+ *  - sandbox / no credentials → mock success
+ *  - production + credentials → real POST to RD
+ *  - RD call fails → still return { success: false } so caller can decide how to handle
+ */
+export async function cancelDocumentRD(
+  docId: string,
+  docNum: string,
+  reason: string,
+  config?: RDClientConfig,
+): Promise<RDCancelResult> {
+  const env = config?.environment ?? process.env.RD_ENVIRONMENT ?? 'sandbox';
+  const clientId = config?.clientId ?? process.env.RD_CLIENT_ID;
+  const clientSecret = config?.clientSecret ?? process.env.RD_CLIENT_SECRET;
+  const hasCredentials = !!(clientId && clientSecret);
+
+  if (env !== 'production' || !hasCredentials) {
+    return mockCancel(docId, docNum);
+  }
+
+  try {
+    const token = await getAccessToken(config);
+    const baseUrl = getBaseUrl(env);
+    const parsed = new URL(`${baseUrl}/document/cancel`);
+
+    const body = JSON.stringify({ docId, docNum, reason });
+    const res = await httpRequest({
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'Authorization': `Bearer ${token}`,
+      },
+      body,
+    });
+
+    const data = JSON.parse(res.body) as { success?: boolean; message?: string };
+
+    if (res.status === 200 || res.status === 201) {
+      logger.info(`RD: document cancelled — docId=${docId}, docNum=${docNum}`);
+      return {
+        success: true,
+        message: data.message ?? `ยกเลิกเอกสาร ${docNum} ที่กรมสรรพากรแล้ว`,
+        isMock: false,
+        rawResponse: data,
+      };
+    } else {
+      logger.error(`RD: cancel failed — HTTP ${res.status}: ${res.body}`);
+      return {
+        success: false,
+        message: data.message ?? `HTTP ${res.status}`,
+        isMock: false,
+        rawResponse: data,
+      };
+    }
+  } catch (err) {
+    logger.error(`RD: cancel error — ${(err as Error).message}`);
+    return {
+      success: false,
+      message: (err as Error).message,
+      isMock: false,
+    };
+  }
+}

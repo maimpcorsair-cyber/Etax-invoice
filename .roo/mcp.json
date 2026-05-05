@@ -55,6 +55,11 @@
 				"-y",
 				"@modelcontextprotocol/server-filesystem",
 				"/Users/domdom/Documents/Github/Etax-invoice"
+			],
+			"alwaysAllow": [
+				"read_text_file",
+				"edit_file",
+				"write_file"
 			]
 		}
 	}

@@ -277,6 +277,11 @@ model Invoice {
   paidAt     DateTime?
   paidAmount Float?
 
+  // Cancellation
+  cancelledAt   DateTime?
+  cancelledBy   String?
+  cancelReason  String?
+
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

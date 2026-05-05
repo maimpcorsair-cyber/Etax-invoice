@@ -9,6 +9,7 @@ import { generateInvoiceNumber } from '../services/invoiceService';
 import { generateInvoiceExcel } from '../services/exportService';
 import { exportInvoicesToSheets } from '../services/googleSheetsService';
 import { sendInvoiceToCustomer } from '../services/emailService';
+import { cancelDocumentRD } from '../services/rdApiService';
 import { sendInvoiceIssuedNotification, sendInvoiceIssuedLineNotification } from '../services/notificationService';
 import { generatePdf, generatePdfFromHtml, buildHtmlForCompany } from '../services/pdfService';
 import {
@@ -1074,6 +1075,145 @@ invoicesRouter.delete('/:id', requireRole('admin'), async (req, res) => {
 
     res.json({ message: 'Invoice cancelled' });
   } catch {
+    res.status(500).json({ error: 'Failed to cancel invoice' });
+  }
+});
+
+/* ─── Cancel invoice (ยกเลิกเอกสาร) — full flow with optional RD cancel ─── */
+invoicesRouter.post('/:id/cancel', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const cancelReason = (req.body as { reason?: string }).reason ?? '';
+    if (!cancelReason.trim()) {
+      res.status(400).json({ error: 'Cancel reason is required' });
+      return;
+    }
+
+    const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.invoice.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+      });
+    });
+    if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
+
+    // Already cancelled
+    if (invoice.status === 'cancelled') {
+      res.status(409).json({ error: 'Invoice is already cancelled' });
+      return;
+    }
+
+    // Draft invoice — just cancel locally, no RD call needed
+    if (invoice.status === 'draft') {
+      const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        return tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: 'cancelled',
+            cancelledAt: new Date(),
+            cancelledBy: req.user!.userId,
+            cancelReason,
+          },
+        });
+      });
+
+      await auditLog({
+        companyId: req.user!.companyId,
+        userId: req.user!.userId,
+        role: req.user!.role,
+        action: 'invoice.cancel',
+        resourceType: 'invoice',
+        resourceId: invoice.id,
+        details: { invoiceNumber: invoice.invoiceNumber, reason: cancelReason, rdCalled: false },
+        ipAddress: req.ip ?? '',
+        userAgent: req.get('user-agent') ?? '',
+        language: 'th',
+      });
+
+      res.json({ data: { id: updated.id, status: updated.status, cancelledAt: updated.cancelledAt }, message: 'ยกเลิกเอกสารสำเร็จแล้ว' });
+      return;
+    }
+
+    // Successfully submitted to RD — call RD cancel API first
+    if (invoice.rdSubmissionStatus === 'success' && invoice.rdDocId) {
+      const company = await prisma.company.findUnique({ where: { id: req.user!.companyId } });
+      const rdResult = await cancelDocumentRD(
+        invoice.rdDocId,
+        invoice.invoiceNumber,
+        cancelReason,
+        company ? { environment: company.rdEnvironment, clientId: company.rdClientId, clientSecret: company.rdClientSecret } : undefined,
+      );
+
+      const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        return tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: 'cancelled',
+            cancelledAt: new Date(),
+            cancelledBy: req.user!.userId,
+            cancelReason,
+          },
+        });
+      });
+
+      await auditLog({
+        companyId: req.user!.companyId,
+        userId: req.user!.userId,
+        role: req.user!.role,
+        action: 'invoice.cancel',
+        resourceType: 'invoice',
+        resourceId: invoice.id,
+        details: {
+          invoiceNumber: invoice.invoiceNumber,
+          reason: cancelReason,
+          rdCalled: true,
+          rdSuccess: rdResult.success,
+          rdMock: rdResult.isMock,
+        },
+        ipAddress: req.ip ?? '',
+        userAgent: req.get('user-agent') ?? '',
+        language: 'th',
+      });
+
+      if (rdResult.success) {
+        res.json({ data: { id: updated.id, status: updated.status, cancelledAt: updated.cancelledAt }, message: 'ยกเลิกเอกสารและแจ้งยกเลิกไปยังกรมสรรพากรแล้ว' });
+      } else {
+        res.json({
+          data: { id: updated.id, status: updated.status, cancelledAt: updated.cancelledAt },
+          message: `ยกเลิกเอกสารแล้ว (แต่ยกเลิกที่กรมสรรพากรไม่สำเร็จ: ${rdResult.message})`,
+          rdError: rdResult.message,
+        });
+      }
+      return;
+    }
+
+    // rdSubmissionStatus = 'failed' | 'pending' | 'in_progress' | 'retrying' — never successfully submitted, just cancel locally
+    const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: 'cancelled',
+          cancelledAt: new Date(),
+          cancelledBy: req.user!.userId,
+          cancelReason,
+        },
+      });
+    });
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'invoice.cancel',
+      resourceType: 'invoice',
+      resourceId: invoice.id,
+      details: { invoiceNumber: invoice.invoiceNumber, reason: cancelReason, rdCalled: false, rdSubmissionStatus: invoice.rdSubmissionStatus },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.json({ data: { id: updated.id, status: updated.status, cancelledAt: updated.cancelledAt }, message: 'ยกเลิกเอกสารสำเร็จแล้ว' });
+  } catch (err) {
+    console.error('Cancel invoice error:', err);
     res.status(500).json({ error: 'Failed to cancel invoice' });
   }
 });
