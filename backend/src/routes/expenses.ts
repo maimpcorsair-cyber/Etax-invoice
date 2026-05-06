@@ -472,6 +472,7 @@ expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (
     if (existing.status !== 'submitted') { res.status(400).json({ error: 'Only submitted vouchers can be approved' }); return; }
 
     const companyId = req.user!.companyId;
+    const totalAmt = Number(existing.totalAmount);
 
     // Approve, log, and deduct petty cash in one transaction
     const [updated] = await prisma.$transaction([
@@ -484,10 +485,10 @@ expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (
       }),
       // Upsert petty cash record and deduct balance
       prisma.$executeRaw`
-        INSERT INTO petty_cash (id, company_id, balance, created_at, updated_at)
-        VALUES (gen_random_uuid()::text, ${companyId}, 0 - ${existing.totalAmount}, now(), now())
-        ON CONFLICT (company_id)
-        DO UPDATE SET balance = petty_cash.balance - ${existing.totalAmount}, updated_at = now()
+        INSERT INTO petty_cash (id, "companyId", balance, "createdAt", "updatedAt")
+        VALUES (gen_random_uuid()::text, ${companyId}, 0 - ${totalAmt}, now(), now())
+        ON CONFLICT ("companyId")
+        DO UPDATE SET balance = petty_cash.balance - ${totalAmt}, "updatedAt" = now()
       `,
     ]);
 
