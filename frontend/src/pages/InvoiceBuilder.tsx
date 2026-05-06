@@ -448,13 +448,13 @@ export default function InvoiceBuilder() {
 
   /* ── Auto-save form to localStorage every 5 seconds (new invoices only) ── */
   useEffect(() => {
-    if (isEdit || form.saving) return;
+    if (isEdit || form.saving || form.recoveredDraft) return;
     const interval = setInterval(() => {
       form.saveDraftToStorage();
     }, 5000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, form.saving]);
+  }, [isEdit, form.saving, form.recoveredDraft]);
 
   /* ── Auto-clear draft when successfully issued ── */
   useEffect(() => {

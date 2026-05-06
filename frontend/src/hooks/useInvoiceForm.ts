@@ -138,6 +138,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       if (draft.signerTitle != null) setSignerTitle(draft.signerTitle);
       if (draft.whtRate) setWhtRate(draft.whtRate);
       // Clear draft after successful load so it doesn't prompt again on next visit
+      setRecoveredDraft(true);
       clearDraftFromStorage();
       return true;
     } catch {
