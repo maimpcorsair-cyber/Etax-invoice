@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   Wallet,
   Calculator,
+  Settings,
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -47,6 +48,7 @@ export default function MobileBottomNav() {
     { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
     { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
+    { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'
       ? [{ key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin' }]
       : []),

@@ -1,11 +1,18 @@
-import type { InvoiceType } from '../../types';
+import { useState } from 'react';
+import { Building2, CheckCircle2, Landmark, LockKeyhole, Plus, ShieldCheck, X } from 'lucide-react';
+import type { BankAccountProfile, InvoiceType } from '../../types';
 import { useLanguage } from '../../hooks/useLanguage';
 
 interface Props {
   documentMode: 'ordinary' | 'electronic';
   onDocumentModeChange: (value: 'ordinary' | 'electronic') => void;
-  bankPaymentInfo: string;
   onBankPaymentInfoChange: (value: string) => void;
+  bankAccounts: BankAccountProfile[];
+  selectedBankAccountId: string;
+  onBankAccountSelect: (id: string) => void;
+  onAddBankAccount: (account: Omit<BankAccountProfile, 'id'>) => Promise<void>;
+  bankProfileSaving: boolean;
+  bankProfileError: string | null;
   showCompanyLogo: boolean;
   onShowCompanyLogoChange: (value: boolean) => void;
   documentLogoUrl: string | null;
@@ -22,8 +29,13 @@ interface Props {
 export default function DocumentAppearanceCard({
   documentMode,
   onDocumentModeChange,
-  bankPaymentInfo,
   onBankPaymentInfoChange,
+  bankAccounts,
+  selectedBankAccountId,
+  onBankAccountSelect,
+  onAddBankAccount,
+  bankProfileSaving,
+  bankProfileError,
   showCompanyLogo,
   onShowCompanyLogoChange,
   documentLogoUrl,
@@ -36,6 +48,17 @@ export default function DocumentAppearanceCard({
   onSignerTitleChange,
 }: Props) {
   const { isThai } = useLanguage();
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [bankDraft, setBankDraft] = useState({
+    label: '',
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    branch: '',
+    promptPayId: '',
+  });
+
+  const selectedBank = bankAccounts.find((account) => account.id === selectedBankAccountId) ?? null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,6 +67,7 @@ export default function DocumentAppearanceCard({
     reader.onload = (event) => onDocumentLogoChange(event.target?.result as string);
     reader.readAsDataURL(file);
   };
+
   const handleSignatureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -52,17 +76,38 @@ export default function DocumentAppearanceCard({
     reader.readAsDataURL(file);
   };
 
+  const handleSaveBank = async () => {
+    const label = bankDraft.label.trim() || bankDraft.bankName.trim();
+    if (!label || !bankDraft.bankName.trim() || !bankDraft.accountName.trim() || !bankDraft.accountNumber.trim()) return;
+    await onAddBankAccount({
+      label,
+      bankName: bankDraft.bankName.trim(),
+      accountName: bankDraft.accountName.trim(),
+      accountNumber: bankDraft.accountNumber.trim(),
+      branch: bankDraft.branch.trim() || null,
+      promptPayId: bankDraft.promptPayId.trim() || null,
+      isDefault: bankAccounts.length === 0,
+    });
+    setBankDraft({ label: '', bankName: '', accountName: '', accountNumber: '', branch: '', promptPayId: '' });
+    setShowBankModal(false);
+  };
+
   return (
     <div className="card space-y-4">
-      <div>
-        <h3 className="text-base font-semibold text-slate-900">
-          {isThai ? 'ตั้งค่าเอกสาร' : 'Document Settings'}
-        </h3>
-        <p className="mt-1 text-sm text-slate-500">
-          {isThai
-            ? 'กำหนดรูปแบบเอกสาร โลโก้ ลายเซ็น และข้อมูลธนาคาร'
-            : 'Configure document mode, logo, signature, and bank info.'}
-        </p>
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+          <Building2 className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">
+            {isThai ? 'รูปแบบและความน่าเชื่อถือเอกสาร' : 'Appearance and trust'}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            {isThai
+              ? 'เลือกโหมดเอกสาร บัญชีรับชำระ และลายเซ็นผู้จัดทำ โดยดึงค่ามาตรฐานจาก Settings ของบริษัท'
+              : 'Choose document mode, payment account, and issuer signature from your company settings.'}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -123,23 +168,71 @@ export default function DocumentAppearanceCard({
         </span>
       </label>
 
-      <div>
-        <label className="label">
-          {isThai ? 'บัญชีธนาคารผู้เรียกเก็บเงิน (แสดงท้ายเอกสาร)' : 'Collector bank account (shown at document bottom)'}
-        </label>
-        <textarea
-          value={bankPaymentInfo}
-          onChange={(e) => onBankPaymentInfoChange(e.target.value)}
-          className="input-field min-h-[92px]"
-          placeholder={isThai
-            ? 'เช่น ธนาคารกสิกรไทย\nชื่อบัญชี บริษัท ตัวอย่าง จำกัด\nเลขที่บัญชี 123-4-56789-0'
-            : 'e.g. Kasikorn Bank\nAccount name Example Co., Ltd.\nAccount no. 123-4-56789-0'}
-        />
-        <p className="mt-2 text-xs text-slate-500">
-          {isThai
-            ? 'ถ้าเว้นว่าง ระบบจะไม่แสดงกล่องข้อมูลโอนเงินใน PDF'
-            : 'Leave blank to hide the bank transfer box in the PDF.'}
-        </p>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-emerald-600" />
+              <h4 className="text-sm font-semibold text-slate-900">
+                {isThai ? 'บัญชีรับชำระบนเอกสาร' : 'Payment account'}
+              </h4>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {isThai
+                ? 'เลือกจากบัญชีที่บันทึกไว้ใน Settings เพื่อให้ข้อมูลท้าย PDF ตรงกันทุกฉบับ'
+                : 'Select a saved account from Settings so every PDF uses consistent payment details.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBankModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {isThai ? 'เพิ่มบัญชี' : 'Add account'}
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <select
+            value={selectedBankAccountId}
+            onChange={(e) => {
+              const id = e.target.value;
+              onBankAccountSelect(id);
+              if (!id) onBankPaymentInfoChange('');
+            }}
+            className="input-field"
+          >
+            <option value="">{isThai ? 'ไม่แสดงบัญชีธนาคารในเอกสารนี้' : 'Do not show a bank account on this document'}</option>
+            {bankAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.label} - {account.bankName} - {account.accountNumber}
+              </option>
+            ))}
+          </select>
+          {selectedBank && (
+            <span className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {isThai ? 'พร้อมใช้' : 'Ready'}
+            </span>
+          )}
+        </div>
+
+        {selectedBank ? (
+          <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-xs leading-5 text-slate-700">
+            <div className="font-semibold text-slate-900">{selectedBank.accountName}</div>
+            <div>{selectedBank.bankName} - {selectedBank.accountNumber}</div>
+            {selectedBank.branch && <div>{isThai ? 'สาขา' : 'Branch'}: {selectedBank.branch}</div>}
+            {selectedBank.promptPayId && <div>PromptPay: {selectedBank.promptPayId}</div>}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
+            {bankAccounts.length === 0
+              ? (isThai ? 'ยังไม่มีบัญชีธนาคารที่บันทึกไว้ เพิ่มบัญชีแรกได้จากปุ่มด้านบนหรือหน้า Settings' : 'No saved bank accounts yet. Add the first one here or in Settings.')
+              : (isThai ? 'เอกสารนี้จะไม่แสดงข้อมูลโอนเงินท้าย PDF' : 'This document will not show bank transfer details in the PDF.')}
+          </div>
+        )}
+        {bankProfileError && <p className="mt-2 text-xs text-rose-600">{bankProfileError}</p>}
       </div>
 
       <div>
@@ -151,38 +244,47 @@ export default function DocumentAppearanceCard({
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
           />
           {documentLogoUrl && (
             <button
               type="button"
               onClick={() => onDocumentLogoChange(null)}
-              className="text-red-500 hover:text-red-700 font-semibold text-sm px-3 py-2 rounded hover:bg-red-50"
+              className="rounded px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700"
             >
-              ✕
+              x
             </button>
           )}
         </div>
         {documentLogoUrl && (
           <img src={documentLogoUrl} alt="document mark preview" className="mt-3 h-16 object-contain" />
         )}
-        <p className="mt-2 text-xs text-slate-500">
-          {isThai
-            ? 'ใช้สำหรับตราแบรนด์ย่อย, โลโก้แคมเปญ, หรือเครื่องหมายเฉพาะบนใบ invoice/receipt โดยไม่กระทบข้อมูลบริษัทหลัก'
-            : 'Useful for a sub-brand seal, campaign mark, or a document-specific badge without changing the main company identity.'}
-        </p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 p-4 shadow-sm">
         <div>
-          <h4 className="text-sm font-semibold text-slate-900">
-            {isThai ? 'ลายเซ็นผู้มีอำนาจบนเอกสาร' : 'Authorized signature'}
-          </h4>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-indigo-700" />
+            <h4 className="text-sm font-semibold text-slate-900">
+              {isThai ? 'ลายเซ็นผู้จัดทำที่ตรวจสอบได้' : 'Trusted issuer signature'}
+            </h4>
+          </div>
           <p className="mt-1 text-xs leading-5 text-slate-500">
             {isThai
-              ? 'รูปเซ็นและชื่อจะแสดงบน PDF ตอนออกเอกสาร ใช้สำหรับความน่าเชื่อถือของเอกสารที่ส่งให้ลูกค้า'
-              : 'The signature image and signer details appear on issued PDFs to make customer-facing documents look official.'}
+              ? 'ใช้แสดงผู้จัดทำบน PDF พร้อมโหมด e-Tax/QR ตรวจสอบเอกสาร ระบบยังคงใช้ certificate และ audit trail ฝั่ง backend ตอนออกเอกสารจริง'
+              : 'Shown on PDFs with e-Tax/QR verification. The backend still handles certificate signing and audit trails for issued documents.'}
           </p>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {(isThai
+            ? ['ล็อกกับบริษัทนี้', 'มี QR ตรวจสอบ', 'บันทึก audit trail']
+            : ['Company scoped', 'QR verifiable', 'Audit logged']
+          ).map((label) => (
+            <div key={label} className="flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700">
+              <LockKeyhole className="h-3.5 w-3.5 text-indigo-600" />
+              {label}
+            </div>
+          ))}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
@@ -209,24 +311,80 @@ export default function DocumentAppearanceCard({
             type="file"
             accept="image/*"
             onChange={handleSignatureFileChange}
-            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
           />
           {signatureImageUrl && (
             <button
               type="button"
               onClick={() => onSignatureImageChange(null)}
-              className="text-red-500 hover:text-red-700 font-semibold text-sm px-3 py-2 rounded hover:bg-red-50"
+              className="rounded px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700"
             >
-              ✕
+              x
             </button>
           )}
         </div>
         {signatureImageUrl && (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
             <img src={signatureImageUrl} alt="signature preview" className="h-16 object-contain" />
           </div>
         )}
       </div>
+
+      {showBankModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/70 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  {isThai ? 'เพิ่มบัญชีธนาคาร' : 'Add bank account'}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {isThai ? 'บันทึกไว้เป็นตัวเลือกสำหรับเอกสารครั้งต่อไป' : 'Save it as a reusable option for future documents.'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowBankModal(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label">{isThai ? 'ชื่อเรียก' : 'Label'}</label>
+                <input className="input-field" value={bankDraft.label} onChange={(e) => setBankDraft((prev) => ({ ...prev, label: e.target.value }))} placeholder={isThai ? 'บัญชีหลัก' : 'Main account'} />
+              </div>
+              <div>
+                <label className="label">{isThai ? 'ธนาคาร' : 'Bank'}</label>
+                <input className="input-field" value={bankDraft.bankName} onChange={(e) => setBankDraft((prev) => ({ ...prev, bankName: e.target.value }))} placeholder={isThai ? 'ธนาคารกสิกรไทย' : 'Kasikorn Bank'} />
+              </div>
+              <div>
+                <label className="label">{isThai ? 'ชื่อบัญชี' : 'Account name'}</label>
+                <input className="input-field" value={bankDraft.accountName} onChange={(e) => setBankDraft((prev) => ({ ...prev, accountName: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">{isThai ? 'เลขที่บัญชี' : 'Account number'}</label>
+                <input className="input-field" value={bankDraft.accountNumber} onChange={(e) => setBankDraft((prev) => ({ ...prev, accountNumber: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">{isThai ? 'สาขา' : 'Branch'}</label>
+                <input className="input-field" value={bankDraft.branch} onChange={(e) => setBankDraft((prev) => ({ ...prev, branch: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">PromptPay</label>
+                <input className="input-field" value={bankDraft.promptPayId} onChange={(e) => setBankDraft((prev) => ({ ...prev, promptPayId: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowBankModal(false)} className="btn-secondary">
+                {isThai ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button type="button" onClick={handleSaveBank} disabled={bankProfileSaving} className="btn-primary">
+                {bankProfileSaving ? (isThai ? 'กำลังบันทึก...' : 'Saving...') : (isThai ? 'บันทึกบัญชี' : 'Save account')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

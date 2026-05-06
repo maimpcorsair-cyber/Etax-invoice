@@ -128,6 +128,10 @@ model Company {
   lineNotifyEnabled   Boolean @default(false)
   overdueReminderDays Int     @default(3)
 
+  // Document issuing profile
+  documentBankAccounts      Json?
+  documentSignatureProfile  Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

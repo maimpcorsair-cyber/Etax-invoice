@@ -19,6 +19,26 @@ export interface User {
   };
 }
 
+export interface BankAccountProfile {
+  id: string;
+  label: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  branch?: string | null;
+  promptPayId?: string | null;
+  isDefault?: boolean;
+  sortOrder?: number;
+}
+
+export interface SignatureProfile {
+  signatureImageUrl?: string | null;
+  signerName?: string | null;
+  signerTitle?: string | null;
+  securityNote?: string | null;
+  updatedAt?: string | null;
+}
+
 /** Subset of Company returned by GET /api/company/profile */
 export interface CompanyProfile {
   nameTh: string;
@@ -31,6 +51,8 @@ export interface CompanyProfile {
   phone?: string;
   email?: string;
   logoUrl?: string;
+  documentBankAccounts?: BankAccountProfile[];
+  documentSignatureProfile?: SignatureProfile | null;
 }
 
 export interface Company {

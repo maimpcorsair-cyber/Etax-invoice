@@ -1,11 +1,61 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { z } from 'zod';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { rdComplianceQueue } from '../queues/rdComplianceQueue';
 
 export const dashboardRouter = Router();
+
+const bankAccountSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().trim().min(1).max(80),
+  bankName: z.string().trim().min(1).max(120),
+  accountName: z.string().trim().min(1).max(160),
+  accountNumber: z.string().trim().min(1).max(60),
+  branch: z.string().trim().max(120).optional().nullable(),
+  promptPayId: z.string().trim().max(80).optional().nullable(),
+  isDefault: z.boolean().optional(),
+});
+
+const signatureProfileSchema = z.object({
+  signatureImageUrl: z.string().optional().nullable(),
+  signerName: z.string().trim().max(120).optional().nullable(),
+  signerTitle: z.string().trim().max(120).optional().nullable(),
+  securityNote: z.string().trim().max(220).optional().nullable(),
+  updatedAt: z.string().optional().nullable(),
+});
+
+const documentProfileSchema = z.object({
+  bankAccounts: z.array(bankAccountSchema).max(20).optional(),
+  signatureProfile: signatureProfileSchema.optional().nullable(),
+});
+
+function normalizeBankAccounts(input: z.infer<typeof bankAccountSchema>[]) {
+  const accounts = input.map((account, index) => ({
+    id: account.id?.trim() || randomUUID(),
+    label: account.label.trim(),
+    bankName: account.bankName.trim(),
+    accountName: account.accountName.trim(),
+    accountNumber: account.accountNumber.trim(),
+    branch: account.branch?.trim() || null,
+    promptPayId: account.promptPayId?.trim() || null,
+    isDefault: account.isDefault === true,
+    sortOrder: index,
+  }));
+
+  const firstDefault = accounts.findIndex((account) => account.isDefault);
+  if (firstDefault === -1 && accounts.length > 0) {
+    accounts[0].isDefault = true;
+  }
+
+  return accounts.map((account, index) => ({
+    ...account,
+    isDefault: account.isDefault && index === (firstDefault === -1 ? 0 : firstDefault),
+  }));
+}
 
 dashboardRouter.get('/integration-status', async (req, res) => {
   try {
@@ -290,6 +340,8 @@ dashboardRouter.get('/profile', async (req, res) => {
         phone: true,
         email: true,
         logoUrl: true,
+        documentBankAccounts: true,
+        documentSignatureProfile: true,
       },
     });
 
@@ -302,5 +354,80 @@ dashboardRouter.get('/profile', async (req, res) => {
   } catch (err) {
     logger.error('Failed to fetch company profile', { err });
     res.status(500).json({ error: 'Failed to fetch company profile' });
+  }
+});
+
+/* ─── GET /api/company/document-profile ─── */
+dashboardRouter.get('/document-profile', async (req, res) => {
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: {
+        documentBankAccounts: true,
+        documentSignatureProfile: true,
+      },
+    });
+
+    if (!company) {
+      res.status(404).json({ error: 'Company not found' });
+      return;
+    }
+
+    res.json({
+      data: {
+        bankAccounts: Array.isArray(company.documentBankAccounts) ? company.documentBankAccounts : [],
+        signatureProfile: company.documentSignatureProfile ?? null,
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to fetch document profile', { err });
+    res.status(500).json({ error: 'Failed to fetch document profile' });
+  }
+});
+
+/* ─── PATCH /api/company/document-profile ─── */
+dashboardRouter.patch('/document-profile', async (req, res) => {
+  try {
+    const body = documentProfileSchema.parse(req.body);
+    const data: Prisma.CompanyUpdateInput = {};
+
+    if (body.bankAccounts !== undefined) {
+      data.documentBankAccounts = normalizeBankAccounts(body.bankAccounts) as Prisma.InputJsonValue;
+    }
+
+    if (body.signatureProfile !== undefined) {
+      data.documentSignatureProfile = body.signatureProfile
+        ? {
+            signatureImageUrl: body.signatureProfile.signatureImageUrl ?? null,
+            signerName: body.signatureProfile.signerName?.trim() || null,
+            signerTitle: body.signatureProfile.signerTitle?.trim() || null,
+            securityNote: body.signatureProfile.securityNote?.trim() || null,
+            updatedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue
+        : Prisma.JsonNull;
+    }
+
+    const company = await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data,
+      select: {
+        documentBankAccounts: true,
+        documentSignatureProfile: true,
+      },
+    });
+
+    res.json({
+      data: {
+        bankAccounts: Array.isArray(company.documentBankAccounts) ? company.documentBankAccounts : [],
+        signatureProfile: company.documentSignatureProfile ?? null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid document profile', details: err.errors });
+      return;
+    }
+    logger.error('Failed to update document profile', { err });
+    res.status(500).json({ error: 'Failed to update document profile' });
   }
 });

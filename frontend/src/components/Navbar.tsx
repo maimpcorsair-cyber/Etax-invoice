@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   LogOut,
   ChevronDown,
+  Settings,
   Zap,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -28,6 +29,7 @@ const navItems = [
   { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
   { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
   { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
+  { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
 const adminNavItems = [

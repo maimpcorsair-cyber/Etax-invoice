@@ -67,8 +67,8 @@ export default function DocumentSettingsCard({
 
   return (
     <div className="card space-y-4">
-      <div className="rounded-2xl bg-slate-50 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-slate-50 px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
           {isThai ? 'Document setup' : 'Document setup'}
         </p>
         <h2 className="mt-1 text-base font-semibold text-slate-900">
@@ -77,7 +77,7 @@ export default function DocumentSettingsCard({
         <p className="mt-1 text-sm text-slate-600">{currentDocType.description}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <label className="label">
             {isThai ? 'ประเภทเอกสาร' : 'Document Type'}

@@ -5,6 +5,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyProfile } from '../hooks/useCompanyProfile';
 import { useCustomerSearch } from '../hooks/useCustomerSearch';
+import { formatBankPaymentInfo, useDocumentProfile } from '../hooks/useDocumentProfile';
 import { useInvoiceForm } from '../hooks/useInvoiceForm';
 import { useInvoicePreview } from '../hooks/useInvoicePreview';
 import InvoiceBuilderHeader from '../components/invoice/InvoiceBuilderHeader';
@@ -18,7 +19,7 @@ import NotesPaymentCard from '../components/invoice/NotesPaymentCard';
 import WhtCard from '../components/invoice/WhtCard';
 import PreviewModal from '../components/invoice/PreviewModal';
 import TemplateMarketplace from '../components/invoice/TemplateMarketplace';
-import type { DocumentTemplateOption } from '../types';
+import type { BankAccountProfile, DocumentTemplateOption } from '../types';
 import { builtinDocumentTemplates, supportsDocumentType } from '../lib/documentTemplatePresets';
 
 function getInvoiceValidationErrors(params: {
@@ -104,6 +105,7 @@ export default function InvoiceBuilder() {
 
   const ctx = { token, clearAuth, navigate, isThai };
   const { company } = useCompanyProfile({ token });
+  const documentProfile = useDocumentProfile({ token });
   const customer = useCustomerSearch({ token });
   const form = useInvoiceForm(ctx);
   const preview = useInvoicePreview(ctx);
@@ -116,6 +118,7 @@ export default function InvoiceBuilder() {
   const [isDraft, setIsDraft] = useState(false);
 
   const [showMarketplace, setShowMarketplace] = useState(false);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
 
   // Mobile/tablet tab state
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
@@ -148,8 +151,9 @@ export default function InvoiceBuilder() {
   const [inlineDownloading, setInlineDownloading] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewPanelRef = useRef<HTMLDivElement>(null);
-  const [previewScale, setPreviewScale] = useState(1);
+  const [previewScale, setPreviewScale] = useState(0.46);
   const lastPayloadRef = useRef<object | null>(null);
+  const didApplyDocumentProfile = useRef(false);
 
   const validationErrors = getInvoiceValidationErrors({
     isThai,
@@ -198,6 +202,61 @@ export default function InvoiceBuilder() {
     if (!el || !container) return;
     container.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
   }
+
+  const applyBankAccount = useCallback((bankAccountId: string) => {
+    setSelectedBankAccountId(bankAccountId);
+    const account = documentProfile.profile.bankAccounts.find((item) => item.id === bankAccountId);
+    form.setBankPaymentInfo(account ? formatBankPaymentInfo(account, isThai) : '');
+  }, [documentProfile.profile.bankAccounts, form.setBankPaymentInfo, isThai]);
+
+  const handleAddBankAccount = useCallback(async (account: Omit<BankAccountProfile, 'id'>) => {
+    const nextAccounts = [...documentProfile.profile.bankAccounts, account];
+    const saved = await documentProfile.saveProfile({ bankAccounts: nextAccounts });
+    const newAccount = saved?.bankAccounts.find((item) =>
+      item.accountNumber === account.accountNumber && item.bankName === account.bankName,
+    );
+    if (newAccount) {
+      setSelectedBankAccountId(newAccount.id);
+      form.setBankPaymentInfo(formatBankPaymentInfo(newAccount, isThai));
+    }
+  }, [documentProfile.profile.bankAccounts, documentProfile.saveProfile, form.setBankPaymentInfo, isThai]);
+
+  useEffect(() => {
+    if (didApplyDocumentProfile.current || documentProfile.loading) return;
+    const accounts = documentProfile.profile.bankAccounts;
+    const defaultAccount = accounts.find((account) => account.isDefault) ?? accounts[0];
+    if (!form.bankPaymentInfo && defaultAccount) {
+      setSelectedBankAccountId(defaultAccount.id);
+      form.setBankPaymentInfo(formatBankPaymentInfo(defaultAccount, isThai));
+    }
+
+    const signatureProfile = documentProfile.profile.signatureProfile;
+    if (signatureProfile) {
+      if (!form.signatureImageUrl && signatureProfile.signatureImageUrl) {
+        form.setSignatureImageUrl(signatureProfile.signatureImageUrl);
+      }
+      if (!form.signerName && signatureProfile.signerName) {
+        form.setSignerName(signatureProfile.signerName);
+      }
+      if (!form.signerTitle && signatureProfile.signerTitle) {
+        form.setSignerTitle(signatureProfile.signerTitle);
+      }
+    }
+    didApplyDocumentProfile.current = true;
+  }, [
+    documentProfile.loading,
+    documentProfile.profile.bankAccounts,
+    documentProfile.profile.signatureProfile,
+    form.bankPaymentInfo,
+    form.setBankPaymentInfo,
+    form.signatureImageUrl,
+    form.setSignatureImageUrl,
+    form.signerName,
+    form.setSignerName,
+    form.signerTitle,
+    form.setSignerTitle,
+    isThai,
+  ]);
 
   /* ── Preview payload builder ── */
   const buildPreviewPayload = useCallback((overrides?: { templateId?: string | null }) => ({
@@ -283,8 +342,10 @@ export default function InvoiceBuilder() {
     if (!previewPanelRef.current) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const width = entry.contentRect.width - 32; // subtract padding
-        setPreviewScale(Math.min(1, width / 794));
+        const width = entry.contentRect.width - 64;
+        const height = entry.contentRect.height - 128;
+        const fitScale = Math.min(width / 794, height / 1123);
+        setPreviewScale(Math.min(0.5, Math.max(0.32, fitScale)));
       }
     });
     observer.observe(previewPanelRef.current);
@@ -503,8 +564,8 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* Scrollable cards area */}
-      <div ref={formScrollRef} className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4 space-y-4">
-        <div ref={settingsRef}>
+      <div ref={formScrollRef} className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0">
+        <div ref={settingsRef} className="xl:col-span-2">
           <DocumentSettingsCard
             docType={form.docType}
             onDocTypeChange={form.setDocType}
@@ -518,12 +579,17 @@ export default function InvoiceBuilder() {
             onReferenceDocNumberChange={form.setReferenceDocNumber}
           />
         </div>
-        <div ref={appearanceRef}>
+        <div ref={appearanceRef} className="xl:col-span-2">
           <DocumentAppearanceCard
             documentMode={form.documentMode}
             onDocumentModeChange={form.setDocumentMode}
-            bankPaymentInfo={form.bankPaymentInfo}
             onBankPaymentInfoChange={form.setBankPaymentInfo}
+            bankAccounts={documentProfile.profile.bankAccounts}
+            selectedBankAccountId={selectedBankAccountId}
+            onBankAccountSelect={applyBankAccount}
+            onAddBankAccount={handleAddBankAccount}
+            bankProfileSaving={documentProfile.saving}
+            bankProfileError={documentProfile.error}
             showCompanyLogo={form.showCompanyLogo}
             onShowCompanyLogoChange={form.setShowCompanyLogo}
             documentLogoUrl={form.logoUrl}
@@ -558,7 +624,7 @@ export default function InvoiceBuilder() {
             onToggleSection={() => setShowBuyerSection((s) => !s)}
           />
         </div>
-        <div ref={itemsRef}>
+        <div ref={itemsRef} className="xl:col-span-2">
           <ItemsTable
             items={form.items}
             subtotal={form.subtotal}
@@ -569,7 +635,7 @@ export default function InvoiceBuilder() {
             onUpdateItem={form.updateItem}
           />
         </div>
-        <div ref={notesRef}>
+        <div ref={notesRef} className="xl:col-span-2">
           <NotesPaymentCard
             notes={form.notes}
             onNotesChange={form.setNotes}
@@ -585,7 +651,7 @@ export default function InvoiceBuilder() {
           />
         </div>
         {/* bottom padding so last card isn't flush */}
-        <div className="h-8" />
+        <div className="h-8 xl:col-span-2" />
       </div>
     </div>
   );
@@ -734,7 +800,7 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* Preview content */}
-      <div className="flex-1 overflow-auto p-4 flex flex-col items-center">
+      <div className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#eef2ff_0,#f8fafc_42%,#eef2f7_100%)] p-5 flex flex-col items-center">
         {inlinePreviewError && (
           <div className="w-full max-w-2xl mb-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             {inlinePreviewError}
@@ -757,27 +823,42 @@ export default function InvoiceBuilder() {
             <p className="text-sm text-slate-500">{isThai ? 'กำลังโหลดตัวอย่าง...' : 'Loading preview...'}</p>
           </div>
         ) : inlinePreviewHtml ? (
-          <div
-            className="relative bg-white shadow-xl rounded-sm"
-            style={{
-              width: 794,
-              transformOrigin: 'top center',
-              transform: `scale(${previewScale})`,
-              marginBottom: `calc((794px * ${previewScale} - 794px))`,
-            }}
-          >
-            {inlinePreviewLoading && (
-              <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 rounded-sm">
-                <div className="w-6 h-6 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+          <div className="rounded-3xl bg-white/70 p-4 shadow-inner ring-1 ring-slate-200/70">
+            <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+              <span className="font-medium">{isThai ? 'ตัวอย่างแบบย่อ' : 'Compact preview'}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                {Math.round(previewScale * 100)}%
+              </span>
+            </div>
+            <div
+              className="relative overflow-hidden rounded-sm bg-white shadow-xl"
+              style={{
+                width: 794 * previewScale,
+                height: 1123 * previewScale,
+              }}
+            >
+              <div
+                style={{
+                  width: 794,
+                  height: 1123,
+                  transformOrigin: 'top left',
+                  transform: `scale(${previewScale})`,
+                }}
+              >
+                {inlinePreviewLoading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-white/60">
+                    <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-500" />
+                  </div>
+                )}
+                <iframe
+                  srcDoc={inlinePreviewHtml}
+                  title={isThai ? 'ตัวอย่างเอกสาร' : 'Document Preview'}
+                  sandbox="allow-same-origin allow-scripts"
+                  className="block w-full rounded-sm border-0"
+                  style={{ height: 1123 }}
+                />
               </div>
-            )}
-            <iframe
-              srcDoc={inlinePreviewHtml}
-              title={isThai ? 'ตัวอย่างเอกสาร' : 'Document Preview'}
-              sandbox="allow-same-origin allow-scripts"
-              className="w-full border-0 rounded-sm"
-              style={{ height: 1123, display: 'block' }}
-            />
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 text-center text-slate-300 gap-3 py-16">
@@ -884,7 +965,7 @@ export default function InvoiceBuilder() {
         {/* Desktop (lg+): split pane — form left, preview right */}
         <div className="hidden lg:flex w-full min-h-0">
           {/* LEFT: form panel */}
-          <div className="w-[500px] flex-shrink-0 flex flex-col min-h-0 border-r border-gray-200">
+          <div className="w-[62vw] max-w-[820px] min-w-[640px] flex-shrink-0 flex flex-col min-h-0 border-r border-gray-200">
             {formPanel}
           </div>
           {/* RIGHT: preview panel */}
