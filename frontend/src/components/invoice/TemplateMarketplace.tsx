@@ -682,17 +682,49 @@ const catalogCss = `
   z-index: -1;
 }
 .invoiceTemplate-structured {
-  background: var(--paper);
+  background:
+    radial-gradient(circle at 91% 10%, color-mix(in srgb, var(--accent2) 58%, transparent) 0 20%, transparent 21%),
+    radial-gradient(circle at 12% 92%, color-mix(in srgb, var(--accent2) 54%, transparent) 0 22%, transparent 23%),
+    linear-gradient(180deg, var(--paper) 0%, color-mix(in srgb, var(--bg) 38%, var(--paper)) 100%);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--border) 76%, transparent) inset,
     0 1px 0 rgba(255, 255, 255, .8) inset;
 }
 .invoiceTemplate-structured::before {
-  opacity: .2;
+  inset: 0 0 auto 0;
+  height: 22%;
+  z-index: -1;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent2) 72%, transparent), transparent 64%),
+    radial-gradient(circle at 16% 42%, color-mix(in srgb, var(--accent) 18%, transparent) 0 14%, transparent 15%);
+  border-radius: 0 0 54% 38% / 0 0 32% 46%;
+  opacity: .78;
 }
-.invoiceTemplate-structured::after,
+.invoiceTemplate-structured::after {
+  display: block;
+  left: -14%;
+  right: auto;
+  top: auto;
+  bottom: -8%;
+  width: 128%;
+  height: 18%;
+  aspect-ratio: auto;
+  border-radius: 50% 50% 0 0;
+  background:
+    radial-gradient(circle at 14% 26%, color-mix(in srgb, var(--accent) 24%, transparent) 0 7px, transparent 8px),
+    radial-gradient(circle at 86% 18%, color-mix(in srgb, var(--accent2) 80%, transparent) 0 14px, transparent 15px),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent2) 76%, transparent), color-mix(in srgb, var(--accent) 18%, transparent));
+  transform: none;
+  opacity: .72;
+}
 .invoiceTemplate-structured .invoiceGlow {
   display: none;
+}
+.invoiceTemplate-structured .decorSvg {
+  right: -12%;
+  top: 5%;
+  width: 48%;
+  opacity: .28;
 }
 .invoiceTemplate-structured .invoiceHeader,
 .invoiceTemplate-structured .invoiceMeta,

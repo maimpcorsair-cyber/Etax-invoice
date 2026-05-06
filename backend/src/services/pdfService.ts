@@ -3148,6 +3148,66 @@ function marketplaceDecorSvg(tokens: MarketplaceTemplateTokens) {
   </svg>`;
 }
 
+type PrintTemplateTone = 'minimal' | 'cute';
+
+type PrintTemplateLayoutSpec = {
+  tone: PrintTemplateTone;
+  radius: number;
+  contentLeft: number;
+  contentWidth: number;
+  headerTop: number;
+  partyTop: number;
+  tableTop: number;
+  wordsTop: number;
+  notesTop: number;
+  totalsTop: number;
+  signatureBottom: number;
+  qrBottom: number;
+};
+
+function resolvePrintTemplateLayout(tokens: MarketplaceTemplateTokens): PrintTemplateLayoutSpec {
+  const cuteDecor = ['bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'].includes(tokens.decor);
+  return {
+    tone: cuteDecor ? 'cute' : 'minimal',
+    radius: cuteDecor ? 24 : 8,
+    contentLeft: 56,
+    contentWidth: 682,
+    headerTop: cuteDecor ? 70 : 64,
+    partyTop: cuteDecor ? 244 : 226,
+    tableTop: cuteDecor ? 408 : 392,
+    wordsTop: cuteDecor ? 810 : 802,
+    notesTop: cuteDecor ? 870 : 858,
+    totalsTop: cuteDecor ? 790 : 782,
+    signatureBottom: cuteDecor ? 84 : 84,
+    qrBottom: cuteDecor ? 72 : 72,
+  };
+}
+
+function renderPrintTemplateOrnaments(tokens: MarketplaceTemplateTokens, layout: PrintTemplateLayoutSpec) {
+  const cute = layout.tone === 'cute';
+  const topFill = cute ? tokens.accent2 : tokens.tableHead;
+  const topAccent = cute ? tokens.accent : tokens.accent;
+  const bottomFill = cute ? tokens.bg : `${tokens.accent2}66`;
+  const mascot = marketplaceDecorSvg(tokens);
+  const cornerMarks = cute
+    ? `<span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span><span class="spark s4"></span>
+       <span class="heart h1"></span><span class="heart h2"></span>`
+    : `<span class="minimal-mark m1"></span><span class="minimal-mark m2"></span>`;
+
+  return `
+  <svg class="paper-wave top-wave" viewBox="0 0 794 170" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 0 H794 V92 C700 132 620 54 520 92 C424 128 344 124 250 88 C158 52 82 84 0 118 Z" fill="${topFill}" opacity="${cute ? '.74' : '.42'}"/>
+    <path d="M0 120 C90 82 160 52 250 88 C344 124 424 128 520 92 C620 54 700 132 794 92" fill="none" stroke="${topAccent}" stroke-width="${cute ? '3' : '2'}" stroke-dasharray="${cute ? '8 10' : '0'}" opacity="${cute ? '.34' : '.22'}"/>
+  </svg>
+  <svg class="paper-wave bottom-wave" viewBox="0 0 794 150" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 58 C96 18 170 76 264 48 C370 16 462 24 560 62 C650 96 724 66 794 36 V150 H0 Z" fill="${bottomFill}" opacity="${cute ? '.82' : '.5'}"/>
+    <path d="M0 58 C96 18 170 76 264 48 C370 16 462 24 560 62 C650 96 724 66 794 36" fill="none" stroke="${topAccent}" stroke-width="2" stroke-dasharray="${cute ? '7 9' : '0'}" opacity="${cute ? '.25' : '.16'}"/>
+  </svg>
+  <div class="decor decor-top">${mascot}</div>
+  ${cute ? `<div class="decor decor-bottom">${mascot}</div>` : ''}
+  ${cornerMarks}`;
+}
+
 function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTemplateTokens): string {
   const isTh = data.language !== 'en';
   const isEn = data.language === 'en';
@@ -3163,10 +3223,11 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
   const totalWords = isTh
     ? amountInWordsThai(data.total)
     : isEn ? amountInWordsEnglish(data.total) : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
-  const cuteTemplateDecor = ['bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'].includes(tokens.decor);
+  const layout = resolvePrintTemplateLayout(tokens);
+  const cuteTemplateDecor = layout.tone === 'cute';
   const titleColor = cuteTemplateDecor ? tokens.accent : '#1f2937';
   const rowText = cuteTemplateDecor ? tokens.text : '#252a31';
-  const tableTop = cuteTemplateDecor ? 390 : 386;
+  const tableTop = layout.tableTop;
   const maxRows = 10;
   const itemRows = data.items.slice(0, maxRows).map((item, idx) => {
     const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
@@ -3182,17 +3243,14 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
   const emptyRows = Array.from({ length: Math.max(0, maxRows - data.items.slice(0, maxRows).length) }, () => (
     '<tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
   )).join('');
-  const topRibbon = cuteTemplateDecor
-    ? `linear-gradient(135deg, ${tokens.accent2} 0%, transparent 56%)`
-    : `linear-gradient(135deg, ${tokens.accent} 0%, ${tokens.accent} 18%, transparent 18%)`;
   const pageBackground = cuteTemplateDecor
-    ? `radial-gradient(circle at 13% 8%, ${tokens.accent2}70 0 72px, transparent 73px),
-       radial-gradient(circle at 88% 10%, ${tokens.accent}30 0 86px, transparent 87px),
-       radial-gradient(circle at 15% 94%, ${tokens.accent2}66 0 120px, transparent 121px),
-       linear-gradient(180deg, ${tokens.paper} 0%, #ffffff 54%, ${tokens.bg} 100%)`
-    : `linear-gradient(180deg, ${tokens.paper} 0%, #ffffff 56%, ${tokens.bg} 100%)`;
-  const borderRadius = cuteTemplateDecor ? 22 : 8;
+    ? `radial-gradient(circle at 94% 13%, ${tokens.accent2}55 0 98px, transparent 99px),
+       radial-gradient(circle at 9% 93%, ${tokens.accent2}66 0 132px, transparent 133px),
+       linear-gradient(180deg, ${tokens.paper} 0%, #fffefe 52%, ${tokens.bg} 100%)`
+    : `linear-gradient(180deg, ${tokens.paper} 0%, #ffffff 58%, ${tokens.bg} 100%)`;
+  const borderRadius = layout.radius;
   const headerTextColor = cuteTemplateDecor || tokens.tableHead === '#111827' ? '#ffffff' : rowText;
+  const ornaments = renderPrintTemplateOrnaments(tokens, layout);
 
   return `<!DOCTYPE html>
 <html lang="${isTh ? 'th' : 'en'}">
@@ -3204,65 +3262,65 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-size:12px}
 .page{width:794px;height:1123px;margin:0 auto;position:relative;background:${pageBackground};overflow:hidden;border:1px solid ${tokens.border}}
-.page::before{content:'';position:absolute;left:0;right:0;top:0;height:${cuteTemplateDecor ? 118 : 92}px;background:${topRibbon};opacity:${cuteTemplateDecor ? '.5' : '.9'};z-index:0}
-.page::after{content:'';position:absolute;left:-42px;right:-42px;bottom:-66px;height:${cuteTemplateDecor ? 146 : 76}px;background:${cuteTemplateDecor ? `radial-gradient(circle at 12% 22%, ${tokens.accent}28 0 8px, transparent 9px),radial-gradient(circle at 84% 20%, ${tokens.accent2}70 0 14px, transparent 15px),linear-gradient(135deg, ${tokens.accent2}70, ${tokens.accent}24)` : `linear-gradient(135deg, ${tokens.accent}18, transparent)`};border-radius:50% 50% 0 0;opacity:.78;z-index:0}
-.template-skin{position:absolute;inset:0;z-index:0;pointer-events:none}
-.template-skin .dot{position:absolute;border-radius:999px;background:${tokens.accent};opacity:.22}
-.template-skin .dot.d1{left:64px;top:88px;width:8px;height:8px}
-.template-skin .dot.d2{right:80px;top:160px;width:10px;height:10px}
-.template-skin .dot.d3{left:88px;bottom:164px;width:7px;height:7px}
-.template-skin .rule{position:absolute;height:1px;background:${tokens.border};opacity:.58}
-.template-skin .rule.r1{left:58px;right:58px;top:242px}
-.template-skin .rule.r2{left:58px;right:58px;bottom:166px}
+.template-skin{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.paper-wave{position:absolute;left:0;width:100%;z-index:0}
+.top-wave{top:0;height:170px}.bottom-wave{bottom:0;height:150px}
+.spark{position:absolute;width:8px;height:8px;border-radius:999px;background:${tokens.accent};opacity:.42}
+.spark.s1{left:54px;top:92px}.spark.s2{right:62px;top:154px;width:6px;height:6px}.spark.s3{left:94px;bottom:166px;width:7px;height:7px}.spark.s4{right:126px;bottom:92px;width:9px;height:9px;background:${tokens.accent2}}
+.heart{position:absolute;width:13px;height:13px;background:${tokens.accent};opacity:.28;transform:rotate(45deg);border-radius:3px}
+.heart::before,.heart::after{content:'';position:absolute;width:13px;height:13px;border-radius:999px;background:inherit}
+.heart::before{left:-7px;top:0}.heart::after{left:0;top:-7px}.heart.h1{left:150px;top:116px}.heart.h2{right:114px;bottom:126px;width:10px;height:10px}
+.minimal-mark{position:absolute;border:1px solid ${tokens.border};opacity:.48}.minimal-mark.m1{left:42px;top:42px;width:72px;height:72px;border-radius:999px}.minimal-mark.m2{right:44px;bottom:46px;width:96px;height:28px;border-radius:999px}
 .decor-top,.decor-bottom{position:absolute;z-index:0;pointer-events:none;color:${tokens.accent}}
-.decor-top{right:50px;top:54px;width:156px;height:156px;opacity:${cuteTemplateDecor ? '.18' : '.12'}}
-.decor-bottom{left:36px;bottom:76px;width:170px;height:170px;opacity:${cuteTemplateDecor ? '.34' : '.14'}}
+.decor-top{right:42px;top:48px;width:176px;height:176px;opacity:${cuteTemplateDecor ? '.26' : '.12'}}
+.decor-bottom{left:32px;bottom:82px;width:178px;height:178px;opacity:${cuteTemplateDecor ? '.42' : '.14'}}
 .decor-top .decor-svg,.decor-bottom .decor-svg{position:static;width:100%;height:100%;display:block;pointer-events:none}
 .layer{position:absolute;z-index:1}
-.seller{left:${cuteTemplateDecor ? 86 : 78}px;top:${cuteTemplateDecor ? 78 : 76}px;width:365px}
+.seller{left:${layout.contentLeft + 24}px;top:${layout.headerTop}px;width:370px}
 .seller-logo{position:absolute;left:${cuteTemplateDecor ? -62 : -68}px;top:0;width:48px;height:48px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.72);padding:5px}
-.company-name{font-size:16px;line-height:1.25;font-weight:800;color:${titleColor};margin-bottom:5px;max-width:340px}
+.company-name{font-size:17px;line-height:1.25;font-weight:800;color:${titleColor};margin-bottom:5px;max-width:340px}
 .company-detail{font-size:10.4px;line-height:1.52;color:${tokens.muted}}
-.doc{right:${cuteTemplateDecor ? 60 : 62}px;top:${cuteTemplateDecor ? 78 : 76}px;width:246px;text-align:right}
-.doc-title{font-size:24px;line-height:1.14;font-weight:800;color:${titleColor}}
+.doc{right:${layout.contentLeft}px;top:${layout.headerTop}px;width:250px;text-align:right}
+.doc-title{font-size:28px;line-height:1.08;font-weight:800;color:${titleColor}}
 .doc-sub{font-size:11px;line-height:1.3;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:${tokens.accent};margin-top:4px}
-.copy{display:inline-block;margin-top:8px;border:1px solid ${tokens.accent};border-radius:999px;padding:2px 9px;background:rgba(255,255,255,.7);font-size:10px;font-weight:800;color:${titleColor}}
-.meta{right:${cuteTemplateDecor ? 58 : 62}px;top:${cuteTemplateDecor ? 224 : 222}px;width:238px;display:grid;gap:7px;padding:14px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.76)}
+.copy{display:inline-block;margin-top:9px;border:1px solid ${tokens.accent};border-radius:999px;padding:3px 13px;background:rgba(255,255,255,.78);font-size:10px;font-weight:800;color:${titleColor}}
+.meta{right:${layout.contentLeft}px;top:${layout.partyTop}px;width:242px;display:grid;gap:7px;padding:14px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.82)}
 .meta-row{display:grid;grid-template-columns:82px 1fr;gap:8px;font-size:11px;line-height:1.35}
 .meta-key{color:${tokens.muted}}
 .meta-val{text-align:right;font-weight:800;color:${rowText};word-break:break-word}
-.buyer{left:${cuteTemplateDecor ? 58 : 58}px;top:${cuteTemplateDecor ? 224 : 222}px;width:${cuteTemplateDecor ? 430 : 400}px;min-height:118px;padding:14px 16px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.82)}
+.buyer{left:${layout.contentLeft}px;top:${layout.partyTop}px;width:${cuteTemplateDecor ? 438 : 408}px;min-height:122px;padding:16px 18px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.86)}
 .label{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:${tokens.accent};margin-bottom:7px}
 .buyer-name{font-size:13.2px;font-weight:800;line-height:1.32;color:${rowText};margin-bottom:4px}
 .buyer-detail{font-size:10.4px;line-height:1.55;color:${tokens.muted}}
-.table-wrap{left:58px;top:${tableTop}px;width:678px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;overflow:hidden;background:rgba(255,255,255,.86)}
+.table-wrap{left:${layout.contentLeft}px;top:${tableTop}px;width:${layout.contentWidth}px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;overflow:hidden;background:rgba(255,255,255,.9)}
 .table{width:100%;border-collapse:collapse;table-layout:fixed;background:transparent}
 .table col:nth-child(1){width:45px}.table col:nth-child(3){width:62px}.table col:nth-child(4){width:66px}.table col:nth-child(5){width:102px}.table col:nth-child(6){width:110px}
-.table th{height:38px;padding:0 9px;text-align:left;font-size:9.6px;font-weight:800;color:${headerTextColor};background:${tokens.tableHead};border-right:1px solid rgba(255,255,255,.28)}
+.table th{height:42px;padding:0 10px;text-align:left;font-size:9.8px;font-weight:800;color:${headerTextColor};background:${tokens.tableHead};border-right:1px solid rgba(255,255,255,.28)}
 .table th:first-child,.table td:first-child{text-align:center}
 .table th:nth-child(3),.table td:nth-child(3){text-align:center}
 .table th:nth-child(4),.table td:nth-child(4){text-align:center}
 .table th:nth-child(5),.table td:nth-child(5){text-align:right}
 .table th:nth-child(6),.table td:nth-child(6){text-align:right}
-.table td{height:36px;padding:6px 9px;font-size:10.7px;line-height:1.35;color:${rowText};vertical-align:top;border-top:1px solid ${tokens.border};border-right:1px solid ${tokens.border}}
+.table td{height:34px;padding:6px 10px;font-size:10.7px;line-height:1.35;color:${rowText};vertical-align:top;border-top:1px solid ${tokens.border};border-right:1px solid ${tokens.border}}
+.table tbody tr:nth-child(even) td{background:${cuteTemplateDecor ? 'rgba(255,255,255,.34)' : 'rgba(248,250,252,.5)'}}
 .table th:last-child,.table td:last-child{border-right:none}
 .table .empty-row td{color:transparent}
 .table .item-name{text-align:left;font-weight:700}
-.words{left:58px;top:${cuteTemplateDecor ? 806 : 798}px;width:390px;padding:9px 0}
+.words{left:${layout.contentLeft}px;top:${layout.wordsTop}px;width:390px;padding:9px 0}
 .words-text{font-size:11px;line-height:1.55;color:${rowText};font-weight:700}
-.notes{left:58px;top:${cuteTemplateDecor ? 870 : 858}px;width:390px;font-size:10.5px;line-height:1.55;color:${tokens.muted};white-space:pre-line}
-.totals{right:58px;top:${cuteTemplateDecor ? 792 : 784}px;width:280px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.86);overflow:hidden}
+.notes{left:${layout.contentLeft}px;top:${layout.notesTop}px;width:390px;font-size:10.5px;line-height:1.55;color:${tokens.muted};white-space:pre-line}
+.totals{right:${layout.contentLeft}px;top:${layout.totalsTop}px;width:282px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.9);overflow:hidden}
 .total-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 14px;font-size:11.3px;color:${tokens.muted};border-bottom:1px solid rgba(148,163,184,.24)}
 .total-row strong{font-weight:800;color:${rowText}}
 .total-row.grand{background:${cuteTemplateDecor ? tokens.totalBg : 'rgba(241,245,249,.78)'};color:${rowText};font-weight:800;border-bottom:none;padding:10px 14px}
-.sig-left{left:260px;bottom:82px;width:170px;text-align:center}
-.sig-right{left:462px;bottom:82px;width:170px;text-align:center}
+.sig-left{left:260px;bottom:${layout.signatureBottom}px;width:170px;text-align:center}
+.sig-right{left:462px;bottom:${layout.signatureBottom}px;width:170px;text-align:center}
 .sig-space{height:40px;display:flex;align-items:center;justify-content:center}
 .sig-image{max-width:145px;max-height:38px;object-fit:contain}
 .sig-line{border-top:1px solid rgba(71,85,105,.55);margin:4px auto 6px;width:84%}
 .sig-label{font-size:10px;color:${tokens.muted};line-height:1.35}
 .sig-name{font-size:10px;font-weight:800;color:${rowText};margin-top:2px}
-.qr{right:58px;bottom:72px;width:102px;text-align:center;z-index:2}
+.qr{right:${layout.contentLeft}px;bottom:${layout.qrBottom}px;width:102px;text-align:center;z-index:2}
 .qr-img{width:88px;height:88px;object-fit:contain;background:#fff;border:1px solid ${tokens.border};border-radius:8px;padding:4px}
 .qr-label{font-size:8.8px;color:${tokens.muted};margin-top:3px}
 .footer{left:50px;right:50px;bottom:34px;display:flex;justify-content:space-between;gap:12px;font-size:9px;color:${tokens.muted}}
@@ -3271,12 +3329,7 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
 </head>
 <body>
 <div class="page">
-  <div class="template-skin">
-    <i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i>
-    <i class="rule r1"></i><i class="rule r2"></i>
-    <div class="decor-top">${marketplaceDecorSvg(tokens)}</div>
-    ${cuteTemplateDecor ? `<div class="decor-bottom">${marketplaceDecorSvg(tokens)}</div>` : ''}
-  </div>
+  <div class="template-skin">${ornaments}</div>
   <div class="layer seller">
     ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="seller-logo" src="${data.seller.logoUrl}" alt="logo"/>` : ''}
     <div class="company-name">${escapeHtml(sellerName)}</div>
