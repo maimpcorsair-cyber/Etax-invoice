@@ -36,7 +36,9 @@
 				"browser_snapshot",
 				"browser_file_upload",
 				"browser_resize",
-				"browser_close"
+				"browser_close",
+				"browser_fill_form",
+				"browser_network_requests"
 			]
 		},
 		"context7": {
@@ -59,7 +61,9 @@
 			"alwaysAllow": [
 				"read_text_file",
 				"edit_file",
-				"write_file"
+				"write_file",
+				"read_multiple_files",
+				"search_files"
 			]
 		}
 	}

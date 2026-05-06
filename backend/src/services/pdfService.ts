@@ -39,7 +39,7 @@ interface PdfInvoiceData {
     quantity: number;
     unit: string;
     unitPrice: number;
-    discount: number;
+    discountAmount: number;
     vatType: string;
     amount: number;
     vatAmount: number;
@@ -47,7 +47,7 @@ interface PdfInvoiceData {
   }[];
   subtotal: number;
   vatAmount: number;
-  discount: number;
+  discountAmount: number;
   total: number;
   notes?: string | null;
   paymentMethod?: string | null;
@@ -359,7 +359,7 @@ function buildHtml(data: PdfInvoiceData): string {
         <td style="text-align:center">${item.quantity}</td>
         <td style="text-align:center">${item.unit}</td>
         <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
-        <td style="text-align:center">${item.discount > 0 ? item.discount + '%' : '-'}</td>
+        <td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : '-'}</td>
         <td style="text-align:center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>
         <td style="text-align:right">${formatCurrency(item.amount)}</td>
         <td style="text-align:right">${formatCurrency(item.vatAmount)}</td>
@@ -1784,7 +1784,7 @@ function buildHtmlProfessional(data: PdfInvoiceData, variant: string): string {
       <td class="center">${item.quantity}</td>
       <td class="center">${escapeHtml(item.unit)}</td>
       <td class="right">${formatCurrency(item.unitPrice)}</td>
-      <td class="center">${item.discount > 0 ? `${item.discount}%` : '-'}</td>
+      <td class="center">${item.discountAmount > 0 ? `${item.discountAmount}%` : '-'}</td>
       <td class="center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>
       <td class="right strong">${formatCurrency(item.totalAmount)}</td>
     </tr>`).join('');
@@ -3416,7 +3416,7 @@ function buildHtmlMarketplace(data: PdfInvoiceData, tokens: MarketplaceTemplateT
       <td class="center">${item.quantity}</td>
       <td class="center">${escapeHtml(item.unit)}</td>
       <td class="right">${formatCurrency(item.unitPrice)}</td>
-      <td class="center">${item.discount > 0 ? `${item.discount}%` : '-'}</td>
+      <td class="center">${item.discountAmount > 0 ? `${item.discountAmount}%` : '-'}</td>
       <td class="right strong">${formatCurrency(item.totalAmount)}</td>
     </tr>`;
   }).join('');

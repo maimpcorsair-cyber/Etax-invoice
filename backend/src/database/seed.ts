@@ -378,6 +378,59 @@ async function main() {
     await upsertSubscriptionWithDb(db, COMPANY_ID, 'business');
     await seedCompanyData(db, COMPANY_ID, 0, primaryCustomerCount, primaryInvoiceCount);
 
+    // ── Secondary company for RLS integration tests (TC-RLS-001 to TC-RLS-003) ──
+    const SECONDARY_COMPANY_ID = 'company-demo-002';
+    const secondaryCompany = companySeed(99); // use index 99 → distinct taxId from primary
+    secondaryCompany.id = SECONDARY_COMPANY_ID;
+    secondaryCompany.nameTh = 'บริษัท ดีเวลลอปเม้นท์ ทู จำกัด';
+    secondaryCompany.nameEn = 'Development Two Co., Ltd.';
+    secondaryCompany.taxId = '0105569999002';
+    secondaryCompany.branchCode = '00000';
+    secondaryCompany.branchNameTh = 'สำนักงานใหญ่';
+    secondaryCompany.branchNameEn = 'Head Office';
+
+    await db.company.upsert({
+      where: { id: SECONDARY_COMPANY_ID },
+      update: {
+        nameTh: secondaryCompany.nameTh,
+        nameEn: secondaryCompany.nameEn,
+        taxId: secondaryCompany.taxId,
+        branchCode: secondaryCompany.branchCode,
+        branchNameTh: secondaryCompany.branchNameTh,
+        branchNameEn: secondaryCompany.branchNameEn,
+        addressTh: secondaryCompany.addressTh,
+        addressEn: secondaryCompany.addressEn,
+        phone: secondaryCompany.phone,
+        email: secondaryCompany.email,
+      },
+      create: secondaryCompany,
+    });
+
+    const secondaryPasswordHash = await hashSeedPassword('Admin@123456');
+    const viewerPasswordHash = await hashSeedPassword('Viewer@123456');
+
+    // Admin
+    await db.user.upsert({
+      where: { email: 'admin+1@demo-etax.co.th' },
+      update: { companyId: SECONDARY_COMPANY_ID, name: 'Secondary Admin', role: 'admin', passwordHash: secondaryPasswordHash, isActive: true },
+      create: { companyId: SECONDARY_COMPANY_ID, email: 'admin+1@demo-etax.co.th', name: 'Secondary Admin', passwordHash: secondaryPasswordHash, role: 'admin', isActive: true },
+    });
+    // Accountant
+    await db.user.upsert({
+      where: { email: 'accountant+1@demo-etax.co.th' },
+      update: { companyId: SECONDARY_COMPANY_ID, name: 'Secondary Accountant', role: 'accountant', passwordHash: secondaryPasswordHash, isActive: true },
+      create: { companyId: SECONDARY_COMPANY_ID, email: 'accountant+1@demo-etax.co.th', name: 'Secondary Accountant', passwordHash: secondaryPasswordHash, role: 'accountant', isActive: true },
+    });
+    // Viewer
+    await db.user.upsert({
+      where: { email: 'viewer+1@demo-etax.co.th' },
+      update: { companyId: SECONDARY_COMPANY_ID, name: 'Secondary Viewer', role: 'viewer', passwordHash: viewerPasswordHash, isActive: true },
+      create: { companyId: SECONDARY_COMPANY_ID, email: 'viewer+1@demo-etax.co.th', name: 'Secondary Viewer', passwordHash: viewerPasswordHash, role: 'viewer', isActive: true },
+    });
+
+    await upsertSubscriptionWithDb(db, SECONDARY_COMPANY_ID, 'business');
+    await seedCompanyData(db, SECONDARY_COMPANY_ID, 99, 5, 8);
+
     const extraPlans: Array<'starter' | 'business' | 'enterprise'> = ['starter', 'business', 'enterprise', 'starter'];
     const seededCompanies = [COMPANY_ID];
     for (let i = 0; i < extraCompanyCount; i++) {
@@ -387,6 +440,11 @@ async function main() {
       await upsertSubscriptionWithDb(db, company.id, extraPlans[i]);
       await seedCompanyData(db, company.id, 100 + i * 50, extraCustomerCount, extraInvoiceCount);
       seededCompanies.push(company.id);
+    }
+
+    // Ensure company-demo-002 is in seededCompanies for billing transactions
+    if (!seededCompanies.includes(SECONDARY_COMPANY_ID)) {
+      seededCompanies.push(SECONDARY_COMPANY_ID);
     }
 
     const launchCoupon = await db.coupon.upsert({

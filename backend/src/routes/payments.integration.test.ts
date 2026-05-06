@@ -130,7 +130,7 @@ test('payments API recalculates invoice payment state across add/list/delete flo
                 },
                 subtotal: 1000,
                 vatAmount: 70,
-                discount: 0,
+                discountAmount: 0,
                 total,
                 createdBy: auth.user.id,
                 items: {
@@ -141,7 +141,7 @@ test('payments API recalculates invoice payment state across add/list/delete flo
                       quantity: 1,
                       unit: 'ชิ้น',
                       unitPrice: 1000,
-                      discount: 0,
+                      discountAmount: 0,
                       vatType: 'vat7',
                       amount: 1000,
                       vatAmount: 70,

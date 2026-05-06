@@ -31,7 +31,7 @@ const itemSchema = z.object({
   quantity: z.number().positive(),
   unit: z.string(),
   unitPrice: z.number().min(0),
-  discount: z.number().min(0).max(100).default(0),
+  discountAmount: z.number().min(0).max(100).default(0),
   vatType: z.enum(['vat7', 'vatExempt', 'vatZero']),
 });
 
@@ -42,7 +42,7 @@ const createInvoiceSchema = z.object({
   dueDate: z.string().optional(),
   customerId: z.string(),
   items: z.array(itemSchema).min(1),
-  discount: z.number().min(0).default(0),
+  discountAmount: z.number().min(0).default(0),
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
   templateId: z.string().optional(),
@@ -83,8 +83,8 @@ function calculateTotals(items: z.infer<typeof itemSchema>[]) {
 
   const calculated = items.map((item) => {
     const gross = item.quantity * item.unitPrice;
-    const discountAmt = item.discount > 0 ? (gross * item.discount) / 100 : 0;
-    const amount = gross - discountAmt;
+    const discountAmountAmt = item.discountAmount > 0 ? (gross * item.discountAmount) / 100 : 0;
+    const amount = gross - discountAmountAmt;
     const vatAmount = item.vatType === 'vat7' ? amount * VAT_RATE : 0;
     subtotal += amount;
     totalVat += vatAmount;
@@ -391,7 +391,7 @@ invoicesRouter.post('/', async (req, res) => {
         seller: sellerJson,
         subtotal,
         vatAmount: totalVat,
-        discount: body.discount ?? 0,
+        discountAmount: body.discountAmount ?? 0,
         total,
         notes: body.notes,
         paymentMethod: body.paymentMethod,
@@ -411,7 +411,7 @@ invoicesRouter.post('/', async (req, res) => {
             quantity: item.quantity,
             unit: item.unit,
             unitPrice: item.unitPrice,
-            discount: item.discount,
+            discountAmount: item.discountAmount,
             vatType: item.vatType,
             vatAmount: item.vatAmount,
             amount: item.amount,
@@ -604,7 +604,7 @@ invoicesRouter.patch('/:id', async (req, res) => {
           seller: sellerJson,
           subtotal,
           vatAmount: totalVat,
-          discount: body.discount ?? 0,
+          discountAmount: body.discountAmount ?? 0,
           total,
           notes: body.notes,
           paymentMethod: body.paymentMethod,
@@ -624,7 +624,7 @@ invoicesRouter.patch('/:id', async (req, res) => {
               quantity: item.quantity,
               unit: item.unit,
               unitPrice: item.unitPrice,
-              discount: item.discount,
+              discountAmount: item.discountAmount,
               vatType: item.vatType,
               vatAmount: item.vatAmount,
               amount: item.amount,
@@ -802,7 +802,7 @@ invoicesRouter.post('/:id/issue-receipt', requireRole('admin', 'accountant'), as
           seller: taxInvoice.seller ?? {},
           subtotal: taxInvoice.subtotal,
           vatAmount: taxInvoice.vatAmount,
-          discount: taxInvoice.discount,
+          discountAmount: taxInvoice.discountAmount,
           total: taxInvoice.total,
           notes: note ?? taxInvoice.notes,
           paymentMethod: paymentMethod ?? taxInvoice.paymentMethod,
@@ -822,7 +822,7 @@ invoicesRouter.post('/:id/issue-receipt', requireRole('admin', 'accountant'), as
               quantity: item.quantity,
               unit: item.unit,
               unitPrice: item.unitPrice,
-              discount: item.discount,
+              discountAmount: item.discountAmount,
               vatType: item.vatType,
               amount: item.amount,
               vatAmount: item.vatAmount,
@@ -1276,7 +1276,7 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
         quantity:    item.quantity,
         unit:        item.unit,
         unitPrice:   item.unitPrice,
-        discount:    item.discount,
+        discountAmount:    item.discountAmount,
         vatType:     item.vatType,
         amount:      item.amount,
         vatAmount:   item.vatAmount,
@@ -1284,7 +1284,7 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
       })),
       subtotal:      invoice.subtotal,
       vatAmount:     invoice.vatAmount,
-      discount:      invoice.discount,
+      discountAmount:      invoice.discountAmount,
       total:         invoice.total,
       notes:         invoice.notes,
       paymentMethod: invoice.paymentMethod,
@@ -1369,7 +1369,7 @@ invoicesRouter.post('/preview', async (req, res) => {
         quantity: item.quantity,
         unit: item.unit,
         unitPrice: item.unitPrice,
-        discount: item.discount,
+        discountAmount: item.discountAmount,
         vatType: item.vatType,
         amount: item.amount,
         vatAmount: item.vatAmount,
@@ -1377,7 +1377,7 @@ invoicesRouter.post('/preview', async (req, res) => {
       })),
       subtotal,
       vatAmount: totalVat,
-      discount: 0,
+      discountAmount: 0,
       total,
       notes: body.notes,
       documentLogoUrl: body.logoUrl || null,

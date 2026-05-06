@@ -102,7 +102,6 @@ test('tenant isolation: another company cannot read or mutate foreign customer/i
         },
         subtotal: 1000,
         vatAmount: 70,
-        discount: 0,
         total: 1070,
         createdBy: primary.user.id,
         items: {
@@ -112,7 +111,7 @@ test('tenant isolation: another company cannot read or mutate foreign customer/i
             quantity: 1,
             unit: 'ชิ้น',
             unitPrice: 1000,
-            discount: 0,
+            discountAmount: 0,
             vatType: 'vat7',
             amount: 1000,
             vatAmount: 70,
