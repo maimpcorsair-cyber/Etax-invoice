@@ -3164,16 +3164,11 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
     ? amountInWordsThai(data.total)
     : isEn ? amountInWordsEnglish(data.total) : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
   const cuteTemplateDecor = ['bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'].includes(tokens.decor);
-  const backgroundUrl = frontendPublicAssetUrl(
-    cuteTemplateDecor
-      ? '/brand/templates/tax-template-cute-pastel.png?v=20260506a'
-      : '/brand/templates/tax-template-minimal-line.png?v=20260506a',
-  );
   const titleColor = cuteTemplateDecor ? tokens.accent : '#1f2937';
   const rowText = cuteTemplateDecor ? tokens.text : '#252a31';
-  const tableTop = cuteTemplateDecor ? 420 : 415;
-  const tableHeight = cuteTemplateDecor ? 346 : 310;
-  const itemRows = data.items.slice(0, 8).map((item, idx) => {
+  const tableTop = cuteTemplateDecor ? 390 : 386;
+  const maxRows = 10;
+  const itemRows = data.items.slice(0, maxRows).map((item, idx) => {
     const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
     return `<tr>
       <td>${idx + 1}</td>
@@ -3184,6 +3179,20 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
       <td>${formatCurrency(item.totalAmount)}</td>
     </tr>`;
   }).join('');
+  const emptyRows = Array.from({ length: Math.max(0, maxRows - data.items.slice(0, maxRows).length) }, () => (
+    '<tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
+  )).join('');
+  const topRibbon = cuteTemplateDecor
+    ? `linear-gradient(135deg, ${tokens.accent2} 0%, transparent 56%)`
+    : `linear-gradient(135deg, ${tokens.accent} 0%, ${tokens.accent} 18%, transparent 18%)`;
+  const pageBackground = cuteTemplateDecor
+    ? `radial-gradient(circle at 13% 8%, ${tokens.accent2}70 0 72px, transparent 73px),
+       radial-gradient(circle at 88% 10%, ${tokens.accent}30 0 86px, transparent 87px),
+       radial-gradient(circle at 15% 94%, ${tokens.accent2}66 0 120px, transparent 121px),
+       linear-gradient(180deg, ${tokens.paper} 0%, #ffffff 54%, ${tokens.bg} 100%)`
+    : `linear-gradient(180deg, ${tokens.paper} 0%, #ffffff 56%, ${tokens.bg} 100%)`;
+  const borderRadius = cuteTemplateDecor ? 22 : 8;
+  const headerTextColor = cuteTemplateDecor || tokens.tableHead === '#111827' ? '#ffffff' : rowText;
 
   return `<!DOCTYPE html>
 <html lang="${isTh ? 'th' : 'en'}">
@@ -3194,50 +3203,67 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-size:12px}
-.page{width:794px;height:1123px;margin:0 auto;position:relative;background:#fff;overflow:hidden}
-.template-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.page{width:794px;height:1123px;margin:0 auto;position:relative;background:${pageBackground};overflow:hidden;border:1px solid ${tokens.border}}
+.page::before{content:'';position:absolute;left:0;right:0;top:0;height:${cuteTemplateDecor ? 118 : 92}px;background:${topRibbon};opacity:${cuteTemplateDecor ? '.5' : '.9'};z-index:0}
+.page::after{content:'';position:absolute;left:-42px;right:-42px;bottom:-66px;height:${cuteTemplateDecor ? 146 : 76}px;background:${cuteTemplateDecor ? `radial-gradient(circle at 12% 22%, ${tokens.accent}28 0 8px, transparent 9px),radial-gradient(circle at 84% 20%, ${tokens.accent2}70 0 14px, transparent 15px),linear-gradient(135deg, ${tokens.accent2}70, ${tokens.accent}24)` : `linear-gradient(135deg, ${tokens.accent}18, transparent)`};border-radius:50% 50% 0 0;opacity:.78;z-index:0}
+.template-skin{position:absolute;inset:0;z-index:0;pointer-events:none}
+.template-skin .dot{position:absolute;border-radius:999px;background:${tokens.accent};opacity:.22}
+.template-skin .dot.d1{left:64px;top:88px;width:8px;height:8px}
+.template-skin .dot.d2{right:80px;top:160px;width:10px;height:10px}
+.template-skin .dot.d3{left:88px;bottom:164px;width:7px;height:7px}
+.template-skin .rule{position:absolute;height:1px;background:${tokens.border};opacity:.58}
+.template-skin .rule.r1{left:58px;right:58px;top:242px}
+.template-skin .rule.r2{left:58px;right:58px;bottom:166px}
+.decor-top,.decor-bottom{position:absolute;z-index:0;pointer-events:none;color:${tokens.accent}}
+.decor-top{right:50px;top:54px;width:156px;height:156px;opacity:${cuteTemplateDecor ? '.18' : '.12'}}
+.decor-bottom{left:36px;bottom:76px;width:170px;height:170px;opacity:${cuteTemplateDecor ? '.34' : '.14'}}
+.decor-top .decor-svg,.decor-bottom .decor-svg{position:static;width:100%;height:100%;display:block;pointer-events:none}
 .layer{position:absolute;z-index:1}
-.seller{left:${cuteTemplateDecor ? 120 : 116}px;top:${cuteTemplateDecor ? 112 : 108}px;width:310px}
+.seller{left:${cuteTemplateDecor ? 86 : 78}px;top:${cuteTemplateDecor ? 78 : 76}px;width:365px}
 .seller-logo{position:absolute;left:${cuteTemplateDecor ? -62 : -68}px;top:0;width:48px;height:48px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.72);padding:5px}
-.company-name{font-size:16px;line-height:1.25;font-weight:800;color:${titleColor};margin-bottom:5px}
+.company-name{font-size:16px;line-height:1.25;font-weight:800;color:${titleColor};margin-bottom:5px;max-width:340px}
 .company-detail{font-size:10.4px;line-height:1.52;color:${tokens.muted}}
-.doc{right:${cuteTemplateDecor ? 72 : 74}px;top:${cuteTemplateDecor ? 86 : 90}px;width:238px;text-align:right}
+.doc{right:${cuteTemplateDecor ? 60 : 62}px;top:${cuteTemplateDecor ? 78 : 76}px;width:246px;text-align:right}
 .doc-title{font-size:24px;line-height:1.14;font-weight:800;color:${titleColor}}
 .doc-sub{font-size:11px;line-height:1.3;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:${tokens.accent};margin-top:4px}
 .copy{display:inline-block;margin-top:8px;border:1px solid ${tokens.accent};border-radius:999px;padding:2px 9px;background:rgba(255,255,255,.7);font-size:10px;font-weight:800;color:${titleColor}}
-.meta{right:${cuteTemplateDecor ? 76 : 82}px;top:${cuteTemplateDecor ? 242 : 252}px;width:232px;display:grid;gap:8px}
+.meta{right:${cuteTemplateDecor ? 58 : 62}px;top:${cuteTemplateDecor ? 224 : 222}px;width:238px;display:grid;gap:7px;padding:14px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.76)}
 .meta-row{display:grid;grid-template-columns:82px 1fr;gap:8px;font-size:11px;line-height:1.35}
 .meta-key{color:${tokens.muted}}
 .meta-val{text-align:right;font-weight:800;color:${rowText};word-break:break-word}
-.buyer{left:${cuteTemplateDecor ? 58 : 58}px;top:${cuteTemplateDecor ? 258 : 244}px;width:${cuteTemplateDecor ? 430 : 370}px;min-height:112px;padding:13px 16px;border-radius:${cuteTemplateDecor ? 18 : 8}px;background:rgba(255,255,255,.58)}
+.buyer{left:${cuteTemplateDecor ? 58 : 58}px;top:${cuteTemplateDecor ? 224 : 222}px;width:${cuteTemplateDecor ? 430 : 400}px;min-height:118px;padding:14px 16px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.82)}
 .label{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:${tokens.accent};margin-bottom:7px}
 .buyer-name{font-size:13.2px;font-weight:800;line-height:1.32;color:${rowText};margin-bottom:4px}
 .buyer-detail{font-size:10.4px;line-height:1.55;color:${tokens.muted}}
-.table{left:${cuteTemplateDecor ? 26 : 41}px;top:${tableTop}px;width:${cuteTemplateDecor ? 742 : 710}px;height:${tableHeight}px;border-collapse:collapse;table-layout:fixed;background:transparent}
-.table th{height:38px;padding:0 7px;text-align:left;font-size:9.6px;font-weight:800;color:${cuteTemplateDecor ? '#fff' : '#4b5563'};background:${cuteTemplateDecor ? tokens.tableHead : 'rgba(255,255,255,.42)'}}
-.table th:first-child,.table td:first-child{width:38px;text-align:center}
-.table th:nth-child(3),.table td:nth-child(3){width:55px;text-align:center}
-.table th:nth-child(4),.table td:nth-child(4){width:58px;text-align:center}
-.table th:nth-child(5),.table td:nth-child(5){width:95px;text-align:right}
-.table th:nth-child(6),.table td:nth-child(6){width:102px;text-align:right}
-.table td{height:30px;padding:5px 7px;font-size:10.7px;line-height:1.35;color:${rowText};vertical-align:top;border-bottom:1px solid rgba(148,163,184,.22)}
+.table-wrap{left:58px;top:${tableTop}px;width:678px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;overflow:hidden;background:rgba(255,255,255,.86)}
+.table{width:100%;border-collapse:collapse;table-layout:fixed;background:transparent}
+.table col:nth-child(1){width:45px}.table col:nth-child(3){width:62px}.table col:nth-child(4){width:66px}.table col:nth-child(5){width:102px}.table col:nth-child(6){width:110px}
+.table th{height:38px;padding:0 9px;text-align:left;font-size:9.6px;font-weight:800;color:${headerTextColor};background:${tokens.tableHead};border-right:1px solid rgba(255,255,255,.28)}
+.table th:first-child,.table td:first-child{text-align:center}
+.table th:nth-child(3),.table td:nth-child(3){text-align:center}
+.table th:nth-child(4),.table td:nth-child(4){text-align:center}
+.table th:nth-child(5),.table td:nth-child(5){text-align:right}
+.table th:nth-child(6),.table td:nth-child(6){text-align:right}
+.table td{height:36px;padding:6px 9px;font-size:10.7px;line-height:1.35;color:${rowText};vertical-align:top;border-top:1px solid ${tokens.border};border-right:1px solid ${tokens.border}}
+.table th:last-child,.table td:last-child{border-right:none}
+.table .empty-row td{color:transparent}
 .table .item-name{text-align:left;font-weight:700}
-.words{left:${cuteTemplateDecor ? 58 : 42}px;top:${cuteTemplateDecor ? 800 : 790}px;width:${cuteTemplateDecor ? 420 : 310}px;padding:9px 0}
+.words{left:58px;top:${cuteTemplateDecor ? 806 : 798}px;width:390px;padding:9px 0}
 .words-text{font-size:11px;line-height:1.55;color:${rowText};font-weight:700}
-.notes{left:${cuteTemplateDecor ? 58 : 42}px;top:${cuteTemplateDecor ? 846 : 835}px;width:${cuteTemplateDecor ? 400 : 310}px;font-size:10.5px;line-height:1.55;color:${tokens.muted};white-space:pre-line}
-.totals{right:${cuteTemplateDecor ? 52 : 48}px;top:${cuteTemplateDecor ? 768 : 744}px;width:${cuteTemplateDecor ? 265 : 326}px;border-radius:${cuteTemplateDecor ? 18 : 8}px;background:rgba(255,255,255,.58);overflow:hidden}
+.notes{left:58px;top:${cuteTemplateDecor ? 870 : 858}px;width:390px;font-size:10.5px;line-height:1.55;color:${tokens.muted};white-space:pre-line}
+.totals{right:58px;top:${cuteTemplateDecor ? 792 : 784}px;width:280px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.86);overflow:hidden}
 .total-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 14px;font-size:11.3px;color:${tokens.muted};border-bottom:1px solid rgba(148,163,184,.24)}
 .total-row strong{font-weight:800;color:${rowText}}
 .total-row.grand{background:${cuteTemplateDecor ? tokens.totalBg : 'rgba(241,245,249,.78)'};color:${rowText};font-weight:800;border-bottom:none;padding:10px 14px}
-.sig-left{left:${cuteTemplateDecor ? 282 : 220}px;bottom:${cuteTemplateDecor ? 83 : 94}px;width:170px;text-align:center}
-.sig-right{left:${cuteTemplateDecor ? 472 : 420}px;bottom:${cuteTemplateDecor ? 83 : 94}px;width:170px;text-align:center}
+.sig-left{left:260px;bottom:82px;width:170px;text-align:center}
+.sig-right{left:462px;bottom:82px;width:170px;text-align:center}
 .sig-space{height:40px;display:flex;align-items:center;justify-content:center}
 .sig-image{max-width:145px;max-height:38px;object-fit:contain}
 .sig-line{border-top:1px solid rgba(71,85,105,.55);margin:4px auto 6px;width:84%}
 .sig-label{font-size:10px;color:${tokens.muted};line-height:1.35}
 .sig-name{font-size:10px;font-weight:800;color:${rowText};margin-top:2px}
-.qr{right:${cuteTemplateDecor ? 54 : 78}px;bottom:${cuteTemplateDecor ? 68 : 72}px;width:${cuteTemplateDecor ? 104 : 90}px;text-align:center}
-.qr-img{width:${cuteTemplateDecor ? 90 : 76}px;height:${cuteTemplateDecor ? 90 : 76}px;object-fit:contain;background:#fff;border:1px solid rgba(148,163,184,.5);border-radius:8px;padding:4px}
+.qr{right:58px;bottom:72px;width:102px;text-align:center;z-index:2}
+.qr-img{width:88px;height:88px;object-fit:contain;background:#fff;border:1px solid ${tokens.border};border-radius:8px;padding:4px}
 .qr-label{font-size:8.8px;color:${tokens.muted};margin-top:3px}
 .footer{left:50px;right:50px;bottom:34px;display:flex;justify-content:space-between;gap:12px;font-size:9px;color:${tokens.muted}}
 @media print{body{background:#fff}.page{margin:0}}
@@ -3245,7 +3271,12 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
 </head>
 <body>
 <div class="page">
-  <img class="template-bg" src="${backgroundUrl}" alt=""/>
+  <div class="template-skin">
+    <i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i>
+    <i class="rule r1"></i><i class="rule r2"></i>
+    <div class="decor-top">${marketplaceDecorSvg(tokens)}</div>
+    ${cuteTemplateDecor ? `<div class="decor-bottom">${marketplaceDecorSvg(tokens)}</div>` : ''}
+  </div>
   <div class="layer seller">
     ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="seller-logo" src="${data.seller.logoUrl}" alt="logo"/>` : ''}
     <div class="company-name">${escapeHtml(sellerName)}</div>
@@ -3258,7 +3289,7 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
     <div class="meta-row"><div class="meta-key">${isTh ? 'ครบกำหนด' : 'Due'}</div><div class="meta-val">${escapeHtml(dueStr || '-')}</div></div>
   </div>
   <div class="layer buyer"><div class="label">${isTh ? 'ผู้ซื้อ / Bill To' : 'Bill To'}</div><div class="buyer-name">${escapeHtml(buyerName)}</div><div class="buyer-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: <strong>${escapeHtml(data.buyer.taxId)}</strong><br/>${isTh ? 'สาขา' : 'Branch'}: <strong>${escapeHtml(buyerBranch)}</strong><br/>${escapeHtml(buyerAddr)}</div></div>
-  <table class="layer table"><thead><tr><th>${isTh ? 'ลำดับ' : 'No.'}</th><th>${isTh ? 'รายการ' : 'Description'}</th><th>${isTh ? 'จำนวน' : 'Qty'}</th><th>${isTh ? 'หน่วย' : 'Unit'}</th><th>${isTh ? 'ราคา/หน่วย' : 'Unit Price'}</th><th>${isTh ? 'จำนวนเงิน' : 'Amount'}</th></tr></thead><tbody>${itemRows}</tbody></table>
+  <div class="layer table-wrap"><table class="table"><colgroup><col/><col/><col/><col/><col/><col/></colgroup><thead><tr><th>${isTh ? 'ลำดับ' : 'No.'}</th><th>${isTh ? 'รายการ' : 'Description'}</th><th>${isTh ? 'จำนวน' : 'Qty'}</th><th>${isTh ? 'หน่วย' : 'Unit'}</th><th>${isTh ? 'ราคา/หน่วย' : 'Unit Price'}</th><th>${isTh ? 'จำนวนเงิน' : 'Amount'}</th></tr></thead><tbody>${itemRows}${emptyRows}</tbody></table></div>
   <div class="layer words"><div class="label">${isTh ? 'จำนวนเงินเป็นตัวอักษร' : 'Amount in Words'}</div><div class="words-text">${escapeHtml(totalWords)}</div></div>
   ${data.notes || data.bankPaymentInfo ? `<div class="layer notes">${data.notes ? escapeHtml(data.notes) : ''}${data.notes && data.bankPaymentInfo ? '<br/>' : ''}${data.bankPaymentInfo ? escapeHtml(data.bankPaymentInfo) : ''}</div>` : ''}
   <div class="layer totals">

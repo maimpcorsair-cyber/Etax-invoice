@@ -81,19 +81,9 @@ function InvoiceTemplate({ preset }: { preset: TemplatePreset }) {
   } as CSSProperties;
 
   const dark = preset.decor === 'darkAccent';
-  const generatedArtSrc = preset.group === 'cute'
-    ? '/brand/templates/tax-template-cute-pastel.png?v=20260506a'
-    : '/brand/templates/tax-template-minimal-line.png?v=20260506a';
 
   return (
-    <div className={`invoiceTemplate invoiceTemplate-${preset.group} decor-${preset.decor} invoiceTemplate-generated`} style={style}>
-      <img
-        className="invoiceTemplateArt"
-        src={generatedArtSrc}
-        alt=""
-        aria-hidden="true"
-        loading="lazy"
-      />
+    <div className={`invoiceTemplate invoiceTemplate-${preset.group} decor-${preset.decor} invoiceTemplate-structured`} style={style}>
       <div className="invoiceGlow" />
       <div className="invoiceHeader">
         <div className="brandBlock">
@@ -691,40 +681,29 @@ const catalogCss = `
   background: radial-gradient(ellipse, color-mix(in srgb, var(--accent) 28%, transparent), transparent 68%);
   z-index: -1;
 }
-.invoiceTemplateArt {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: .88;
-  pointer-events: none;
-}
-.invoiceTemplate-generated {
+.invoiceTemplate-structured {
   background: var(--paper);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--border) 76%, transparent) inset,
     0 1px 0 rgba(255, 255, 255, .8) inset;
 }
-.invoiceTemplate-generated::before {
-  opacity: .03;
+.invoiceTemplate-structured::before {
+  opacity: .2;
 }
-.invoiceTemplate-generated::after,
-.invoiceTemplate-generated .decorSvg,
-.invoiceTemplate-generated .invoiceGlow {
+.invoiceTemplate-structured::after,
+.invoiceTemplate-structured .invoiceGlow {
   display: none;
 }
-.invoiceTemplate-generated .invoiceHeader,
-.invoiceTemplate-generated .invoiceMeta,
-.invoiceTemplate-generated .invoiceTable,
-.invoiceTemplate-generated .invoiceLower,
-.invoiceTemplate-generated .invoiceFooter {
+.invoiceTemplate-structured .invoiceHeader,
+.invoiceTemplate-structured .invoiceMeta,
+.invoiceTemplate-structured .invoiceTable,
+.invoiceTemplate-structured .invoiceLower,
+.invoiceTemplate-structured .invoiceFooter {
   filter: drop-shadow(0 1px 0 rgba(255,255,255,.72));
 }
-.invoiceTemplate-generated .invoiceMeta > div,
-.invoiceTemplate-generated .invoiceTable,
-.invoiceTemplate-generated .totalCard {
+.invoiceTemplate-structured .invoiceMeta > div,
+.invoiceTemplate-structured .invoiceTable,
+.invoiceTemplate-structured .totalCard {
   background: color-mix(in srgb, var(--paper) 68%, transparent);
 }
 .decorSvg {
