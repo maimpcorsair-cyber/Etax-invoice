@@ -37,23 +37,13 @@ const updateWhtSchema = z.object({
 async function generateCertNumber(companyId: string, companyTaxId: string): Promise<string> {
   const now = new Date();
   const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const seqKey = `wht_seq_${companyTaxId}_${ym}`;
 
-  // Find the highest sequence number for this company + period
-  const existing = await prisma.whtCertificate.findFirst({
-    where: {
-      companyId,
-      certificateNumber: { startsWith: `WHT-${companyTaxId}-${ym}` },
-    },
-    orderBy: { certificateNumber: 'desc' },
-    select: { certificateNumber: true },
-  });
-
-  let seq = 1;
-  if (existing) {
-    const last = existing.certificateNumber.split('-').pop();
-    if (last) seq = parseInt(last, 10) + 1;
-  }
-
+  // Use nextval() on a shared sequence — same strategy as the invoice WHT route.
+  // This avoids collisions when both routes operate on the same company/month.
+  await prisma.$queryRawUnsafe(`CREATE SEQUENCE IF NOT EXISTS ${seqKey}`);
+  const raw = await prisma.$queryRawUnsafe(`SELECT nextval('${seqKey}')`) as { nextval: bigint }[];
+  const seq = Number(raw[0]?.nextval ?? 1n);
   return `WHT-${companyTaxId}-${ym}-${String(seq).padStart(4, '0')}`;
 }
 
@@ -240,7 +230,9 @@ whtCertificatesRouter.patch('/:id', requireRole('admin', 'accountant'), async (r
         where: { id: req.params.id },
         data: {
           ...(body.whtRate !== undefined ? { whtRate: body.whtRate } : {}),
-          ...(body.totalAmount !== undefined ? { totalAmount: body.totalAmount, whtAmount, netAmount } : {}),
+          ...(body.totalAmount !== undefined || body.whtRate !== undefined
+            ? { totalAmount: body.totalAmount ?? existing.totalAmount, whtAmount, netAmount }
+            : {}),
           ...(body.recipientName !== undefined ? { recipientName: body.recipientName } : {}),
           ...(body.recipientTaxId !== undefined ? { recipientTaxId: body.recipientTaxId } : {}),
           ...(body.recipientBranch !== undefined ? { recipientBranch: body.recipientBranch } : {}),
