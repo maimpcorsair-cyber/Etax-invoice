@@ -84,15 +84,15 @@ function getInvoiceValidationErrors(params: {
   return errors;
 }
 
-type SectionKey = 'settings' | 'appearance' | 'seller' | 'buyer' | 'items' | 'notes';
+type SectionKey = 'settings' | 'buyer' | 'items' | 'notes' | 'appearance' | 'seller';
 
 const STEPPER_STEPS: { key: SectionKey; labelTh: string; labelEn: string }[] = [
   { key: 'settings',   labelTh: 'เอกสาร',   labelEn: 'Document' },
-  { key: 'appearance', labelTh: 'รูปแบบ',   labelEn: 'Appearance' },
-  { key: 'seller',     labelTh: 'ผู้ขาย',   labelEn: 'Seller' },
   { key: 'buyer',      labelTh: 'ผู้ซื้อ',  labelEn: 'Buyer' },
   { key: 'items',      labelTh: 'รายการ',   labelEn: 'Items' },
   { key: 'notes',      labelTh: 'หมายเหตุ', labelEn: 'Notes' },
+  { key: 'appearance', labelTh: 'รูปแบบ',   labelEn: 'Appearance' },
+  { key: 'seller',     labelTh: 'ผู้ขาย',   labelEn: 'Seller' },
 ];
 
 export default function InvoiceBuilder() {
@@ -579,34 +579,7 @@ export default function InvoiceBuilder() {
             onReferenceDocNumberChange={form.setReferenceDocNumber}
           />
         </div>
-        <div ref={appearanceRef} className="xl:col-span-2">
-          <DocumentAppearanceCard
-            documentMode={form.documentMode}
-            onDocumentModeChange={form.setDocumentMode}
-            onBankPaymentInfoChange={form.setBankPaymentInfo}
-            bankAccounts={documentProfile.profile.bankAccounts}
-            selectedBankAccountId={selectedBankAccountId}
-            onBankAccountSelect={applyBankAccount}
-            onAddBankAccount={handleAddBankAccount}
-            bankProfileSaving={documentProfile.saving}
-            bankProfileError={documentProfile.error}
-            showCompanyLogo={form.showCompanyLogo}
-            onShowCompanyLogoChange={form.setShowCompanyLogo}
-            documentLogoUrl={form.logoUrl}
-            onDocumentLogoChange={form.setLogoUrl}
-            signatureImageUrl={form.signatureImageUrl}
-            onSignatureImageChange={form.setSignatureImageUrl}
-            signerName={form.signerName}
-            onSignerNameChange={form.setSignerName}
-            signerTitle={form.signerTitle}
-            onSignerTitleChange={form.setSignerTitle}
-            docType={form.docType}
-          />
-        </div>
-        <div ref={sellerRef}>
-          <SellerCard company={company} />
-        </div>
-        <div ref={buyerRef}>
+        <div ref={buyerRef} className="xl:col-span-2">
           <BuyerCard
             customers={customer.customers}
             customerSearch={customer.customerSearch}
@@ -649,6 +622,33 @@ export default function InvoiceBuilder() {
             totalVat={form.totalVat}
             total={form.total}
           />
+        </div>
+        <div ref={appearanceRef} className="xl:col-span-2">
+          <DocumentAppearanceCard
+            documentMode={form.documentMode}
+            onDocumentModeChange={form.setDocumentMode}
+            onBankPaymentInfoChange={form.setBankPaymentInfo}
+            bankAccounts={documentProfile.profile.bankAccounts}
+            selectedBankAccountId={selectedBankAccountId}
+            onBankAccountSelect={applyBankAccount}
+            onAddBankAccount={handleAddBankAccount}
+            bankProfileSaving={documentProfile.saving}
+            bankProfileError={documentProfile.error}
+            showCompanyLogo={form.showCompanyLogo}
+            onShowCompanyLogoChange={form.setShowCompanyLogo}
+            documentLogoUrl={form.logoUrl}
+            onDocumentLogoChange={form.setLogoUrl}
+            signatureImageUrl={form.signatureImageUrl}
+            onSignatureImageChange={form.setSignatureImageUrl}
+            signerName={form.signerName}
+            onSignerNameChange={form.setSignerName}
+            signerTitle={form.signerTitle}
+            onSignerTitleChange={form.setSignerTitle}
+            docType={form.docType}
+          />
+        </div>
+        <div ref={sellerRef} className="xl:col-span-2">
+          <SellerCard company={company} />
         </div>
         {/* bottom padding so last card isn't flush */}
         <div className="h-8 xl:col-span-2" />

@@ -100,12 +100,12 @@ export default function DocumentAppearanceCard({
         </div>
         <div>
           <h3 className="text-base font-semibold text-slate-900">
-            {isThai ? 'รูปแบบและความน่าเชื่อถือเอกสาร' : 'Appearance and trust'}
+            {isThai ? 'ตัวเลือกท้ายเอกสาร' : 'Document options'}
           </h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">
             {isThai
-              ? 'เลือกโหมดเอกสาร บัญชีรับชำระ และลายเซ็นผู้จัดทำ โดยดึงค่ามาตรฐานจาก Settings ของบริษัท'
-              : 'Choose document mode, payment account, and issuer signature from your company settings.'}
+              ? 'ส่วนนี้ดึงค่ามาตรฐานจาก Settings ไว้แล้ว แก้เฉพาะกรณีที่เอกสารฉบับนี้ต้องใช้รูปแบบ บัญชี หรือผู้ลงนามต่างจากปกติ'
+              : 'Defaults are loaded from Settings. Adjust this only when this document needs a different mode, payment account, or signer.'}
           </p>
         </div>
       </div>
