@@ -430,7 +430,7 @@ export default function InvoiceBuilder() {
 
   /* ── Draft recovery — on new invoice, offer to restore from localStorage ── */
   useEffect(() => {
-    if (isEdit || !token) return;
+    if (isEdit || !token || form.recoveredDraft || form.userDismissedDraft) return;
     if (form.hasRecoverableDraft()) {
       const recovered = window.confirm(
         isThai
@@ -444,17 +444,17 @@ export default function InvoiceBuilder() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, token]);
+  }, [isEdit, token, form.recoveredDraft, form.userDismissedDraft]);
 
   /* ── Auto-save form to localStorage every 5 seconds (new invoices only) ── */
   useEffect(() => {
-    if (isEdit || form.saving || form.recoveredDraft) return;
+    if (isEdit || form.saving || form.recoveredDraft || form.userDismissedDraft) return;
     const interval = setInterval(() => {
       form.saveDraftToStorage();
     }, 5000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, form.saving, form.recoveredDraft]);
+  }, [isEdit, form.saving, form.recoveredDraft, form.userDismissedDraft]);
 
   /* ── Auto-clear draft when successfully issued ── */
   useEffect(() => {

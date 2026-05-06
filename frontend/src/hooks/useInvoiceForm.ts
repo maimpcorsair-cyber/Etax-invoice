@@ -79,6 +79,9 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState(false);
+  // Tracks whether user explicitly dismissed (Cancel) the draft recovery prompt —
+  // used to suppress the auto-save interval so it doesn't re-create the same draft.
+  const [userDismissedDraft, setUserDismissedDraft] = useState(false);
 
   /* ── Auto-save draft to localStorage ── */
   const saveDraftToStorage = useCallback(() => {
@@ -137,8 +140,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       if (draft.signerName != null) setSignerName(draft.signerName);
       if (draft.signerTitle != null) setSignerTitle(draft.signerTitle);
       if (draft.whtRate) setWhtRate(draft.whtRate);
-      // Clear draft after successful load so it doesn't prompt again on next visit
       setRecoveredDraft(true);
+      setUserDismissedDraft(false);
       clearDraftFromStorage();
       return true;
     } catch {
@@ -165,6 +168,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const discardRecoveredDraft = useCallback(() => {
     clearDraftFromStorage();
     setRecoveredDraft(false);
+    setUserDismissedDraft(true);
   }, [clearDraftFromStorage]);
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
@@ -405,6 +409,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     discardRecoveredDraft,
     recoveredDraft,
     setRecoveredDraft,
+    userDismissedDraft,
     handleSave,
     handleSaveDraft,
     handleIssue,
