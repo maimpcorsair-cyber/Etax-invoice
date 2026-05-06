@@ -953,8 +953,10 @@ invoicesRouter.post('/:id/wht-certificate', requireRole('admin', 'accountant'), 
 
     const yearMonth = new Date(paymentDate).toISOString().slice(0, 7).replace('-', '');
     const seqKey = `wht_seq_${company.taxId}_${yearMonth}`;
-    const raw = await prisma.$queryRaw<{ seq: bigint }[]>`SELECT nextval(${seqKey})`;
-    const seq = Number(raw[0].seq);
+    // Use a shared sequence so standalone and invoice-linked WHT cert routes never collide.
+    await prisma.$queryRawUnsafe(`CREATE SEQUENCE IF NOT EXISTS ${seqKey}`);
+    const raw = await prisma.$queryRawUnsafe(`SELECT nextval('${seqKey}')`) as { nextval: bigint }[];
+    const seq = Number(raw[0]?.nextval ?? 1n);
     const certNumber = `WHT-${company.taxId}-${yearMonth}-${String(seq).padStart(4, '0')}`;
 
     const cert = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
