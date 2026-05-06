@@ -1,0 +1,29 @@
+[mcp_servers.context7]
+args = [
+    "-y",
+    "@upstash/context7-mcp",
+]
+command = "npx"
+
+[mcp_servers.firecrawl]
+args = [
+    "-y",
+    "firecrawl-mcp",
+]
+command = "npx"
+env_vars = ["FIRECRAWL_API_KEY"]
+
+[mcp_servers.playwright]
+args = [
+    "-y",
+    "@playwright/mcp",
+]
+command = "npx"
+
+[mcp_servers.tavily]
+args = [
+    "-y",
+    "tavily-mcp",
+]
+command = "npx"
+env_vars = ["TAVILY_API_KEY"]

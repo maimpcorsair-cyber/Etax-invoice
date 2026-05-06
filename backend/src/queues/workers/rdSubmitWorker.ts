@@ -271,7 +271,7 @@ rdSubmitWorker.on('failed', async (job, err) => {
       const invoice = await withSystemRlsContext(prisma, (tx) => tx.invoice.findUnique({
         where: { id: job.data.invoiceId },
         include: { buyer: true, company: true },
-      }), { role: 'worker' });
+      }), { role: 'worker' }).catch(() => null); // guard: invoice may have been deleted
 
       // Push notification on final failure
       if (invoice) {
