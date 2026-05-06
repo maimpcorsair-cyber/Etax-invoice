@@ -27,7 +27,29 @@ adminRouter.use(requireRole('admin', 'super_admin'));
 /* ─── Company ─── */
 adminRouter.get('/company', async (req, res) => {
   try {
-    const company = await prisma.company.findUnique({ where: { id: req.user!.companyId } });
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: {
+        id: true,
+        nameTh: true,
+        nameEn: true,
+        taxId: true,
+        branchCode: true,
+        branchNameTh: true,
+        branchNameEn: true,
+        addressTh: true,
+        addressEn: true,
+        phone: true,
+        email: true,
+        website: true,
+        logoUrl: true,
+        rdEnvironment: true,
+        lineNotifyEnabled: true,
+        overdueReminderDays: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
     res.json({ data: company });
   } catch {
     res.status(500).json({ error: 'Failed to fetch company' });

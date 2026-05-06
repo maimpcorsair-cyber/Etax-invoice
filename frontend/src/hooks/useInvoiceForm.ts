@@ -4,6 +4,25 @@ import type { Invoice, InvoiceItem, InvoiceType, Language } from '../types';
 import { emptyItem, calculateItem, translateZodMessage } from '../utils/invoiceHelpers';
 
 const DRAFT_STORAGE_KEY = 'etax_invoice_draft';
+const PREFERENCES_STORAGE_KEY = 'etax_invoice_preferences';
+
+interface InvoicePreferences {
+  defaultDocType?: InvoiceType;
+  defaultLanguage?: Language;
+  defaultDocumentMode?: 'ordinary' | 'electronic';
+  defaultPaymentMethod?: string;
+  defaultShowCompanyLogo?: boolean;
+  defaultWhtRate?: string;
+}
+
+function loadInvoicePreferences(): InvoicePreferences {
+  try {
+    const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as InvoicePreferences : {};
+  } catch {
+    return {};
+  }
+}
 
 /** Shape of the draft saved in localStorage — mirrors form state fields */
 interface DraftPayload {
@@ -35,8 +54,9 @@ interface Options {
 }
 
 export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) {
-  const [docType, setDocType] = useState<InvoiceType>('tax_invoice');
-  const [docLanguage, setDocLanguage] = useState<Language>('th');
+  const preferences = loadInvoicePreferences();
+  const [docType, setDocType] = useState<InvoiceType>(preferences.defaultDocType ?? 'tax_invoice');
+  const [docLanguage, setDocLanguage] = useState<Language>(preferences.defaultLanguage ?? 'th');
   const [invoiceDate, setInvoiceDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -44,18 +64,18 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [referenceDocNumber, setReferenceDocNumber] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([emptyItem()]);
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState(preferences.defaultPaymentMethod ?? '');
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [showCompanyLogo, setShowCompanyLogo] = useState(true);
+  const [showCompanyLogo, setShowCompanyLogo] = useState(preferences.defaultShowCompanyLogo ?? true);
   const [templateId, setTemplateId] = useState<string | null>(null);
-  const [documentMode, setDocumentMode] = useState<'ordinary' | 'electronic'>('electronic');
+  const [documentMode, setDocumentMode] = useState<'ordinary' | 'electronic'>(preferences.defaultDocumentMode ?? 'electronic');
   const [bankPaymentInfo, setBankPaymentInfo] = useState('');
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null);
   const [signerName, setSignerName] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
   // WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ)
-  const [whtRate, setWhtRate] = useState<string>(''); // "1" | "3" | "5" | ""
+  const [whtRate, setWhtRate] = useState<string>(preferences.defaultWhtRate ?? ''); // "1" | "3" | "5" | ""
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState(false);
