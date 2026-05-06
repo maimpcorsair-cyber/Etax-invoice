@@ -1212,7 +1212,7 @@ function buildHtmlMinimal(data: PdfInvoiceData, variant: string): string {
   const sellerBranch = data.seller.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.seller.branchCode;
   const buyerBranch  = data.buyer.branchCode  === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.buyer.branchCode;
 
-  const dueStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate)) : '';
+  const dueStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate as Date) : formatDateEn(data.dueDate as Date)) : '';
 
   // Per-variant color tokens
   const v: Record<string, { border: string; headerBg: string; accent: string; totalBg: string; totalText: string; thBg: string; thText: string; bodyPad: string; shellBorder: string }> = {
@@ -1443,7 +1443,7 @@ function buildHtmlCute(data: PdfInvoiceData, variant: string): string {
   const buyerAddr  = isTh ? data.buyer.addressTh  : isEn ? (data.buyer.addressEn  ?? data.buyer.addressTh)  : data.buyer.addressTh;
   const sellerBranch = data.seller.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.seller.branchCode;
   const buyerBranch  = data.buyer.branchCode  === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.buyer.branchCode;
-  const dueStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate)) : '';
+  const dueStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate as Date) : formatDateEn(data.dueDate as Date)) : '';
 
   type CuteTokens = { bg: string; headerBg: string; accent: string; accentDark: string; border: string; totalBg: string; totalText: string; thBg: string; thText: string; rowEven: string; };
   const v: Record<string, CuteTokens> = {
@@ -3148,12 +3148,141 @@ function marketplaceDecorSvg(tokens: MarketplaceTemplateTokens) {
   </svg>`;
 }
 
-function buildHtmlMarketplace(data: PdfInvoiceData, tokens: MarketplaceTemplateTokens): string {
+function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTemplateTokens): string {
   const isTh = data.language !== 'en';
   const isEn = data.language === 'en';
   const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
   const dateStr = isTh ? formatDateTh(data.invoiceDate) : formatDateEn(data.invoiceDate);
   const dueStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate)) : '';
+  const sellerName = isTh ? data.seller.nameTh : (data.seller.nameEn ?? data.seller.nameTh);
+  const buyerName = isTh ? data.buyer.nameTh : (data.buyer.nameEn ?? data.buyer.nameTh);
+  const sellerAddr = isTh ? data.seller.addressTh : (data.seller.addressEn ?? data.seller.addressTh);
+  const buyerAddr = isTh ? data.buyer.addressTh : (data.buyer.addressEn ?? data.buyer.addressTh);
+  const sellerBranch = data.seller.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.seller.branchCode;
+  const buyerBranch = data.buyer.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.buyer.branchCode;
+  const totalWords = isTh
+    ? amountInWordsThai(data.total)
+    : isEn ? amountInWordsEnglish(data.total) : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
+  const cuteTemplateDecor = ['bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'].includes(tokens.decor);
+  const backgroundUrl = frontendPublicAssetUrl(
+    cuteTemplateDecor
+      ? '/brand/templates/tax-template-cute-pastel.png?v=20260506a'
+      : '/brand/templates/tax-template-minimal-line.png?v=20260506a',
+  );
+  const titleColor = cuteTemplateDecor ? tokens.accent : '#1f2937';
+  const rowText = cuteTemplateDecor ? tokens.text : '#252a31';
+  const tableTop = cuteTemplateDecor ? 420 : 415;
+  const tableHeight = cuteTemplateDecor ? 346 : 310;
+  const itemRows = data.items.slice(0, 8).map((item, idx) => {
+    const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
+    return `<tr>
+      <td>${idx + 1}</td>
+      <td class="item-name">${escapeHtml(name)}</td>
+      <td>${item.quantity}</td>
+      <td>${escapeHtml(item.unit)}</td>
+      <td>${formatCurrency(item.unitPrice)}</td>
+      <td>${formatCurrency(item.totalAmount)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="${isTh ? 'th' : 'en'}">
+<head>
+<meta charset="UTF-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-size:12px}
+.page{width:794px;height:1123px;margin:0 auto;position:relative;background:#fff;overflow:hidden}
+.template-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.layer{position:absolute;z-index:1}
+.seller{left:${cuteTemplateDecor ? 120 : 116}px;top:${cuteTemplateDecor ? 112 : 108}px;width:310px}
+.seller-logo{position:absolute;left:${cuteTemplateDecor ? -62 : -68}px;top:0;width:48px;height:48px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.72);padding:5px}
+.company-name{font-size:16px;line-height:1.25;font-weight:800;color:${titleColor};margin-bottom:5px}
+.company-detail{font-size:10.4px;line-height:1.52;color:${tokens.muted}}
+.doc{right:${cuteTemplateDecor ? 72 : 74}px;top:${cuteTemplateDecor ? 86 : 90}px;width:238px;text-align:right}
+.doc-title{font-size:24px;line-height:1.14;font-weight:800;color:${titleColor}}
+.doc-sub{font-size:11px;line-height:1.3;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:${tokens.accent};margin-top:4px}
+.copy{display:inline-block;margin-top:8px;border:1px solid ${tokens.accent};border-radius:999px;padding:2px 9px;background:rgba(255,255,255,.7);font-size:10px;font-weight:800;color:${titleColor}}
+.meta{right:${cuteTemplateDecor ? 76 : 82}px;top:${cuteTemplateDecor ? 242 : 252}px;width:232px;display:grid;gap:8px}
+.meta-row{display:grid;grid-template-columns:82px 1fr;gap:8px;font-size:11px;line-height:1.35}
+.meta-key{color:${tokens.muted}}
+.meta-val{text-align:right;font-weight:800;color:${rowText};word-break:break-word}
+.buyer{left:${cuteTemplateDecor ? 58 : 58}px;top:${cuteTemplateDecor ? 258 : 244}px;width:${cuteTemplateDecor ? 430 : 370}px;min-height:112px;padding:13px 16px;border-radius:${cuteTemplateDecor ? 18 : 8}px;background:rgba(255,255,255,.58)}
+.label{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:${tokens.accent};margin-bottom:7px}
+.buyer-name{font-size:13.2px;font-weight:800;line-height:1.32;color:${rowText};margin-bottom:4px}
+.buyer-detail{font-size:10.4px;line-height:1.55;color:${tokens.muted}}
+.table{left:${cuteTemplateDecor ? 26 : 41}px;top:${tableTop}px;width:${cuteTemplateDecor ? 742 : 710}px;height:${tableHeight}px;border-collapse:collapse;table-layout:fixed;background:transparent}
+.table th{height:38px;padding:0 7px;text-align:left;font-size:9.6px;font-weight:800;color:${cuteTemplateDecor ? '#fff' : '#4b5563'};background:${cuteTemplateDecor ? tokens.tableHead : 'rgba(255,255,255,.42)'}}
+.table th:first-child,.table td:first-child{width:38px;text-align:center}
+.table th:nth-child(3),.table td:nth-child(3){width:55px;text-align:center}
+.table th:nth-child(4),.table td:nth-child(4){width:58px;text-align:center}
+.table th:nth-child(5),.table td:nth-child(5){width:95px;text-align:right}
+.table th:nth-child(6),.table td:nth-child(6){width:102px;text-align:right}
+.table td{height:30px;padding:5px 7px;font-size:10.7px;line-height:1.35;color:${rowText};vertical-align:top;border-bottom:1px solid rgba(148,163,184,.22)}
+.table .item-name{text-align:left;font-weight:700}
+.words{left:${cuteTemplateDecor ? 58 : 42}px;top:${cuteTemplateDecor ? 800 : 790}px;width:${cuteTemplateDecor ? 420 : 310}px;padding:9px 0}
+.words-text{font-size:11px;line-height:1.55;color:${rowText};font-weight:700}
+.notes{left:${cuteTemplateDecor ? 58 : 42}px;top:${cuteTemplateDecor ? 846 : 835}px;width:${cuteTemplateDecor ? 400 : 310}px;font-size:10.5px;line-height:1.55;color:${tokens.muted};white-space:pre-line}
+.totals{right:${cuteTemplateDecor ? 52 : 48}px;top:${cuteTemplateDecor ? 768 : 744}px;width:${cuteTemplateDecor ? 265 : 326}px;border-radius:${cuteTemplateDecor ? 18 : 8}px;background:rgba(255,255,255,.58);overflow:hidden}
+.total-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 14px;font-size:11.3px;color:${tokens.muted};border-bottom:1px solid rgba(148,163,184,.24)}
+.total-row strong{font-weight:800;color:${rowText}}
+.total-row.grand{background:${cuteTemplateDecor ? tokens.totalBg : 'rgba(241,245,249,.78)'};color:${rowText};font-weight:800;border-bottom:none;padding:10px 14px}
+.sig-left{left:${cuteTemplateDecor ? 282 : 220}px;bottom:${cuteTemplateDecor ? 83 : 94}px;width:170px;text-align:center}
+.sig-right{left:${cuteTemplateDecor ? 472 : 420}px;bottom:${cuteTemplateDecor ? 83 : 94}px;width:170px;text-align:center}
+.sig-space{height:40px;display:flex;align-items:center;justify-content:center}
+.sig-image{max-width:145px;max-height:38px;object-fit:contain}
+.sig-line{border-top:1px solid rgba(71,85,105,.55);margin:4px auto 6px;width:84%}
+.sig-label{font-size:10px;color:${tokens.muted};line-height:1.35}
+.sig-name{font-size:10px;font-weight:800;color:${rowText};margin-top:2px}
+.qr{right:${cuteTemplateDecor ? 54 : 78}px;bottom:${cuteTemplateDecor ? 68 : 72}px;width:${cuteTemplateDecor ? 104 : 90}px;text-align:center}
+.qr-img{width:${cuteTemplateDecor ? 90 : 76}px;height:${cuteTemplateDecor ? 90 : 76}px;object-fit:contain;background:#fff;border:1px solid rgba(148,163,184,.5);border-radius:8px;padding:4px}
+.qr-label{font-size:8.8px;color:${tokens.muted};margin-top:3px}
+.footer{left:50px;right:50px;bottom:34px;display:flex;justify-content:space-between;gap:12px;font-size:9px;color:${tokens.muted}}
+@media print{body{background:#fff}.page{margin:0}}
+</style>
+</head>
+<body>
+<div class="page">
+  <img class="template-bg" src="${backgroundUrl}" alt=""/>
+  <div class="layer seller">
+    ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="seller-logo" src="${data.seller.logoUrl}" alt="logo"/>` : ''}
+    <div class="company-name">${escapeHtml(sellerName)}</div>
+    <div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}</div>
+  </div>
+  <div class="layer doc"><div class="doc-title">${escapeHtml(docTitle)}</div><div class="doc-sub">TAX INVOICE</div><div class="copy">${isTh ? 'ต้นฉบับ' : 'ORIGINAL'}</div></div>
+  <div class="layer meta">
+    <div class="meta-row"><div class="meta-key">${isTh ? 'เลขที่' : 'No.'}</div><div class="meta-val">${escapeHtml(data.invoiceNumber)}</div></div>
+    <div class="meta-row"><div class="meta-key">${isTh ? 'วันที่' : 'Date'}</div><div class="meta-val">${escapeHtml(dateStr)}</div></div>
+    <div class="meta-row"><div class="meta-key">${isTh ? 'ครบกำหนด' : 'Due'}</div><div class="meta-val">${escapeHtml(dueStr || '-')}</div></div>
+  </div>
+  <div class="layer buyer"><div class="label">${isTh ? 'ผู้ซื้อ / Bill To' : 'Bill To'}</div><div class="buyer-name">${escapeHtml(buyerName)}</div><div class="buyer-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: <strong>${escapeHtml(data.buyer.taxId)}</strong><br/>${isTh ? 'สาขา' : 'Branch'}: <strong>${escapeHtml(buyerBranch)}</strong><br/>${escapeHtml(buyerAddr)}</div></div>
+  <table class="layer table"><thead><tr><th>${isTh ? 'ลำดับ' : 'No.'}</th><th>${isTh ? 'รายการ' : 'Description'}</th><th>${isTh ? 'จำนวน' : 'Qty'}</th><th>${isTh ? 'หน่วย' : 'Unit'}</th><th>${isTh ? 'ราคา/หน่วย' : 'Unit Price'}</th><th>${isTh ? 'จำนวนเงิน' : 'Amount'}</th></tr></thead><tbody>${itemRows}</tbody></table>
+  <div class="layer words"><div class="label">${isTh ? 'จำนวนเงินเป็นตัวอักษร' : 'Amount in Words'}</div><div class="words-text">${escapeHtml(totalWords)}</div></div>
+  ${data.notes || data.bankPaymentInfo ? `<div class="layer notes">${data.notes ? escapeHtml(data.notes) : ''}${data.notes && data.bankPaymentInfo ? '<br/>' : ''}${data.bankPaymentInfo ? escapeHtml(data.bankPaymentInfo) : ''}</div>` : ''}
+  <div class="layer totals">
+    <div class="total-row"><span>${isTh ? 'ยอดรวม' : 'Subtotal'}</span><strong>${formatCurrency(data.subtotal)}</strong></div>
+    <div class="total-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><strong>${formatCurrency(data.vatAmount)}</strong></div>
+    <div class="total-row grand"><span>${isTh ? 'ยอดรวมสุทธิ' : 'Grand Total'}</span><strong>${formatCurrency(data.total)}</strong></div>
+  </div>
+  <div class="layer sig-left"><div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="signature"/>` : ''}</div><div class="sig-line"></div><div class="sig-label">${isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : 'Prepared by / Issuer'}</div>${(data.signerName || data.signerTitle) ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>` : ''}</div>
+  <div class="layer sig-right"><div class="sig-space"></div><div class="sig-line"></div><div class="sig-label">${isTh ? 'ผู้รับสินค้า / ลูกค้า' : 'Received by / Customer'}</div></div>
+  ${data.documentMode === 'electronic' && data.onlineQrDataUrl ? `<div class="layer qr"><img class="qr-img" src="${data.onlineQrDataUrl}" alt="QR"/><div class="qr-label">${isTh ? 'สแกนตรวจสอบเอกสาร' : 'Scan to verify'}</div></div>` : ''}
+  <div class="layer footer"><div>${data.documentMode === 'electronic' ? (isTh ? 'เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax' : 'Electronic e-Tax document') : (isTh ? 'เอกสารฉบับปกติ' : 'Ordinary document')}</div><div>${escapeHtml(docTitle)} · ${escapeHtml(data.invoiceNumber)}</div></div>
+</div>
+</body>
+</html>`;
+}
+
+function buildHtmlMarketplace(data: PdfInvoiceData, tokens: MarketplaceTemplateTokens): string {
+  return buildHtmlGeneratedTemplate(data, tokens);
+
+  const isTh = data.language !== 'en';
+  const isEn = data.language === 'en';
+  const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
+  const dateStr = isTh ? formatDateTh(data.invoiceDate) : formatDateEn(data.invoiceDate);
+  const dueStr = data.dueDate ? (isTh ? formatDateTh(data.dueDate as Date) : formatDateEn(data.dueDate as Date)) : '';
   const sellerName = isTh ? data.seller.nameTh : (data.seller.nameEn ?? data.seller.nameTh);
   const buyerName = isTh ? data.buyer.nameTh : (data.buyer.nameEn ?? data.buyer.nameTh);
   const sellerAddr = isTh ? data.seller.addressTh : (data.seller.addressEn ?? data.seller.addressTh);
@@ -3250,8 +3379,8 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:${tok
     </tr></thead><tbody>${itemRows}</tbody></table></div>
     <div class="summary"><div class="stack">
       <div class="info"><div class="label">${isTh ? 'จำนวนเงินเป็นตัวอักษร' : 'Amount in Words'}</div><div class="info-text"><strong>${escapeHtml(totalWords)}</strong></div></div>
-      ${data.notes ? `<div class="info"><div class="label">${isTh ? 'หมายเหตุ' : 'Notes'}</div><div class="info-text">${escapeHtml(data.notes)}</div></div>` : ''}
-      ${data.bankPaymentInfo ? `<div class="info"><div class="label">${isTh ? 'ช่องทางชำระเงิน' : 'Payment Details'}</div><div class="info-text">${escapeHtml(data.bankPaymentInfo)}</div></div>` : ''}
+      ${data.notes ? `<div class="info"><div class="label">${isTh ? 'หมายเหตุ' : 'Notes'}</div><div class="info-text">${escapeHtml(data.notes ?? '')}</div></div>` : ''}
+      ${data.bankPaymentInfo ? `<div class="info"><div class="label">${isTh ? 'ช่องทางชำระเงิน' : 'Payment Details'}</div><div class="info-text">${escapeHtml(data.bankPaymentInfo ?? '')}</div></div>` : ''}
     </div><div class="totals"><div class="total-title">${isTh ? 'สรุปยอด' : 'Summary'}</div><div class="total-row"><span>${isTh ? 'ยอดรวม' : 'Subtotal'}</span><strong>${formatCurrency(data.subtotal)}</strong></div><div class="total-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><strong>${formatCurrency(data.vatAmount)}</strong></div><div class="total-row grand"><span>${isTh ? 'ยอดรวมสุทธิ' : 'Grand Total'}</span><strong>${formatCurrency(data.total)}</strong></div></div></div>
     <div class="support">
       <div class="sig"><div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="signature"/>` : ''}</div><div class="sig-line"></div><div class="sig-label">${isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : 'Prepared by / Issuer'}</div>${(data.signerName || data.signerTitle) ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>` : ''}</div>
