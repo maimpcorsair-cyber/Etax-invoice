@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "assetPacks": {
+    "doodlePastelV1": {
+      "src": "/brand/templates/doodle-asset-pack-v1.png?v=20260506c",
+      "type": "sprite",
+      "grid": {
+        "columns": 4,
+        "rows": 7
+      },
+      "assets": {
+        "receiptMascot": { "backgroundPosition": "0% 0%" },
+        "bearReceipt": { "backgroundPosition": "33.33% 0%" },
+        "bunny": { "backgroundPosition": "66.66% 0%" },
+        "catReceipt": { "backgroundPosition": "100% 0%" },
+        "cloudBlue": { "backgroundPosition": "100% 16.5%" },
+        "flower": { "backgroundPosition": "33.33% 33%" },
+        "rainbow": { "backgroundPosition": "33.33% 66.5%" },
+        "wavePink": { "backgroundPosition": "50% 84%" }
+      }
+    }
+  },
+  "templateModel": {
+    "layers": ["paper", "ornament", "content", "verification"],
+    "contentOwnedByRenderer": ["text", "table", "totals", "qr", "signature"],
+    "customerEditableTokens": [
+      "accent",
+      "accent2",
+      "paper",
+      "background",
+      "tableHead",
+      "totalBg",
+      "radius",
+      "ornamentSet",
+      "ornamentOpacity"
+    ]
+  }
+}

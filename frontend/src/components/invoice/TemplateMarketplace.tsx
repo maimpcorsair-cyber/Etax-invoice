@@ -85,6 +85,14 @@ function InvoiceTemplate({ preset }: { preset: TemplatePreset }) {
   return (
     <div className={`invoiceTemplate invoiceTemplate-${preset.group} decor-${preset.decor} invoiceTemplate-structured`} style={style}>
       <div className="invoiceGlow" />
+      {preset.group === 'cute' && (
+        <div className="templateAssets" aria-hidden="true">
+          <span className="templateAsset assetReceipt" />
+          <span className="templateAsset assetCloud" />
+          <span className="templateAsset assetRainbow" />
+          <span className="templateAsset assetWave" />
+        </div>
+      )}
       <div className="invoiceHeader">
         <div className="brandBlock">
           <div className="logoMark">{preset.no}</div>
@@ -725,6 +733,52 @@ const catalogCss = `
   top: 5%;
   width: 48%;
   opacity: .28;
+}
+.templateAssets {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.templateAsset {
+  position: absolute;
+  display: block;
+  background-image: url('/brand/templates/doodle-asset-pack-v1.png?v=20260506c');
+  background-repeat: no-repeat;
+  background-size: 430% 720%;
+}
+.assetReceipt {
+  left: 4%;
+  top: 5%;
+  width: 16%;
+  height: 19%;
+  background-position: 0% 0%;
+  opacity: .18;
+}
+.assetCloud {
+  right: 7%;
+  top: 9%;
+  width: 20%;
+  height: 12%;
+  background-position: 100% 16.5%;
+  opacity: .34;
+}
+.assetRainbow {
+  left: 28%;
+  bottom: 7%;
+  width: 24%;
+  height: 14%;
+  background-position: 33.33% 66.5%;
+  opacity: .42;
+}
+.assetWave {
+  left: 4%;
+  right: 4%;
+  bottom: 2.5%;
+  height: 6%;
+  background-size: 330% 600%;
+  background-position: 50% 84%;
+  opacity: .5;
 }
 .invoiceTemplate-structured .invoiceHeader,
 .invoiceTemplate-structured .invoiceMeta,

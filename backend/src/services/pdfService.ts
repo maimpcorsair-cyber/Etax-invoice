@@ -3189,6 +3189,13 @@ function renderPrintTemplateOrnaments(tokens: MarketplaceTemplateTokens, layout:
   const topAccent = cute ? tokens.accent : tokens.accent;
   const bottomFill = cute ? tokens.bg : `${tokens.accent2}66`;
   const mascot = marketplaceDecorSvg(tokens);
+  const generatedAssets = cute
+    ? `<span class="asset asset-receipt"></span>
+       <span class="asset asset-cloud"></span>
+       <span class="asset asset-rainbow"></span>
+       <span class="asset asset-wave"></span>
+       <span class="asset asset-flower"></span>`
+    : '';
   const cornerMarks = cute
     ? `<span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span><span class="spark s4"></span>
        <span class="heart h1"></span><span class="heart h2"></span>`
@@ -3205,6 +3212,7 @@ function renderPrintTemplateOrnaments(tokens: MarketplaceTemplateTokens, layout:
   </svg>
   <div class="decor decor-top">${mascot}</div>
   ${cute ? `<div class="decor decor-bottom">${mascot}</div>` : ''}
+  ${generatedAssets}
   ${cornerMarks}`;
 }
 
@@ -3250,6 +3258,7 @@ function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: MarketplaceTem
     : `linear-gradient(180deg, ${tokens.paper} 0%, #ffffff 58%, ${tokens.bg} 100%)`;
   const borderRadius = layout.radius;
   const headerTextColor = cuteTemplateDecor || tokens.tableHead === '#111827' ? '#ffffff' : rowText;
+  const assetPackUrl = frontendPublicAssetUrl('/brand/templates/doodle-asset-pack-v1.png?v=20260506c');
   const ornaments = renderPrintTemplateOrnaments(tokens, layout);
 
   return `<!DOCTYPE html>
@@ -3265,6 +3274,12 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
 .template-skin{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .paper-wave{position:absolute;left:0;width:100%;z-index:0}
 .top-wave{top:0;height:170px}.bottom-wave{bottom:0;height:150px}
+.asset{position:absolute;z-index:0;background-image:var(--asset-pack);background-repeat:no-repeat;background-size:430% 720%;opacity:.9}
+.asset-receipt{left:50px;top:82px;width:88px;height:118px;background-position:0% 0%;opacity:.18}
+.asset-cloud{right:106px;top:114px;width:118px;height:78px;background-position:100% 16.5%;opacity:.28}
+.asset-rainbow{left:246px;bottom:116px;width:138px;height:94px;background-position:33.33% 66.5%;opacity:.42}
+.asset-wave{left:18px;right:18px;bottom:52px;height:38px;background-size:330% 600%;background-position:50% 84%;opacity:.5}
+.asset-flower{left:86px;bottom:142px;width:70px;height:90px;background-position:33.33% 33%;opacity:.36}
 .spark{position:absolute;width:8px;height:8px;border-radius:999px;background:${tokens.accent};opacity:.42}
 .spark.s1{left:54px;top:92px}.spark.s2{right:62px;top:154px;width:6px;height:6px}.spark.s3{left:94px;bottom:166px;width:7px;height:7px}.spark.s4{right:126px;bottom:92px;width:9px;height:9px;background:${tokens.accent2}}
 .heart{position:absolute;width:13px;height:13px;background:${tokens.accent};opacity:.28;transform:rotate(45deg);border-radius:3px}
@@ -3329,7 +3344,7 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
 </head>
 <body>
 <div class="page">
-  <div class="template-skin">${ornaments}</div>
+  <div class="template-skin" style="--asset-pack:url('${assetPackUrl}')">${ornaments}</div>
   <div class="layer seller">
     ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="seller-logo" src="${data.seller.logoUrl}" alt="logo"/>` : ''}
     <div class="company-name">${escapeHtml(sellerName)}</div>
