@@ -748,37 +748,37 @@ const catalogCss = `
   background-size: 430% 720%;
 }
 .assetReceipt {
-  left: 4%;
-  top: 5%;
-  width: 16%;
-  height: 19%;
+  left: 7%;
+  top: 9%;
+  width: 10%;
+  height: 13%;
   background-position: 0% 0%;
-  opacity: .18;
+  opacity: .1;
 }
 .assetCloud {
-  right: 7%;
-  top: 9%;
-  width: 20%;
-  height: 12%;
+  right: 12%;
+  top: 12%;
+  width: 13%;
+  height: 8%;
   background-position: 100% 16.5%;
-  opacity: .34;
+  opacity: .18;
 }
 .assetRainbow {
-  left: 28%;
-  bottom: 7%;
-  width: 24%;
-  height: 14%;
+  left: 31%;
+  bottom: 4%;
+  width: 15%;
+  height: 9%;
   background-position: 33.33% 66.5%;
-  opacity: .42;
+  opacity: .28;
 }
 .assetWave {
-  left: 4%;
-  right: 4%;
-  bottom: 2.5%;
-  height: 6%;
+  left: 8%;
+  right: 8%;
+  bottom: 2%;
+  height: 3%;
   background-size: 330% 600%;
   background-position: 50% 84%;
-  opacity: .5;
+  opacity: .18;
 }
 .invoiceTemplate-structured .invoiceHeader,
 .invoiceTemplate-structured .invoiceMeta,

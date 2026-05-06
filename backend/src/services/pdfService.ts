@@ -3275,11 +3275,11 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
 .paper-wave{position:absolute;left:0;width:100%;z-index:0}
 .top-wave{top:0;height:170px}.bottom-wave{bottom:0;height:150px}
 .asset{position:absolute;z-index:0;background-image:var(--asset-pack);background-repeat:no-repeat;background-size:430% 720%;opacity:.9}
-.asset-receipt{left:50px;top:82px;width:88px;height:118px;background-position:0% 0%;opacity:.18}
-.asset-cloud{right:106px;top:114px;width:118px;height:78px;background-position:100% 16.5%;opacity:.28}
-.asset-rainbow{left:246px;bottom:116px;width:138px;height:94px;background-position:33.33% 66.5%;opacity:.42}
-.asset-wave{left:18px;right:18px;bottom:52px;height:38px;background-size:330% 600%;background-position:50% 84%;opacity:.5}
-.asset-flower{left:86px;bottom:142px;width:70px;height:90px;background-position:33.33% 33%;opacity:.36}
+.asset-receipt{left:70px;top:138px;width:56px;height:76px;background-position:0% 0%;opacity:.1}
+.asset-cloud{right:124px;top:128px;width:76px;height:50px;background-position:100% 16.5%;opacity:.14}
+.asset-rainbow{left:286px;bottom:52px;width:88px;height:60px;background-position:33.33% 66.5%;opacity:.24}
+.asset-wave{left:52px;right:52px;bottom:38px;height:18px;background-size:330% 600%;background-position:50% 84%;opacity:.16}
+.asset-flower{left:104px;bottom:136px;width:42px;height:54px;background-position:33.33% 33%;opacity:.18}
 .spark{position:absolute;width:8px;height:8px;border-radius:999px;background:${tokens.accent};opacity:.42}
 .spark.s1{left:54px;top:92px}.spark.s2{right:62px;top:154px;width:6px;height:6px}.spark.s3{left:94px;bottom:166px;width:7px;height:7px}.spark.s4{right:126px;bottom:92px;width:9px;height:9px;background:${tokens.accent2}}
 .heart{position:absolute;width:13px;height:13px;background:${tokens.accent};opacity:.28;transform:rotate(45deg);border-radius:3px}
