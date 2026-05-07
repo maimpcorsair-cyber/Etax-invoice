@@ -289,8 +289,9 @@ invoicesRouter.get('/', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[/api/invoices GET] Error:', err);
-    res.status(500).json({ error: 'Failed to fetch invoices' });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[/api/invoices GET] Error: ${message}`);
+    res.status(500).json({ error: 'Failed to fetch invoices', debug: message });
   }
 });
 
