@@ -239,23 +239,26 @@ export default function DocumentAppearanceCard({
         <label className="label">
           {isThai ? 'โลโก้/ตราเฉพาะเอกสาร (ไม่บังคับ)' : 'Document mark or badge (optional)'}
         </label>
-        <div className="flex items-center gap-4">
+        <label className="flex items-center gap-4 cursor-pointer">
+          <span className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+            {isThai ? 'เลือกไฟล์ภาพ' : 'Choose image'}
+          </span>
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+            className="sr-only"
           />
           {documentLogoUrl && (
             <button
               type="button"
-              onClick={() => onDocumentLogoChange(null)}
+              onClick={(e) => { e.stopPropagation(); onDocumentLogoChange(null); }}
               className="rounded px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700"
             >
               x
             </button>
           )}
-        </div>
+        </label>
         {documentLogoUrl && (
           <img src={documentLogoUrl} alt="document mark preview" className="mt-3 h-16 object-contain" />
         )}
@@ -306,23 +309,26 @@ export default function DocumentAppearanceCard({
             />
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-4">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleSignatureFileChange}
-            className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
-          />
-          {signatureImageUrl && (
-            <button
-              type="button"
-              onClick={() => onSignatureImageChange(null)}
-              className="rounded px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700"
-            >
-              x
-            </button>
-          )}
-        </div>
+        <label className="flex items-center gap-4 cursor-pointer">
+            <span className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 cursor-pointer">
+              {isThai ? 'เลือกไฟล์ภาพลายเซ็น' : 'Choose signature image'}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleSignatureFileChange}
+              className="sr-only"
+            />
+            {signatureImageUrl && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onSignatureImageChange(null); }}
+                className="rounded px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700"
+              >
+                x
+              </button>
+            )}
+          </label>
         {signatureImageUrl && (
           <div className="mt-3 rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
             <img src={signatureImageUrl} alt="signature preview" className="h-16 object-contain" />
