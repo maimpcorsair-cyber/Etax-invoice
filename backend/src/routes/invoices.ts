@@ -273,7 +273,7 @@ invoicesRouter.get('/', async (req, res) => {
 
     const { invoices, total } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       const [items, count] = await Promise.all([
-        tx.invoice.findMany({ where, skip, take: limitNumber, orderBy: { createdAt: 'desc' }, include: { buyer: { select: { nameTh: true, nameEn: true, taxId: true } }, items: true } }),
+        tx.invoice.findMany({ where, skip, take: limitNumber, orderBy: { createdAt: 'desc' }, include: { buyer: { select: { nameTh: true, nameEn: true, taxId: true } } } }),
         tx.invoice.count({ where }),
       ]);
       return { invoices: items, total: count };
