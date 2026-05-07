@@ -269,7 +269,7 @@ purchaseInvoicesRouter.get('/document-intakes/review', async (req, res) => {
   }
 });
 
-purchaseInvoicesRouter.get('/document-intakes', async (req, res) => {
+purchaseInvoicesRouter.get('/document-intakes', authenticate, async (req, res) => {
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
     const type = typeof req.query.type === 'string' ? req.query.type : undefined;
@@ -280,28 +280,30 @@ purchaseInvoicesRouter.get('/document-intakes', async (req, res) => {
     if (type === 'pdf') where.mimeType = 'application/pdf';
     if (type === 'image') where.mimeType = { startsWith: 'image/' };
 
-    const items = await prisma.documentIntake.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: {
-        id: true,
-        source: true,
-        fileName: true,
-        mimeType: true,
-        fileSize: true,
-        fileUrl: true,
-        status: true,
-        ocrResult: true,
-        warnings: true,
-        error: true,
-        targetType: true,
-        targetId: true,
-        purchaseInvoiceId: true,
-        processedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const items = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.documentIntake.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          source: true,
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          fileUrl: true,
+          status: true,
+          ocrResult: true,
+          warnings: true,
+          error: true,
+          targetType: true,
+          targetId: true,
+          purchaseInvoiceId: true,
+          processedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
     });
 
     res.json({ data: items });
