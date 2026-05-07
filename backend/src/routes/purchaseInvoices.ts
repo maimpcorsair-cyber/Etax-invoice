@@ -440,19 +440,21 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       fileUrl = await uploadToStorage(storageKey, buffer, body.mimeType);
     }
 
-    let created = await prisma.documentIntake.create({
-      data: {
-        companyId: req.user!.companyId,
-        userId: req.user!.userId,
-        source: 'web',
-        fileName: body.fileName,
-        mimeType: body.mimeType,
-        fileSize: buffer.length,
-        fileBase64: storageReady ? undefined : buffer.toString('base64'),
-        fileUrl,
-        storageKey,
-        status: 'processing',
-      },
+    let created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.documentIntake.create({
+        data: {
+          companyId: req.user!.companyId,
+          userId: req.user!.userId,
+          source: 'web',
+          fileName: body.fileName,
+          mimeType: body.mimeType,
+          fileSize: buffer.length,
+          fileBase64: storageReady ? undefined : buffer.toString('base64'),
+          fileUrl,
+          storageKey,
+          status: 'processing',
+        },
+      });
     });
 
     await incrementStorageUsed(req.user!.companyId, buffer.length);
@@ -463,25 +465,29 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       const status = hasUsefulData && purchaseRecordDocumentTypes.has(result.documentType)
         ? 'awaiting_confirmation'
         : 'needs_review';
-      created = await prisma.documentIntake.update({
-        where: { id: created.id },
-        data: {
-          status,
-          ocrResult: result as unknown as Prisma.InputJsonValue,
-          warnings: result.validationWarnings as unknown as Prisma.InputJsonValue,
-          error: hasUsefulData ? null : 'OCR returned no useful fields',
-          processedAt: new Date(),
-        },
+      created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        return tx.documentIntake.update({
+          where: { id: created.id },
+          data: {
+            status,
+            ocrResult: result as unknown as Prisma.InputJsonValue,
+            warnings: result.validationWarnings as unknown as Prisma.InputJsonValue,
+            error: hasUsefulData ? null : 'OCR returned no useful fields',
+            processedAt: new Date(),
+          },
+        });
       });
     } catch (ocrErr) {
       logger.error('Uploaded purchase document OCR failed', { error: ocrErr, intakeId: created.id });
-      created = await prisma.documentIntake.update({
-        where: { id: created.id },
-        data: {
-          status: 'failed',
-          error: ocrErr instanceof Error ? ocrErr.message : 'OCR failed',
-          processedAt: new Date(),
-        },
+      created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        return tx.documentIntake.update({
+          where: { id: created.id },
+          data: {
+            status: 'failed',
+            error: ocrErr instanceof Error ? ocrErr.message : 'OCR failed',
+            processedAt: new Date(),
+          },
+        });
       });
     }
 
@@ -491,6 +497,7 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       res.status(400).json({ error: 'Validation error', details: err.errors });
       return;
     }
+    console.error('[/document-intakes/upload] Upload failed:', err);
     logger.error('Failed to upload purchase document', { error: err });
     res.status(500).json({ error: 'Failed to upload document' });
   }

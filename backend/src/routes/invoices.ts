@@ -288,7 +288,8 @@ invoicesRouter.get('/', async (req, res) => {
         totalPages: Math.ceil(total / limitNumber),
       },
     });
-  } catch {
+  } catch (err) {
+    console.error('[/api/invoices GET] Error:', err);
     res.status(500).json({ error: 'Failed to fetch invoices' });
   }
 });
