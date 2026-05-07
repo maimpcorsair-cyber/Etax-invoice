@@ -251,7 +251,7 @@ model Invoice {
 
   subtotal  Float
   vatAmount Float
-  discountAmount Float @default(0) @map("discount_amount")
+  discountAmount Float @default(0) @map("discount")
   total     Float
 
   notes         String?
@@ -325,7 +325,7 @@ model InvoiceItem {
   quantity      Float
   unit          String
   unitPrice     Float
-  discountAmount Float   @default(0)
+  discountAmount Float   @default(0) @map("discount")
   vatType       VatType @default(vat7)
   amount        Float
   vatAmount     Float
