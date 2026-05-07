@@ -95,27 +95,27 @@ enum ExpenseVoucherStatus {
 
 model Company {
   id            String  @id @default(cuid())
-  nameTh        String  @map("name_th")
-  nameEn        String? @map("name_en")
-  taxId         String  @unique @map("tax_id")
-  branchCode    String  @default("00000") @map("branch_code")
-  branchNameTh  String? @map("branch_name_th")
-  branchNameEn  String? @map("branch_name_en")
-  addressTh     String  @map("address_th")
-  addressEn     String? @map("address_en")
+  nameTh        String
+  nameEn        String?
+  taxId         String  @unique
+  branchCode    String  @default("00000")
+  branchNameTh  String?
+  branchNameEn  String?
+  addressTh     String
+  addressEn     String?
   phone         String?
   email         String?
   website       String?
-  logoUrl       String? @map("logo_url")
+  logoUrl       String?
 
   // Serialized certificate (encrypted)
-  certificatePath     String? @map("certificate_path")
-  certificatePassword String? @map("certificate_password")
+  certificatePath     String?
+  certificatePassword String?
 
   // RD Config
-  rdClientId     String? @map("rd_client_id")
-  rdClientSecret String? @map("rd_client_secret")
-  rdEnvironment  String  @default("sandbox") @map("rd_environment")
+  rdClientId     String?
+  rdClientSecret String?
+  rdEnvironment  String  @default("sandbox")
 
   // Expense settings
   expenseLimit        Decimal?  @db.Decimal(12, 2)
@@ -129,11 +129,11 @@ model Company {
   overdueReminderDays Int     @default(3)
 
   // Document issuing profile
-  documentBankAccounts      Json? @map("document_bank_accounts")
-  documentSignatureProfile  Json? @map("document_signature_profile")
+  documentBankAccounts      Json?
+  documentSignatureProfile  Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users     User[]
   customers Customer[]
