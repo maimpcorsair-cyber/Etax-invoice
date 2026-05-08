@@ -8,9 +8,10 @@
  */
 
 import 'dotenv/config';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import prisma from '../config/database';
+import redis from '../config/redis';
 import { withSystemRlsContext } from '../config/rls';
 import { lineWebhookHandler } from './line';
 
@@ -18,6 +19,11 @@ const BASE_URL = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:4000';
 const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? 'admin@siamtech.co.th';
 const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD ?? 'Admin@123456';
 const SECONDARY_EMAIL = process.env.TEST_SECONDARY_ADMIN_EMAIL ?? 'admin+1@demo-etax.co.th';
+
+after(async () => {
+  await prisma.$disconnect();
+  redis.disconnect();
+});
 
 interface AuthResponse {
   token: string;
@@ -83,6 +89,28 @@ async function getLineUserLink(userId: string) {
 async function deleteLineUserLink(userId: string) {
   return withSystemRlsContext(prisma, async (tx) =>
     tx.lineUserLink.deleteMany({ where: { userId } }),
+  );
+}
+
+async function getLineGroupLink(lineGroupId: string) {
+  return withSystemRlsContext(prisma, async (tx) =>
+    tx.lineGroupLink.findUnique({ where: { lineGroupId } }),
+  );
+}
+
+async function deleteLineGroupLink(lineGroupId: string) {
+  return withSystemRlsContext(prisma, async (tx) =>
+    tx.lineGroupLink.deleteMany({ where: { lineGroupId } }),
+  );
+}
+
+async function upsertLineUserLink(userId: string, lineUserId: string) {
+  return withSystemRlsContext(prisma, async (tx) =>
+    tx.lineUserLink.upsert({
+      where: { userId },
+      create: { userId, lineUserId, isActive: true },
+      update: { lineUserId, isActive: true },
+    }),
   );
 }
 
@@ -163,6 +191,72 @@ test('TC-LINE-001d: PUT /api/line/settings updates LINE notify settings', async 
   assert.equal(res.status, 200, 'Settings update should succeed');
 });
 
+test('TC-LINE-001d-admin: admin can list users and generate a user-specific LINE OTP', async () => {
+  const auth = await login(ADMIN_EMAIL);
+
+  const listRes = await api<{ data?: Array<{ id: string; line: { linked: boolean } }> }>('/api/line/admin/users', {
+    headers: adminHeaders(auth.token),
+  });
+  assert.ok(listRes.data?.some((user) => user.id === auth.user.id), 'Managed users should include the current admin');
+
+  const otpRes = await api<{ data?: { otp?: string; user?: { id: string } } }>(`/api/line/admin/users/${auth.user.id}/link-start`, {
+    method: 'POST',
+    headers: adminHeaders(auth.token),
+  });
+  assert.equal(otpRes.data?.user?.id, auth.user.id, 'OTP should target the requested user');
+  assert.match(otpRes.data?.otp ?? '', /^\d{6}$/, 'Admin-managed OTP should be 6 digits');
+});
+
+test('TC-LINE-001d-group: admin can list groups and generate a group-specific LINE OTP', async () => {
+  const auth = await login(ADMIN_EMAIL);
+
+  const listRes = await api<{ data?: Array<{ id: string; isActive: boolean }> }>('/api/line/admin/groups', {
+    headers: adminHeaders(auth.token),
+  });
+  assert.ok(Array.isArray(listRes.data), 'Managed groups should return an array');
+
+  const otpRes = await api<{ data?: { otp?: string } }>('/api/line/admin/groups/link-start', {
+    method: 'POST',
+    headers: adminHeaders(auth.token),
+  });
+  assert.match(otpRes.data?.otp ?? '', /^\d{6}$/, 'Group OTP should be 6 digits');
+});
+
+test('TC-LINE-001h: group OTP link flow via webhook creates LineGroupLink', async () => {
+  const auth = await login(ADMIN_EMAIL);
+  const otpRes = await api<{ data?: { otp?: string } }>('/api/line/admin/groups/link-start', {
+    method: 'POST',
+    headers: adminHeaders(auth.token),
+  });
+  const otp = otpRes.data?.otp;
+  assert.ok(otp, 'Group OTP should be generated');
+
+  const fakeLineGroupId = `G${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+  await deleteLineGroupLink(fakeLineGroupId);
+
+  const webhookBody = {
+    events: [{
+      type: 'message',
+      webhookEventId: `group-link-event-${Date.now()}`,
+      replyToken: 'test-group-reply-token',
+      source: { type: 'group', groupId: fakeLineGroupId, userId: `UADMIN${Date.now()}` },
+      message: { type: 'text', id: `msg-${Date.now()}`, text: otp },
+    }],
+  };
+
+  const req = createMockWebhookReq(webhookBody);
+  const res = createMockRes();
+  await lineWebhookHandler(req as Parameters<typeof lineWebhookHandler>[0], res as Parameters<typeof lineWebhookHandler>[1]);
+
+  assert.equal(res.getStatus(), 200, 'Webhook should return 200');
+  const link = await getLineGroupLink(fakeLineGroupId);
+  assert.ok(link, 'LineGroupLink should be created');
+  assert.equal(link!.companyId, auth.user.companyId, 'Group should link to OTP company');
+  assert.equal(link!.isActive, true, 'Group link should be active');
+
+  await deleteLineGroupLink(fakeLineGroupId);
+});
+
 test('TC-LINE-001e: Full OTP link flow via webhook — LineUserLink created', async () => {
   // 1. Get OTP via link-start
   const auth = await login(ADMIN_EMAIL);
@@ -201,6 +295,46 @@ test('TC-LINE-001e: Full OTP link flow via webhook — LineUserLink created', as
 
   // Cleanup
   await deleteLineUserLink(auth.user.id);
+});
+
+test('TC-LINE-001g: OTP link flow does not let one LINE account hijack another user', async () => {
+  const auth = await login(ADMIN_EMAIL);
+  const secondary = await login(SECONDARY_EMAIL);
+  const fakeLineUserId = `UCLAIM${Date.now()}`;
+
+  await deleteLineUserLink(auth.user.id);
+  await deleteLineUserLink(secondary.user.id);
+  await upsertLineUserLink(secondary.user.id, fakeLineUserId);
+
+  const otpRes = await api<{ data?: { otp?: string } }>('/api/line/link-start', {
+    method: 'POST',
+    headers: adminHeaders(auth.token),
+  });
+  const otp = otpRes.data?.otp;
+  assert.ok(otp, 'OTP should be generated');
+
+  const webhookBody = {
+    events: [{
+      type: 'message',
+      webhookEventId: `claim-event-${Date.now()}`,
+      replyToken: 'test-reply-token',
+      source: { type: 'user', userId: fakeLineUserId },
+      message: { type: 'text', id: `msg-${Date.now()}`, text: otp },
+    }],
+  };
+
+  const req = createMockWebhookReq(webhookBody);
+  const res = createMockRes();
+  await lineWebhookHandler(req as Parameters<typeof lineWebhookHandler>[0], res as Parameters<typeof lineWebhookHandler>[1]);
+
+  assert.equal(res.getStatus(), 200, 'Webhook should still acknowledge LINE');
+  const adminLink = await getLineUserLink(auth.user.id);
+  const secondaryLink = await getLineUserLink(secondary.user.id);
+  assert.equal(adminLink, null, 'Admin should not be linked to an already-claimed LINE account');
+  assert.equal(secondaryLink?.lineUserId, fakeLineUserId, 'Existing LINE ownership should remain unchanged');
+
+  await deleteLineUserLink(auth.user.id);
+  await deleteLineUserLink(secondary.user.id);
 });
 
 test('TC-LINE-001f: OTP text message without /link prefix also works', async () => {

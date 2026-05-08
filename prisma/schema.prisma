@@ -144,6 +144,7 @@ model Company {
   purchaseInvoices    PurchaseInvoice[]
   expenseVouchers     ExpenseVoucher[]
   pettyCash           PettyCash?
+  lineGroupLinks      LineGroupLink[]
 
   @@map("companies")
 }
@@ -171,6 +172,7 @@ model User {
   purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
   expenseVouchers  ExpenseVoucher[]  @relation("ExpenseVoucherCreatedBy")
   lineUserLink     LineUserLink?
+  linkedLineGroups LineGroupLink[]    @relation("LineGroupLinkedBy")
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -610,6 +612,26 @@ model LineUserLink {
 
   @@index([lineUserId])
   @@map("line_user_links")
+}
+
+model LineGroupLink {
+  id          String   @id @default(cuid())
+  companyId   String
+  lineGroupId String   @unique
+  groupName   String?
+  isActive    Boolean  @default(true)
+  linkedById  String?
+  linkedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  linkedBy    User?    @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+  @@index([lineGroupId])
+  @@map("line_group_links")
 }
 
 model ExpenseVoucher {

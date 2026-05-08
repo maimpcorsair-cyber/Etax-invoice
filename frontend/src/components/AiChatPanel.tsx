@@ -36,8 +36,8 @@ export default function AiChatPanel({
       id: 'hello',
       role: 'assistant',
       content: isThai
-        ? 'สวัสดีครับ ผมพี่นุช ถามเรื่องเอกสาร ภาษีซื้อ/ขาย สถานะในระบบ หรือแนบเอกสารให้ผมอ่านได้เลยครับ'
-        : 'Hi, I am Pinuch. Ask me about documents, VAT, system status, or upload a document for me to read.',
+        ? 'สวัสดีครับ ผม Billboy ถามเรื่องเอกสาร ภาษีซื้อ/ขาย สถานะในระบบ หรือแนบเอกสารให้ผมอ่านได้เลยครับ'
+        : 'Hi, I am Billboy. Ask me about documents, VAT, system status, or upload a document for me to read.',
     },
   ]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -149,7 +149,7 @@ export default function AiChatPanel({
             <Bot className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-bold">{isThai ? 'พี่นุช AI' : 'Pinuch AI'}</p>
+            <p className="text-sm font-bold">Billboy AI</p>
             <p className="text-xs text-slate-500">{isThai ? 'คุยผ่านเว็บ ไม่กิน LINE quota' : 'Web chat, no LINE quota'}</p>
           </div>
           <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
@@ -219,7 +219,7 @@ export default function AiChatPanel({
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isThai ? 'ถามพี่นุช...' : 'Ask Pinuch...'}
+            placeholder={isThai ? 'ถาม Billboy...' : 'Ask Billboy...'}
             className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none"
             disabled={sending || uploading}
           />

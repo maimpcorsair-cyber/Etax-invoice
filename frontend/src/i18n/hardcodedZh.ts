@@ -76,7 +76,7 @@ export const hardcodedZh: Record<string, string> = {
   'API Key (Read-only)': 'API 密钥（只读）',
   'Application Settings': '应用程序设置',
   'Ask accounting and tax invoice questions via AI': '通过人工智能询问会计和税务发票问题',
-  'Ask Pinuch...': '询问 Pinuch...',
+  'Ask Billboy...': '询问 Billboy...',
   'Ask questions in Thai naturally': '自然地用泰语提问',
   Attach: '附',
   'Attach document': '附上文件',
@@ -148,7 +148,7 @@ export const hardcodedZh: Record<string, string> = {
   'Configure language, notifications, and API access for this account.':
     '为此帐户配置语言、通知和 API 访问权限。',
   'Confirm unlink from Line?': '确认取消与 Line 的链接？',
-  'Connect Line Pinuch': '连接线管脚',
+  'Connect LINE Billboy': '连接 LINE Billboy',
   Connected: '已连接',
   'Connected ✅': '已连接 ✅',
   'Connection Status': '连接状态',
@@ -314,8 +314,8 @@ export const hardcodedZh: Record<string, string> = {
   'Google Sign-In is not configured': '未配置 Google 登录',
   'Google verified': '谷歌验证',
   'Grand Total': '累计',
-  'Hi, I am Pinuch. Ask me about documents, VAT, system status, or upload a document for me to read.':
-    '嗨，我是皮努奇。询问我有关文件、增值税、系统状态的信息，或上传文件供我阅读。',
+  'Hi, I am Billboy. Ask me about documents, VAT, system status, or upload a document for me to read.':
+    '嗨，我是 Billboy。询问我有关文件、增值税、系统状态的信息，或上传文件供我阅读。',
   'High confidence': '高置信度',
   Home: '家',
   'How access works': '访问如何运作',
@@ -364,7 +364,7 @@ export const hardcodedZh: Record<string, string> = {
     '让 Billoy 帮您处理会计与税务，简单、完整，一站完成',
   'Lets you continue with Google right away': '让您可以立即继续使用 Google',
   'LINE AI': '线人工智能',
-  'Line AI Assistant (Pinuch)': 'LINE AI 助手（Pinuch）',
+  'Line AI Assistant (Billboy)': 'LINE AI 助手（Billboy）',
   'LINE OCR': '线条OCR',
   'List / Export': '列表/导出',
   'Live LINE/OCR Status': '实时 LINE/OCR 状态',
@@ -487,7 +487,7 @@ export const hardcodedZh: Record<string, string> = {
   'Phone Number': '电话号码',
   'Pick a document-specific template, or create the full T01-T05 set for selection in the invoice builder.':
     '选择特定于文档的模板，或创建完整的 T01-T05 集以供在发票生成器中选择。',
-  'Pinuch AI': 'Pinuch AI',
+  'Billboy AI': 'Billboy AI',
   Plan: '计划',
   'Plan & Upgrade': '规划和升级',
   Playbook: '剧本',
@@ -607,10 +607,10 @@ export const hardcodedZh: Record<string, string> = {
   'Statement exported successfully.': '报表导出成功。',
   'Statement not found': '未找到声明',
   Status: '地位',
-  'Step 1 — Add Line Official Account Pinuch': '第 1 步 — 添加 Line 公众号 Pinuch',
+  'Step 1 - Add LINE Official Account Billboy': '第 1 步 - 添加 LINE 官方账号 Billboy',
   'Step 2 — Generate OTP to link your account': '第 2 步 — 生成 OTP 以链接您的帐户',
-  'Step 3 — Waiting for Pinuch to confirm... This code expires in 10 minutes':
-    '第 3 步 — 等待 Pinuch 确认...此代码将在 10 分钟后过期',
+  'Step 3 - Waiting for Billboy to confirm... This code expires in 10 minutes':
+    '第 3 步 - 等待 Billboy 确认...此代码将在 10 分钟后过期',
   'Storage files': '存储文件',
   'Stripe setup checklist': 'Stripe 设置清单',
   'Submit RD': '提交研发报告',
@@ -700,8 +700,8 @@ export const hardcodedZh: Record<string, string> = {
   'Upgrade to Business to export to Google Sheets': '升级到 Business 以导出到 Google 表格',
   'Upgrade to record Input VAT and auto-calculate VAT payable':
     '升级记录进项税额并自动计算应纳税额',
-  'Upgrade your plan to use the Line AI Assistant (Pinuch).':
-    '升级您的计划以使用 Line AI Assistant (Pinuch)。',
+  'Upgrade your plan to use the LINE AI Assistant (Billboy).':
+    '升级您的计划以使用 LINE AI Assistant (Billboy)。',
   Upload: '上传',
   'Upload & Validate': '上传并验证',
   'Upload document': '上传文件',
@@ -778,7 +778,7 @@ export const hardcodedZh: Record<string, string> = {
   'Web chat, no LINE quota': '网络聊天，无 LINE 配额',
   'What a template changes': '模板改变了什么',
   'What a template does not change': '什么模板不改变',
-  'What can Pinuch do?': '皮努奇​​能做什么？',
+  'What can Billboy do?': 'Billboy 能做什么？',
   'What documents do we have?': '我们有什么文件？',
   'What happens next': '接下来会发生什么',
   Workflow: '工作流程',

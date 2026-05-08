@@ -1637,6 +1637,27 @@ function CertificateTab({ isThai }: { isThai: boolean; t: (k: string) => string 
 
 function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isThai: boolean }) {
   const { token } = useAuthStore();
+  type LineManagedUser = {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    line: {
+      linked: boolean;
+      displayName?: string | null;
+      linkedAt?: string | null;
+      lineUserIdMasked?: string | null;
+    };
+  };
+  type LineManagedGroup = {
+    id: string;
+    groupName?: string | null;
+    isActive: boolean;
+    linkedAt?: string | null;
+    lineGroupIdMasked?: string | null;
+    linkedBy?: { id: string; name: string; email: string } | null;
+  };
   const [lineStatus, setLineStatus] = useState<{
     linked: boolean;
     displayName?: string;
@@ -1664,6 +1685,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     documentIntakesSchema?: { ok: boolean; missingColumns: string[]; error?: string };
     recentDocumentIntakes?: { ok: boolean; items: Array<{ id: string; status: string; mimeType: string; error?: string | null; createdAt: string; updatedAt: string }> };
     linkedUsers?: { ok: boolean; count: number };
+    linkedGroups?: { ok: boolean; count: number };
     documentOps?: {
       windowDays: number;
       byStatus: Record<string, number>;
@@ -1672,6 +1694,12 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     ocrReadiness?: { productionReady: boolean; tier: string; warnings?: string[]; models?: { fastTextOrPdf?: string; scanImageOrPdf?: string; proEscalation?: string | null } };
   } | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
+  const [managedUsers, setManagedUsers] = useState<LineManagedUser[]>([]);
+  const [managedUsersLoading, setManagedUsersLoading] = useState(false);
+  const [userOtp, setUserOtp] = useState<null | { userId: string; userName: string; otp: string }>(null);
+  const [managedGroups, setManagedGroups] = useState<LineManagedGroup[]>([]);
+  const [managedGroupsLoading, setManagedGroupsLoading] = useState(false);
+  const [groupOtp, setGroupOtp] = useState<null | { otp: string }>(null);
 
   useEffect(() => {
     if (!policy?.canUseLineOa) { setLoading(false); return; }
@@ -1687,6 +1715,38 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, [token, policy?.canUseLineOa]);
+
+  async function loadManagedUsers() {
+    setManagedUsersLoading(true);
+    try {
+      const res = await fetch('/api/line/admin/users', { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json() as { data?: LineManagedUser[] };
+      setManagedUsers(json.data ?? []);
+    } catch {
+      setManagedUsers([]);
+    } finally {
+      setManagedUsersLoading(false);
+    }
+  }
+
+  async function loadManagedGroups() {
+    setManagedGroupsLoading(true);
+    try {
+      const res = await fetch('/api/line/admin/groups', { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json() as { data?: LineManagedGroup[] };
+      setManagedGroups(json.data ?? []);
+    } catch {
+      setManagedGroups([]);
+    } finally {
+      setManagedGroupsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!policy?.canUseLineOa) return;
+    void loadManagedUsers();
+    void loadManagedGroups();
   }, [token, policy?.canUseLineOa]);
 
   useEffect(() => {
@@ -1758,6 +1818,78 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     }
   }
 
+  async function handleUserLinkStart(user: LineManagedUser) {
+    setMsg(null);
+    setUserOtp(null);
+    try {
+      const res = await fetch(`/api/line/admin/users/${user.id}/link-start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json() as { data?: { otp: string }; error?: string };
+      if (!res.ok || !json.data?.otp) {
+        setMsg({ type: 'err', text: json.error ?? (isThai ? 'สร้างรหัสเชื่อมต่อไม่สำเร็จ' : 'Failed to create link code') });
+        return;
+      }
+      setUserOtp({ userId: user.id, userName: user.name, otp: json.data.otp });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
+  async function handleUserUnlink(user: LineManagedUser) {
+    if (!confirm(isThai ? `ยืนยันถอด LINE จาก ${user.name}?` : `Unlink LINE from ${user.name}?`)) return;
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/line/admin/users/${user.id}/unlink`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'Failed');
+      setUserOtp(null);
+      await loadManagedUsers();
+      setMsg({ type: 'ok', text: isThai ? 'ถอดการเชื่อมต่อ LINE แล้ว' : 'LINE account unlinked.' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
+  async function handleGroupLinkStart() {
+    setMsg(null);
+    setGroupOtp(null);
+    try {
+      const res = await fetch('/api/line/admin/groups/link-start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json() as { data?: { otp: string }; error?: string };
+      if (!res.ok || !json.data?.otp) {
+        setMsg({ type: 'err', text: json.error ?? (isThai ? 'สร้างรหัสเชื่อมกลุ่มไม่สำเร็จ' : 'Failed to create group link code') });
+        return;
+      }
+      setGroupOtp({ otp: json.data.otp });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
+  async function handleGroupUnlink(group: LineManagedGroup) {
+    if (!confirm(isThai ? `ยืนยันถอด LINE group ${group.groupName ?? group.lineGroupIdMasked ?? ''}?` : `Unlink LINE group ${group.groupName ?? group.lineGroupIdMasked ?? ''}?`)) return;
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/line/admin/groups/${group.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'Failed');
+      setGroupOtp(null);
+      await loadManagedGroups();
+      setMsg({ type: 'ok', text: isThai ? 'ถอดการเชื่อมต่อกลุ่ม LINE แล้ว' : 'LINE group unlinked.' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
   async function handleUnlink() {
     if (!confirm(isThai ? 'ยืนยันยกเลิกการเชื่อมต่อ Line?' : 'Confirm unlink from Line?')) return;
     try {
@@ -1792,6 +1924,22 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     });
   }
 
+  function copyUserOtp() {
+    if (!userOtp) return;
+    navigator.clipboard.writeText(userOtp.otp).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function copyGroupOtp() {
+    if (!groupOtp) return;
+    navigator.clipboard.writeText(groupOtp.otp).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   function healthPill(ok?: boolean, label?: string) {
     return (
       <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
@@ -1813,8 +1961,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
           </p>
           <p className="text-sm text-gray-500 max-w-xs mx-auto">
             {isThai
-              ? 'อัปเกรดแพ็กเกจเพื่อใช้งาน Line AI Assistant พี่นุช'
-              : 'Upgrade your plan to use the Line AI Assistant (Pinuch).'}
+              ? 'อัปเกรดแพ็กเกจเพื่อใช้งาน LINE AI Assistant Billboy'
+              : 'Upgrade your plan to use the LINE AI Assistant (Billboy).'}
           </p>
         </div>
         <Link to="/app/plan" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -1832,13 +1980,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   return (
     <div className="space-y-6">
       <h2 className="font-semibold text-lg text-gray-900">
-        {isThai ? 'Line พี่นุช' : 'Line AI Assistant (Pinuch)'}
+        {isThai ? 'LINE Billboy' : 'LINE AI Assistant (Billboy)'}
       </h2>
 
       {/* Features card — always shown */}
       <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-3">
         <p className="font-semibold text-indigo-900 text-sm">
-          {isThai ? 'พี่นุชทำอะไรได้บ้าง?' : 'What can Pinuch do?'}
+          {isThai ? 'Billboy ทำอะไรได้บ้าง?' : 'What can Billboy do?'}
         </p>
         <ul className="space-y-2 text-sm text-indigo-800">
           <li>🤖 {isThai ? 'ถามตอบข้อมูลบัญชีและใบกำกับภาษีด้วย AI' : 'Ask accounting and tax invoice questions via AI'}</li>
@@ -1848,6 +1996,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
           <li>💬 {isThai ? 'พิมพ์คำถามภาษาไทยได้เลย' : 'Ask questions in Thai naturally'}</li>
         </ul>
       </div>
+
+      {msg && (
+        <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {msg.type === 'ok' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+          {msg.text}
+        </div>
+      )}
 
       {/* Live status dashboard */}
       <div className="border border-gray-200 rounded-xl p-5 space-y-4">
@@ -1893,8 +2048,10 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         </div>
 
         {liveStatus?.documentOps && (
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
             {[
+              { label: isThai ? 'ผู้ใช้ LINE' : 'LINE users', value: liveStatus.linkedUsers?.count ?? 0 },
+              { label: isThai ? 'กลุ่ม LINE' : 'LINE groups', value: liveStatus.linkedGroups?.count ?? 0 },
               { label: isThai ? 'รอยืนยัน' : 'Awaiting', value: (liveStatus.documentOps.byStatus.awaiting_confirmation ?? 0) + (liveStatus.documentOps.byStatus.awaiting_input ?? 0) },
               { label: isThai ? 'บันทึกแล้ว' : 'Saved', value: liveStatus.documentOps.byStatus.saved ?? 0 },
               { label: isThai ? 'ล้มเหลว' : 'Failed', value: liveStatus.documentOps.byStatus.failed ?? 0 },
@@ -1949,11 +2106,179 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         )}
       </div>
 
+      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="font-medium text-gray-800">
+              {isThai ? 'ผูก LINE กับผู้ใช้ในบริษัท' : 'User LINE connections'}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {isThai
+                ? 'แอดมินสร้างรหัสให้ user แต่ละคน แล้วให้ user ส่งรหัสนั้นใน LINE Billboy ระบบจะผูกจาก LINE user จริงและแยกข้อมูลตามบัญชี'
+                : 'Admins generate a code for each user. The user sends it to Billboy in LINE, so the system links the real LINE user safely.'}
+            </p>
+          </div>
+          <button className="btn-secondary text-sm" onClick={() => void loadManagedUsers()} disabled={managedUsersLoading}>
+            {managedUsersLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            {isThai ? 'รีเฟรช' : 'Refresh'}
+          </button>
+        </div>
+
+        {userOtp && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">
+              {isThai ? `รหัสเชื่อมต่อสำหรับ ${userOtp.userName}` : `Link code for ${userOtp.userName}`}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <span className="font-mono text-3xl font-bold tracking-[0.3em] text-amber-900 select-all">{userOtp.otp}</span>
+              <button className="btn-secondary text-xs" onClick={copyUserOtp}>
+                {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-amber-800">
+              {isThai ? 'ส่งรหัสนี้ให้ผู้ใช้พิมพ์ใน LINE ภายใน 10 นาที' : 'Ask this user to send the code in LINE within 10 minutes.'}
+            </p>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-xl border border-gray-100">
+          <div className="grid grid-cols-[1.4fr_.7fr_.9fr] gap-3 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 md:grid-cols-[1.6fr_.7fr_.9fr_.9fr]">
+            <span>{isThai ? 'ผู้ใช้' : 'User'}</span>
+            <span>Role</span>
+            <span>LINE</span>
+            <span className="hidden md:block">{isThai ? 'จัดการ' : 'Action'}</span>
+          </div>
+          <div className="divide-y divide-gray-100 bg-white">
+            {managedUsers.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-gray-500">
+                {managedUsersLoading ? (isThai ? 'กำลังโหลด...' : 'Loading...') : (isThai ? 'ยังไม่มีผู้ใช้ให้แสดง' : 'No users to show.')}
+              </div>
+            )}
+            {managedUsers.map((managedUser) => (
+              <div key={managedUser.id} className="grid grid-cols-[1.4fr_.7fr_.9fr] gap-3 px-3 py-3 text-sm md:grid-cols-[1.6fr_.7fr_.9fr_.9fr] md:items-center">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-900">{managedUser.name}</p>
+                  <p className="truncate text-xs text-gray-500">{managedUser.email}</p>
+                </div>
+                <span className="text-xs capitalize text-gray-600">{managedUser.role}</span>
+                <div className="min-w-0">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${managedUser.line.linked ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {managedUser.line.linked ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                    {managedUser.line.linked ? (isThai ? 'เชื่อมแล้ว' : 'Linked') : (isThai ? 'ยังไม่เชื่อม' : 'Unlinked')}
+                  </span>
+                  {managedUser.line.lineUserIdMasked && (
+                    <p className="mt-1 truncate text-[11px] text-gray-400">{managedUser.line.lineUserIdMasked}</p>
+                  )}
+                </div>
+                <div className="col-span-3 flex flex-wrap gap-2 md:col-span-1">
+                  <button
+                    className="btn-secondary text-xs"
+                    onClick={() => void handleUserLinkStart(managedUser)}
+                    disabled={!managedUser.isActive}
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    {managedUser.line.linked ? (isThai ? 'เชื่อมใหม่' : 'Relink') : (isThai ? 'สร้างรหัส' : 'Generate code')}
+                  </button>
+                  {managedUser.line.linked && (
+                    <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => void handleUserUnlink(managedUser)}>
+                      <Unlink2 className="w-3.5 h-3.5" />
+                      {isThai ? 'ถอด' : 'Unlink'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="font-medium text-gray-800">
+              {isThai ? 'ผูก LINE Group กับบริษัท' : 'Company LINE group connections'}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {isThai
+                ? 'สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัสในกลุ่ม LINE ที่มี Billboy อยู่ ระบบจะบันทึกเอกสารเข้าบริษัทนี้โดยแยก tenant ปลอดภัย'
+                : 'Generate a group code, then send it in the LINE group that Billboy has joined. Documents from that group are stored under this company safely.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary text-sm" onClick={() => void loadManagedGroups()} disabled={managedGroupsLoading}>
+              {managedGroupsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+              {isThai ? 'รีเฟรช' : 'Refresh'}
+            </button>
+            <button className="btn-primary text-sm" onClick={() => void handleGroupLinkStart()}>
+              <Link2 className="w-4 h-4" />
+              {isThai ? 'สร้างรหัสเชื่อมกลุ่ม' : 'Generate group code'}
+            </button>
+          </div>
+        </div>
+
+        {groupOtp && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-sm font-semibold text-emerald-900">
+              {isThai ? 'รหัสเชื่อมต่อกลุ่ม LINE' : 'LINE group link code'}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <span className="font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900 select-all">{groupOtp.otp}</span>
+              <button className="btn-secondary text-xs" onClick={copyGroupOtp}>
+                {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-emerald-800">
+              {isThai ? 'ส่งรหัสนี้ในกลุ่ม LINE ภายใน 10 นาที เช่น 123456 หรือ /link-group 123456' : 'Send this code in the LINE group within 10 minutes, for example 123456 or /link-group 123456.'}
+            </p>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-xl border border-gray-100">
+          <div className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 md:grid-cols-[1.4fr_.8fr_.9fr_.8fr]">
+            <span>{isThai ? 'กลุ่ม' : 'Group'}</span>
+            <span>{isThai ? 'สถานะ' : 'Status'}</span>
+            <span>{isThai ? 'ผู้เชื่อม' : 'Linked by'}</span>
+            <span className="hidden md:block">{isThai ? 'จัดการ' : 'Action'}</span>
+          </div>
+          <div className="divide-y divide-gray-100 bg-white">
+            {managedGroups.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-gray-500">
+                {managedGroupsLoading ? (isThai ? 'กำลังโหลด...' : 'Loading...') : (isThai ? 'ยังไม่มีกลุ่มที่เชื่อม' : 'No linked groups yet.')}
+              </div>
+            )}
+            {managedGroups.map((group) => (
+              <div key={group.id} className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 px-3 py-3 text-sm md:grid-cols-[1.4fr_.8fr_.9fr_.8fr] md:items-center">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-900">{group.groupName ?? (isThai ? 'LINE Group' : 'LINE Group')}</p>
+                  {group.lineGroupIdMasked && <p className="mt-1 truncate text-[11px] text-gray-400">{group.lineGroupIdMasked}</p>}
+                </div>
+                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${group.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {group.isActive ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                  {group.isActive ? (isThai ? 'เชื่อมแล้ว' : 'Linked') : (isThai ? 'ปิดอยู่' : 'Inactive')}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-gray-600">{group.linkedBy?.name ?? '-'}</p>
+                  {group.linkedAt && <p className="truncate text-[11px] text-gray-400">{new Date(group.linkedAt).toLocaleString()}</p>}
+                </div>
+                <div className="col-span-3 flex flex-wrap gap-2 md:col-span-1">
+                  <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => void handleGroupUnlink(group)}>
+                    <Unlink2 className="w-3.5 h-3.5" />
+                    {isThai ? 'ถอด' : 'Unlink'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Connection Status card */}
       <div className="border border-gray-200 rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-gray-800">
-            {isThai ? 'เชื่อมต่อ Line พี่นุช' : 'Connect Line Pinuch'}
+            {isThai ? 'เชื่อมต่อ LINE Billboy' : 'Connect LINE Billboy'}
           </h3>
           {lineStatus?.linked && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
@@ -1982,13 +2307,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             {/* Step 1 */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">
-                {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน Line Official Account พี่นุช' : 'Step 1 — Add Line Official Account Pinuch'}
+                {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน LINE Official Account Billboy' : 'Step 1 - Add LINE Official Account Billboy'}
               </p>
               <div className="flex items-start gap-4">
                 <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="flex-shrink-0">
                   <img
                     src="https://qr-official.line.me/g/M/566fvjbg.png"
-                    alt="QR Code พี่นุช"
+                    alt="QR Code Billboy"
                     className="w-28 h-28 rounded-lg border border-gray-200 shadow-sm"
                   />
                 </a>
@@ -2029,7 +2354,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                     </button>
                   </div>
                   <p className="text-sm text-gray-500">
-                    {isThai ? 'พิมพ์รหัส 6 หลักนี้ส่งให้พี่นุชใน Line: ' : 'Type this 6-digit code and send to Pinuch in Line: '}
+                    {isThai ? 'พิมพ์รหัส 6 หลักนี้ส่งให้ Billboy ใน LINE: ' : 'Type this 6-digit code and send to Billboy in LINE: '}
                     <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">{otp}</code>
                   </p>
                 </div>
@@ -2047,8 +2372,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>
                   {isThai
-                    ? 'ขั้นตอนที่ 3 — รอพี่นุชยืนยัน... รหัสนี้หมดอายุใน 10 นาที'
-                    : 'Step 3 — Waiting for Pinuch to confirm... This code expires in 10 minutes'}
+                    ? 'ขั้นตอนที่ 3 — รอ Billboy ยืนยัน... รหัสนี้หมดอายุใน 10 นาที'
+                    : 'Step 3 - Waiting for Billboy to confirm... This code expires in 10 minutes'}
                 </span>
               </div>
             )}
@@ -2116,13 +2441,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
               </select>
             </div>
           </div>
-
-          {msg && (
-            <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${msg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {msg.type === 'ok' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-              {msg.text}
-            </div>
-          )}
 
           <button className="btn-primary" onClick={handleSaveSettings} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

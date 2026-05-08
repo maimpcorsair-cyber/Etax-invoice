@@ -243,7 +243,7 @@ async function callOpenRouter(
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://etax-invoice.vercel.app',
-          'X-Title': 'e-Tax Invoice Pinuch',
+          'X-Title': 'Billboy e-Tax Invoice',
         },
         body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0.2 }),
       }, timeoutMs);
@@ -779,7 +779,7 @@ export async function buildCompanyContext(companyId: string): Promise<string> {
   return serialized;
 }
 
-export async function askPinuch(
+export async function askBillboy(
   companyId: string,
   companyName: string,
   taxId: string,
@@ -838,7 +838,7 @@ ${context}`,
     return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error('askPinuch failed', { error: msg, companyId });
+    logger.error('askBillboy failed', { error: msg, companyId });
     return 'ขอโทษ ตอนนี้ Billboy ตอบช้า/ไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้งในอีกสักครู่';
   }
 }

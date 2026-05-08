@@ -1087,7 +1087,7 @@ Tests are ordered to maximize coverage with minimum effort by leveraging prerequ
 
 #### TC-LINE-008: LINE AI fallback — ask about VAT
 - **Test ID:** TC-LINE-008
-- **Description:** LINE user asks "ภาษีซื้อเดือนนี้เท่าไร" → AI (Pinuch) responds
+- **Description:** LINE user asks "ภาษีซื้อเดือนนี้เท่าไร" → AI (Billboy) responds
 - **Role:** LINE user linked to tenant
 - **Plan:** starter+
 - **Steps:** Send message matching AI handler pattern to LINE

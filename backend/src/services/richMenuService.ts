@@ -176,8 +176,8 @@ function buildRichMenuBody(): object {
   return {
     size: { width: W, height: H },
     selected: true,
-    name: 'พี่นุช เมนูหลัก',
-    chatBarText: '📋 เมนูพี่นุช',
+    name: 'Billboy เมนูหลัก',
+    chatBarText: '📋 เมนู Billboy',
     areas,
   };
 }

@@ -65,7 +65,7 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canInviteUsers: false,
     canSendInvoiceEmail: false,
     canUseBillingPortal: false,
-    canUseLineOa: false,
+    canUseLineOa: true,
     maxUsers: 1,
     maxDocumentsPerMonth: 20,
     maxCustomers: 50,

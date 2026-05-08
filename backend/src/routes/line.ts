@@ -18,7 +18,7 @@ import {
   getLineMessagingDiagnostics,
   OverdueInvoice,
 } from '../services/lineService';
-import { askPinuch, buildCompanyContext, getOcrProductionReadiness, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
+import { askBillboy, buildCompanyContext, getOcrProductionReadiness, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { decodeQrFromImage } from '../services/qrDecodeService';
@@ -88,6 +88,21 @@ const REVIEW_ONLY_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
   'contract',
   'other',
 ]);
+
+type LineOtpPayload = {
+  type?: 'user' | 'group';
+  userId?: string;
+  companyId: string;
+  issuedBy?: string;
+};
+
+type LineMessageContext = {
+  sourceType?: string;
+  replyTargetId: string;
+  senderLineUserId?: string;
+  lineGroupId?: string;
+  lineRoomId?: string;
+};
 
 interface LineSession {
   state: 'awaiting_field';
@@ -235,6 +250,27 @@ async function safeRedisSetex(key: string, ttlSeconds: number, value: string) {
   }
 }
 
+async function createLineLinkOtp(payload: LineOtpPayload) {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  await redis.setex(`line:otp:${otp}`, OTP_TTL, JSON.stringify(payload));
+
+  // Verify OTP was stored before responding; otherwise users can receive a code
+  // that LINE cannot redeem after a Redis cold start or transient write lag.
+  const stored = await redis.get(`line:otp:${otp}`);
+  if (!stored) {
+    logger.error('[Line] OTP write verification failed — Redis may be lagging (cold start?)');
+    return null;
+  }
+
+  return otp;
+}
+
+function maskLineUserId(lineUserId?: string | null) {
+  if (!lineUserId) return null;
+  if (lineUserId.length <= 10) return 'linked';
+  return `${lineUserId.slice(0, 3)}…${lineUserId.slice(-4)}`;
+}
+
 function buildOcrTextSummary(result: OcrResult, note?: string) {
   const fmt = (value: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
@@ -360,13 +396,15 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
   );
 }
 
-async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, companyId: string, fallbackId: string) {
-  const link = await prisma.lineUserLink.findUnique({
-    where: { lineUserId },
-    select: { userId: true },
-  });
+async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, companyId: string, fallbackId: string, createdByUserId?: string) {
+  const link = createdByUserId
+    ? { userId: createdByUserId }
+    : await prisma.lineUserLink.findUnique({
+        where: { lineUserId },
+        select: { userId: true },
+      });
 
-  if (!link) {
+  if (!link?.userId) {
     throw new Error('Line user link not found while saving OCR purchase invoice');
   }
 
@@ -699,15 +737,8 @@ lineRouter.post('/link-start', authenticate, async (req, res) => {
     const userId = req.user!.userId;
     const companyId = req.user!.companyId;
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await redis.setex(`line:otp:${otp}`, OTP_TTL, JSON.stringify({ userId, companyId }));
-
-    // Verify OTP was stored (guards against Render cold-start where Redis write
-    // may complete AFTER the HTTP response is sent, causing OTP to appear valid
-    // but not actually be in Redis)
-    const stored = await redis.get(`line:otp:${otp}`);
-    if (!stored) {
-      logger.error('[Line] OTP write verification failed — Redis may be lagging (cold start?)');
+    const otp = await createLineLinkOtp({ type: 'user', userId, companyId });
+    if (!otp) {
       res.status(503).json({ error: 'Service temporarily unavailable. Please try again in a few seconds.' });
       return;
     }
@@ -762,6 +793,197 @@ lineRouter.put('/settings', authenticate, requireRole('admin', 'super_admin'), a
   }
 });
 
+lineRouter.get('/admin/users', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { companyId: req.user!.companyId },
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        lineUserLink: {
+          select: {
+            lineUserId: true,
+            displayName: true,
+            pictureUrl: true,
+            isActive: true,
+            linkedAt: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      data: users.map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        line: user.lineUserLink
+          ? {
+              linked: user.lineUserLink.isActive,
+              displayName: user.lineUserLink.displayName,
+              pictureUrl: user.lineUserLink.pictureUrl,
+              linkedAt: user.lineUserLink.linkedAt,
+              lineUserIdMasked: maskLineUserId(user.lineUserLink.lineUserId),
+            }
+          : { linked: false },
+      })),
+    });
+  } catch (err) {
+    logger.error('[Line] GET /admin/users failed', { err });
+    res.status(500).json({ error: 'Failed to fetch Line users' });
+  }
+});
+
+lineRouter.post('/admin/users/:userId/link-start', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        id: req.params.userId,
+        companyId: req.user!.companyId,
+        isActive: true,
+      },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (!targetUser) {
+      res.status(404).json({ error: 'Active user not found in this company' });
+      return;
+    }
+
+    const otp = await createLineLinkOtp({
+      type: 'user',
+      userId: targetUser.id,
+      companyId: req.user!.companyId,
+      issuedBy: req.user!.userId,
+    });
+    if (!otp) {
+      res.status(503).json({ error: 'Service temporarily unavailable. Please try again in a few seconds.' });
+      return;
+    }
+
+    res.json({
+      data: {
+        otp,
+        expiresInSeconds: OTP_TTL,
+        user: targetUser,
+      },
+    });
+  } catch (err) {
+    logger.error('[Line] POST /admin/users/:userId/link-start failed', { err, userId: req.params.userId });
+    res.status(500).json({ error: 'Failed to generate user link OTP' });
+  }
+});
+
+lineRouter.delete('/admin/users/:userId/unlink', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        id: req.params.userId,
+        companyId: req.user!.companyId,
+      },
+      select: { id: true },
+    });
+
+    if (!targetUser) {
+      res.status(404).json({ error: 'User not found in this company' });
+      return;
+    }
+
+    await prisma.lineUserLink.deleteMany({ where: { userId: targetUser.id } });
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error('[Line] DELETE /admin/users/:userId/unlink failed', { err, userId: req.params.userId });
+    res.status(500).json({ error: 'Failed to unlink Line user' });
+  }
+});
+
+lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const groups = await prisma.lineGroupLink.findMany({
+      where: { companyId: req.user!.companyId },
+      orderBy: [{ isActive: 'desc' }, { linkedAt: 'desc' }],
+      select: {
+        id: true,
+        lineGroupId: true,
+        groupName: true,
+        isActive: true,
+        linkedAt: true,
+        linkedBy: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    res.json({
+      data: groups.map((group) => ({
+        id: group.id,
+        groupName: group.groupName,
+        isActive: group.isActive,
+        linkedAt: group.linkedAt,
+        lineGroupIdMasked: maskLineUserId(group.lineGroupId),
+        linkedBy: group.linkedBy,
+      })),
+    });
+  } catch (err) {
+    logger.error('[Line] GET /admin/groups failed', { err });
+    res.status(500).json({ error: 'Failed to fetch Line groups' });
+  }
+});
+
+lineRouter.post('/admin/groups/link-start', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const otp = await createLineLinkOtp({
+      type: 'group',
+      companyId: req.user!.companyId,
+      issuedBy: req.user!.userId,
+    });
+
+    if (!otp) {
+      res.status(503).json({ error: 'Service temporarily unavailable. Please try again in a few seconds.' });
+      return;
+    }
+
+    res.json({
+      data: {
+        otp,
+        expiresInSeconds: OTP_TTL,
+      },
+    });
+  } catch (err) {
+    logger.error('[Line] POST /admin/groups/link-start failed', { err });
+    res.status(500).json({ error: 'Failed to generate group link OTP' });
+  }
+});
+
+lineRouter.delete('/admin/groups/:groupId', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const existing = await prisma.lineGroupLink.findFirst({
+      where: {
+        id: req.params.groupId,
+        companyId: req.user!.companyId,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Line group not found in this company' });
+      return;
+    }
+
+    await prisma.lineGroupLink.delete({ where: { id: existing.id } });
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error('[Line] DELETE /admin/groups/:groupId failed', { err, groupId: req.params.groupId });
+    res.status(500).json({ error: 'Failed to unlink Line group' });
+  }
+});
+
 // POST /api/line/admin/setup-richmenu
 lineRouter.post('/admin/setup-richmenu', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
@@ -807,7 +1029,7 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
   const companyId = req.user!.companyId;
   const since = new Date();
   since.setDate(since.getDate() - 30);
-  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult, intakeStatusResult, storageResult] = await Promise.allSettled([
+  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult, linkedGroupsResult, intakeStatusResult, storageResult] = await Promise.allSettled([
     testRedisSessionWrite(),
     prisma.$queryRaw<Array<{ column_name: string }>>`
       SELECT column_name
@@ -830,6 +1052,7 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       },
     }),
     prisma.lineUserLink.count({ where: { user: { companyId }, isActive: true } }),
+    prisma.lineGroupLink.count({ where: { companyId, isActive: true } }),
     prisma.documentIntake.groupBy({
       by: ['status'],
       where: { companyId, createdAt: { gte: since } },
@@ -878,6 +1101,9 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       linkedUsers: linkedUsersResult.status === 'fulfilled'
         ? { ok: true, count: linkedUsersResult.value }
         : { ok: false, count: 0, error: linkedUsersResult.reason instanceof Error ? linkedUsersResult.reason.message : String(linkedUsersResult.reason) },
+      linkedGroups: linkedGroupsResult.status === 'fulfilled'
+        ? { ok: true, count: linkedGroupsResult.value }
+        : { ok: false, count: 0, error: linkedGroupsResult.reason instanceof Error ? linkedGroupsResult.reason.message : String(linkedGroupsResult.reason) },
       documentOps: {
         windowDays: 30,
         byStatus: intakeStatusResult.status === 'fulfilled'
@@ -900,7 +1126,10 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 interface LineSource {
+  type?: 'user' | 'group' | 'room';
   userId?: string;
+  groupId?: string;
+  roomId?: string;
 }
 
 interface LineTextMessage {
@@ -926,6 +1155,151 @@ interface LineEvent {
 
 interface LineWebhookBody {
   events: LineEvent[];
+}
+
+async function handleGroupLinkOtp(context: LineMessageContext, text: string): Promise<boolean> {
+  const lineGroupId = context.lineGroupId ?? context.lineRoomId;
+  if (!lineGroupId) return false;
+
+  const otpMatch = text.trim().match(/^(?:\/link-group\s+|\/link\s+)?(\d{6})$/);
+  if (!otpMatch) return false;
+
+  const otp = otpMatch[1];
+  let stored: string | null = null;
+  try {
+    stored = await redis.get(`line:otp:${otp}`);
+  } catch (err) {
+    logger.error('[Line] Group OTP Redis lookup failed', { err });
+  }
+
+  if (!stored) {
+    await sendLineText(context.replyTargetId, 'รหัสเชื่อมต่อกลุ่มไม่ถูกต้องหรือหมดอายุแล้ว กรุณาให้แอดมินสร้างรหัสใหม่');
+    return true;
+  }
+
+  let payload: LineOtpPayload;
+  try {
+    payload = JSON.parse(stored) as LineOtpPayload;
+  } catch (err) {
+    await safeRedisDel(`line:otp:${otp}`);
+    logger.warn('[Line] Corrupted group OTP payload cleared', { err });
+    await sendLineText(context.replyTargetId, 'รหัสเชื่อมต่อกลุ่มใช้ไม่ได้แล้ว กรุณาให้แอดมินสร้างรหัสใหม่');
+    return true;
+  }
+
+  if (payload.type !== 'group') {
+    return false;
+  }
+
+  const company = await prisma.company.findUnique({
+    where: { id: payload.companyId },
+    select: { id: true, nameTh: true },
+  });
+
+  if (!company) {
+    await safeRedisDel(`line:otp:${otp}`);
+    await sendLineText(context.replyTargetId, 'ไม่พบบริษัทที่ผูกกับรหัสนี้ กรุณาสร้างรหัสใหม่');
+    return true;
+  }
+
+  await prisma.lineGroupLink.upsert({
+    where: { lineGroupId },
+    create: {
+      companyId: company.id,
+      lineGroupId,
+      groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
+      isActive: true,
+      linkedById: payload.issuedBy,
+    },
+    update: {
+      companyId: company.id,
+      groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
+      isActive: true,
+      linkedById: payload.issuedBy,
+      linkedAt: new Date(),
+    },
+  });
+
+  await safeRedisDel(`line:otp:${otp}`);
+  await sendLineText(
+    context.replyTargetId,
+    `เชื่อมกลุ่ม LINE กับ ${company.nameTh} สำเร็จแล้วครับ\n\nจากนี้สมาชิกในกลุ่มส่งรูป/PDF ใบเสร็จหรือใบกำกับภาษีให้ Billboy อ่านและเข้าคิวเอกสารของบริษัทได้เลย`,
+  );
+  return true;
+}
+
+async function resolveLineConversationContext(context: LineMessageContext) {
+  const [senderLink, groupLink] = await Promise.all([
+    context.senderLineUserId
+      ? prisma.lineUserLink.findUnique({
+          where: { lineUserId: context.senderLineUserId },
+          include: { user: { include: { company: true } } },
+        })
+      : Promise.resolve(null),
+    (context.lineGroupId ?? context.lineRoomId)
+      ? prisma.lineGroupLink.findUnique({
+          where: { lineGroupId: context.lineGroupId ?? context.lineRoomId },
+          include: {
+            company: true,
+            linkedBy: { select: { id: true, isActive: true } },
+          },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  if (context.lineGroupId || context.lineRoomId) {
+    if (!groupLink?.isActive) {
+      return { ok: false as const, reason: 'group_unlinked' as const };
+    }
+
+    const senderBelongsToGroupCompany = !!senderLink?.isActive && senderLink.user.companyId === groupLink.companyId;
+    const fallbackUserId = (senderBelongsToGroupCompany ? senderLink.userId : null)
+      ?? (groupLink.linkedBy?.isActive ? groupLink.linkedBy.id : null)
+      ?? await findActiveCompanyAdminId(groupLink.companyId);
+
+    if (!fallbackUserId) {
+      return { ok: false as const, reason: 'no_active_user' as const };
+    }
+
+    return {
+      ok: true as const,
+      companyId: groupLink.companyId,
+      companyName: groupLink.company.nameTh,
+      userId: fallbackUserId,
+      userName: senderBelongsToGroupCompany ? senderLink.user.name : 'LINE group member',
+      userCompany: senderBelongsToGroupCompany ? senderLink.user.company : groupLink.company,
+      senderLink: senderBelongsToGroupCompany ? senderLink : null,
+      groupLink,
+    };
+  }
+
+  if (!senderLink?.isActive) {
+    return { ok: false as const, reason: 'user_unlinked' as const };
+  }
+
+  return {
+    ok: true as const,
+    companyId: senderLink.user.companyId,
+    companyName: senderLink.user.company.nameTh,
+    userId: senderLink.userId,
+    userName: senderLink.user.name,
+    userCompany: senderLink.user.company,
+    senderLink,
+    groupLink: null,
+  };
+}
+
+async function findActiveCompanyAdminId(companyId: string) {
+  const admin = await prisma.user.findFirst({
+    where: {
+      companyId,
+      isActive: true,
+      role: { in: ['admin', 'super_admin'] },
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  return admin?.id ?? null;
 }
 
 async function handleSessionReply(lineUserId: string, text: string): Promise<boolean> {
@@ -1217,8 +1591,12 @@ async function handleEditReply(lineUserId: string, trimmed: string): Promise<boo
   return true;
 }
 
-async function handleTextMessage(lineUserId: string, text: string): Promise<void> {
+async function handleTextMessage(lineUserId: string, text: string, context?: LineMessageContext): Promise<void> {
+  const messageContext = context ?? { replyTargetId: lineUserId, senderLineUserId: lineUserId };
+  const senderLineUserId = messageContext.senderLineUserId ?? lineUserId;
   const trimmed = text.trim();
+
+  if (await handleGroupLinkOtp(messageContext, trimmed)) return;
 
   // Check if user is in a field-input session
   if (await handleSessionReply(lineUserId, trimmed)) return;
@@ -1236,33 +1614,71 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
     try {
       const stored = await redis.get(`line:otp:${otp}`);
       if (stored) {
-        const { userId } = JSON.parse(stored) as { userId: string; companyId: string };
+        const { type, userId, companyId } = JSON.parse(stored) as LineOtpPayload;
 
-        // Get Line profile info — we'll store what we have
-        const existingUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { name: true },
+        if (type === 'group') {
+          await sendLineText(lineUserId, 'รหัสนี้ใช้สำหรับเชื่อม LINE group กรุณาส่งรหัสในกลุ่มที่ต้องการเชื่อม');
+          return;
+        }
+
+        if (!userId) {
+          await safeRedisDel(`line:otp:${otp}`);
+          await sendLineText(lineUserId, 'รหัสนี้ไม่สมบูรณ์ กรุณาขอรหัสใหม่จากระบบ');
+          return;
+        }
+
+        const linkResult = await prisma.$transaction(async (tx) => {
+          const targetUser = await tx.user.findFirst({
+            where: { id: userId, companyId, isActive: true },
+            select: { id: true, name: true, companyId: true },
+          });
+
+          if (!targetUser) {
+            return { ok: false as const, reason: 'user_not_found' as const };
+          }
+
+          const existingLineLink = await tx.lineUserLink.findUnique({
+            where: { lineUserId: senderLineUserId },
+            select: { userId: true },
+          });
+
+          if (existingLineLink && existingLineLink.userId !== targetUser.id) {
+            return { ok: false as const, reason: 'line_already_linked' as const };
+          }
+
+          await tx.lineUserLink.upsert({
+            where: { userId: targetUser.id },
+            create: {
+              userId: targetUser.id,
+              lineUserId: senderLineUserId,
+              displayName: targetUser.name,
+              isActive: true,
+            },
+            update: {
+              lineUserId: senderLineUserId,
+              displayName: targetUser.name,
+              isActive: true,
+              linkedAt: new Date(),
+            },
+          });
+
+          return { ok: true as const, userName: targetUser.name };
         });
 
-        await prisma.lineUserLink.upsert({
-          where: { userId },
-          create: {
-            userId,
-            lineUserId,
-            displayName: existingUser?.name ?? null,
-            isActive: true,
-          },
-          update: {
-            lineUserId,
-            displayName: existingUser?.name ?? null,
-            isActive: true,
-          },
-        });
+        if (!linkResult.ok) {
+          if (linkResult.reason === 'line_already_linked') {
+            await sendLineText(lineUserId, 'บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว กรุณาให้แอดมินถอดการเชื่อมต่อก่อนแล้วลองใหม่');
+            return;
+          }
+          await safeRedisDel(`line:otp:${otp}`);
+          await sendLineText(lineUserId, 'ไม่พบผู้ใช้ที่เชื่อมกับรหัสนี้ หรือผู้ใช้ถูกปิดใช้งานแล้ว กรุณาขอรหัสใหม่จากแอดมิน');
+          return;
+        }
 
         await safeRedisDel(`line:otp:${otp}`);
         await sendLineText(
           lineUserId,
-          `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${existingUser?.name ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
+          `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
         );
         return;
       }
@@ -1273,29 +1689,33 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
     return;
   }
 
-  // Find linked user
-  const link = await prisma.lineUserLink.findUnique({
-    where: { lineUserId },
-    include: { user: { include: { company: true } } },
-  });
+  const resolved = await resolveLineConversationContext(messageContext);
 
-  if (!link) {
+  if (!resolved.ok) {
+    if (resolved.reason === 'group_unlinked') {
+      await sendLineText(
+        lineUserId,
+        'กลุ่มนี้ยังไม่ได้เชื่อมกับบริษัทครับ\n\nให้แอดมินเข้าเว็บ Billboy → Admin → LINE → สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนี้',
+      );
+      return;
+    }
     await sendLineText(
       lineUserId,
-      'ยังไม่ได้เชื่อมบัญชีครับ 🔗\n\nกรุณาเข้าระบบ e-Tax Invoice → ตั้งค่า → Line แล้วกด "สร้างรหัส OTP"\nจากนั้นส่งรหัส 6 หลักมาที่นี่ครับ\n\n👉 https://etax-invoice.vercel.app',
+      resolved.reason === 'no_active_user'
+        ? 'กลุ่มนี้เชื่อมแล้ว แต่ยังไม่มีผู้ใช้ active สำหรับบันทึกเอกสาร กรุณาตรวจผู้ใช้ในบริษัท'
+        : 'ยังไม่ได้เชื่อมบัญชีครับ 🔗\n\nกรุณาเข้าระบบ Billboy → Admin → LINE แล้วกด "สร้างรหัสเชื่อมต่อ"\nจากนั้นส่งรหัส 6 หลักมาที่นี่ครับ\n\n👉 https://etax-invoice.vercel.app',
     );
     return;
   }
 
-  const { user } = link;
-  const companyId = user.companyId;
+  const companyId = resolved.companyId;
   const lower = trimmed.toLowerCase();
 
   // Help / greeting
   if (['สวัสดี', 'help', 'ช่วยเหลือ'].includes(lower)) {
     await sendLineText(
       lineUserId,
-      `สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีของ ${user.company.nameTh} 🤖\n\n` +
+      `สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีของ ${resolved.companyName} 🤖\n\n` +
       `📥 บันทึกภาษีซื้อ:\n` +
       `• ส่งรูป .jpg/.png หรือ PDF ใบกำกับภาษีผู้ขาย\n\n` +
       `📊 ดูข้อมูลบัญชี:\n` +
@@ -1339,7 +1759,7 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   // VAT summary
   if (['สรุปภาษี', 'ยอดภาษี'].includes(lower)) {
     try {
-      const context = await buildCompanyContext(companyId);
+        const context = await buildCompanyContext(companyId);
       const data = JSON.parse(context) as {
         company: { name: string };
         salesThisMonth: { count: number; total: number; outputVat: number };
@@ -1520,10 +1940,10 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
 
   // AI fallback
   try {
-    const answer = await askPinuch(
+      const answer = await askBillboy(
       companyId,
-      user.company.nameTh,
-      user.company.taxId,
+      resolved.userCompany.nameTh,
+      resolved.userCompany.taxId,
       trimmed,
     );
     await sendLineText(lineUserId, answer);
@@ -1533,19 +1953,22 @@ async function handleTextMessage(lineUserId: string, text: string): Promise<void
   }
 }
 
-async function handleImageMessage(lineUserId: string, messageId: string, messageType?: string): Promise<void> {
+async function handleImageMessage(lineUserId: string, messageId: string, messageType?: string, context?: LineMessageContext): Promise<void> {
   let stage = 'start';
   try {
     stage = 'link_lookup';
-    const link = await prisma.lineUserLink.findUnique({
-      where: { lineUserId },
-      select: { user: { select: { companyId: true } } },
-    });
+    const messageContext = context ?? { replyTargetId: lineUserId, senderLineUserId: lineUserId };
+    const resolved = await resolveLineConversationContext(messageContext);
 
-    if (!link) {
+    if (!resolved.ok) {
+      const errorText = resolved.reason === 'group_unlinked'
+        ? 'กลุ่มนี้ยังไม่ได้เชื่อมกับบริษัทครับ\n\nให้แอดมินเข้าเว็บ Billboy → Admin → LINE → สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนี้'
+        : resolved.reason === 'no_active_user'
+          ? 'กลุ่มนี้เชื่อมแล้ว แต่ยังไม่มีผู้ใช้ active สำหรับบันทึกเอกสาร กรุณาตรวจผู้ใช้ในบริษัท'
+          : 'ยังไม่ได้เชื่อมบัญชีครับ กรุณาเข้าระบบ Billboy → Admin → LINE แล้วสร้างรหัส OTP ก่อนส่งเอกสาร';
       await sendLineText(
         lineUserId,
-        'ยังไม่ได้เชื่อมบัญชีครับ กรุณาเข้าระบบ e-Tax Invoice → ตั้งค่า → Line แล้วสร้างรหัส OTP ก่อนส่งเอกสาร',
+        errorText,
       );
       return;
     }
@@ -1573,21 +1996,15 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '', messageType);
     const isPdf = contentType === 'application/pdf';
     const qrResult = !isPdf ? decodeQrFromImage(buffer, contentType) : { ok: false };
-    const companyId = link.user.companyId;
-    const creator = await prisma.lineUserLink.findUnique({
-      where: { lineUserId },
-      select: { userId: true },
+    const companyId = resolved.companyId;
+    const intake = await createDocumentIntake({
+      companyId,
+      userId: resolved.userId,
+      lineUserId,
+      messageId,
+      mimeType: contentType,
+      buffer,
     });
-    const intake = creator
-      ? await createDocumentIntake({
-          companyId,
-          userId: creator.userId,
-          lineUserId,
-          messageId,
-          mimeType: contentType,
-          buffer,
-        })
-      : null;
 
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
@@ -1684,16 +2101,6 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     }
 
     if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
-      if (!creator) {
-        await updateDocumentIntake(intake?.id, {
-          status: 'failed',
-          ocrResult: result,
-          warnings: result.validationWarnings,
-          error: 'Line user link not found for payment matching',
-        });
-        await sendLineText(lineUserId, 'อ่านสลิปโอนได้แล้วครับ แต่ยังไม่พบผู้ใช้ที่เชื่อมบัญชี กรุณาเชื่อม LINE ใหม่');
-        return;
-      }
       stage = 'match_bank_transfer';
       const enrichedResult = {
         ...result,
@@ -1708,7 +2115,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         await askForConfirmation(lineUserId, intake.id, enrichedResult);
         return;
       }
-      const match = await handleBankTransferDocument(lineUserId, enrichedResult, companyId, creator.userId);
+      const match = await handleBankTransferDocument(lineUserId, enrichedResult, companyId, resolved.userId);
       await sendLineText(lineUserId, match.message);
       return;
     }
@@ -1843,7 +2250,7 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         return;
       }
 
-      const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id);
+      const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id, intake.userId);
       await prisma.purchaseInvoice.update({
         where: { id: saved.id },
         data: { pdfUrl: documentIntakeFileUrl(intake.id, intake.fileUrl) },
@@ -2164,8 +2571,15 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
   res.json({ ok: true });
 
   for (const event of body.events ?? []) {
-    const lineUserId = event.source.userId;
-    if (!lineUserId) continue;
+    const replyTargetId = event.source.groupId ?? event.source.roomId ?? event.source.userId;
+    if (!replyTargetId) continue;
+    const context: LineMessageContext = {
+      sourceType: event.source.type,
+      replyTargetId,
+      senderLineUserId: event.source.userId,
+      lineGroupId: event.source.groupId,
+      lineRoomId: event.source.roomId,
+    };
 
     // Idempotency: skip if this event was already processed (LINE retries on timeout)
     const eventId = (event as { webhookEventId?: string }).webhookEventId
@@ -2186,7 +2600,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
     try {
       if (event.type === 'follow') {
         await sendLineText(
-          lineUserId,
+          replyTargetId,
           'สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\n' +
           'ส่ง OTP 6 หลักจากระบบ e-Tax Invoice เพื่อเชื่อมบัญชีก่อนเริ่มใช้งานนะครับ\n\n' +
           '📋 สิ่งที่ทำได้หลังเชื่อมบัญชี:\n' +
@@ -2197,16 +2611,21 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
           '• พิมพ์ "ช่วยเหลือ" → ดูคำสั่งทั้งหมด\n\n' +
           '💡 หรือใช้เมนูด้านล่างได้เลยครับ',
         );
+      } else if (event.type === 'join') {
+        await sendLineText(
+          replyTargetId,
+          'Billboy เข้ากลุ่มแล้วครับ\n\nให้แอดมินเข้าเว็บ Billboy → Admin → LINE → สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนี้เพื่อเริ่มใช้งาน',
+        );
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;
         if (msg.type === 'text') {
-          await withLineReplyToken(event.replyToken, () => handleTextMessage(lineUserId, (msg as LineTextMessage).text));
+          await withLineReplyToken(event.replyToken, () => handleTextMessage(replyTargetId, (msg as LineTextMessage).text, context));
         } else if (msg.type === 'image' || msg.type === 'file') {
-          await withLineReplyToken(event.replyToken, () => handleImageMessage(lineUserId, msg.id, msg.type));
+          await withLineReplyToken(event.replyToken, () => handleImageMessage(replyTargetId, msg.id, msg.type, context));
         }
       } else if (event.type === 'postback' && event.postback) {
         const postbackData = event.postback.data;
-        await withLineReplyToken(event.replyToken, () => handlePostback(lineUserId, postbackData));
+        await withLineReplyToken(event.replyToken, () => handlePostback(replyTargetId, postbackData));
       }
     } catch (err) {
       lineWebhookDiagnostics.lastUnhandledError = {
@@ -2214,9 +2633,9 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
         eventType: event.type,
         message: err instanceof Error ? err.message : String(err),
       };
-      logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, lineUserId });
+      logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, replyTargetId, senderLineUserId: event.source.userId });
       try {
-        await sendLineText(lineUserId, 'ขอโทษครับ ระบบสะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง 🙏');
+        await sendLineText(replyTargetId, 'ขอโทษครับ ระบบสะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง 🙏');
       } catch { /* ignore send failure */ }
     }
   }

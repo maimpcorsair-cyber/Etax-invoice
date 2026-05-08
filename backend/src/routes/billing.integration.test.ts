@@ -368,6 +368,7 @@ test('TC-BILL-007: Access policy for free plan shows correct limits', async () =
     assert.equal(policy.canUseCustomTemplates, false, 'Free plan should not allow custom templates');
     assert.equal(policy.canExportGoogleSheets, false, 'Free plan should not allow Google Sheets');
     assert.equal(policy.canInviteUsers, false, 'Free plan should not allow user invitation');
+    assert.equal(policy.canUseLineOa, true, 'Free plan should allow LINE chatbot access');
   } finally {
     await deleteTestCompanyData(company.id);
   }

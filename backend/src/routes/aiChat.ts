@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/database';
 import { logger } from '../config/logger';
-import { askPinuch } from '../services/aiService';
+import { askBillboy } from '../services/aiService';
 
 export const aiChatRouter = Router();
 
@@ -23,7 +23,7 @@ aiChatRouter.post('/message', async (req, res) => {
       return;
     }
 
-    const answer = await askPinuch(
+    const answer = await askBillboy(
       company.id,
       company.nameTh,
       company.taxId,
@@ -35,7 +35,7 @@ aiChatRouter.post('/message', async (req, res) => {
       data: {
         answer,
         source: 'web',
-        model: 'pinuch',
+        model: 'billboy',
         createdAt: new Date().toISOString(),
       },
     });
