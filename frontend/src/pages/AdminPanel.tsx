@@ -1671,6 +1671,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   const [localReminderDays, setLocalReminderDays] = useState(3);
   const [copied, setCopied] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [liveStatus, setLiveStatus] = useState<{
     checkedAt: string;
     webhook?: { lastWebhookAt?: string; lastEventCount?: number; lastUnhandledError?: { at: string; eventType?: string; message: string } };
@@ -1952,8 +1953,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400" /></div>;
   }
-
-  const [statusOpen, setStatusOpen] = useState(false);
 
   return (
     <div className="space-y-6">
