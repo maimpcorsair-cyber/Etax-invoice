@@ -702,6 +702,16 @@ lineRouter.post('/link-start', authenticate, async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await redis.setex(`line:otp:${otp}`, OTP_TTL, JSON.stringify({ userId, companyId }));
 
+    // Verify OTP was stored (guards against Render cold-start where Redis write
+    // may complete AFTER the HTTP response is sent, causing OTP to appear valid
+    // but not actually be in Redis)
+    const stored = await redis.get(`line:otp:${otp}`);
+    if (!stored) {
+      logger.error('[Line] OTP write verification failed — Redis may be lagging (cold start?)');
+      res.status(503).json({ error: 'Service temporarily unavailable. Please try again in a few seconds.' });
+      return;
+    }
+
     res.json({ data: { otp } });
   } catch (err) {
     logger.error('[Line] POST /link-start failed', { err });
