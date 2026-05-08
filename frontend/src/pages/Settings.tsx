@@ -3,8 +3,10 @@ import type { ChangeEvent, ReactNode } from 'react';
 import {
   AlertTriangle,
   Building2,
+  Check,
   CheckCircle2,
   Cloud,
+  Copy,
   FileCheck2,
   FileText,
   Globe2,
@@ -16,6 +18,7 @@ import {
   Save,
   ShieldCheck,
   Trash2,
+  Unlink2,
   XCircle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -225,6 +228,8 @@ export default function Settings() {
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatus | null>(null);
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
   const [lineStatus, setLineStatus] = useState<LineStatus | null>(null);
+  const [lineOtp, setLineOtp] = useState<string | null>(null);
+  const [lineOtpCopied, setLineOtpCopied] = useState(false);
   const [rdStatus, setRdStatus] = useState<RdConfigStatus | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -426,6 +431,44 @@ export default function Settings() {
       return;
     }
     setMessage(isThai ? 'บันทึกการแจ้งเตือน LINE แล้ว' : 'LINE settings saved.');
+  };
+
+  const handleLineSelfLink = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/line/link-start', {
+        method: 'POST',
+        headers: authHeaders,
+      });
+      const json = await res.json() as { data?: { otp: string }; error?: string };
+      if (!res.ok || !json.data?.otp) {
+        setError(json.error ?? (isThai ? 'สร้างรหัสเชื่อมต่อไม่สำเร็จ' : 'Failed to generate link code'));
+        return;
+      }
+      setLineOtp(json.data.otp);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleLineUnlink = async () => {
+    if (!token) return;
+    try {
+      await fetch('/api/line/unlink', { method: 'DELETE', headers: authHeaders });
+      setLineStatus(prev => prev ? { ...prev, linked: false, displayName: undefined } : prev);
+      setLineOtp(null);
+      setMessage(isThai ? 'ถอดการเชื่อมต่อ LINE แล้ว' : 'LINE account unlinked.');
+    } catch {
+      setError(isThai ? 'ถอดการเชื่อมต่อไม่สำเร็จ' : 'Failed to unlink');
+    }
+  };
+
+  const copyLineOtp = () => {
+    if (!lineOtp) return;
+    navigator.clipboard.writeText(lineOtp).then(() => {
+      setLineOtpCopied(true);
+      setTimeout(() => setLineOtpCopied(false), 2000);
+    });
   };
 
   const connectDrive = async () => {
@@ -730,25 +773,74 @@ export default function Settings() {
             description={isThai ? 'ตรวจสถานะ LINE, Google, Drive และระบบ export ที่ใช้กับงานเอกสาร' : 'Check LINE, Google, Drive, and export automation status.'}
           >
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 p-4">
+              <div className="rounded-2xl border border-slate-200 p-4 space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 font-semibold text-slate-900"><MessageCircle className="h-4 w-4 text-emerald-600" /> LINE AI</div>
+                  <div className="flex items-center gap-2 font-semibold text-slate-900"><MessageCircle className="h-4 w-4 text-emerald-600" /> LINE Billboy</div>
                   <StatusPill ok={lineStatus?.linked ?? integrationStatus?.lineAi?.connected} label={(lineStatus?.linked ?? integrationStatus?.lineAi?.connected) ? (isThai ? 'เชื่อมแล้ว' : 'Connected') : (isThai ? 'ยังไม่เชื่อม' : 'Not linked')} />
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" checked={lineStatus?.lineNotifyEnabled ?? false} onChange={(e) => setLineStatus((prev) => prev ? { ...prev, lineNotifyEnabled: e.target.checked } : prev)} disabled={!isAdmin || !lineStatus} />
-                    {isThai ? 'เปิดแจ้งเตือน LINE' : 'Enable LINE notifications'}
-                  </label>
-                  <select className="input-field" value={lineStatus?.overdueReminderDays ?? 3} onChange={(e) => setLineStatus((prev) => prev ? { ...prev, overdueReminderDays: Number(e.target.value) as 1 | 3 | 7 } : prev)} disabled={!isAdmin || !lineStatus}>
-                    <option value={1}>{isThai ? 'เตือนค้างชำระ 1 วัน' : 'Overdue reminder 1 day'}</option>
-                    <option value={3}>{isThai ? 'เตือนค้างชำระ 3 วัน' : 'Overdue reminder 3 days'}</option>
-                    <option value={7}>{isThai ? 'เตือนค้างชำระ 7 วัน' : 'Overdue reminder 7 days'}</option>
-                  </select>
-                </div>
-                <button type="button" onClick={() => void saveLineSettings()} disabled={!isAdmin || !lineStatus} className="btn-secondary mt-3 text-sm">
-                  {isThai ? 'บันทึก LINE' : 'Save LINE'}
-                </button>
+
+                {lineStatus?.linked ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-slate-600">
+                      {isThai ? 'บัญชี LINE: ' : 'LINE account: '}
+                      <span className="font-medium text-slate-900">{lineStatus.displayName ?? '—'}</span>
+                    </p>
+                    <button type="button" onClick={() => void handleLineUnlink()} className="text-xs text-red-600 hover:text-red-700 font-medium inline-flex items-center gap-1">
+                      <Unlink2 className="w-3.5 h-3.5" />
+                      {isThai ? 'ถอด' : 'Unlink'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="flex-shrink-0">
+                        <img src="https://qr-official.line.me/g/M/566fvjbg.png" alt="QR Code Billboy" className="w-20 h-20 rounded-lg border border-slate-200" />
+                      </a>
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-slate-600">{isThai ? 'สแกน QR เพิ่มเพื่อน Billboy' : 'Scan to add Billboy'}</p>
+                        <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-[#06C755] hover:underline">
+                          <Link2 className="w-3 h-3" /> @566fvjbg
+                        </a>
+                      </div>
+                    </div>
+                    {lineOtp ? (
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-2xl font-bold tracking-[0.25em] text-indigo-700 select-all">{lineOtp}</span>
+                          <button type="button" onClick={copyLineOtp} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 border border-slate-200 rounded px-2 py-1">
+                            {lineOtpCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            {lineOtpCopied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
+                          </button>
+                        </div>
+                        <p className="text-xs text-indigo-800">{isThai ? 'ส่งรหัสนี้ให้ Billboy ใน LINE ภายใน 10 นาที' : 'Send this code to Billboy in LINE within 10 min.'}</p>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => void handleLineSelfLink()} className="btn-primary text-sm w-full">
+                        <Link2 className="w-4 h-4" />
+                        {isThai ? 'สร้างรหัสเชื่อมบัญชี LINE' : 'Generate LINE link code'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {lineStatus?.linked && isAdmin && (
+                  <div className="border-t border-slate-100 pt-3 space-y-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" checked={lineStatus?.lineNotifyEnabled ?? false} onChange={(e) => setLineStatus((prev) => prev ? { ...prev, lineNotifyEnabled: e.target.checked } : prev)} disabled={!lineStatus} />
+                        {isThai ? 'เปิดแจ้งเตือน LINE' : 'Enable LINE notifications'}
+                      </label>
+                      <select className="input-field" value={lineStatus?.overdueReminderDays ?? 3} onChange={(e) => setLineStatus((prev) => prev ? { ...prev, overdueReminderDays: Number(e.target.value) as 1 | 3 | 7 } : prev)} disabled={!lineStatus}>
+                        <option value={1}>{isThai ? 'เตือนค้างชำระ 1 วัน' : 'Overdue reminder 1 day'}</option>
+                        <option value={3}>{isThai ? 'เตือนค้างชำระ 3 วัน' : 'Overdue reminder 3 days'}</option>
+                        <option value={7}>{isThai ? 'เตือนค้างชำระ 7 วัน' : 'Overdue reminder 7 days'}</option>
+                      </select>
+                    </div>
+                    <button type="button" onClick={() => void saveLineSettings()} disabled={!lineStatus} className="btn-secondary text-sm">
+                      {isThai ? 'บันทึก LINE' : 'Save LINE'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">

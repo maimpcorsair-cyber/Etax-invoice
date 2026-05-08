@@ -1772,30 +1772,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     };
   }, [token, policy?.canUseLineOa]);
 
-  const [richMenuLoading, setRichMenuLoading] = useState(false);
-  const [richMenuMsg, setRichMenuMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-
-  async function handleSetupRichMenu() {
-    setRichMenuLoading(true);
-    setRichMenuMsg(null);
-    try {
-      const res = await fetch('/api/line/admin/setup-richmenu', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const j = await res.json() as { data?: { richMenuId: string }; error?: string };
-      if (!res.ok) {
-        setRichMenuMsg({ type: 'err', text: j.error ?? 'เกิดข้อผิดพลาด' });
-      } else {
-        setRichMenuMsg({ type: 'ok', text: `✅ ติดตั้ง Rich Menu สำเร็จ (ID: ${j.data?.richMenuId ?? ''})` });
-      }
-    } catch {
-      setRichMenuMsg({ type: 'err', text: 'ไม่สามารถเชื่อมต่อได้' });
-    } finally {
-      setRichMenuLoading(false);
-    }
-  }
-
   async function handleLinkStart() {
     setMsg(null);
     try {
@@ -1977,24 +1953,37 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-6 h-6 text-gray-400" /></div>;
   }
 
+  const [statusOpen, setStatusOpen] = useState(false);
+
   return (
     <div className="space-y-6">
       <h2 className="font-semibold text-lg text-gray-900">
         {isThai ? 'LINE Billboy' : 'LINE AI Assistant (Billboy)'}
       </h2>
 
-      {/* Features card — always shown */}
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-3">
+      {/* Section 1: Features — 4 document groups */}
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-4">
         <p className="font-semibold text-indigo-900 text-sm">
-          {isThai ? 'Billboy ทำอะไรได้บ้าง?' : 'What can Billboy do?'}
+          {isThai ? 'Billboy รองรับเอกสาร 16+ ประเภท ครอบคลุม 4 กลุ่มงาน' : 'Billboy supports 16+ document types across 4 categories'}
         </p>
-        <ul className="space-y-2 text-sm text-indigo-800">
-          <li>🤖 {isThai ? 'ถามตอบข้อมูลบัญชีและใบกำกับภาษีด้วย AI' : 'Ask accounting and tax invoice questions via AI'}</li>
-          <li>📸 {isThai ? 'ส่งรูปใบแจ้งหนี้ supplier → บันทึกภาษีซื้ออัตโนมัติ (OCR)' : 'Send supplier invoice photo → Auto-record input VAT (OCR)'}</li>
-          <li>⚠️ {isThai ? 'แจ้งเตือน Invoice เกินกำหนดชำระรายวัน' : 'Daily overdue invoice reminders'}</li>
-          <li>📊 {isThai ? 'สรุปยอด VAT และข้อมูลบัญชีได้ทันที' : 'Instant VAT summary and accounting data'}</li>
-          <li>💬 {isThai ? 'พิมพ์คำถามภาษาไทยได้เลย' : 'Ask questions in Thai naturally'}</li>
-        </ul>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-indigo-700">{isThai ? 'ภาษีซื้อ (Input VAT)' : 'Input VAT Documents'}</p>
+            <p className="text-xs text-indigo-800">{isThai ? 'ใบกำกับภาษี, ใบเสร็จ, ใบแจ้งหนี้, ใบวางบิล, ใบลดหนี้, ใบเพิ่มหนี้' : 'Tax invoice, receipt, invoice, billing note, credit note, debit note'}</p>
+          </div>
+          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-emerald-700">{isThai ? 'หลักฐานชำระเงิน' : 'Payment Proofs'}</p>
+            <p className="text-xs text-indigo-800">{isThai ? 'สลิปโอนเงินทุกธนาคาร, รายการเดินบัญชี, Payment Advice' : 'Bank transfer slips, bank statements, payment advice'}</p>
+          </div>
+          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-purple-700">{isThai ? 'เอกสารประกอบ' : 'Supporting Documents'}</p>
+            <p className="text-xs text-indigo-800">{isThai ? 'ใบเสนอราคา, Purchase Order (PO), ใบส่งของ, สัญญา, หนังสือหัก ณ ที่จ่าย' : 'Quotation, PO, delivery note, contract, withholding tax cert'}</p>
+          </div>
+          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-amber-700">{isThai ? 'AI อัจฉริยะ' : 'Smart AI'}</p>
+            <p className="text-xs text-indigo-800">{isThai ? 'ถามตอบบัญชี, สรุป VAT, แจ้งเตือนเกินกำหนด, พิมพ์ไทยได้เลย' : 'Accounting Q&A, VAT summary, overdue alerts, natural Thai input'}</p>
+          </div>
+        </div>
       </div>
 
       {msg && (
@@ -2004,118 +1993,47 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         </div>
       )}
 
-      {/* Live status dashboard */}
-      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="font-medium text-gray-800">
-              {isThai ? 'สถานะระบบ LINE/OCR สด' : 'Live LINE/OCR Status'}
-            </h3>
-            <p className="text-xs text-gray-500 mt-1">
-              {liveStatus?.checkedAt
-                ? `${isThai ? 'ตรวจล่าสุด' : 'Last checked'} ${new Date(liveStatus.checkedAt).toLocaleString()}`
-                : (isThai ? 'กำลังโหลดสถานะ...' : 'Loading status...')}
+      {/* Section 2: Add friend Billboy — QR code prominent */}
+      <div className="border border-green-200 rounded-xl bg-green-50 p-5 space-y-4">
+        <h3 className="font-medium text-green-900">
+          {isThai ? 'เพิ่มเพื่อน LINE Billboy' : 'Add Billboy on LINE'}
+        </h3>
+        <div className="flex items-start gap-5">
+          <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="flex-shrink-0">
+            <img
+              src="https://qr-official.line.me/g/M/566fvjbg.png"
+              alt="QR Code Billboy"
+              className="w-32 h-32 rounded-lg border border-green-200 shadow-sm"
+            />
+          </a>
+          <div className="space-y-2">
+            <p className="text-sm text-green-800">
+              {isThai ? 'สแกน QR หรือกดลิงก์ด้านล่างเพื่อเพิ่มเพื่อน Billboy ทุกคนในบริษัทต้องเพิ่มเพื่อนก่อนเชื่อมบัญชี' : 'Scan the QR code or click the link below. Every user must add Billboy before linking their account.'}
             </p>
-          </div>
-          {liveLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <div className="text-xs text-gray-500 mb-2">Webhook</div>
-            {healthPill(!!liveStatus?.webhook?.lastWebhookAt, liveStatus?.webhook?.lastWebhookAt ? 'Active' : 'No event')}
-            <p className="mt-2 text-xs text-gray-600">
-              {liveStatus?.webhook?.lastWebhookAt ? new Date(liveStatus.webhook.lastWebhookAt).toLocaleString() : '-'}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <div className="text-xs text-gray-500 mb-2">Redis</div>
-            {healthPill(liveStatus?.redis?.ok)}
-            {liveStatus?.redis?.error && <p className="mt-2 text-xs text-red-600 line-clamp-2">{liveStatus.redis.error}</p>}
-          </div>
-          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <div className="text-xs text-gray-500 mb-2">Database</div>
-            {healthPill(liveStatus?.documentIntakesSchema?.ok, liveStatus?.documentIntakesSchema?.ok ? 'Migrated' : 'Needs migration')}
-            {!!liveStatus?.documentIntakesSchema?.missingColumns?.length && (
-              <p className="mt-2 text-xs text-red-600">Missing: {liveStatus.documentIntakesSchema.missingColumns.join(', ')}</p>
-            )}
-          </div>
-          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <div className="text-xs text-gray-500 mb-2">OCR</div>
-            {healthPill(liveStatus?.ocrReadiness?.productionReady, liveStatus?.ocrReadiness?.productionReady ? 'Production' : 'Check env')}
-            <p className="mt-2 text-xs text-gray-600">{liveStatus?.ocrReadiness?.models?.fastTextOrPdf ?? '-'}</p>
+            <a
+              href="https://line.me/R/ti/p/@566fvjbg"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#06C755] px-4 py-2 text-sm font-semibold text-white hover:bg-[#05b34d] transition-colors"
+            >
+              <Link2 className="w-4 h-4" />
+              {isThai ? 'เพิ่มเพื่อน @566fvjbg' : 'Add friend @566fvjbg'}
+            </a>
           </div>
         </div>
-
-        {liveStatus?.documentOps && (
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
-            {[
-              { label: isThai ? 'ผู้ใช้ LINE' : 'LINE users', value: liveStatus.linkedUsers?.count ?? 0 },
-              { label: isThai ? 'กลุ่ม LINE' : 'LINE groups', value: liveStatus.linkedGroups?.count ?? 0 },
-              { label: isThai ? 'รอยืนยัน' : 'Awaiting', value: (liveStatus.documentOps.byStatus.awaiting_confirmation ?? 0) + (liveStatus.documentOps.byStatus.awaiting_input ?? 0) },
-              { label: isThai ? 'บันทึกแล้ว' : 'Saved', value: liveStatus.documentOps.byStatus.saved ?? 0 },
-              { label: isThai ? 'ล้มเหลว' : 'Failed', value: liveStatus.documentOps.byStatus.failed ?? 0 },
-              { label: isThai ? 'ไฟล์บน Storage' : 'Storage files', value: liveStatus.documentOps.storage.storageBacked },
-              { label: isThai ? 'กันเอกสารซ้ำ' : 'Duplicates blocked', value: liveStatus.documentOps.storage.duplicateWarnings },
-            ].map((item) => (
-              <div key={item.label} className="rounded-lg border border-gray-100 bg-white px-3 py-2">
-                <p className="text-[11px] text-gray-500">{item.label}</p>
-                <p className="text-lg font-bold text-gray-900">{item.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {liveStatus?.documentOps && !liveStatus.documentOps.storage.configured && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            {isThai
-              ? 'Storage ยังไม่พร้อมสำหรับ production: เอกสารใหม่อาจถูกเก็บใน database ชั่วคราว ให้ตั้งค่า S3/R2 env ก่อนขายจริง'
-              : 'Production storage is not ready: new documents may be stored in the database temporarily. Configure S3/R2 env before launch.'}
-          </div>
-        )}
-
-        {(liveStatus?.lineMessaging?.lastPushFailure || liveStatus?.lineMessaging?.lastReplyFailure || liveStatus?.webhook?.lastUnhandledError) && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
-            {liveStatus.webhook?.lastUnhandledError && (
-              <p><strong>Webhook error:</strong> {liveStatus.webhook.lastUnhandledError.message}</p>
-            )}
-            {liveStatus.lineMessaging?.lastPushFailure && (
-              <p><strong>Push failed:</strong> {liveStatus.lineMessaging.lastPushFailure.status ?? '-'} {liveStatus.lineMessaging.lastPushFailure.body ?? liveStatus.lineMessaging.lastPushFailure.error}</p>
-            )}
-            {liveStatus.lineMessaging?.lastReplyFailure && (
-              <p><strong>Reply failed:</strong> {liveStatus.lineMessaging.lastReplyFailure.status ?? '-'} {liveStatus.lineMessaging.lastReplyFailure.body ?? liveStatus.lineMessaging.lastReplyFailure.error}</p>
-            )}
-          </div>
-        )}
-
-        {!!liveStatus?.recentDocumentIntakes?.items?.length && (
-          <div className="rounded-lg border border-gray-100 overflow-hidden">
-            <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
-              {isThai ? 'เอกสาร LINE ล่าสุด' : 'Recent LINE documents'}
-            </div>
-            <div className="divide-y divide-gray-100">
-              {liveStatus.recentDocumentIntakes.items.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                  <span className="text-gray-600">{item.mimeType}</span>
-                  <span className="font-medium text-gray-900">{item.status}</span>
-                  <span className="text-gray-400">{new Date(item.createdAt).toLocaleTimeString()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+      {/* Section 3: Connection — self-link + admin-managed users */}
+      <div className="border border-gray-200 rounded-xl p-5 space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="font-medium text-gray-800">
-              {isThai ? 'ผูก LINE กับผู้ใช้ในบริษัท' : 'User LINE connections'}
+              {isThai ? 'เชื่อมบัญชี LINE กับผู้ใช้' : 'Link LINE to user accounts'}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               {isThai
-                ? 'แอดมินสร้างรหัสให้ user แต่ละคน แล้วให้ user ส่งรหัสนั้นใน LINE Billboy ระบบจะผูกจาก LINE user จริงและแยกข้อมูลตามบัญชี'
-                : 'Admins generate a code for each user. The user sends it to Billboy in LINE, so the system links the real LINE user safely.'}
+                ? 'สร้างรหัส 6 หลัก แล้วให้ผู้ใช้ส่งรหัสนั้นในแชท Billboy บน LINE ระบบจะผูกอัตโนมัติภายใน 10 นาที'
+                : 'Generate a 6-digit code and have the user send it to Billboy in LINE. The system links automatically within 10 minutes.'}
             </p>
           </div>
           <button className="btn-secondary text-sm" onClick={() => void loadManagedUsers()} disabled={managedUsersLoading}>
@@ -2123,6 +2041,50 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             {isThai ? 'รีเฟรช' : 'Refresh'}
           </button>
         </div>
+
+        {/* Self-link for current user */}
+        {lineStatus && !lineStatus.linked && (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+            <p className="text-sm font-semibold text-indigo-900">
+              {isThai ? 'เชื่อมบัญชีของคุณเอง' : 'Link your own account'}
+            </p>
+            {otp ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-3xl font-bold tracking-[0.3em] text-indigo-700 select-all">{otp}</span>
+                  <button onClick={handleCopyOtp} className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors">
+                    {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
+                  </button>
+                </div>
+                <p className="text-xs text-indigo-800">
+                  {isThai ? 'ส่งรหัสนี้ให้ Billboy ใน LINE ภายใน 10 นาที' : 'Send this code to Billboy in LINE within 10 minutes.'}
+                </p>
+              </div>
+            ) : (
+              <button className="btn-primary text-sm" onClick={handleLinkStart}>
+                <Link2 className="w-4 h-4" />
+                {isThai ? 'สร้างรหัสเชื่อมต่อ' : 'Generate link code'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {lineStatus?.linked && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+              <span className="text-sm text-green-800">
+                {isThai ? 'บัญชีของคุณเชื่อม LINE แล้ว: ' : 'Your account is linked: '}
+                <span className="font-medium">{lineStatus.displayName ?? '—'}</span>
+              </span>
+            </div>
+            <button className="text-xs text-red-600 hover:text-red-700 font-medium inline-flex items-center gap-1" onClick={handleUnlink}>
+              <Unlink2 className="w-3.5 h-3.5" />
+              {isThai ? 'ถอด' : 'Unlink'}
+            </button>
+          </div>
+        )}
 
         {userOtp && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -2193,16 +2155,17 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         </div>
       </div>
 
+      {/* Section 4: Group linking */}
       <div className="border border-gray-200 rounded-xl p-5 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="font-medium text-gray-800">
-              {isThai ? 'ผูก LINE Group กับบริษัท' : 'Company LINE group connections'}
+              {isThai ? 'เชื่อมกลุ่ม LINE กับบริษัท' : 'Link LINE group to company'}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               {isThai
-                ? 'สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัสในกลุ่ม LINE ที่มี Billboy อยู่ ระบบจะบันทึกเอกสารเข้าบริษัทนี้โดยแยก tenant ปลอดภัย'
-                : 'Generate a group code, then send it in the LINE group that Billboy has joined. Documents from that group are stored under this company safely.'}
+                ? 'สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัสในกลุ่ม LINE ที่มี Billboy อยู่ ทุกคนในกลุ่มจะส่งเอกสารเข้าบริษัทได้'
+                : 'Generate a group code, then send it in the LINE group with Billboy. Everyone in the group can submit documents.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -2274,135 +2237,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         </div>
       </div>
 
-      {/* Connection Status card */}
-      <div className="border border-gray-200 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium text-gray-800">
-            {isThai ? 'เชื่อมต่อ LINE Billboy' : 'Connect LINE Billboy'}
-          </h3>
-          {lineStatus?.linked && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-              <CheckCircle className="w-3.5 h-3.5" />
-              {isThai ? 'เชื่อมต่อแล้ว ✅' : 'Connected ✅'}
-            </span>
-          )}
-        </div>
-
-        {lineStatus?.linked ? (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600">
-              {isThai ? 'บัญชี Line: ' : 'Line account: '}
-              <span className="font-medium text-gray-900">{lineStatus.displayName ?? '—'}</span>
-            </p>
-            <button
-              className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium"
-              onClick={handleUnlink}
-            >
-              <Unlink2 className="w-4 h-4" />
-              {isThai ? 'ยกเลิกการเชื่อมต่อ' : 'Unlink'}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {/* Step 1 */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">
-                {isThai ? 'ขั้นตอนที่ 1 — เพิ่มเพื่อน LINE Official Account Billboy' : 'Step 1 - Add LINE Official Account Billboy'}
-              </p>
-              <div className="flex items-start gap-4">
-                <a href="https://line.me/R/ti/p/@566fvjbg" target="_blank" rel="noreferrer" className="flex-shrink-0">
-                  <img
-                    src="https://qr-official.line.me/g/M/566fvjbg.png"
-                    alt="QR Code Billboy"
-                    className="w-28 h-28 rounded-lg border border-gray-200 shadow-sm"
-                  />
-                </a>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600">
-                    {isThai ? 'สแกน QR หรือค้นหา' : 'Scan QR or search for'}
-                  </p>
-                  <a
-                    href="https://line.me/R/ti/p/@566fvjbg"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-600 hover:text-green-700"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    {isThai ? 'เพิ่มเพื่อน @566fvjbg' : 'Add friend @566fvjbg'}
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">
-                {isThai ? 'ขั้นตอนที่ 2 — รับรหัส OTP เพื่อเชื่อมต่อบัญชี' : 'Step 2 — Generate OTP to link your account'}
-              </p>
-              {otp ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-3xl font-bold tracking-[0.3em] text-indigo-700 select-all">
-                      {otp}
-                    </span>
-                    <button
-                      onClick={handleCopyOtp}
-                      className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors"
-                    >
-                      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    {isThai ? 'พิมพ์รหัส 6 หลักนี้ส่งให้ Billboy ใน LINE: ' : 'Type this 6-digit code and send to Billboy in LINE: '}
-                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">{otp}</code>
-                  </p>
-                </div>
-              ) : (
-                <button className="btn-primary" onClick={handleLinkStart}>
-                  <Link2 className="w-4 h-4" />
-                  {isThai ? 'สร้างรหัสเชื่อมต่อ' : 'Generate link code'}
-                </button>
-              )}
-            </div>
-
-            {/* Step 3 */}
-            {otp && (
-              <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  {isThai
-                    ? 'ขั้นตอนที่ 3 — รอ Billboy ยืนยัน... รหัสนี้หมดอายุใน 10 นาที'
-                    : 'Step 3 - Waiting for Billboy to confirm... This code expires in 10 minutes'}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Rich Menu Setup card — admin only */}
-      <div className="border border-gray-200 rounded-xl p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">📋</span>
-          <h3 className="font-medium text-gray-800">Rich Menu (เมนูด้านล่าง Chat)</h3>
-        </div>
-        <p className="text-sm text-gray-500">
-          ติดตั้งปุ่มเมนูถาวรในแชท LINE ให้ผู้ใช้กดได้โดยไม่ต้องจำคำสั่ง ทำครั้งเดียวก็พอครับ
-        </p>
-        {richMenuMsg && (
-          <div className={`flex items-center gap-2 text-sm p-2 rounded-lg ${richMenuMsg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            {richMenuMsg.type === 'ok' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            {richMenuMsg.text}
-          </div>
-        )}
-        <button className="btn-primary" onClick={handleSetupRichMenu} disabled={richMenuLoading}>
-          {richMenuLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>🚀</span>}
-          {richMenuLoading ? 'กำลังติดตั้ง...' : 'ติดตั้ง Rich Menu'}
-        </button>
-      </div>
-
-      {/* Notification Settings card — show only when linked */}
+      {/* Section 5: Notification Settings — show only when linked */}
       {lineStatus?.linked && (
         <div className="border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -2448,6 +2283,118 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
           </button>
         </div>
       )}
+
+      {/* Section 6: Live status — collapsible */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between gap-3 p-5 text-left hover:bg-gray-50 transition-colors"
+          onClick={() => setStatusOpen(v => !v)}
+        >
+          <div>
+            <h3 className="font-medium text-gray-800">
+              {isThai ? 'สถานะระบบ LINE/OCR' : 'LINE/OCR System Status'}
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              {liveStatus?.checkedAt
+                ? `${isThai ? 'ตรวจล่าสุด' : 'Last checked'} ${new Date(liveStatus.checkedAt).toLocaleString()}`
+                : (isThai ? 'กำลังโหลดสถานะ...' : 'Loading status...')}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {liveLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+            <ArrowRight className={`w-4 h-4 text-gray-400 transition-transform ${statusOpen ? 'rotate-90' : ''}`} />
+          </div>
+        </button>
+
+        {statusOpen && (
+          <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 pt-4">
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <div className="text-xs text-gray-500 mb-2">Webhook</div>
+                {healthPill(!!liveStatus?.webhook?.lastWebhookAt, liveStatus?.webhook?.lastWebhookAt ? 'Active' : 'No event')}
+                <p className="mt-2 text-xs text-gray-600">
+                  {liveStatus?.webhook?.lastWebhookAt ? new Date(liveStatus.webhook.lastWebhookAt).toLocaleString() : '-'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <div className="text-xs text-gray-500 mb-2">Redis</div>
+                {healthPill(liveStatus?.redis?.ok)}
+                {liveStatus?.redis?.error && <p className="mt-2 text-xs text-red-600 line-clamp-2">{liveStatus.redis.error}</p>}
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <div className="text-xs text-gray-500 mb-2">Database</div>
+                {healthPill(liveStatus?.documentIntakesSchema?.ok, liveStatus?.documentIntakesSchema?.ok ? 'Migrated' : 'Needs migration')}
+                {!!liveStatus?.documentIntakesSchema?.missingColumns?.length && (
+                  <p className="mt-2 text-xs text-red-600">Missing: {liveStatus.documentIntakesSchema.missingColumns.join(', ')}</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <div className="text-xs text-gray-500 mb-2">OCR</div>
+                {healthPill(liveStatus?.ocrReadiness?.productionReady, liveStatus?.ocrReadiness?.productionReady ? 'Production' : 'Check env')}
+                <p className="mt-2 text-xs text-gray-600">{liveStatus?.ocrReadiness?.models?.fastTextOrPdf ?? '-'}</p>
+              </div>
+            </div>
+
+            {liveStatus?.documentOps && (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+                {[
+                  { label: isThai ? 'ผู้ใช้ LINE' : 'LINE users', value: liveStatus.linkedUsers?.count ?? 0 },
+                  { label: isThai ? 'กลุ่ม LINE' : 'LINE groups', value: liveStatus.linkedGroups?.count ?? 0 },
+                  { label: isThai ? 'รอยืนยัน' : 'Awaiting', value: (liveStatus.documentOps.byStatus.awaiting_confirmation ?? 0) + (liveStatus.documentOps.byStatus.awaiting_input ?? 0) },
+                  { label: isThai ? 'บันทึกแล้ว' : 'Saved', value: liveStatus.documentOps.byStatus.saved ?? 0 },
+                  { label: isThai ? 'ล้มเหลว' : 'Failed', value: liveStatus.documentOps.byStatus.failed ?? 0 },
+                  { label: isThai ? 'ไฟล์บน Storage' : 'Storage files', value: liveStatus.documentOps.storage.storageBacked },
+                  { label: isThai ? 'กันเอกสารซ้ำ' : 'Duplicates blocked', value: liveStatus.documentOps.storage.duplicateWarnings },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-gray-100 bg-white px-3 py-2">
+                    <p className="text-[11px] text-gray-500">{item.label}</p>
+                    <p className="text-lg font-bold text-gray-900">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {liveStatus?.documentOps && !liveStatus.documentOps.storage.configured && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                {isThai
+                  ? 'Storage ยังไม่พร้อมสำหรับ production: เอกสารใหม่อาจถูกเก็บใน database ชั่วคราว ให้ตั้งค่า S3/R2 env ก่อนขายจริง'
+                  : 'Production storage is not ready: new documents may be stored in the database temporarily. Configure S3/R2 env before launch.'}
+              </div>
+            )}
+
+            {(liveStatus?.lineMessaging?.lastPushFailure || liveStatus?.lineMessaging?.lastReplyFailure || liveStatus?.webhook?.lastUnhandledError) && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+                {liveStatus.webhook?.lastUnhandledError && (
+                  <p><strong>Webhook error:</strong> {liveStatus.webhook.lastUnhandledError.message}</p>
+                )}
+                {liveStatus.lineMessaging?.lastPushFailure && (
+                  <p><strong>Push failed:</strong> {liveStatus.lineMessaging.lastPushFailure.status ?? '-'} {liveStatus.lineMessaging.lastPushFailure.body ?? liveStatus.lineMessaging.lastPushFailure.error}</p>
+                )}
+                {liveStatus.lineMessaging?.lastReplyFailure && (
+                  <p><strong>Reply failed:</strong> {liveStatus.lineMessaging.lastReplyFailure.status ?? '-'} {liveStatus.lineMessaging.lastReplyFailure.body ?? liveStatus.lineMessaging.lastReplyFailure.error}</p>
+                )}
+              </div>
+            )}
+
+            {!!liveStatus?.recentDocumentIntakes?.items?.length && (
+              <div className="rounded-lg border border-gray-100 overflow-hidden">
+                <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
+                  {isThai ? 'เอกสาร LINE ล่าสุด' : 'Recent LINE documents'}
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {liveStatus.recentDocumentIntakes.items.slice(0, 5).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                      <span className="text-gray-600">{item.mimeType}</span>
+                      <span className="font-medium text-gray-900">{item.status}</span>
+                      <span className="text-gray-400">{new Date(item.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
