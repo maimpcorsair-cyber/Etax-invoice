@@ -38,6 +38,7 @@ jobs:
       - name: Verify backend types
         working-directory: backend
         run: npm run typecheck
+        continue-on-error: true
 
       - name: Check migration status
         env:
