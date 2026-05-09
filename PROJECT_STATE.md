@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 21:45 Asia/Bangkok
+Last updated: 2026-05-09 21:47 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -24,6 +24,8 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - GitHub Actions `Health Check` now has retries and longer timeouts to reduce false failures from Render cold starts.
 - `Deploy to Render` workflow now treats `prisma migrate status` as informational; `prisma migrate deploy` is the step that applies/fails migrations.
 - `Deploy to Render` smoke check now retries `/api/health` to tolerate Render cold starts after deploy hook.
+- Production migration `20260509_project_cost_centers` was applied successfully by GitHub Actions run `25603792760`.
+- Latest verified deploy run: `25603869894` succeeded.
 
 ## Latest Work Completed
 
@@ -83,6 +85,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Recent Commits To Know
 
+- `ac604f4` ci: retry backend health after deploy
+- `383f08d` ci: allow pending migrations before deploy
+- `aa06e6c` feat: add project cost centers
 - `7b92bbf` chore: ignore Vercel local config
 - `ad4c816` docs: require project state updates
 - `80cd323` docs: add project state handoff
