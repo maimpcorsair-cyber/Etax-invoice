@@ -41,6 +41,46 @@ Every relevant record should be able to connect to a project:
 
 Project is not just a budget page. It is the workspace where the team sees the documents, action items, tax safety, and money flow for one job.
 
+## Recommended Build Order
+
+Build in rounds so production keeps working and each round has a clear business value.
+
+1. Project Workspace backbone
+   - project pages, budget, members, file library, LINE group binding, Input VAT, expenses, invoices
+   - goal: every uploaded file and money record can belong to one project
+2. Action Needed + Tax Safety
+   - missing tax ID/date/amount, OCR failed, not VAT-claimable, unmatched slip, approval pending
+   - goal: accountants review risk instead of searching every document
+3. Smart Matching
+   - match slips/supporting files to purchase invoices by amount, date, supplier/receiver, and project
+   - goal: reduce manual chasing in LINE
+4. Export / Close-out Pack
+   - Excel, Google Sheets, ZIP attachments, Drive folder structure
+   - goal: one-click project handoff for owner/accountant/auditor
+5. LINE Guest Portal
+   - read-only project dashboard for LINE group members with limited upload/comment
+   - goal: let non-seat field users help fix missing documents without seeing company accounting
+6. DBD Integration
+   - lookup juristic profile by 13-digit JuristicID
+   - search by juristic name
+   - autofill customer/vendor legal name, status, registered capital, and address when available
+   - goal: reduce wrong tax ID/legal name and make customer/vendor onboarding smarter
+7. DBD-Backed Risk Checks
+   - warn when juristic status is inactive
+   - warn when invoice legal name does not match DBD profile
+   - keep a cached verified profile with source/timestamp
+   - goal: prevent tax-document errors before RD/export time
+
+Current DBD foundation:
+
+- Backend route: `GET /api/dbd/status`
+- Backend route: `GET /api/dbd/juristic/:juristicId`
+- Backend route: `GET /api/dbd/juristic-search?name=...`
+- Required env: `DGA_CONSUMER_KEY`, `DGA_CONSUMER_SECRET`, `DGA_AGENT_ID`
+- Optional env overrides: `DGA_BASE_URL`, `DGA_VALIDATE_PATH`, `DBD_PROFILE_PATH`, `DBD_SEARCH_BY_NAME_PATH`, `DBD_REQUEST_TIMEOUT_MS`
+
+Do not block Project Workspace launch on DBD credentials. DBD should enhance autofill and verification after Government API access is approved.
+
 ## Target Workflow
 
 1. Admin creates a project with budget, owner, approver, accountant, and team members.

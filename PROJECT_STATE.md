@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 02:12 Asia/Bangkok
+Last updated: 2026-05-10 18:45 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -64,6 +64,16 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added DBD / DGA API foundation:
+  - backend `GET /api/dbd/status`
+  - backend `GET /api/dbd/juristic/:juristicId`
+  - backend `GET /api/dbd/juristic-search?name=...`
+  - service gets DGA token via `DGA_CONSUMER_KEY`, `DGA_CONSUMER_SECRET`, and `DGA_AGENT_ID`
+  - DBD profile/search paths are configurable by env so production can follow DGA/DBD contract changes without code edits
+  - DBD is optional; routes return 503 when credentials are not configured
+- Updated `docs/project-workspace-profit-plan.md` with the recommended round-by-round build order and DBD phase.
+- Verified locally after DBD foundation:
+  - backend `npm run typecheck`
 - Added Smart Matching v1:
   - project workspace now returns `smartMatches` for unmatched slips/supporting documents and likely purchase candidates
   - Project Workspace has a Matching tab and overview matching panel
