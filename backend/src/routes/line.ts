@@ -24,6 +24,7 @@ import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { decodeQrFromImage } from '../services/qrDecodeService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { rasterizePdfToPngPages } from '../services/pdfRasterService';
 
 export const lineRouter = Router();
 
@@ -513,6 +514,10 @@ function paymentDate(result: OcrResult) {
 
 function paymentReference(result: OcrResult) {
   return result.payment?.reference || result.invoiceNumber || '';
+}
+
+function hasUsefulLineOcrData(result?: OcrResult) {
+  return !!(result && (result.supplierName || result.invoiceNumber || result.total || result.vatAmount || paymentAmount(result)));
 }
 
 function bankTransferDetails(result: OcrResult) {
@@ -2121,6 +2126,45 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     if (!result) return;
 
+    if (isPdf && !hasUsefulLineOcrData(result)) {
+      stage = 'pdf_raster_fallback';
+      logger.info('[Line] PDF OCR returned no useful fields; rasterizing pages for vision fallback', {
+        bytes: buffer.length,
+        provider: result.extractionProvider,
+      });
+      const rasterPages = await rasterizePdfToPngPages(buffer);
+      for (const [index, png] of rasterPages.entries()) {
+        stage = `pdf_raster_ocr_page_${index + 1}`;
+        const pageResult = await ocrSupplierInvoice(png.toString('base64'), 'image/png', {
+          source: 'image',
+          companyId,
+          pageCount: rasterPages.length,
+        });
+
+        let candidate = pageResult;
+        if (candidate.documentType !== 'bank_transfer'
+          && candidate.documentType !== 'payment_advice'
+          && (!paymentAmount(candidate) || looksLikeBankSlipCandidate(candidate))) {
+          const slipCandidate = await ocrBankTransferSlip(png.toString('base64'), 'image/png');
+          if (paymentAmount(slipCandidate) || slipCandidate.invoiceNumber || slipCandidate.payment?.reference) {
+            candidate = slipCandidate;
+          }
+        }
+
+        if (hasUsefulLineOcrData(candidate)) {
+          result = {
+            ...candidate,
+            extractionProvider: `${candidate.extractionProvider ?? 'vision'}+pdf-raster-fallback`,
+            validationWarnings: [
+              ...(candidate.validationWarnings ?? []),
+              `อ่านจากภาพหน้า PDF หน้า ${index + 1}`,
+            ],
+          };
+          break;
+        }
+      }
+    }
+
     if (result.documentType !== 'bank_transfer'
       && result.documentType !== 'payment_advice'
       && (!paymentAmount(result) || looksLikeBankSlipCandidate(result))) {
@@ -2142,7 +2186,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       qrDecoded: qrResult.ok,
     });
 
-    const hasAnyData = result.supplierName || result.invoiceNumber || result.total || result.vatAmount || paymentAmount(result);
+    const hasAnyData = hasUsefulLineOcrData(result);
     if (!hasAnyData) {
       await updateDocumentIntake(intake?.id, {
         status: 'failed',
