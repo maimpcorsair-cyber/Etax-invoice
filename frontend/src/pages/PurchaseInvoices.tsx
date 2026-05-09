@@ -137,23 +137,23 @@ function DocumentThumbnail({ docId, mimeType, fileUrl, token, isPdf }: DocumentT
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
       {loading ? (
-        <div className="w-14 h-14 rounded-lg bg-gray-100 animate-pulse" />
+        <div className="w-20 h-20 rounded-lg bg-gray-100 animate-pulse" />
       ) : error || !blobUrl ? (
-        <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-lg ${isPdf ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
-          {isPdf ? <FileText className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />}
+        <span className={`inline-flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border ${isPdf ? 'border-rose-100 bg-rose-50 text-rose-600' : 'border-blue-100 bg-blue-50 text-blue-600'}`}>
+          {isPdf ? <FileText className="w-7 h-7" /> : <ImageIcon className="w-7 h-7" />}
         </span>
       ) : isImage ? (
         <img
           src={blobUrl}
           alt=""
-          className="w-14 h-14 rounded-lg object-cover border border-gray-200"
+          className="w-20 h-20 rounded-lg object-contain border border-gray-200 bg-gray-50"
         />
       ) : (
         <iframe
-          src={blobUrl}
+          src={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=0&page=1`}
           title="pdf-preview"
           scrolling="no"
-          className="w-14 h-14 rounded-lg border border-gray-200 overflow-hidden pointer-events-none"
+          className="w-20 h-20 rounded-lg border border-gray-200 overflow-hidden pointer-events-none bg-gray-50"
           style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
         />
       )}
@@ -345,6 +345,18 @@ export default function PurchaseInvoices() {
     if (source === 'line') return isThai ? 'อัปโหลดผ่าน LINE' : 'Uploaded via LINE';
     if (source === 'web') return isThai ? 'อัปโหลดผ่านหน้าเว็บ' : 'Uploaded via web';
     return source;
+  }
+
+  function fileTypeLabel(doc: DocumentIntake) {
+    if (doc.mimeType === 'application/pdf') return 'PDF';
+    if (doc.mimeType.includes('image')) return isThai ? 'รูปภาพ' : 'Image';
+    return doc.mimeType;
+  }
+
+  function documentKindLabel(doc: DocumentIntake) {
+    return doc.ocrResult?.documentTypeLabel
+      || doc.ocrResult?.documentType
+      || (isThai ? 'ยังไม่ทราบประเภทเอกสาร' : 'Unclassified document');
   }
 
   function missingDocumentFields(doc: DocumentIntake) {
@@ -972,12 +984,15 @@ export default function PurchaseInvoices() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-gray-900 truncate">{documentTitle(doc)}</p>
+                            <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                              {fileTypeLabel(doc)}
+                            </span>
                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${documentStatusClass(doc.status)}`}>
                               {documentStatusLabel(doc.status)}
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-gray-500 truncate">
-                            {sourceLabel(doc.source)} · {doc.ocrResult?.documentTypeLabel || doc.ocrResult?.documentType || doc.mimeType} · {formatDate(doc.createdAt)}
+                            {sourceLabel(doc.source)} · {documentKindLabel(doc)} · {formatDate(doc.createdAt)}
                             {doc.ocrResult?.total ? ` · ${formatCurrency(doc.ocrResult.total)}` : ''}
                           </p>
                           {(doc.error || (doc.warnings && doc.warnings.length > 0)) ? (

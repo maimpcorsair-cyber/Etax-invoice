@@ -239,28 +239,31 @@ purchaseInvoicesRouter.get('/document-intakes/review', async (req, res) => {
         : { in: ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed'] },
     };
 
-    const items = await prisma.documentIntake.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      select: {
-        id: true,
-        source: true,
-        mimeType: true,
-        fileSize: true,
-        fileUrl: true,
-        status: true,
-        ocrResult: true,
-        warnings: true,
-        error: true,
-        targetType: true,
-        targetId: true,
-        purchaseInvoiceId: true,
-        processedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const items = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+      tx.documentIntake.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          source: true,
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          fileUrl: true,
+          status: true,
+          ocrResult: true,
+          warnings: true,
+          error: true,
+          targetType: true,
+          targetId: true,
+          purchaseInvoiceId: true,
+          processedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    );
 
     res.json({ data: items });
   } catch (err) {
@@ -325,40 +328,42 @@ purchaseInvoicesRouter.get('/document-intakes/stats/summary', async (req, res) =
       storageBacked,
       dbBacked,
       totalLast30Days,
-    ] = await Promise.all([
-      prisma.documentIntake.groupBy({
-        by: ['status'],
-        where: { companyId, createdAt: { gte: since } },
-        _count: { _all: true },
-      }),
-      prisma.documentIntake.groupBy({
-        by: ['source'],
-        where: { companyId, createdAt: { gte: since } },
-        _count: { _all: true },
-      }),
-      prisma.documentIntake.count({
-        where: { companyId, status: 'failed', createdAt: { gte: since } },
-      }),
-      prisma.documentIntake.count({
-        where: {
-          companyId,
-          createdAt: { gte: since },
-          OR: [
-            { error: { contains: 'duplicate', mode: 'insensitive' } },
-            { error: { contains: 'ซ้ำ' } },
-          ],
-        },
-      }),
-      prisma.documentIntake.count({
-        where: { companyId, storageKey: { not: null }, createdAt: { gte: since } },
-      }),
-      prisma.documentIntake.count({
-        where: { companyId, fileBase64: { not: null }, createdAt: { gte: since } },
-      }),
-      prisma.documentIntake.count({
-        where: { companyId, createdAt: { gte: since } },
-      }),
-    ]);
+    ] = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+      Promise.all([
+        tx.documentIntake.groupBy({
+          by: ['status'],
+          where: { companyId, createdAt: { gte: since } },
+          _count: { _all: true },
+        }),
+        tx.documentIntake.groupBy({
+          by: ['source'],
+          where: { companyId, createdAt: { gte: since } },
+          _count: { _all: true },
+        }),
+        tx.documentIntake.count({
+          where: { companyId, status: 'failed', createdAt: { gte: since } },
+        }),
+        tx.documentIntake.count({
+          where: {
+            companyId,
+            createdAt: { gte: since },
+            OR: [
+              { error: { contains: 'duplicate', mode: 'insensitive' } },
+              { error: { contains: 'ซ้ำ' } },
+            ],
+          },
+        }),
+        tx.documentIntake.count({
+          where: { companyId, storageKey: { not: null }, createdAt: { gte: since } },
+        }),
+        tx.documentIntake.count({
+          where: { companyId, fileBase64: { not: null }, createdAt: { gte: since } },
+        }),
+        tx.documentIntake.count({
+          where: { companyId, createdAt: { gte: since } },
+        }),
+      ]),
+    );
 
     res.json({
       data: {
@@ -383,10 +388,12 @@ purchaseInvoicesRouter.get('/document-intakes/stats/summary', async (req, res) =
 
 purchaseInvoicesRouter.get('/document-intakes/:id/file', async (req, res) => {
   try {
-    const item = await prisma.documentIntake.findFirst({
-      where: { id: req.params.id, companyId: req.user!.companyId },
-      select: { fileBase64: true, fileName: true, mimeType: true, fileUrl: true, storageKey: true },
-    });
+    const item = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+      tx.documentIntake.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        select: { fileBase64: true, fileName: true, mimeType: true, fileUrl: true, storageKey: true },
+      }),
+    );
     if (!item) {
       res.status(404).json({ error: 'Document not found' });
       return;

@@ -673,33 +673,51 @@ async function createDocumentIntake(input: {
   try {
     let fileUrl: string | undefined;
     let storageKey: string | undefined;
+    let fileBase64: string | undefined;
     const storageReady = isStorageConfigured();
+    const ext = input.mimeType === 'application/pdf'
+      ? 'pdf'
+      : input.mimeType.includes('png')
+        ? 'png'
+        : input.mimeType.includes('webp')
+          ? 'webp'
+          : 'jpg';
+
     if (storageReady) {
-      const ext = input.mimeType === 'application/pdf'
-        ? 'pdf'
-        : input.mimeType.includes('png')
-          ? 'png'
-          : input.mimeType.includes('webp')
-            ? 'webp'
-            : 'jpg';
       storageKey = `companies/${input.companyId}/document-intakes/${new Date().toISOString().slice(0, 10)}/${input.messageId}.${ext}`;
-      fileUrl = await uploadToStorage(storageKey, input.buffer, input.mimeType);
+      try {
+        fileUrl = await uploadToStorage(storageKey, input.buffer, input.mimeType);
+      } catch (storageErr) {
+        logger.warn('[Line] Document intake storage upload failed; falling back to database file', {
+          err: storageErr,
+          storageKey,
+          messageId: input.messageId,
+        });
+        storageKey = undefined;
+        fileBase64 = input.buffer.toString('base64');
+      }
+    } else {
+      fileBase64 = input.buffer.toString('base64');
     }
-    return await prisma.documentIntake.create({
-      data: {
-        companyId: input.companyId,
-        userId: input.userId,
-        lineUserId: input.lineUserId,
-        source: 'line',
-        sourceMessageId: input.messageId,
-        mimeType: input.mimeType,
-        fileSize: input.buffer.length,
-        fileBase64: storageReady ? undefined : input.buffer.toString('base64'),
-        fileUrl,
-        storageKey,
-        status: 'received',
-      },
-    });
+
+    return await withSystemRlsContext(prisma, (tx) =>
+      tx.documentIntake.create({
+        data: {
+          companyId: input.companyId,
+          userId: input.userId,
+          lineUserId: input.lineUserId,
+          source: 'line',
+          sourceMessageId: input.messageId,
+          fileName: `LINE-${input.messageId}.${ext}`,
+          mimeType: input.mimeType,
+          fileSize: input.buffer.length,
+          fileBase64,
+          fileUrl,
+          storageKey,
+          status: 'received',
+        },
+      }),
+    );
   } catch (err) {
     logger.warn('[Line] Document intake create failed; continuing inline', { err });
     return null;
@@ -720,19 +738,21 @@ async function updateDocumentIntake(
 ) {
   if (!id) return;
   try {
-    await prisma.documentIntake.update({
-      where: { id },
-      data: {
-        status: data.status,
-        ocrResult: data.ocrResult as Prisma.InputJsonValue | undefined,
-        warnings: data.warnings as Prisma.InputJsonValue | undefined,
-        error: data.error,
-        targetType: data.targetType,
-        targetId: data.targetId,
-        purchaseInvoiceId: data.purchaseInvoiceId,
-        processedAt: ['saved', 'needs_review', 'failed'].includes(data.status) ? new Date() : undefined,
-      },
-    });
+    await withSystemRlsContext(prisma, (tx) =>
+      tx.documentIntake.update({
+        where: { id },
+        data: {
+          status: data.status,
+          ocrResult: data.ocrResult as Prisma.InputJsonValue | undefined,
+          warnings: data.warnings as Prisma.InputJsonValue | undefined,
+          error: data.error,
+          targetType: data.targetType,
+          targetId: data.targetId,
+          purchaseInvoiceId: data.purchaseInvoiceId,
+          processedAt: ['saved', 'needs_review', 'failed'].includes(data.status) ? new Date() : undefined,
+        },
+      }),
+    );
   } catch (err) {
     logger.warn('[Line] Document intake update failed', { err, intakeId: id, status: data.status });
   }
@@ -2124,7 +2144,14 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       });
     }
 
-    if (!result) return;
+    if (!result) {
+      await updateDocumentIntake(intake?.id, {
+        status: 'failed',
+        error: 'OCR returned no result',
+      });
+      await sendLineText(lineUserId, '❌ ระบบอ่านเอกสารยังไม่ได้ผลลัพธ์ครับ\n\nไฟล์ถูกส่งเข้า Billboy แล้ว กรุณาตรวจในหน้า Input VAT หรือส่ง PDF/รูปที่ชัดกว่าอีกครั้ง');
+      return;
+    }
 
     if (isPdf && !hasUsefulLineOcrData(result)) {
       stage = 'pdf_raster_fallback';
@@ -2194,7 +2221,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         warnings: result.validationWarnings,
         error: 'OCR returned no useful fields',
       });
-      await sendLineText(lineUserId, '❌ ยังอ่านข้อมูลจากเอกสารนี้ไม่ได้\n\nกรุณาลองถ่ายให้ชัดขึ้น เห็นทั้งใบ ไม่เอียง แสงพอ และเห็นเลขผู้เสียภาษี/วันที่/ยอดรวม หรือส่งเป็น PDF ต้นฉบับ');
+      await sendLineText(lineUserId, `❌ ยังอ่านข้อมูลจากเอกสารนี้ไม่ได้${intake?.id ? '\n\nไฟล์ถูกเก็บไว้ในหน้า Input VAT แล้ว เพื่อให้กดเปิดดู/ตรวจเองได้' : ''}\n\nกรุณาลองถ่ายให้ชัดขึ้น เห็นทั้งใบ ไม่เอียง แสงพอ และเห็นเลขผู้เสียภาษี/วันที่/ยอดรวม หรือส่งเป็น PDF ต้นฉบับ`);
       return;
     }
 
