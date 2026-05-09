@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 21:36 Asia/Bangkok
+Last updated: 2026-05-09 21:41 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -22,6 +22,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - GitHub CLI is logged in as `maimpcorsair-cyber`; `gh run list` works.
 - GitHub Actions `Deploy to Render` and `Typecheck` are working on `main`.
 - GitHub Actions `Health Check` now has retries and longer timeouts to reduce false failures from Render cold starts.
+- `Deploy to Render` workflow now treats `prisma migrate status` as informational; `prisma migrate deploy` is the step that applies/fails migrations.
 
 ## Latest Work Completed
 
@@ -48,6 +49,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Updated LINE intake behavior:
   - if a LINE group is assigned to a project, new documents from that group are saved with that `projectId`
   - LINE admin group list now returns project info for future UI wiring
+- Fixed deploy workflow migration gate:
+  - previous `prisma migrate status` step failed when migrations were pending
+  - workflow now continues to `prisma migrate deploy` for normal production releases
 - Fixed LINE account linking under database RLS.
 - Fixed LINE webhook link lookup under system RLS.
 - Improved LINE OCR replies for bank transfer slips:

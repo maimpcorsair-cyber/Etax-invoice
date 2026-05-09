@@ -43,7 +43,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         working-directory: backend
-        run: npx prisma migrate status
+        run: npx prisma migrate status || true
 
       - name: Apply production migrations
         env:
