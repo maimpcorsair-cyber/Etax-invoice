@@ -515,6 +515,21 @@ function paymentReference(result: OcrResult) {
   return result.payment?.reference || result.invoiceNumber || '';
 }
 
+function bankTransferDetails(result: OcrResult) {
+  const payment = result.payment;
+  const lines = [
+    payment?.bankName ? `🏦 ธนาคาร/แอป: ${payment.bankName}` : null,
+    payment?.fromName || payment?.fromAccount
+      ? `จาก: ${payment?.fromName || '-'}${payment?.fromAccount ? ` (${payment.fromAccount})` : ''}`
+      : null,
+    payment?.toName || payment?.toAccount
+      ? `ถึง: ${payment?.toName || '-'}${payment?.toAccount ? ` (${payment.toAccount})` : ''}`
+      : null,
+    paymentReference(result) ? `เลขอ้างอิง: ${paymentReference(result)}` : null,
+  ].filter(Boolean);
+  return lines.length ? `\n${lines.join('\n')}` : '';
+}
+
 function closeAmount(left: number, right: number) {
   return Math.abs(left - right) <= 1;
 }
@@ -585,7 +600,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
         status: 'saved',
         targetId: exact.id,
         targetType: 'sales_invoice',
-        message: `✅ บันทึกรับชำระจากสลิปแล้ว\n📄 ${exact.invoiceNumber}\n👤 ${exact.buyer.nameTh}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}`,
+        message: `✅ บันทึกรับชำระจากสลิปแล้ว\n📄 ${exact.invoiceNumber}\n👤 ${exact.buyer.nameTh}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}`,
       };
     }
 
@@ -593,7 +608,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
       ok: false,
       status: 'needs_review',
       targetType: 'sales_invoice',
-      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}\nกรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
+      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}\nกรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
       warnings: ['unmatched:sales_invoice'],
     };
   }
@@ -629,7 +644,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
       status: 'saved',
       targetId: exactPurchase.id,
       targetType: 'purchase_invoice',
-      message: `✅ บันทึกจ่ายชำระเอกสารซื้อแล้ว\n📄 ${exactPurchase.invoiceNumber}\n🏢 ${exactPurchase.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}`,
+      message: `✅ บันทึกจ่ายชำระเอกสารซื้อแล้ว\n📄 ${exactPurchase.invoiceNumber}\n🏢 ${exactPurchase.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}`,
     };
   }
 
@@ -637,7 +652,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
     ok: false,
     status: 'needs_review',
     targetType: 'purchase_invoice',
-    message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับเอกสารซื้อไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}\nกรุณาตรวจในหน้า Input VAT`,
+    message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับเอกสารซื้อไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}\nกรุณาตรวจในหน้า Input VAT`,
     warnings: ['unmatched:purchase_invoice'],
   };
 }
@@ -2106,8 +2121,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     if (!result) return;
 
-    if (!isPdf
-      && result.documentType !== 'bank_transfer'
+    if (result.documentType !== 'bank_transfer'
       && result.documentType !== 'payment_advice'
       && (!paymentAmount(result) || looksLikeBankSlipCandidate(result))) {
       stage = 'ocr_bank_slip_specialist';

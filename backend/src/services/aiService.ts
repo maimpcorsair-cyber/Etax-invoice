@@ -617,6 +617,8 @@ Rules:
 - total and payment.amount must be the transferred amount, not balance or fee.
 - invoiceDate and payment.paidAt must be the transfer date.
 - invoiceNumber and payment.reference should use transaction id/reference number if visible.
+- Always extract both visible party names when present. In Thai bank slips, the name near the upper/source bank logo is usually fromName and the name below the arrow/PromptPay/receiver bank logo is usually toName.
+- Preserve Thai names exactly as visible, including titles such as นาย/นาง/นางสาว and bank/app labels separately in bankName.
 - If Decoded QR/barcode payload evidence is provided, use it to help extract reference, account/PromptPay id, amount, and bank payload. Cross-check it against visible OCR text.
 - direction is "outgoing" if the slip says money was sent/โอนเงินออก/จากบัญชีเรา to another party; "incoming" if money was received/รับเงิน/เงินเข้า; otherwise "unknown".
 - confidence high requires amount plus date plus either reference or counterparty name.${qrContext}`;
