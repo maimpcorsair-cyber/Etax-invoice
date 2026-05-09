@@ -599,6 +599,19 @@ model PendingSignup {
   @@map("pending_signups")
 }
 
+model LineOtp {
+  id        String   @id @default(cuid())
+  otp       String   @unique
+  type      String   @default("user")
+  userId    String?
+  companyId String
+  issuedBy  String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("line_otps")
+}
+
 model LineUserLink {
   id          String   @id @default(cuid())
   userId      String   @unique

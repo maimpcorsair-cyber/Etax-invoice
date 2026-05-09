@@ -252,22 +252,24 @@ async function safeRedisSetex(key: string, ttlSeconds: number, value: string) {
 
 async function createLineLinkOtp(payload: LineOtpPayload) {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const otpKey = `line:otp:${otp}`;
 
-  if (redis.status !== 'ready') {
-    logger.warn('[Line] Redis not ready for OTP creation, connecting...', { status: redis.status });
-    await redis.connect();
+  // Clean up any expired OTPs for this user (prevent stale buildup)
+  if (payload.userId) {
+    await prisma.lineOtp.deleteMany({ where: { userId: payload.userId } });
   }
 
-  await redis.setex(otpKey, OTP_TTL, JSON.stringify(payload));
+  await prisma.lineOtp.create({
+    data: {
+      otp,
+      type: payload.type ?? 'user',
+      userId: payload.userId,
+      companyId: payload.companyId,
+      issuedBy: payload.issuedBy,
+      expiresAt: new Date(Date.now() + OTP_TTL * 1000),
+    },
+  });
 
-  const stored = await redis.get(otpKey);
-  if (!stored) {
-    logger.error('[Line] OTP write verification failed — Redis may be lagging (cold start?)');
-    return null;
-  }
-
-  logger.info('[Line] OTP created', { otpKey, type: payload.type, redisStatus: redis.status });
+  logger.info('[Line] OTP created in DB', { otp: otp.slice(0, 3) + '***', type: payload.type });
   return otp;
 }
 
@@ -1171,39 +1173,25 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
   if (!otpMatch) return false;
 
   const otp = otpMatch[1];
-  let stored: string | null = null;
-  try {
-    stored = await redis.get(`line:otp:${otp}`);
-  } catch (err) {
-    logger.error('[Line] Group OTP Redis lookup failed', { err });
-  }
+  const otpRecord = await prisma.lineOtp.findUnique({ where: { otp } });
 
-  if (!stored) {
+  if (!otpRecord || otpRecord.expiresAt < new Date()) {
+    if (otpRecord) await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
     await sendLineText(context.replyTargetId, 'รหัสเชื่อมต่อกลุ่มไม่ถูกต้องหรือหมดอายุแล้ว กรุณาให้แอดมินสร้างรหัสใหม่');
     return true;
   }
 
-  let payload: LineOtpPayload;
-  try {
-    payload = JSON.parse(stored) as LineOtpPayload;
-  } catch (err) {
-    await safeRedisDel(`line:otp:${otp}`);
-    logger.warn('[Line] Corrupted group OTP payload cleared', { err });
-    await sendLineText(context.replyTargetId, 'รหัสเชื่อมต่อกลุ่มใช้ไม่ได้แล้ว กรุณาให้แอดมินสร้างรหัสใหม่');
-    return true;
-  }
-
-  if (payload.type !== 'group') {
+  if (otpRecord.type !== 'group') {
     return false;
   }
 
   const company = await prisma.company.findUnique({
-    where: { id: payload.companyId },
+    where: { id: otpRecord.companyId },
     select: { id: true, nameTh: true },
   });
 
   if (!company) {
-    await safeRedisDel(`line:otp:${otp}`);
+    await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
     await sendLineText(context.replyTargetId, 'ไม่พบบริษัทที่ผูกกับรหัสนี้ กรุณาสร้างรหัสใหม่');
     return true;
   }
@@ -1215,18 +1203,18 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
       lineGroupId,
       groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
       isActive: true,
-      linkedById: payload.issuedBy,
+      linkedById: otpRecord.issuedBy,
     },
     update: {
       companyId: company.id,
       groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
       isActive: true,
-      linkedById: payload.issuedBy,
+      linkedById: otpRecord.issuedBy,
       linkedAt: new Date(),
     },
   });
 
-  await safeRedisDel(`line:otp:${otp}`);
+  await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
   await sendLineText(
     context.replyTargetId,
     `เชื่อมกลุ่ม LINE กับ ${company.nameTh} สำเร็จแล้วครับ\n\nจากนี้สมาชิกในกลุ่มส่งรูป/PDF ใบเสร็จหรือใบกำกับภาษีให้ Billboy อ่านและเข้าคิวเอกสารของบริษัทได้เลย`,
@@ -1617,66 +1605,33 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
   const otpMatch = trimmed.match(/^(?:\/link\s+)?(\d{6})$/);
   if (otpMatch) {
     const otp = otpMatch[1];
-    const otpKey = `line:otp:${otp}`;
 
-    // Ensure Redis is reachable before OTP lookup (handles cold-start / reconnect)
-    try {
-      if (redis.status !== 'ready') {
-        logger.warn('[Line] Redis not ready for OTP lookup, connecting...', { status: redis.status });
-        await redis.connect();
-      }
-      await redis.ping();
-    } catch (pingErr) {
-      logger.error('[Line] Redis unreachable for OTP lookup', { pingErr, status: redis.status });
-      await sendLineText(lineUserId, 'ระบบสะดุดชั่วคราว กรุณาลองส่ง OTP อีกครั้งใน 10 วินาที 🙏');
-      return;
-    }
+    // Look up OTP from database (not Redis — Redis on Render free tier is unreliable)
+    const otpRecord = await prisma.lineOtp.findUnique({ where: { otp } });
 
-    // Read OTP with one retry on transient failure
-    let stored: string | null = null;
-    let redisGetFailed = false;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        stored = await redis.get(otpKey);
-        redisGetFailed = false;
-        break;
-      } catch (err) {
-        redisGetFailed = true;
-        logger.warn(`[Line] OTP Redis GET attempt ${attempt} failed`, { err, otpKey });
-        if (attempt === 1) await new Promise(r => setTimeout(r, 500));
-      }
-    }
-
-    if (redisGetFailed) {
-      logger.error('[Line] OTP Redis GET failed after 2 attempts', { otpKey });
-      await sendLineText(lineUserId, 'ระบบสะดุดชั่วคราว กรุณาลองส่ง OTP อีกครั้ง 🙏');
-      return;
-    }
-
-    logger.info('[Line] OTP lookup', { otpKey, found: !!stored, redisStatus: redis.status, lineUser: lineUserId.slice(0, 8) });
-
-    if (!stored) {
+    if (!otpRecord || otpRecord.expiresAt < new Date()) {
+      if (otpRecord) await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
       await sendLineText(lineUserId, 'OTP ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอ OTP ใหม่จากระบบ');
       return;
     }
 
+    logger.info('[Line] OTP found in DB', { otp: otp.slice(0, 3) + '***', type: otpRecord.type, lineUser: lineUserId.slice(0, 8) });
+
+    if (otpRecord.type === 'group') {
+      await sendLineText(lineUserId, 'รหัสนี้ใช้สำหรับเชื่อม LINE group กรุณาส่งรหัสในกลุ่มที่ต้องการเชื่อม');
+      return;
+    }
+
+    if (!otpRecord.userId) {
+      await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
+      await sendLineText(lineUserId, 'รหัสนี้ไม่สมบูรณ์ กรุณาขอรหัสใหม่จากระบบ');
+      return;
+    }
+
     try {
-      const { type, userId, companyId } = JSON.parse(stored) as LineOtpPayload;
-
-      if (type === 'group') {
-        await sendLineText(lineUserId, 'รหัสนี้ใช้สำหรับเชื่อม LINE group กรุณาส่งรหัสในกลุ่มที่ต้องการเชื่อม');
-        return;
-      }
-
-      if (!userId) {
-        await safeRedisDel(`line:otp:${otp}`);
-        await sendLineText(lineUserId, 'รหัสนี้ไม่สมบูรณ์ กรุณาขอรหัสใหม่จากระบบ');
-        return;
-      }
-
       const linkResult = await prisma.$transaction(async (tx) => {
         const targetUser = await tx.user.findFirst({
-          where: { id: userId, companyId, isActive: true },
+          where: { id: otpRecord.userId!, companyId: otpRecord.companyId, isActive: true },
           select: { id: true, name: true, companyId: true },
         });
 
@@ -1709,6 +1664,9 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
           },
         });
 
+        // Consume the OTP
+        await tx.lineOtp.delete({ where: { id: otpRecord.id } });
+
         return { ok: true as const, userName: targetUser.name };
       });
 
@@ -1717,25 +1675,24 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
           await sendLineText(lineUserId, 'บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว กรุณาให้แอดมินถอดการเชื่อมต่อก่อนแล้วลองใหม่');
           return;
         }
-        await safeRedisDel(`line:otp:${otp}`);
+        await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
         await sendLineText(lineUserId, 'ไม่พบผู้ใช้ที่เชื่อมกับรหัสนี้ หรือผู้ใช้ถูกปิดใช้งานแล้ว กรุณาขอรหัสใหม่จากแอดมิน');
         return;
       }
 
-      await safeRedisDel(`line:otp:${otp}`);
       await sendLineText(
         lineUserId,
-        `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
+        `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถส่งรูปใบกำกับภาษี, สลิปโอน, PO หรือเอกสารอื่นๆ มาได้เลยครับ`,
       );
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       const errCode = (err as { code?: string }).code;
-      logger.error('[Line] OTP link failed', { err, errMsg, errCode, otpKey, senderLineUserId: senderLineUserId.slice(0, 8) });
+      logger.error('[Line] OTP link transaction failed', { err: errMsg, errCode, otp: otp.slice(0, 3) + '***' });
 
       if (errCode === 'P2002') {
         await sendLineText(lineUserId, 'บัญชี LINE นี้หรือผู้ใช้นี้ถูกเชื่อมแล้ว กรุณาให้แอดมินตรวจสอบสถานะการเชื่อมต่อ');
       } else {
-        await sendLineText(lineUserId, `เกิดข้อผิดพลาด (${errCode ?? 'UNKNOWN'}) กรุณาลองใหม่หรือแจ้งแอดมิน`);
+        await sendLineText(lineUserId, 'เกิดข้อผิดพลาดในการเชื่อมบัญชี กรุณาลองใหม่หรือแจ้งแอดมิน');
       }
     }
     return;
@@ -2621,16 +2578,6 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
 
   // Always respond 200 immediately; process events async
   res.json({ ok: true });
-
-  // Proactively ensure Redis is connected before processing events (handles cold-start with lazyConnect)
-  if (redis.status !== 'ready') {
-    try {
-      await redis.connect();
-      logger.info('[Line] Redis connected proactively for webhook', { status: redis.status });
-    } catch (err) {
-      logger.warn('[Line] Redis proactive connect failed — will retry per-command', { err, status: redis.status });
-    }
-  }
 
   for (const event of body.events ?? []) {
     const replyTargetId = event.source.groupId ?? event.source.roomId ?? event.source.userId;
