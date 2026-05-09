@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 01:30 Asia/Bangkok
+Last updated: 2026-05-10 01:32 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -33,6 +33,8 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified LINE project/export typecheck run: `25607397904` succeeded.
 - Latest verified Project Approval + Tax Safety deploy run: `25608068266` succeeded.
 - Latest verified Project Approval + Tax Safety typecheck run: `25608068262` succeeded.
+- Latest verified Project Close-out + Telemetry deploy run: `25608658632` succeeded.
+- Latest verified Project Close-out + Telemetry typecheck run: `25608658622` succeeded.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
@@ -46,6 +48,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - frontend `/app/projects` returned HTTP 200 from Vercel
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
 - Production checks after `62b29f4`:
+  - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
+  - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
+  - frontend `/app/projects` returned HTTP 200 from Vercel
+- Production checks after `e33bc42`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
   - frontend `/app/projects` returned HTTP 200 from Vercel
@@ -199,6 +205,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Recent Commits To Know
 
+- `e33bc42` feat: add project closeout exports and telemetry
 - `62b29f4` feat: add project approvals and tax safety
 - `c7a2410` feat: add line project admin and export pack
 - `790e231` feat: connect projects across document workflows
