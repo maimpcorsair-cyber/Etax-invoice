@@ -22,7 +22,7 @@ import {
   type BillingPlanKey,
   type BillingPaymentMethod,
 } from '../services/billingService';
-import { resolveCompanyAccessPolicy } from '../services/accessPolicyService';
+import { getMonthStart, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 import { buildPromptPayQr } from '../services/promptPayService';
 import {
   sendBillingActivationEmail,
@@ -194,6 +194,60 @@ const couponSchema = z.object({
   stripePromotionCodeId: z.string().trim().max(120).optional().or(z.literal('')),
   active: z.boolean().default(true),
 });
+
+const overageChargeSchema = z.object({
+  confirm: z.literal('CHARGE_OVERAGE'),
+});
+
+function getOverageBillingPeriod(date = new Date()) {
+  const start = getMonthStart(date);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
+  return { start, end, key: start.toISOString().slice(0, 7) };
+}
+
+async function getUsageOverageSnapshot(companyId: string) {
+  const policy = await resolveCompanyAccessPolicy(companyId);
+  const period = getOverageBillingPeriod();
+  const includedDocuments = policy.maxDocumentsPerMonth;
+  const usedDocuments = policy.usage.documentsThisMonth;
+  const overageDocuments = includedDocuments == null ? 0 : Math.max(0, usedDocuments - includedDocuments);
+  const unitPriceThb = policy.extraOcrDocumentThb ?? 0;
+  const estimatedOverageThb = Math.round(overageDocuments * unitPriceThb * 100) / 100;
+  const externalReference = `overage:${companyId}:${period.key}`;
+  const existingCharge = await withRlsContext(prisma, { companyId, role: 'tenant', systemMode: false }, (tx) =>
+    tx.billingTransaction.findFirst({
+      where: {
+        companyId,
+        externalReference,
+        channel: 'stripe_overage',
+        status: { in: ['pending', 'paid'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  );
+
+  return {
+    policy,
+    period,
+    externalReference,
+    includedDocuments,
+    usedDocuments,
+    remainingDocuments: includedDocuments == null ? null : Math.max(0, includedDocuments - usedDocuments),
+    overageDocuments,
+    unitPriceThb,
+    estimatedOverageThb,
+    billable: overageDocuments > 0 && unitPriceThb > 0,
+    status: includedDocuments == null
+      ? 'unlimited'
+      : overageDocuments > 0
+        ? 'overage'
+        : usedDocuments >= includedDocuments * 0.8
+          ? 'near_limit'
+          : 'ok',
+    existingCharge,
+  };
+}
 
 function issueToken(user: { id: string; companyId: string; role: string; email: string }) {
   return jwt.sign(
@@ -598,6 +652,23 @@ stripeWebhookRouter.post('/stripe/webhook', async (req, res) => {
       }
       case 'invoice.paid': {
         const invoice = event.data.object;
+        const overageTransactionId = invoice.metadata?.billingTransactionId;
+        if (overageTransactionId && typeof invoice.id === 'string') {
+          await withSystemRlsContext(prisma, (tx) => tx.billingTransaction.updateMany({
+            where: { id: overageTransactionId, channel: 'stripe_overage' },
+            data: {
+              status: 'paid',
+              paidAt: new Date(),
+              metadata: {
+                ...invoice.metadata,
+                stripeInvoiceId: invoice.id,
+                stripeInvoiceStatus: invoice.status ?? null,
+              },
+            },
+          }), { role: 'billing-webhook' });
+          break;
+        }
+
         const subscriptionId = getInvoiceSubscriptionId(invoice);
 
         if (subscriptionId) {
@@ -631,6 +702,22 @@ stripeWebhookRouter.post('/stripe/webhook', async (req, res) => {
       }
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
+        const overageTransactionId = invoice.metadata?.billingTransactionId;
+        if (overageTransactionId && typeof invoice.id === 'string') {
+          await withSystemRlsContext(prisma, (tx) => tx.billingTransaction.updateMany({
+            where: { id: overageTransactionId, channel: 'stripe_overage' },
+            data: {
+              status: 'payment_failed',
+              metadata: {
+                ...invoice.metadata,
+                stripeInvoiceId: invoice.id,
+                stripeInvoiceStatus: invoice.status ?? null,
+              },
+            },
+          }), { role: 'billing-webhook' });
+          break;
+        }
+
         const subscriptionId = getInvoiceSubscriptionId(invoice);
 
         if (subscriptionId) {
@@ -1125,35 +1212,173 @@ billingRouter.get('/access-policy', authenticate, async (req, res) => {
 
 billingRouter.get('/usage-overage', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
   try {
-    const policy = await resolveCompanyAccessPolicy(req.user!.companyId);
-    const includedDocuments = policy.maxDocumentsPerMonth;
-    const usedDocuments = policy.usage.documentsThisMonth;
-    const overageDocuments = includedDocuments == null ? 0 : Math.max(0, usedDocuments - includedDocuments);
-    const unitPriceThb = policy.extraOcrDocumentThb ?? 0;
-    const estimatedOverageThb = Math.round(overageDocuments * unitPriceThb * 100) / 100;
+    const snapshot = await getUsageOverageSnapshot(req.user!.companyId);
 
     res.json({
       data: {
-        plan: policy.plan,
-        planLabel: policy.planLabel,
-        includedDocuments,
-        usedDocuments,
-        remainingDocuments: includedDocuments == null ? null : Math.max(0, includedDocuments - usedDocuments),
-        overageDocuments,
-        unitPriceThb,
-        estimatedOverageThb,
-        billable: overageDocuments > 0 && unitPriceThb > 0,
-        status: includedDocuments == null
-          ? 'unlimited'
-          : overageDocuments > 0
-            ? 'overage'
-            : usedDocuments >= includedDocuments * 0.8
-              ? 'near_limit'
-              : 'ok',
+        plan: snapshot.policy.plan,
+        planLabel: snapshot.policy.planLabel,
+        periodStart: snapshot.period.start,
+        periodEnd: snapshot.period.end,
+        includedDocuments: snapshot.includedDocuments,
+        usedDocuments: snapshot.usedDocuments,
+        remainingDocuments: snapshot.remainingDocuments,
+        overageDocuments: snapshot.overageDocuments,
+        unitPriceThb: snapshot.unitPriceThb,
+        estimatedOverageThb: snapshot.estimatedOverageThb,
+        billable: snapshot.billable,
+        status: snapshot.status,
+        autoChargeEnabled: process.env.OVERAGE_BILLING_AUTO_CHARGE_ENABLED === 'true',
+        existingCharge: snapshot.existingCharge
+          ? {
+              id: snapshot.existingCharge.id,
+              status: snapshot.existingCharge.status,
+              totalAmount: snapshot.existingCharge.totalAmount,
+              externalReference: snapshot.existingCharge.externalReference,
+              metadata: snapshot.existingCharge.metadata,
+              createdAt: snapshot.existingCharge.createdAt,
+            }
+          : null,
       },
     });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message || 'Failed to load overage usage' });
+  }
+});
+
+billingRouter.post('/usage-overage/charge', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+  try {
+    overageChargeSchema.parse(req.body);
+    const companyId = req.user!.companyId;
+    const snapshot = await getUsageOverageSnapshot(companyId);
+
+    if (!snapshot.billable) {
+      res.status(400).json({ error: 'No billable overage for this billing period', data: snapshot });
+      return;
+    }
+    if (snapshot.existingCharge) {
+      res.json({ data: { alreadyCharged: true, transaction: snapshot.existingCharge } });
+      return;
+    }
+    if (process.env.OVERAGE_BILLING_AUTO_CHARGE_ENABLED !== 'true') {
+      res.status(409).json({
+        error: 'Overage auto charge is disabled. Set OVERAGE_BILLING_AUTO_CHARGE_ENABLED=true after owner approval.',
+        data: {
+          periodStart: snapshot.period.start,
+          periodEnd: snapshot.period.end,
+          overageDocuments: snapshot.overageDocuments,
+          unitPriceThb: snapshot.unitPriceThb,
+          estimatedOverageThb: snapshot.estimatedOverageThb,
+        },
+      });
+      return;
+    }
+
+    const stripe = getStripeClient();
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe billing is not configured' });
+      return;
+    }
+
+    const subscription = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+      tx.companySubscription.findUnique({ where: { companyId } }),
+    );
+    if (!subscription?.stripeCustomerId) {
+      res.status(404).json({ error: 'No Stripe customer found for this company' });
+      return;
+    }
+
+    const amountSatang = Math.round(snapshot.estimatedOverageThb * 100);
+    const metadata = {
+      kind: 'ocr_overage',
+      companyId,
+      plan: snapshot.policy.plan,
+      periodKey: snapshot.period.key,
+      periodStart: snapshot.period.start.toISOString(),
+      periodEnd: snapshot.period.end.toISOString(),
+      includedDocuments: String(snapshot.includedDocuments ?? 'unlimited'),
+      usedDocuments: String(snapshot.usedDocuments),
+      overageDocuments: String(snapshot.overageDocuments),
+      unitPriceThb: String(snapshot.unitPriceThb),
+    };
+
+    const transaction = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+      tx.billingTransaction.create({
+        data: {
+          companyId,
+          plan: subscription.plan,
+          channel: 'stripe_overage',
+          status: 'pending',
+          currency: 'THB',
+          subtotalAmount: snapshot.estimatedOverageThb,
+          discountAmount: 0,
+          totalAmount: snapshot.estimatedOverageThb,
+          externalReference: snapshot.externalReference,
+          metadata,
+        },
+      }),
+    );
+
+    try {
+      await stripe.invoiceItems.create({
+        customer: subscription.stripeCustomerId,
+        amount: amountSatang,
+        currency: 'thb',
+        description: `Billboy OCR overage ${snapshot.period.key}: ${snapshot.overageDocuments} docs`,
+        metadata: { ...metadata, billingTransactionId: transaction.id },
+      }, { idempotencyKey: `${snapshot.externalReference}:item` });
+
+      const invoice = await stripe.invoices.create({
+        customer: subscription.stripeCustomerId,
+        collection_method: 'charge_automatically',
+        auto_advance: true,
+        description: `Billboy OCR overage ${snapshot.period.key}`,
+        metadata: { ...metadata, billingTransactionId: transaction.id },
+      }, { idempotencyKey: `${snapshot.externalReference}:invoice` });
+
+      const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+        tx.billingTransaction.update({
+          where: { id: transaction.id },
+          data: {
+            metadata: {
+              ...metadata,
+              stripeInvoiceId: invoice.id,
+              stripeHostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+              stripeInvoiceStatus: invoice.status ?? null,
+            },
+          },
+        }),
+      );
+
+      res.status(201).json({
+        data: {
+          transaction: updated,
+          stripeInvoiceId: invoice.id,
+          stripeInvoiceStatus: invoice.status,
+          hostedInvoiceUrl: invoice.hosted_invoice_url,
+        },
+      });
+    } catch (stripeErr) {
+      await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+        tx.billingTransaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'failed',
+            metadata: {
+              ...metadata,
+              error: stripeErr instanceof Error ? stripeErr.message : String(stripeErr),
+            },
+          },
+        }),
+      );
+      throw stripeErr;
+    }
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    res.status(500).json({ error: (err as Error).message || 'Failed to charge overage' });
   }
 });
 

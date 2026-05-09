@@ -496,10 +496,15 @@ Already implemented:
   - matching now shows related PO candidates plus likely purchase invoice candidates
   - Project Excel and Google Sheet exports include `PO 3-way`
 - LINE/OCR live-status usage telemetry and estimated OCR cost.
+- Overage Billing Automation v1:
+  - Admin Billing tab shows monthly document overage, estimate, and existing charge state
+  - guarded endpoint creates Stripe invoice item + auto-charge invoice
+  - production real charge requires `OVERAGE_BILLING_AUTO_CHARGE_ENABLED=true`
+  - webhook updates overage billing transaction status from Stripe invoice events
 
 Still needed:
 
 - Smarter tax safety queue and matching beyond v1:
   - slip to receiver/vendor
   - non-VAT expense to payment voucher
-- Billing automation for overage/add-on seats.
+- Add-on seats billing automation.

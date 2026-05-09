@@ -1277,6 +1277,7 @@ function BillingTab({ isThai }: { isThai: boolean }) {
   const { policy } = useCompanyAccessPolicy();
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [overageCharging, setOverageCharging] = useState(false);
   const [subscription, setSubscription] = useState<null | {
     plan: string;
     status: string;
@@ -1286,6 +1287,28 @@ function BillingTab({ isThai }: { isThai: boolean }) {
     cancelAtPeriodEnd: boolean;
     activatedAt?: string | null;
   }>(null);
+  const [overage, setOverage] = useState<null | {
+    plan: string;
+    planLabel: string;
+    periodStart: string;
+    periodEnd: string;
+    includedDocuments?: number | null;
+    usedDocuments: number;
+    remainingDocuments?: number | null;
+    overageDocuments: number;
+    unitPriceThb: number;
+    estimatedOverageThb: number;
+    billable: boolean;
+    status: 'unlimited' | 'overage' | 'near_limit' | 'ok';
+    autoChargeEnabled: boolean;
+    existingCharge?: {
+      id: string;
+      status: string;
+      totalAmount: number;
+      externalReference?: string | null;
+      createdAt: string;
+    } | null;
+  }>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -1293,12 +1316,22 @@ function BillingTab({ isThai }: { isThai: boolean }) {
 
     async function loadBilling() {
       try {
-        const res = await fetch('/api/billing/subscription', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = await res.json() as { data?: typeof subscription; error?: string };
-        if (!res.ok) throw new Error(json.error ?? 'Failed to load billing');
-        if (active) setSubscription(json.data ?? null);
+        const [subscriptionRes, overageRes] = await Promise.all([
+          fetch('/api/billing/subscription', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch('/api/billing/usage-overage', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        const subscriptionJson = await subscriptionRes.json() as { data?: typeof subscription; error?: string };
+        const overageJson = await overageRes.json() as { data?: typeof overage; error?: string };
+        if (!subscriptionRes.ok) throw new Error(subscriptionJson.error ?? 'Failed to load billing');
+        if (!overageRes.ok) throw new Error(overageJson.error ?? 'Failed to load overage usage');
+        if (active) {
+          setSubscription(subscriptionJson.data ?? null);
+          setOverage(overageJson.data ?? null);
+        }
       } catch (err) {
         if (active) setError((err as Error).message);
       } finally {
@@ -1324,6 +1357,31 @@ function BillingTab({ isThai }: { isThai: boolean }) {
     } catch (err) {
       setError((err as Error).message);
       setPortalLoading(false);
+    }
+  }
+
+  async function chargeOverage() {
+    if (!window.confirm(isThai ? 'ยืนยันสร้างรายการเก็บเงินเอกสารเกินแพ็กเกจ?' : 'Confirm charging this month’s document overage?')) return;
+    setOverageCharging(true);
+    setError('');
+    try {
+      const res = await fetch('/api/billing/usage-overage/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirm: 'CHARGE_OVERAGE' }),
+      });
+      const json = await res.json() as { data?: unknown; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Unable to charge overage');
+      const refreshed = await fetch('/api/billing/usage-overage', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const refreshedJson = await refreshed.json() as { data?: typeof overage; error?: string };
+      if (!refreshed.ok) throw new Error(refreshedJson.error ?? 'Failed to refresh overage usage');
+      setOverage(refreshedJson.data ?? null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setOverageCharging(false);
     }
   }
 
@@ -1370,6 +1428,50 @@ function BillingTab({ isThai }: { isThai: boolean }) {
                   : `Current billing period ends ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-GB')}`)
                 : (isThai ? 'ยังไม่มีวันสิ้นสุดรอบบิล' : 'No billing period end date yet')}
             </p>
+          </div>
+        </div>
+      )}
+
+      {overage && (
+        <div className="card">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-gray-400 mb-2">{isThai ? 'เอกสารเกินแพ็กเกจ' : 'Document overage'}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {overage.overageDocuments.toLocaleString()} {isThai ? 'เอกสาร' : 'docs'}
+                <span className="ml-2 text-base font-semibold text-gray-500">/ ฿{overage.estimatedOverageThb.toLocaleString()}</span>
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                {isThai
+                  ? `ใช้ ${overage.usedDocuments.toLocaleString()} จาก ${overage.includedDocuments?.toLocaleString() ?? 'ไม่จำกัด'} เอกสารในรอบนี้`
+                  : `Used ${overage.usedDocuments.toLocaleString()} of ${overage.includedDocuments?.toLocaleString() ?? 'unlimited'} documents this period`}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {isThai ? 'ราคาเอกสารเกิน' : 'Overage unit price'} ฿{overage.unitPriceThb.toLocaleString()} / {isThai ? 'เอกสาร' : 'doc'}
+                {' · '}
+                {new Date(overage.periodStart).toLocaleDateString(isThai ? 'th-TH' : 'en-GB')} - {new Date(overage.periodEnd).toLocaleDateString(isThai ? 'th-TH' : 'en-GB')}
+              </p>
+              {overage.existingCharge && (
+                <p className="mt-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                  {isThai ? 'มีรายการเก็บเงินแล้ว' : 'Charge created'}: {overage.existingCharge.status}
+                </p>
+              )}
+              {!overage.autoChargeEnabled && (
+                <p className="mt-2 text-xs text-amber-700">
+                  {isThai
+                    ? 'ยังปิดโหมดตัดเงินจริงอยู่ ต้องเปิด OVERAGE_BILLING_AUTO_CHARGE_ENABLED=true ก่อนใช้งานจริง'
+                    : 'Real auto charge is disabled until OVERAGE_BILLING_AUTO_CHARGE_ENABLED=true is set.'}
+                </p>
+              )}
+            </div>
+            <button
+              className="btn-primary"
+              onClick={chargeOverage}
+              disabled={!overage.billable || overageCharging || !!overage.existingCharge}
+            >
+              {overageCharging ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+              {isThai ? 'สร้างรายการเก็บเงินเกินแพ็กเกจ' : 'Charge overage'}
+            </button>
           </div>
         </div>
       )}

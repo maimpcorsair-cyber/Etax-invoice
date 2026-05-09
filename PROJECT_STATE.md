@@ -112,6 +112,19 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Overage Billing Automation v1:
+  - `GET /api/billing/usage-overage` now returns billing period, auto-charge guard state, and existing overage charge state
+  - new guarded `POST /api/billing/usage-overage/charge` creates a Stripe invoice item + auto-charge invoice for OCR overage
+  - real charging is disabled unless `OVERAGE_BILLING_AUTO_CHARGE_ENABLED=true`
+  - duplicate monthly charges are blocked by a deterministic monthly overage reference
+  - Stripe invoice webhooks now update overage billing transactions when `billingTransactionId` metadata is present
+  - Admin Billing tab now shows current document overage, estimated charge, guard warning, and charge action
+- Verified locally after Overage Billing Automation v1:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added Project PO / 3-way Matching v1:
   - new `project_purchase_orders` table with tenant RLS and Prisma model `ProjectPurchaseOrder`
   - Project Workspace now syncs PO/quotation/delivery-note documents from OCR metadata into the PO model
