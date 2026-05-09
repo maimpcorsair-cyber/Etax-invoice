@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 01:20 Asia/Bangkok
+Last updated: 2026-05-10 01:30 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -52,6 +52,21 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Close-out / Phase 5 v1:
+  - backend `POST /api/projects/:id/export/sheets` creates a Google Sheet with Overview, Action Needed, Files, Purchases, Sales, Expenses, and LINE Groups
+  - backend `GET /api/projects/:id/export/zip` downloads a project attachment ZIP from storage-backed or DB-backed document intakes and includes `_links.txt` for link-only files
+  - Project Workspace now has Sync Sheet and ZIP buttons beside Export Excel
+  - Drive upload endpoint can receive `projectId` and `documentFolder` and place files into the project/category folder
+  - project document intake uploads mirror a copy to the project Drive folder when Drive is configured, while keeping existing R2/DB preview behavior
+- Added Monetization / Debug Phase 6 v1:
+  - LINE live-status now includes 30-day source/mime breakdown and usage telemetry
+  - Admin LINE/OCR status panel now shows billable documents, OCR intakes, LINE/web split, and estimated OCR cost
+- Verified locally after Phase 5/6 v1:
+  - backend `npx tsc --noEmit`
+  - frontend `npx tsc --noEmit`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added Project Approval Workflow v1:
   - project owner/approver can approve or reject submitted project expense vouchers
   - admins and super admins keep global expense approval permission

@@ -6,8 +6,11 @@ import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { auditLog } from '../services/auditService';
 import { logger } from '../config/logger';
-import { getLimitErrorMessage, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
+import { getLimitErrorMessage, hasFeatureAccess, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 import { generateProjectExportExcel } from '../services/exportService';
+import { exportProjectToSheets, isSheetsConfigured } from '../services/googleSheetsService';
+import { downloadFromStorage } from '../services/storageService';
+import { createZip, ZipEntryInput } from '../services/zipService';
 
 export const projectsRouter = Router();
 
@@ -380,6 +383,10 @@ function summarizeTaxSafety(items: Array<TaxSafety & { vatAmount?: number }>) {
     claimableVat: items.reduce((sum, item) => sum + (item.status === 'vat_claimable' ? item.vatAmount ?? 0 : 0), 0),
     taxSafetyByStatus: byStatus,
   };
+}
+
+function safeFileName(value: string) {
+  return value.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 160) || 'untitled';
 }
 
 projectsRouter.get('/users', async (req, res) => {
@@ -849,6 +856,309 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
   } catch (err) {
     logger.error('Failed to export project', { error: err, projectId: req.params.id });
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to export project' });
+  }
+});
+
+projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  if (!isSheetsConfigured()) {
+    res.status(503).json({ error: 'Google Sheets is not configured on this server' });
+    return;
+  }
+
+  try {
+    const policy = await resolveCompanyAccessPolicy(req.user!.companyId);
+    if (!hasFeatureAccess(policy, 'export_google_sheets')) {
+      res.status(403).json({ error: 'Upgrade your plan to export project Google Sheets' });
+      return;
+    }
+
+    const companyId = req.user!.companyId;
+    const exportData = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const row = await tx.project.findFirst({
+        where: { id: req.params.id, companyId },
+        include: {
+          owner: { select: { name: true } },
+          approver: { select: { name: true } },
+        },
+      });
+      if (!row) return null;
+
+      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups] = await Promise.all([
+        projectBudgetSummary(companyId, row.id, tx),
+        tx.documentIntake.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { createdAt: 'desc' },
+          take: 1000,
+          select: {
+            id: true,
+            source: true,
+            fileName: true,
+            mimeType: true,
+            fileSize: true,
+            status: true,
+            ocrResult: true,
+            warnings: true,
+            error: true,
+            targetType: true,
+            targetId: true,
+            purchaseInvoiceId: true,
+            createdAt: true,
+          },
+        }),
+        tx.purchaseInvoice.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { invoiceDate: 'desc' },
+          take: 1000,
+          select: {
+            supplierName: true,
+            supplierTaxId: true,
+            invoiceNumber: true,
+            invoiceDate: true,
+            vatType: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            isPaid: true,
+          },
+        }),
+        tx.invoice.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { invoiceDate: 'desc' },
+          take: 1000,
+          select: {
+            invoiceNumber: true,
+            type: true,
+            status: true,
+            invoiceDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            isPaid: true,
+            buyer: { select: { nameTh: true, nameEn: true } },
+          },
+        }),
+        tx.expenseVoucher.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { voucherDate: 'desc' },
+          take: 1000,
+          select: {
+            voucherNumber: true,
+            status: true,
+            voucherDate: true,
+            description: true,
+            totalAmount: true,
+          },
+        }),
+        tx.lineGroupLink.findMany({
+          where: { companyId, projectId: row.id, isActive: true },
+          orderBy: { linkedAt: 'desc' },
+          select: { groupName: true, linkedAt: true },
+        }),
+      ]);
+
+      const purchaseRows = purchaseInvoices.map((item) => ({
+        ...item,
+        subtotal: asNumber(item.subtotal),
+        vatAmount: asNumber(item.vatAmount),
+        total: asNumber(item.total),
+        taxSafety: taxSafetyForPurchase(item),
+      }));
+      const fileRows = documentIntakes.map((item) => ({ ...item, kind: documentKind(item), taxSafety: taxSafetyForIntake(item) }));
+      const purchaseTotal = purchaseRows.reduce((sum, item) => sum + item.total, 0);
+      const purchaseVat = purchaseRows.reduce((sum, item) => sum + item.vatAmount, 0);
+      const revenueTotal = invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
+      const expenseTotal = expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
+      const actionNeeded = fileRows
+        .map(actionNeededForIntake)
+        .filter((item): item is NonNullable<ReturnType<typeof actionNeededForIntake>> => item !== null);
+      const taxSafetySummary = summarizeTaxSafety([
+        ...fileRows.map((item) => item.taxSafety),
+        ...purchaseRows.map((item) => ({ ...item.taxSafety, vatAmount: item.vatAmount })),
+      ]);
+
+      return {
+        project: row,
+        workspaceSummary: {
+          PurchaseTotal: purchaseTotal,
+          PurchaseVAT: purchaseVat,
+          RevenueTotal: revenueTotal,
+          ExpenseTotal: expenseTotal,
+          EstimatedMargin: revenueTotal - purchaseTotal - expenseTotal,
+          ActionNeededCount: actionNeeded.length,
+          FilesCount: documentIntakes.length,
+          LINEGroupCount: lineGroups.length,
+          CommittedAmount: summary.committedAmount,
+          PaidAmount: summary.paidAmount,
+          RemainingBudget: asNumber(row.budgetAmount) - summary.committedAmount,
+          TaxSafetyRiskCount: taxSafetySummary.taxSafetyRiskCount,
+          ClaimableVAT: taxSafetySummary.claimableVat,
+        },
+        actionNeeded,
+        files: fileRows,
+        purchases: purchaseRows,
+        invoices,
+        expenseVouchers,
+        lineGroups,
+      };
+    });
+
+    if (!exportData) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const url = await exportProjectToSheets({
+      project: {
+        code: exportData.project.code,
+        name: exportData.project.name,
+        customerName: exportData.project.customerName,
+        budgetAmount: asNumber(exportData.project.budgetAmount),
+        status: exportData.project.status,
+        ownerName: exportData.project.owner?.name ?? null,
+        approverName: exportData.project.approver?.name ?? null,
+      },
+      summary: exportData.workspaceSummary,
+      actionNeeded: exportData.actionNeeded,
+      files: exportData.files.map((item) => ({
+        fileName: item.fileName ?? item.id,
+        source: item.source,
+        kind: item.kind,
+        status: item.status,
+        taxSafetyStatus: item.taxSafety.status,
+        taxSafetyMessage: item.taxSafety.message,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        createdAt: item.createdAt,
+      })),
+      purchases: exportData.purchases.map((item) => ({
+        supplierName: item.supplierName,
+        supplierTaxId: item.supplierTaxId,
+        invoiceNumber: item.invoiceNumber,
+        invoiceDate: item.invoiceDate,
+        vatType: item.vatType,
+        subtotal: item.subtotal,
+        vatAmount: item.vatAmount,
+        total: item.total,
+        taxSafetyStatus: item.taxSafety.status,
+        taxSafetyMessage: item.taxSafety.message,
+        isPaid: item.isPaid,
+      })),
+      sales: exportData.invoices.map((item) => ({
+        invoiceNumber: item.invoiceNumber,
+        buyerName: item.buyer.nameTh || item.buyer.nameEn || '',
+        type: item.type,
+        status: item.status,
+        invoiceDate: item.invoiceDate,
+        subtotal: asNumber(item.subtotal),
+        vatAmount: asNumber(item.vatAmount),
+        total: asNumber(item.total),
+        isPaid: item.isPaid,
+      })),
+      expenses: exportData.expenseVouchers.map((item) => ({
+        voucherNumber: item.voucherNumber,
+        status: item.status,
+        voucherDate: item.voucherDate,
+        description: item.description ?? '',
+        totalAmount: asNumber(item.totalAmount),
+      })),
+      lineGroups: exportData.lineGroups.map((item) => ({
+        groupName: item.groupName ?? 'LINE Group',
+        linkedAt: item.linkedAt,
+      })),
+    });
+
+    await auditLog({
+      companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'project.export_sheets',
+      resourceType: 'project',
+      resourceId: exportData.project.id,
+      details: { url, code: exportData.project.code },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.json({ data: { url } });
+  } catch (err) {
+    logger.error('Failed to export project to Google Sheets', { error: err, projectId: req.params.id });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to export project to Google Sheets' });
+  }
+});
+
+projectsRouter.get('/:id/export/zip', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const data = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const project = await tx.project.findFirst({
+        where: { id: req.params.id, companyId },
+        select: { id: true, code: true, name: true },
+      });
+      if (!project) return null;
+      const files = await tx.documentIntake.findMany({
+        where: { companyId, projectId: project.id },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+        select: {
+          id: true,
+          fileName: true,
+          mimeType: true,
+          fileBase64: true,
+          fileUrl: true,
+          storageKey: true,
+          status: true,
+          source: true,
+          error: true,
+          createdAt: true,
+        },
+      });
+      return { project, files };
+    });
+
+    if (!data) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const entries: ZipEntryInput[] = [];
+    const links: string[] = [];
+    for (const file of data.files) {
+      const label = safeFileName(file.fileName ?? `${file.id}.${file.mimeType === 'application/pdf' ? 'pdf' : 'bin'}`);
+      const path = `files/${safeFileName(file.status)}/${label}`;
+      try {
+        if (file.storageKey) {
+          entries.push({ path, data: await downloadFromStorage(file.storageKey) });
+        } else if (file.fileBase64) {
+          entries.push({ path, data: Buffer.from(file.fileBase64, 'base64') });
+        } else if (file.fileUrl) {
+          links.push(`${file.fileName ?? file.id}\t${file.status}\t${file.fileUrl}`);
+        } else {
+          links.push(`${file.fileName ?? file.id}\t${file.status}\tmissing original file${file.error ? `\t${file.error}` : ''}`);
+        }
+      } catch (err) {
+        links.push(`${file.fileName ?? file.id}\t${file.status}\tfailed to include: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    entries.push({
+      path: 'README.txt',
+      data: [
+        `Project: ${data.project.code} ${data.project.name}`,
+        `Generated: ${new Date().toISOString()}`,
+        `Included files: ${entries.length}`,
+        links.length ? 'Some files are stored as links in _links.txt.' : '',
+      ].filter(Boolean).join('\n'),
+    });
+    if (links.length > 0) entries.push({ path: '_links.txt', data: ['File\tStatus\tLink/Note', ...links].join('\n') });
+
+    const zip = createZip(entries);
+    const safeCode = safeFileName(data.project.code);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="project-${safeCode}-attachments.zip"`);
+    res.send(zip);
+  } catch (err) {
+    logger.error('Failed to export project ZIP', { error: err, projectId: req.params.id });
+    res.status(500).json({ error: 'Failed to export project ZIP' });
   }
 });
 

@@ -1692,6 +1692,9 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     documentOps?: {
       windowDays: number;
       byStatus: Record<string, number>;
+      bySource?: Record<string, number>;
+      byMimeType?: Record<string, number>;
+      usageTelemetry?: { salesInvoices: number; purchaseInvoices: number; documentIntakes: number; billableDocuments: number; estimatedOcrCostThb: number };
       storage: { configured: boolean; storageBacked: number; databaseBacked: number; duplicateWarnings: number };
     };
     ocrReadiness?: { productionReady: boolean; tier: string; warnings?: string[]; models?: { fastTextOrPdf?: string; scanImageOrPdf?: string; proEscalation?: string | null } };
@@ -2318,6 +2321,23 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                   <div key={item.label} className="rounded-lg border border-gray-100 bg-white px-3 py-2">
                     <p className="text-[11px] text-gray-500">{item.label}</p>
                     <p className="text-lg font-bold text-gray-900">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {liveStatus?.documentOps?.usageTelemetry && (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                {[
+                  { label: isThai ? 'เอกสารคิดแพ็กเกจ' : 'Billable docs', value: liveStatus.documentOps.usageTelemetry.billableDocuments },
+                  { label: isThai ? 'OCR intake' : 'OCR intakes', value: liveStatus.documentOps.usageTelemetry.documentIntakes },
+                  { label: isThai ? 'จาก LINE' : 'From LINE', value: liveStatus.documentOps.bySource?.line ?? 0 },
+                  { label: isThai ? 'จากเว็บ' : 'From web', value: liveStatus.documentOps.bySource?.web ?? 0 },
+                  { label: isThai ? 'ต้นทุน OCR ประมาณ' : 'Est. OCR cost', value: `฿${liveStatus.documentOps.usageTelemetry.estimatedOcrCostThb}` },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                    <p className="text-[11px] text-emerald-700">{item.label}</p>
+                    <p className="text-lg font-bold text-emerald-950">{item.value}</p>
                   </div>
                 ))}
               </div>

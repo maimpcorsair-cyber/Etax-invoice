@@ -334,6 +334,146 @@ export async function exportExpensesToSheets(
   return url;
 }
 
+export async function exportProjectToSheets(input: {
+  project: {
+    code: string;
+    name: string;
+    customerName?: string | null;
+    budgetAmount: number;
+    status: string;
+    ownerName?: string | null;
+    approverName?: string | null;
+  };
+  summary: Record<string, string | number>;
+  actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
+  files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
+  purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean }>;
+  sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
+  expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
+  lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
+}): Promise<string> {
+  const auth = getAuthWithDrive();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const drive = google.drive({ version: 'v3', auth });
+  const title = `${input.project.code} ${input.project.name} - Project Export ${new Date().toISOString().slice(0, 10)}`;
+  const spreadsheet = await sheets.spreadsheets.create({
+    requestBody: {
+      properties: { title },
+      sheets: [
+        { properties: { title: 'Overview', sheetId: 0 } },
+        { properties: { title: 'Action Needed', sheetId: 1 } },
+        { properties: { title: 'Files', sheetId: 2 } },
+        { properties: { title: 'Purchases', sheetId: 3 } },
+        { properties: { title: 'Sales', sheetId: 4 } },
+        { properties: { title: 'Expenses', sheetId: 5 } },
+        { properties: { title: 'LINE Groups', sheetId: 6 } },
+      ],
+    },
+  });
+  const id = spreadsheet.data.spreadsheetId!;
+  const asDate = (value: Date | string) => value instanceof Date ? formatDate(value) : value;
+
+  const overviewRows = [
+    ['Project code', input.project.code],
+    ['Project name', input.project.name],
+    ['Customer / site', input.project.customerName ?? ''],
+    ['Status', input.project.status],
+    ['Owner', input.project.ownerName ?? ''],
+    ['Approver', input.project.approverName ?? ''],
+    ['Budget', input.project.budgetAmount],
+    ...Object.entries(input.summary).map(([key, value]) => [key, value]),
+  ];
+
+  await Promise.all([
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Overview!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Metric', 'Value'], ...overviewRows] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Action Needed!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Severity', 'Type', 'Title', 'Message'], ...input.actionNeeded.map((item) => [item.severity, item.type, item.title, item.message])] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Files!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.mimeType, item.fileSize, asDate(item.createdAt)])] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Purchases!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No'])] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Sales!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Invoice no.', 'Buyer', 'Type', 'Status', 'Invoice date', 'Subtotal', 'VAT', 'Total', 'Paid'], ...input.sales.map((item) => [item.invoiceNumber, item.buyerName, item.type, item.status, asDate(item.invoiceDate), item.subtotal, item.vatAmount, item.total, item.isPaid ? 'Yes' : 'No'])] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Expenses!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total'], ...input.expenses.map((item) => [item.voucherNumber, item.status, asDate(item.voucherDate), item.description, item.totalAmount])] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'LINE Groups!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Group name', 'Linked at'], ...input.lineGroups.map((item) => [item.groupName, asDate(item.linkedAt)])] },
+    }),
+  ]);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: id,
+    requestBody: {
+      requests: Array.from({ length: 7 }, (_, sheetId) => [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.059, green: 0.463, blue: 0.369 },
+                textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat)',
+          },
+        },
+        {
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+            fields: 'gridProperties.frozenRowCount',
+          },
+        },
+        {
+          autoResizeDimensions: {
+            dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 12 },
+          },
+        },
+      ]).flat(),
+    },
+  });
+
+  try {
+    await drive.permissions.create({
+      fileId: id,
+      requestBody: { role: 'reader', type: 'anyone' },
+    });
+  } catch {
+    logger.warn('Could not set project sheet permissions to anyone-reader');
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${id}`;
+  logger.info(`Project Sheets export created: ${url} (${input.project.code})`);
+  return url;
+}
+
 /* ── PP.30 / VAT summary sheet ─────────────────────────────────────────────── */
 
 export interface Pp30SheetData {

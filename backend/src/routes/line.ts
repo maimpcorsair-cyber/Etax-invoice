@@ -1152,7 +1152,7 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
   const companyId = req.user!.companyId;
   const since = new Date();
   since.setDate(since.getDate() - 30);
-  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult, linkedGroupsResult, intakeStatusResult, storageResult] = await Promise.allSettled([
+  const [redisResult, intakeColumnsResult, recentIntakesResult, linkedUsersResult, linkedGroupsResult, intakeStatusResult, storageResult, intakeSourceResult, intakeMimeResult, documentUsageResult] = await Promise.allSettled([
     testRedisSessionWrite(),
     prisma.$queryRaw<Array<{ column_name: string }>>`
       SELECT column_name
@@ -1201,6 +1201,21 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
         },
       }),
     ]),
+    prisma.documentIntake.groupBy({
+      by: ['source'],
+      where: { companyId, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    prisma.documentIntake.groupBy({
+      by: ['mimeType'],
+      where: { companyId, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    Promise.all([
+      prisma.invoice.count({ where: { companyId, createdAt: { gte: since } } }),
+      prisma.purchaseInvoice.count({ where: { companyId, createdAt: { gte: since } } }),
+      prisma.documentIntake.count({ where: { companyId, createdAt: { gte: since } } }),
+    ]),
   ]);
 
   const columns = intakeColumnsResult.status === 'fulfilled'
@@ -1238,6 +1253,21 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
         byStatus: intakeStatusResult.status === 'fulfilled'
           ? Object.fromEntries(intakeStatusResult.value.map((row) => [row.status, row._count._all]))
           : {},
+        bySource: intakeSourceResult.status === 'fulfilled'
+          ? Object.fromEntries(intakeSourceResult.value.map((row) => [row.source, row._count._all]))
+          : {},
+        byMimeType: intakeMimeResult.status === 'fulfilled'
+          ? Object.fromEntries(intakeMimeResult.value.map((row) => [row.mimeType, row._count._all]))
+          : {},
+        usageTelemetry: documentUsageResult.status === 'fulfilled'
+          ? {
+              salesInvoices: documentUsageResult.value[0],
+              purchaseInvoices: documentUsageResult.value[1],
+              documentIntakes: documentUsageResult.value[2],
+              billableDocuments: documentUsageResult.value[0] + documentUsageResult.value[1] + documentUsageResult.value[2],
+              estimatedOcrCostThb: Math.round(documentUsageResult.value[2] * Number(process.env.AI_OCR_AVG_COST_THB ?? 0.25) * 100) / 100,
+            }
+          : { salesInvoices: 0, purchaseInvoices: 0, documentIntakes: 0, billableDocuments: 0, estimatedOcrCostThb: 0 },
         storage: storageResult.status === 'fulfilled'
           ? {
               configured: isStorageConfigured(),

@@ -8,7 +8,7 @@ import { requireRole } from '../middleware/auth';
 import { auditLog } from '../services/auditService';
 import { hasFeatureAccess, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 import { generateVoucherNumber, getExpenseLimit } from '../services/expenseService';
-import { uploadToDrive, isDriveConfigured } from '../services/googleDriveService';
+import { uploadToDrive, isDriveConfigured, DriveDocumentFolder } from '../services/googleDriveService';
 import { exportExpensesToSheets, isSheetsConfigured } from '../services/googleSheetsService';
 import { logger } from '../config/logger';
 
@@ -675,11 +675,25 @@ expensesRouter.post(
     }
 
     try {
+      const projectId = typeof req.body.projectId === 'string' && req.body.projectId ? req.body.projectId : null;
+      const documentFolder = typeof req.body.documentFolder === 'string' && req.body.documentFolder
+        ? req.body.documentFolder as DriveDocumentFolder
+        : null;
       const [company, userRecord] = await Promise.all([
         prisma.company.findUnique({ where: { id: req.user!.companyId }, select: { nameTh: true, nameEn: true } }),
         prisma.user.findUnique({ where: { id: req.user!.userId }, select: { googleRefreshToken: true } }),
       ]);
       const companyName = company?.nameEn ?? company?.nameTh ?? req.user!.companyId;
+      const project = projectId
+        ? await prisma.project.findFirst({
+            where: { id: projectId, companyId: req.user!.companyId },
+            select: { code: true, name: true },
+          })
+        : null;
+      if (projectId && !project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
 
       const result = await uploadToDrive(
         req.file.buffer,
@@ -687,6 +701,11 @@ expensesRouter.post(
         req.file.mimetype,
         companyName,
         userRecord?.googleRefreshToken,
+        {
+          projectCode: project?.code,
+          projectName: project?.name,
+          documentFolder,
+        },
       );
 
       res.json({ data: result });

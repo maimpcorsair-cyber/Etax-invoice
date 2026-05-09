@@ -9,7 +9,9 @@ import {
   CheckCircle2,
   Download,
   ExternalLink,
+  FileArchive,
   FileImage,
+  FileSpreadsheet,
   FileText,
   FolderOpen,
   Inbox,
@@ -214,6 +216,8 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [zipDownloading, setZipDownloading] = useState(false);
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -354,6 +358,53 @@ export default function ProjectDetail() {
     }
   }
 
+  async function syncProjectSheet() {
+    if (!token || !workspace) return;
+    setSheetSyncing(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/export/sheets`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Google Sheets export failed');
+      const url = json.data?.url;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google Sheets export failed');
+    } finally {
+      setSheetSyncing(false);
+    }
+  }
+
+  async function downloadAttachmentZip() {
+    if (!token || !workspace) return;
+    setZipDownloading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/export/zip`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'ZIP export failed');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const safeCode = workspace.project.code.replace(/[^A-Z0-9-_]/gi, '_');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `project-${safeCode}-attachments.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ZIP export failed');
+    } finally {
+      setZipDownloading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -430,6 +481,24 @@ export default function ProjectDetail() {
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {isThai ? 'Export Excel' : 'Export Excel'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void syncProjectSheet()}
+            disabled={sheetSyncing}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {sheetSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            {isThai ? 'Sync Sheet' : 'Sync Sheet'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadAttachmentZip()}
+            disabled={zipDownloading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {zipDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
+            ZIP
           </button>
           <Link
             to={`/app/invoices/new?projectId=${project.id}`}

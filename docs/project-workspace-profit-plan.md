@@ -432,12 +432,19 @@ Already implemented:
 - Access policy exposes project and LINE group limits.
 - Google Drive service can create project/category folder paths.
 - Project Excel export pack.
+- Project Google Sheet sync.
+- Project ZIP attachment pack.
+- Project Drive upload wiring for direct uploads and project document intake mirrors.
+- Approval workflow by project owner/approver.
+- Project tax safety summary/status chips.
+- LINE/OCR live-status usage telemetry and estimated OCR cost.
 
 Still needed:
 
 - Guest project portal.
-- Google Sheet sync per project.
-- ZIP attachment pack per project.
-- Direct Drive upload wiring with project/category.
-- Approval workflow by project owner/approver.
-- Tax safety queue and smart matching.
+- Smarter tax safety queue and matching:
+  - PO to purchase invoice
+  - purchase invoice to payment slip
+  - slip to receiver/vendor
+  - non-VAT expense to payment voucher
+- Billing automation for overage/add-on seats.
