@@ -46,6 +46,11 @@ const assignPayloadSchema = z.object({
   projectId: z.string().min(1).nullable(),
 });
 
+const documentCommentPayloadSchema = z.object({
+  message: z.string().trim().min(1).max(1200),
+  kind: z.enum(['comment', 'request']).default('comment'),
+});
+
 function normalizeCode(input?: string | null) {
   return input?.trim().toUpperCase().replace(/\s+/g, '-') || '';
 }
@@ -590,6 +595,24 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
             processedAt: true,
             createdAt: true,
             updatedAt: true,
+            comments: {
+              orderBy: { createdAt: 'desc' },
+              take: 3,
+              select: {
+                id: true,
+                authorType: true,
+                authorName: true,
+                kind: true,
+                status: true,
+                message: true,
+                createdAt: true,
+              },
+            },
+            _count: {
+              select: {
+                comments: true,
+              },
+            },
           },
         }),
         tx.purchaseInvoice.findMany({
@@ -666,6 +689,8 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
       const expenseTotal = expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
       const documentIntakeRows = documentIntakes.map((item) => ({
         ...item,
+        commentCount: item._count.comments,
+        comments: item.comments.reverse(),
         kind: documentKind(item),
         taxSafety: taxSafetyForIntake(item),
       }));
@@ -737,6 +762,97 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
   } catch (err) {
     logger.error('Failed to get project workspace', { error: err });
     res.status(500).json({ error: 'Failed to fetch project workspace' });
+  }
+});
+
+projectsRouter.post('/:id/documents/:documentIntakeId/comments', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const body = documentCommentPayloadSchema.parse(req.body);
+    const companyId = req.user!.companyId;
+    const created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const document = await tx.documentIntake.findFirst({
+        where: {
+          id: req.params.documentIntakeId,
+          companyId,
+          projectId: req.params.id,
+        },
+        select: { id: true, projectId: true, fileName: true },
+      });
+      if (!document?.projectId) return null;
+
+      return tx.documentComment.create({
+        data: {
+          companyId,
+          projectId: document.projectId,
+          documentIntakeId: document.id,
+          authorType: 'user',
+          authorUserId: req.user!.userId,
+          authorName: req.user!.email,
+          kind: body.kind,
+          status: 'open',
+          message: body.message,
+        },
+      });
+    });
+
+    if (!created) {
+      res.status(404).json({ error: 'Project document not found' });
+      return;
+    }
+
+    await auditLog({
+      companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'project.document_comment.create',
+      resourceType: 'document_intake',
+      resourceId: req.params.documentIntakeId,
+      details: { projectId: req.params.id, commentId: created.id, kind: created.kind },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.status(201).json({ data: created });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to create project document comment', { error: err });
+    res.status(500).json({ error: 'Failed to create project document comment' });
+  }
+});
+
+projectsRouter.patch('/:id/documents/:documentIntakeId/comments/:commentId/resolve', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const comment = await tx.documentComment.findFirst({
+        where: {
+          id: req.params.commentId,
+          companyId,
+          projectId: req.params.id,
+          documentIntakeId: req.params.documentIntakeId,
+        },
+        select: { id: true },
+      });
+      if (!comment) return null;
+      return tx.documentComment.update({
+        where: { id: comment.id },
+        data: { status: 'resolved' },
+      });
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: 'Project document comment not found' });
+      return;
+    }
+
+    res.json({ data: updated });
+  } catch (err) {
+    logger.error('Failed to resolve project document comment', { error: err });
+    res.status(500).json({ error: 'Failed to resolve project document comment' });
   }
 });
 

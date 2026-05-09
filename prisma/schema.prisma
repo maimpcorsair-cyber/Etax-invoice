@@ -439,13 +439,37 @@ model DocumentIntake {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project  Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  comments DocumentComment[]
 
   @@index([companyId, status, createdAt])
   @@index([companyId, projectId, createdAt])
   @@index([companyId, purchaseInvoiceId])
   @@index([sourceMessageId])
   @@map("document_intakes")
+}
+
+model DocumentComment {
+  id               String   @id @default(cuid())
+  companyId        String
+  projectId        String
+  documentIntakeId String
+  authorType       String   @default("user") // user | guest | system
+  authorUserId     String?
+  authorName       String?
+  kind             String   @default("comment") // comment | request | reply
+  status           String   @default("open") // open | resolved
+  message          String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentIntake DocumentIntake @relation(fields: [documentIntakeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, projectId, createdAt])
+  @@index([companyId, documentIntakeId, createdAt])
+  @@index([companyId, status])
+  @@map("document_comments")
 }
 
 model AuditLog {
@@ -532,6 +556,7 @@ model Project {
   invoices         Invoice[]
   purchaseInvoices PurchaseInvoice[]
   documentIntakes  DocumentIntake[]
+  documentComments DocumentComment[]
   expenseVouchers  ExpenseVoucher[]
   lineGroupLinks   LineGroupLink[]
 

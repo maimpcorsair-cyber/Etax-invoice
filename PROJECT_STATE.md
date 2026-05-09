@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 20:10 Asia/Bangkok
+Last updated: 2026-05-10 20:35 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -82,6 +82,19 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Document Request Thread v1:
+  - new `document_comments` table with tenant RLS for per-document requests, comments, and guest replies
+  - Project Workspace file list shows recent comments/requests for each document
+  - admins/accountants can create a request/comment on a project document from Project Workspace
+  - Project Guest Portal shows open requests/comments on recent files
+  - guests can reply to a document request from the portal without becoming a full user
+  - migration: `20260510_document_comments`
+- Verified locally after Project Document Request Thread v1:
+  - `DATABASE_URL=... prisma validate --schema=prisma/schema.prisma`
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
 - Added LINE Project Guest Upload v1:
   - public portal users can upload PDF/JPG/PNG/WebP into the linked project
   - backend `POST /api/project-portal/:token/upload`

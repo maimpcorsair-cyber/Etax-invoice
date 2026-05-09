@@ -23,6 +23,10 @@ const uploadSchema = z.object({
   fileBase64: z.string().min(1),
 });
 
+const guestCommentSchema = z.object({
+  message: z.string().trim().min(1).max(1200),
+});
+
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 function asNumber(value: Prisma.Decimal | number | null | undefined) {
@@ -154,6 +158,20 @@ projectPortalRouter.get('/:token', async (req, res) => {
             ocrResult: true,
             createdAt: true,
             updatedAt: true,
+            comments: {
+              where: { status: 'open' },
+              orderBy: { createdAt: 'desc' },
+              take: 3,
+              select: {
+                id: true,
+                authorType: true,
+                authorName: true,
+                kind: true,
+                status: true,
+                message: true,
+                createdAt: true,
+              },
+            },
           },
         }),
       ]);
@@ -212,6 +230,7 @@ projectPortalRouter.get('/:token', async (req, res) => {
           kind: documentKind(item),
           needsAction: needsAction(item),
           error: item.error,
+          comments: item.comments.reverse(),
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
         })),
@@ -228,6 +247,66 @@ projectPortalRouter.get('/:token', async (req, res) => {
   } catch (err) {
     logger.warn('Failed to open project guest portal', { error: err });
     res.status(401).json({ error: 'Invalid or expired project portal link' });
+  }
+});
+
+projectPortalRouter.post('/:token/documents/:documentIntakeId/comments', async (req, res) => {
+  try {
+    const payload = verifyPortalToken(req.params.token);
+    const group = await assertPortalAccess(payload);
+    if (!group || !group.project) {
+      res.status(404).json({ error: 'Project portal not found or expired' });
+      return;
+    }
+
+    const body = guestCommentSchema.parse(req.body);
+    const created = await withSystemRlsContext(prisma, async (tx) => {
+      const document = await tx.documentIntake.findFirst({
+        where: {
+          id: req.params.documentIntakeId,
+          companyId: payload.companyId,
+          projectId: payload.projectId,
+        },
+        select: { id: true },
+      });
+      if (!document) return null;
+
+      return tx.documentComment.create({
+        data: {
+          companyId: payload.companyId,
+          projectId: payload.projectId,
+          documentIntakeId: document.id,
+          authorType: 'guest',
+          authorName: group.groupName || 'LINE guest',
+          kind: 'reply',
+          status: 'open',
+          message: body.message,
+        },
+        select: {
+          id: true,
+          authorType: true,
+          authorName: true,
+          kind: true,
+          status: true,
+          message: true,
+          createdAt: true,
+        },
+      });
+    });
+
+    if (!created) {
+      res.status(404).json({ error: 'Project document not found' });
+      return;
+    }
+
+    res.status(201).json({ data: created });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.warn('Project guest comment failed', { error: err });
+    res.status(401).json({ error: err instanceof Error ? err.message : 'Failed to send project comment' });
   }
 });
 

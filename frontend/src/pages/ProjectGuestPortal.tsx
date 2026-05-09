@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
+  MessageCircle,
   ReceiptText,
   Upload,
   WalletCards,
@@ -55,6 +56,15 @@ type PortalData = {
     kind: string;
     needsAction: boolean;
     error?: string | null;
+    comments?: Array<{
+      id: string;
+      authorType: string;
+      authorName?: string | null;
+      kind: string;
+      status: string;
+      message: string;
+      createdAt: string;
+    }>;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -86,6 +96,7 @@ export default function ProjectGuestPortal() {
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [replyingId, setReplyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -146,6 +157,31 @@ export default function ProjectGuestPortal() {
       setError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleReply(fileId: string) {
+    if (!token) return;
+    const message = window.prompt('พิมพ์คำตอบหรือรายละเอียดเพิ่มเติมสำหรับเอกสารนี้');
+    if (!message?.trim()) return;
+
+    setReplyingId(fileId);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/project-portal/${token}/documents/${fileId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message.trim() }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'ส่งข้อความไม่สำเร็จ');
+      setNotice('ส่งข้อความกลับเข้าโปรเจคแล้ว');
+      await loadPortal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ส่งข้อความไม่สำเร็จ');
+    } finally {
+      setReplyingId(null);
     }
   }
 
@@ -255,10 +291,34 @@ export default function ProjectGuestPortal() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-900">{file.fileName || 'Untitled file'}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{kindLabel(file.kind)} · {file.status} · {formatDate(file.createdAt)}</p>
+                      {file.comments && file.comments.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {file.comments.map((comment) => (
+                            <div key={comment.id} className="rounded-md border border-amber-100 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                              <span className="font-semibold">{comment.kind === 'request' ? 'คำขอจากบัญชี' : comment.authorType === 'guest' ? 'ตอบกลับ' : 'คอมเมนต์'}</span>
+                              {' · '}
+                              {comment.message}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {file.needsAction && (
-                      <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">ต้องตรวจ</span>
-                    )}
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      {file.needsAction && (
+                        <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">ต้องตรวจ</span>
+                      )}
+                      {file.comments && file.comments.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => void handleReply(file.id)}
+                          disabled={replyingId === file.id}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          {replyingId === file.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                          ตอบกลับ
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}

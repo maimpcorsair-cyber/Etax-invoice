@@ -60,7 +60,7 @@ Build in rounds so production keeps working and each round has a clear business 
 5. LINE Guest Portal
    - project dashboard for LINE group members with limited upload/comment
    - goal: let non-seat field users help fix missing documents without seeing company accounting
-   - current: portal view and guest upload are implemented; comment threads are still pending
+   - current: portal view, guest upload, and document request/reply threads are implemented
 6. DBD Integration
    - lookup juristic profile by 13-digit JuristicID
    - search by juristic name

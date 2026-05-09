@@ -17,6 +17,7 @@ import {
   Inbox,
   Link2,
   Loader2,
+  MessageCircle,
   Receipt,
   RefreshCw,
   Send,
@@ -101,9 +102,21 @@ interface DocumentIntake {
   targetId?: string | null;
   purchaseInvoiceId?: string | null;
   taxSafety?: TaxSafety;
+  commentCount?: number;
+  comments?: DocumentComment[];
   processedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface DocumentComment {
+  id: string;
+  authorType: string;
+  authorName?: string | null;
+  kind: string;
+  status: string;
+  message: string;
+  createdAt: string;
 }
 
 interface SmartMatchCandidate {
@@ -245,6 +258,7 @@ export default function ProjectDetail() {
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
   const [matchingId, setMatchingId] = useState<string | null>(null);
+  const [commentingId, setCommentingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -451,6 +465,29 @@ export default function ProjectDetail() {
       setError(err instanceof Error ? err.message : 'Failed to match document');
     } finally {
       setMatchingId(null);
+    }
+  }
+
+  async function requestDocumentComment(doc: DocumentIntake) {
+    if (!token || !workspace) return;
+    const message = window.prompt(isThai ? 'พิมพ์คำขอหรือคอมเมนต์สำหรับไฟล์นี้' : 'Write a request or comment for this file');
+    if (!message?.trim()) return;
+
+    setCommentingId(doc.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/documents/${doc.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ kind: 'request', message: message.trim() }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(json.error || 'Failed to create document request');
+      await fetchWorkspace();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create document request');
+    } finally {
+      setCommentingId(null);
     }
   }
 
@@ -664,7 +701,7 @@ export default function ProjectDetail() {
             <TaxSafetyPanel summary={workspaceSummary} isThai={isThai} formatCurrency={formatCurrency} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
-            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} />
+            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} onComment={requestDocumentComment} commentingId={commentingId} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'LINE / ทีม' : 'LINE / team'} icon={Users}>
             <div className="space-y-3">
@@ -704,7 +741,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'files' && (
         <WorkspacePanel title={isThai ? 'ไฟล์ทั้งหมดของโปรเจค' : 'Project file library'} icon={FolderOpen}>
-          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} />
+          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} onComment={requestDocumentComment} commentingId={commentingId} />
         </WorkspacePanel>
       )}
 
@@ -936,12 +973,16 @@ function DocumentList({
   token,
   formatDate,
   onOpen,
+  onComment,
+  commentingId,
 }: {
   docs: DocumentIntake[];
   isThai: boolean;
   token: string;
   formatDate: (value: string) => string;
   onOpen: (doc: DocumentIntake) => void | Promise<void>;
+  onComment: (doc: DocumentIntake) => void | Promise<void>;
+  commentingId?: string | null;
 }) {
   if (docs.length === 0) {
     return <EmptyBlock text={isThai ? 'ยังไม่มีไฟล์ในโปรเจคนี้' : 'No files in this project yet'} />;
@@ -960,7 +1001,30 @@ function DocumentList({
               <div className="mt-1">
                 <TaxSafetyBadge taxSafety={doc.taxSafety} />
               </div>
+              {doc.comments && doc.comments.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {doc.comments.slice(-2).map((comment) => (
+                    <div key={comment.id} className="rounded-md border border-amber-100 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                      <span className="font-semibold">
+                        {comment.kind === 'request' ? (isThai ? 'ขอเพิ่ม' : 'Request') : comment.authorType === 'guest' ? 'Guest' : (isThai ? 'คอมเมนต์' : 'Comment')}
+                      </span>
+                      {' · '}
+                      {comment.message}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => void onComment(doc)}
+              disabled={!token || commentingId === doc.id}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+              aria-label={isThai ? 'ขอเอกสารเพิ่ม' : 'Request more info'}
+              title={isThai ? 'ขอเอกสาร/คอมเมนต์' : 'Request/comment'}
+            >
+              {commentingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+            </button>
             <button
               type="button"
               onClick={() => void onOpen(doc)}
