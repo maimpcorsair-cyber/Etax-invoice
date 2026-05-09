@@ -1728,8 +1728,15 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
         `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
       );
     } catch (err) {
-      logger.error('[Line] OTP link transaction failed', { err, otpKey });
-      await sendLineText(lineUserId, 'เกิดข้อผิดพลาดในการเชื่อมบัญชี กรุณาลองส่ง OTP อีกครั้ง');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errCode = (err as { code?: string }).code;
+      logger.error('[Line] OTP link failed', { err, errMsg, errCode, otpKey, senderLineUserId: senderLineUserId.slice(0, 8) });
+
+      if (errCode === 'P2002') {
+        await sendLineText(lineUserId, 'บัญชี LINE นี้หรือผู้ใช้นี้ถูกเชื่อมแล้ว กรุณาให้แอดมินตรวจสอบสถานะการเชื่อมต่อ');
+      } else {
+        await sendLineText(lineUserId, `เกิดข้อผิดพลาด (${errCode ?? 'UNKNOWN'}) กรุณาลองใหม่หรือแจ้งแอดมิน`);
+      }
     }
     return;
   }

@@ -1664,7 +1664,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     lineNotifyEnabled: boolean;
     overdueReminderDays: number;
   } | null>(null);
-  const [otp, setOtp] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [localNotifyEnabled, setLocalNotifyEnabled] = useState(false);
@@ -1773,28 +1772,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     };
   }, [token, policy?.canUseLineOa]);
 
-  async function handleLinkStart() {
-    setMsg(null);
-    try {
-      const res = await fetch('/api/line/link-start', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const j = await res.json() as { data?: { otp: string }; error?: string };
-      if (!res.ok) {
-        setMsg({ type: 'err', text: j.error ?? 'เกิดข้อผิดพลาด' });
-        return;
-      }
-      if (j.data?.otp) {
-        setOtp(j.data.otp);
-      } else {
-        setMsg({ type: 'err', text: 'ไม่ได้รับรหัส OTP กรุณาลองใหม่' });
-      }
-    } catch (e) {
-      setMsg({ type: 'err', text: isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}` });
-    }
-  }
-
   async function handleUserLinkStart(user: LineManagedUser) {
     setMsg(null);
     setUserOtp(null);
@@ -1867,17 +1844,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     }
   }
 
-  async function handleUnlink() {
-    if (!confirm(isThai ? 'ยืนยันยกเลิกการเชื่อมต่อ Line?' : 'Confirm unlink from Line?')) return;
-    try {
-      await fetch('/api/line/unlink', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-      setLineStatus(null);
-      setOtp(null);
-    } catch {
-      setMsg({ type: 'err', text: isThai ? 'ยกเลิกการเชื่อมต่อไม่สำเร็จ' : 'Failed to unlink' });
-    }
-  }
-
   async function handleSaveSettings() {
     setSaving(true); setMsg(null);
     try {
@@ -1891,14 +1857,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
     } finally { setSaving(false); }
-  }
-
-  function handleCopyOtp() {
-    if (!otp) return;
-    navigator.clipboard.writeText(otp).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
   }
 
   function copyUserOtp() {
@@ -2022,7 +1980,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         </div>
       </div>
 
-      {/* Section 3: Connection — self-link + admin-managed users */}
+      {/* Section 3: Connection — admin-managed users */}
       <div className="border border-gray-200 rounded-xl p-5 space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -2031,8 +1989,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               {isThai
-                ? 'สร้างรหัส 6 หลัก แล้วให้ผู้ใช้ส่งรหัสนั้นในแชท Billboy บน LINE ระบบจะผูกอัตโนมัติภายใน 10 นาที'
-                : 'Generate a 6-digit code and have the user send it to Billboy in LINE. The system links automatically within 10 minutes.'}
+                ? 'กดปุ่ม "สร้างรหัส" ข้างชื่อผู้ใช้ → ได้รหัส 6 หลัก → ให้ผู้ใช้ส่งรหัสนั้นในแชท Billboy บน LINE (หมดอายุ 10 นาที)'
+                : 'Click "Generate code" next to a user → get a 6-digit code → have the user send it to Billboy in LINE (expires in 10 min).'}
             </p>
           </div>
           <button className="btn-secondary text-sm" onClick={() => void loadManagedUsers()} disabled={managedUsersLoading}>
@@ -2040,50 +1998,6 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             {isThai ? 'รีเฟรช' : 'Refresh'}
           </button>
         </div>
-
-        {/* Self-link for current user */}
-        {lineStatus && !lineStatus.linked && (
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
-            <p className="text-sm font-semibold text-indigo-900">
-              {isThai ? 'เชื่อมบัญชีของคุณเอง' : 'Link your own account'}
-            </p>
-            {otp ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-3xl font-bold tracking-[0.3em] text-indigo-700 select-all">{otp}</span>
-                  <button onClick={handleCopyOtp} className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors">
-                    {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
-                  </button>
-                </div>
-                <p className="text-xs text-indigo-800">
-                  {isThai ? 'ส่งรหัสนี้ให้ Billboy ใน LINE ภายใน 10 นาที' : 'Send this code to Billboy in LINE within 10 minutes.'}
-                </p>
-              </div>
-            ) : (
-              <button className="btn-primary text-sm" onClick={handleLinkStart}>
-                <Link2 className="w-4 h-4" />
-                {isThai ? 'สร้างรหัสเชื่อมต่อ' : 'Generate link code'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {lineStatus?.linked && (
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-green-800">
-                {isThai ? 'บัญชีของคุณเชื่อม LINE แล้ว: ' : 'Your account is linked: '}
-                <span className="font-medium">{lineStatus.displayName ?? '—'}</span>
-              </span>
-            </div>
-            <button className="text-xs text-red-600 hover:text-red-700 font-medium inline-flex items-center gap-1" onClick={handleUnlink}>
-              <Unlink2 className="w-3.5 h-3.5" />
-              {isThai ? 'ถอด' : 'Unlink'}
-            </button>
-          </div>
-        )}
 
         {userOtp && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
