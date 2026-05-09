@@ -145,6 +145,7 @@ model Company {
   expenseVouchers     ExpenseVoucher[]
   pettyCash           PettyCash?
   lineGroupLinks      LineGroupLink[]
+  whtCertificates     WhtCertificate[]
 
   @@map("companies")
 }
@@ -252,8 +253,18 @@ model Invoice {
 
   subtotal  Float
   vatAmount Float
-  discount  Float @default(0)
+  discountAmount  Float @default(0) @map("discount")
   total     Float
+
+  // WHT (withholding tax)
+  whtRate          String?    @map("wht_rate")
+  whtAmount        Float?     @map("wht_amount")
+  whtCertificateId String?    @map("wht_certificate_id")
+
+  // Cancellation
+  cancelledAt      DateTime?  @map("cancelled_at")
+  cancelledBy      String?    @map("cancelled_by")
+  cancelReason     String?    @map("cancel_reason")
 
   notes         String?
   paymentMethod String?
@@ -286,8 +297,9 @@ model Invoice {
   creator          User          @relation("CreatedBy", fields: [createdBy], references: [id])
   items            InvoiceItem[]
   referenceInvoice Invoice?      @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
-  relatedDocuments Invoice[]     @relation("InvoiceReference")
-  payments         Payment[]
+  relatedDocuments  Invoice[]     @relation("InvoiceReference")
+  payments          Payment[]
+  whtCertificates   WhtCertificate[]
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
@@ -315,7 +327,7 @@ model InvoiceItem {
   quantity      Float
   unit          String
   unitPrice     Float
-  discount      Float   @default(0)
+  discountAmount Float  @default(0) @map("discount")
   vatType       VatType @default(vat7)
   amount        Float
   vatAmount     Float
@@ -757,4 +769,32 @@ model ExpenseAttachment {
 
   @@index([expenseItemId])
   @@map("expense_attachments")
+}
+
+model WhtCertificate {
+  id                String   @id @default(cuid())
+  companyId         String   @map("company_id")
+  invoiceId         String?  @map("invoice_id")
+  certificateNumber String   @map("certificate_number")
+  whtRate           String   @map("wht_rate")
+  whtAmount         Float    @map("wht_amount")
+  totalAmount       Float    @map("total_amount")
+  netAmount         Float    @map("net_amount")
+  recipientName     String   @map("recipient_name")
+  recipientTaxId    String   @map("recipient_tax_id")
+  recipientBranch   String   @default("00000") @map("recipient_branch")
+  incomeType        String?  @map("income_type")
+  paymentDate       DateTime @map("payment_date")
+  pdfUrl            String?  @map("pdf_url")
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@unique([companyId, certificateNumber])
+  @@index([companyId])
+  @@index([companyId, paymentDate])
+  @@map("wht_certificates")
 }
