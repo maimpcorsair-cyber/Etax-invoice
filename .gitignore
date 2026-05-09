@@ -56,3 +56,4 @@ backend/node_modules/.prisma/
 
 # Mobile dev screenshots (local only)
 mobile-*.png
+.vercel
