@@ -26,6 +26,7 @@ import { pp30Router } from './routes/pp30';
 import { whtCertificatesRouter } from './routes/whtCertificates';
 import { lineRouter, lineWebhookHandler } from './routes/line';
 import { aiChatRouter } from './routes/aiChat';
+import { projectsRouter } from './routes/projects';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -85,6 +86,7 @@ app.use('/api/company', authenticate, dashboardRouter);
 app.use('/api/notifications', authenticate, notificationsRouter);
 app.use('/api/purchase-invoices', purchaseInvoicesRouter);
 app.use('/api/expenses', authenticate, expensesRouter);
+app.use('/api/projects', authenticate, projectsRouter);
 app.use('/api/drive', driveRouter); // /callback is unauthenticated (OAuth redirect)
 app.use('/api/vat-summary', vatSummaryRouter);
 app.use('/api/pp30', pp30Router);

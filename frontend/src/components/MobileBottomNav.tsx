@@ -10,6 +10,7 @@ import {
   Shield,
   ShieldAlert,
   ShoppingCart,
+  BriefcaseBusiness,
   Wallet,
   Calculator,
   Settings,
@@ -23,7 +24,7 @@ const primaryTabs = [
   { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
   { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
-  { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
+  { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects' },
 ];
 
 export default function MobileBottomNav() {
@@ -46,6 +47,7 @@ export default function MobileBottomNav() {
 
   const moreItems = [
     { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
+    { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
     { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
     { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },

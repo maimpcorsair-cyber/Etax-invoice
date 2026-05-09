@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 19:30 Asia/Bangkok
+Last updated: 2026-05-09 21:36 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -25,6 +25,29 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project / Cost Center foundation:
+  - new `projects` and `project_members` tables
+  - tenant-safe RLS policies for project data
+  - optional `projectId` on invoices, purchase invoices, document intakes, expense vouchers, and LINE group links
+  - Prisma migration: `20260509_project_cost_centers`
+- Added `/api/projects`:
+  - list/create/update/archive projects
+  - assign owner/approver/members
+  - budget summary from purchase invoices and expense vouchers
+  - assign existing documents/records to a project
+- Added frontend Projects page at `/app/projects`:
+  - project budget cards
+  - committed/paid/remaining totals
+  - over-budget indicator
+  - create/edit project modal
+  - desktop and mobile nav links
+- Updated Input VAT:
+  - web uploads can be tagged with a project
+  - manual purchase invoice create/edit can choose a project
+  - OCR review inherits project from the intake
+- Updated LINE intake behavior:
+  - if a LINE group is assigned to a project, new documents from that group are saved with that `projectId`
+  - LINE admin group list now returns project info for future UI wiring
 - Fixed LINE account linking under database RLS.
 - Fixed LINE webhook link lookup under system RLS.
 - Improved LINE OCR replies for bank transfer slips:
@@ -87,19 +110,28 @@ Expected backend health after the latest backend fix:
 
 ## What To Test Next
 
-1. In LINE, send a PDF that previously produced no reply.
-2. Confirm LINE sends a reply even if OCR cannot read it.
-3. Open web app `https://etax-invoice.vercel.app/app/purchase-invoices`.
-4. Check Input VAT document library:
+1. After deploy, confirm migration `20260509_project_cost_centers` ran on production.
+2. Open web app `https://etax-invoice.vercel.app/app/projects`.
+3. Create a project with budget, owner, and approver.
+4. Open Input VAT and upload a PDF/JPG with a project selected.
+5. Confirm the intake and saved purchase invoice keep the same `projectId`.
+6. In LINE, send a PDF that previously produced no reply.
+7. Confirm LINE sends a reply even if OCR cannot read it.
+8. Open web app `https://etax-invoice.vercel.app/app/purchase-invoices`.
+9. Check Input VAT document library:
    - LINE-uploaded PDF/JPG appears.
    - thumbnail/preview opens.
    - OCR status is visible.
    - failed unreadable file remains available for manual review.
-5. Send a bank transfer slip and confirm reply includes sender/receiver/reference.
+10. Send a bank transfer slip and confirm reply includes sender/receiver/reference.
 
 ## Known Risks / Next Improvements
 
 - Production DB read-only debugging is not yet set up as a safe repeatable tool.
+- Projects v1 is usable for budget/project tagging, but next useful upgrades are:
+  - project picker in LINE Admin group UI
+  - project filter across Input VAT, expenses, and invoice lists
+  - approval workflow by project owner/approver
 - LINE webhook observability should be improved with a compact admin/debug view:
   - message id
   - company id

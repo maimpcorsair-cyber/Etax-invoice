@@ -261,6 +261,7 @@ export interface WhtSummaryData {
 
 export interface PurchaseInvoice {
   id: string;
+  projectId?: string | null;
   supplierName: string;
   supplierTaxId: string;
   supplierBranch?: string | null;
@@ -283,6 +284,7 @@ export interface PurchaseInvoice {
 
 export interface DocumentIntake {
   id: string;
+  projectId?: string | null;
   source: string;
   mimeType: string;
   fileSize: number;

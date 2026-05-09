@@ -664,6 +664,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
 
 async function createDocumentIntake(input: {
   companyId: string;
+  projectId?: string | null;
   userId: string;
   lineUserId: string;
   messageId: string;
@@ -704,6 +705,7 @@ async function createDocumentIntake(input: {
       tx.documentIntake.create({
         data: {
           companyId: input.companyId,
+          projectId: input.projectId ?? null,
           userId: input.userId,
           lineUserId: input.lineUserId,
           source: 'line',
@@ -978,10 +980,14 @@ lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'
         orderBy: [{ isActive: 'desc' }, { linkedAt: 'desc' }],
         select: {
           id: true,
+          projectId: true,
           lineGroupId: true,
           groupName: true,
           isActive: true,
           linkedAt: true,
+          project: {
+            select: { id: true, code: true, name: true, status: true },
+          },
           linkedBy: {
             select: { id: true, name: true, email: true },
           },
@@ -993,6 +999,8 @@ lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'
       data: groups.map((group) => ({
         id: group.id,
         groupName: group.groupName,
+        projectId: group.projectId,
+        project: group.project,
         isActive: group.isActive,
         linkedAt: group.linkedAt,
         lineGroupIdMasked: maskLineUserId(group.lineGroupId),
@@ -2079,6 +2087,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     const companyId = resolved.companyId;
     const intake = await createDocumentIntake({
       companyId,
+      projectId: resolved.groupLink?.projectId ?? null,
       userId: resolved.userId,
       lineUserId,
       messageId,

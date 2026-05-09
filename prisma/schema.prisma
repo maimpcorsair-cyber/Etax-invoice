@@ -93,20 +93,34 @@ enum ExpenseVoucherStatus {
   rejected
 }
 
+enum ProjectStatus {
+  active
+  on_hold
+  completed
+  archived
+}
+
+enum ProjectMemberRole {
+  owner
+  approver
+  member
+  viewer
+}
+
 model Company {
-  id            String  @id @default(cuid())
-  nameTh        String
-  nameEn        String?
-  taxId         String  @unique
-  branchCode    String  @default("00000")
-  branchNameTh  String?
-  branchNameEn  String?
-  addressTh     String
-  addressEn     String?
-  phone         String?
-  email         String?
-  website       String?
-  logoUrl       String?
+  id           String  @id @default(cuid())
+  nameTh       String
+  nameEn       String?
+  taxId        String  @unique
+  branchCode   String  @default("00000")
+  branchNameTh String?
+  branchNameEn String?
+  addressTh    String
+  addressEn    String?
+  phone        String?
+  email        String?
+  website      String?
+  logoUrl      String?
 
   // Serialized certificate (encrypted)
   certificatePath     String?
@@ -118,30 +132,31 @@ model Company {
   rdEnvironment  String  @default("sandbox")
 
   // Expense settings
-  expenseLimit        Decimal?  @db.Decimal(12, 2)
+  expenseLimit Decimal? @db.Decimal(12, 2)
 
   // Storage quota
-  storageUsedBytes    BigInt  @default(0)
-  storageQuotaBytes   BigInt  @default(524288000) // 500MB
+  storageUsedBytes  BigInt @default(0)
+  storageQuotaBytes BigInt @default(524288000) // 500MB
 
   // Line OA settings
   lineNotifyEnabled   Boolean @default(false)
   overdueReminderDays Int     @default(3)
 
   // Document issuing profile
-  documentBankAccounts      Json?
-  documentSignatureProfile  Json?
+  documentBankAccounts     Json?
+  documentSignatureProfile Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  customers Customer[]
-  products  Product[]
-  invoices  Invoice[]
-  subscription CompanySubscription?
+  users               User[]
+  customers           Customer[]
+  products            Product[]
+  invoices            Invoice[]
+  subscription        CompanySubscription?
   billingTransactions BillingTransaction[]
   purchaseInvoices    PurchaseInvoice[]
+  projects            Project[]
   expenseVouchers     ExpenseVoucher[]
   pettyCash           PettyCash?
   lineGroupLinks      LineGroupLink[]
@@ -151,17 +166,17 @@ model Company {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  companyId    String
-  email        String   @unique
-  name         String
-  passwordHash String?
-  googleSub    String?  @unique
-  role         UserRole @default(viewer)
-  isActive     Boolean  @default(true)
-  lastLoginAt           DateTime?
-  googleRefreshToken    String?
-  googleDriveLinkedAt   DateTime?
+  id                  String    @id @default(cuid())
+  companyId           String
+  email               String    @unique
+  name                String
+  passwordHash        String?
+  googleSub           String?   @unique
+  role                UserRole  @default(viewer)
+  isActive            Boolean   @default(true)
+  lastLoginAt         DateTime?
+  googleRefreshToken  String?
+  googleDriveLinkedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -172,8 +187,12 @@ model User {
   fcmTokens        FcmToken[]
   purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
   expenseVouchers  ExpenseVoucher[]  @relation("ExpenseVoucherCreatedBy")
+  ownedProjects    Project[]         @relation("ProjectOwner")
+  approvedProjects Project[]         @relation("ProjectApprover")
+  createdProjects  Project[]         @relation("ProjectCreatedBy")
+  projectMembers   ProjectMember[]
   lineUserLink     LineUserLink?
-  linkedLineGroups LineGroupLink[]    @relation("LineGroupLinkedBy")
+  linkedLineGroups LineGroupLink[]   @relation("LineGroupLinkedBy")
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -197,7 +216,7 @@ model Customer {
   email         String?
   phone         String?
   contactPerson String?
-  personalId    String?  // เลขบัตรประชาชน 13 หลัก (สำหรับ Easy e-Receipt)
+  personalId    String? // เลขบัตรประชาชน 13 หลัก (สำหรับ Easy e-Receipt)
   isActive      Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -240,6 +259,7 @@ model Product {
 model Invoice {
   id            String        @id @default(cuid())
   companyId     String
+  projectId     String?
   invoiceNumber String
   type          InvoiceType
   status        InvoiceStatus @default(draft)
@@ -251,20 +271,20 @@ model Invoice {
   buyerId String
   seller  Json
 
-  subtotal  Float
-  vatAmount Float
-  discountAmount  Float @default(0) @map("discount")
-  total     Float
+  subtotal       Float
+  vatAmount      Float
+  discountAmount Float @default(0) @map("discount")
+  total          Float
 
   // WHT (withholding tax)
-  whtRate          String?    @map("wht_rate")
-  whtAmount        Float?     @map("wht_amount")
-  whtCertificateId String?    @map("wht_certificate_id")
+  whtRate          String? @map("wht_rate")
+  whtAmount        Float?  @map("wht_amount")
+  whtCertificateId String? @map("wht_certificate_id")
 
   // Cancellation
-  cancelledAt      DateTime?  @map("cancelled_at")
-  cancelledBy      String?    @map("cancelled_by")
-  cancelReason     String?    @map("cancel_reason")
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by")
+  cancelReason String?   @map("cancel_reason")
 
   notes         String?
   paymentMethod String?
@@ -280,8 +300,8 @@ model Invoice {
   xmlUrl String?
 
   // Reference (for credit/debit notes and receipts linked to a tax invoice)
-  referenceDocNumber  String?
-  referenceInvoiceId  String?   // FK → Invoice (ใบอ้างอิงสำหรับ receipt/credit/debit)
+  referenceDocNumber String?
+  referenceInvoiceId String? // FK → Invoice (ใบอ้างอิงสำหรับ receipt/credit/debit)
 
   // Payment tracking
   isPaid     Boolean   @default(false)
@@ -292,17 +312,19 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company          Company       @relation(fields: [companyId], references: [id])
-  buyer            Customer      @relation(fields: [buyerId], references: [id])
-  creator          User          @relation("CreatedBy", fields: [createdBy], references: [id])
+  company          Company          @relation(fields: [companyId], references: [id])
+  project          Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buyer            Customer         @relation(fields: [buyerId], references: [id])
+  creator          User             @relation("CreatedBy", fields: [createdBy], references: [id])
   items            InvoiceItem[]
-  referenceInvoice Invoice?      @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
-  relatedDocuments  Invoice[]     @relation("InvoiceReference")
-  payments          Payment[]
-  whtCertificates   WhtCertificate[]
+  referenceInvoice Invoice?         @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
+  relatedDocuments Invoice[]        @relation("InvoiceReference")
+  payments         Payment[]
+  whtCertificates  WhtCertificate[]
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
+  @@index([companyId, projectId])
   @@index([companyId, status])
   @@index([companyId, invoiceDate])
   // Compound index for dashboard: "issued invoices in date range" — covers status + date together
@@ -317,21 +339,21 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id            String  @id @default(cuid())
-  invoiceId     String
-  productId     String?
-  nameTh        String
-  nameEn        String?
-  descriptionTh String?
-  descriptionEn String?
-  quantity      Float
-  unit          String
-  unitPrice     Float
-  discountAmount Float  @default(0) @map("discount")
-  vatType       VatType @default(vat7)
-  amount        Float
-  vatAmount     Float
-  totalAmount   Float
+  id             String  @id @default(cuid())
+  invoiceId      String
+  productId      String?
+  nameTh         String
+  nameEn         String?
+  descriptionTh  String?
+  descriptionEn  String?
+  quantity       Float
+  unit           String
+  unitPrice      Float
+  discountAmount Float   @default(0) @map("discount")
+  vatType        VatType @default(vat7)
+  amount         Float
+  vatAmount      Float
+  totalAmount    Float
 
   invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id])
@@ -341,13 +363,14 @@ model InvoiceItem {
 }
 
 model PurchaseInvoice {
-  id          String   @id @default(cuid())
-  companyId   String
+  id        String  @id @default(cuid())
+  companyId String
+  projectId String?
 
   // Supplier info (snapshot at time of recording)
   supplierName   String
-  supplierTaxId  String            // required for VAT deduction
-  supplierBranch String?  @default("00000")
+  supplierTaxId  String // required for VAT deduction
+  supplierBranch String? @default("00000")
 
   // Document info
   invoiceNumber String
@@ -355,34 +378,36 @@ model PurchaseInvoice {
   dueDate       DateTime?
 
   // Financial
-  subtotal  Float                  // amount before VAT
-  vatAmount Float   @default(0)    // input VAT amount (may be 0 for non-VAT)
-  total     Float                  // subtotal + vatAmount
+  subtotal  Float // amount before VAT
+  vatAmount Float @default(0) // input VAT amount (may be 0 for non-VAT)
+  total     Float // subtotal + vatAmount
 
   // VAT classification
-  vatType   String  @default("vat7")  // vat7 | vatExempt | vatZero
+  vatType String @default("vat7") // vat7 | vatExempt | vatZero
 
   // Document details
-  description  String?   // what was purchased
-  category     String?   // e.g. "office supplies", "freight", "services"
-  notes        String?
+  description String? // what was purchased
+  category    String? // e.g. "office supplies", "freight", "services"
+  notes       String?
 
   // Document storage
-  pdfUrl    String?   // uploaded supplier invoice scan
+  pdfUrl String? // uploaded supplier invoice scan
 
   // Status
-  isPaid    Boolean  @default(false)
-  paidAt    DateTime?
+  isPaid Boolean   @default(false)
+  paidAt DateTime?
 
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
-  creator   User     @relation("PurchaseCreatedBy", fields: [createdBy], references: [id])
+  company Company  @relation(fields: [companyId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  creator User     @relation("PurchaseCreatedBy", fields: [createdBy], references: [id])
 
   @@unique([companyId, supplierTaxId, invoiceNumber])
   @@index([companyId])
+  @@index([companyId, projectId])
   @@index([companyId, invoiceDate])
   @@index([companyId, vatType])
   @@index([createdBy])
@@ -392,6 +417,7 @@ model PurchaseInvoice {
 model DocumentIntake {
   id                String    @id @default(cuid())
   companyId         String
+  projectId         String?
   userId            String
   lineUserId        String?
   source            String    @default("line")
@@ -413,7 +439,10 @@ model DocumentIntake {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
   @@index([companyId, status, createdAt])
+  @@index([companyId, projectId, createdAt])
   @@index([companyId, purchaseInvoiceId])
   @@index([sourceMessageId])
   @@map("document_intakes")
@@ -444,15 +473,15 @@ model AuditLog {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  invoiceId     String
-  amount        Float
-  method        String   // cash, transfer, cheque, credit_card, other
-  reference     String?  // เลขอ้างอิงการชำระ / slip ref
-  paidAt        DateTime @default(now())
-  note          String?
-  createdBy     String
-  createdAt     DateTime @default(now())
+  id        String   @id @default(cuid())
+  invoiceId String
+  amount    Float
+  method    String // cash, transfer, cheque, credit_card, other
+  reference String? // เลขอ้างอิงการชำระ / slip ref
+  paidAt    DateTime @default(now())
+  note      String?
+  createdBy String
+  createdAt DateTime @default(now())
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -461,14 +490,14 @@ model Payment {
 }
 
 model DocumentTemplate {
-  id       String @id @default(cuid())
+  id        String  @id @default(cuid())
   companyId String
-  type     String
-  language String
-  name     String
-  htmlTh   String @db.Text
-  htmlEn   String @db.Text
-  isActive Boolean @default(true)
+  type      String
+  language  String
+  name      String
+  htmlTh    String  @db.Text
+  htmlEn    String  @db.Text
+  isActive  Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -477,23 +506,76 @@ model DocumentTemplate {
   @@map("document_templates")
 }
 
+model Project {
+  id           String        @id @default(cuid())
+  companyId    String
+  code         String
+  name         String
+  description  String?
+  customerName String?
+  budgetAmount Decimal       @default(0) @db.Decimal(14, 2)
+  status       ProjectStatus @default(active)
+  ownerId      String?
+  approverId   String?
+  startDate    DateTime?
+  endDate      DateTime?
+  metadata     Json?
+  createdBy    String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner            User?             @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  approver         User?             @relation("ProjectApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  creator          User              @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
+  members          ProjectMember[]
+  invoices         Invoice[]
+  purchaseInvoices PurchaseInvoice[]
+  documentIntakes  DocumentIntake[]
+  expenseVouchers  ExpenseVoucher[]
+  lineGroupLinks   LineGroupLink[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([companyId, ownerId])
+  @@index([companyId, approverId])
+  @@index([createdBy])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String            @id @default(cuid())
+  projectId String
+  userId    String
+  role      ProjectMemberRole @default(member)
+  createdAt DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId, role])
+  @@map("project_members")
+}
+
 model CompanySubscription {
-  id                    String        @id @default(cuid())
-  companyId             String        @unique
-  plan                  BillingPlan
-  status                BillingStatus @default(pending)
-  billingInterval       String        @default("month")
-  docLimit              Int?
-  stripeCustomerId      String?       @unique
-  stripeSubscriptionId  String?       @unique
-  stripePriceId         String?
-  stripeCheckoutSessionId String?     @unique
-  currentPeriodStart    DateTime?
-  currentPeriodEnd      DateTime?
-  cancelAtPeriodEnd     Boolean       @default(false)
-  activatedAt           DateTime?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id                      String        @id @default(cuid())
+  companyId               String        @unique
+  plan                    BillingPlan
+  status                  BillingStatus @default(pending)
+  billingInterval         String        @default("month")
+  docLimit                Int?
+  stripeCustomerId        String?       @unique
+  stripeSubscriptionId    String?       @unique
+  stripePriceId           String?
+  stripeCheckoutSessionId String?       @unique
+  currentPeriodStart      DateTime?
+  currentPeriodEnd        DateTime?
+  cancelAtPeriodEnd       Boolean       @default(false)
+  activatedAt             DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -503,23 +585,23 @@ model CompanySubscription {
 }
 
 model Coupon {
-  id                 String   @id @default(cuid())
-  code               String   @unique
-  name               String
-  description        String?
-  discountType       String
-  discountValue      Float
-  minSubtotalAmount  Float?
-  maxDiscountAmount  Float?
-  maxRedemptions     Int?
-  redeemedCount      Int      @default(0)
-  stripePromotionCodeId String? @unique
-  active             Boolean  @default(true)
-  startsAt           DateTime?
-  endsAt             DateTime?
-  metadata           Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  code                  String    @unique
+  name                  String
+  description           String?
+  discountType          String
+  discountValue         Float
+  minSubtotalAmount     Float?
+  maxDiscountAmount     Float?
+  maxRedemptions        Int?
+  redeemedCount         Int       @default(0)
+  stripePromotionCodeId String?   @unique
+  active                Boolean   @default(true)
+  startsAt              DateTime?
+  endsAt                DateTime?
+  metadata              Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   transactions BillingTransaction[]
 
@@ -566,7 +648,7 @@ model FcmToken {
   id        String   @id @default(cuid())
   userId    String
   token     String   @unique
-  platform  String   // "android" | "ios" | "web"
+  platform  String // "android" | "ios" | "web"
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -577,31 +659,31 @@ model FcmToken {
 }
 
 model PendingSignup {
-  id                     String       @id @default(cuid())
-  companyNameTh          String
-  companyNameEn          String?
-  taxId                  String
-  addressTh              String
-  adminName              String
-  adminEmail             String
-  phone                  String?
-  plan                   BillingPlan
-  paymentMethod          String       @default("stripe")
-  couponCode             String?
-  subtotalAmount         Float?
-  discountAmount         Float        @default(0)
-  totalAmount            Float?
-  status                 SignupStatus @default(pending)
-  locale                 String       @default("th")
-  stripeCheckoutSessionId String?     @unique
-  stripeCustomerId       String?
-  stripeSubscriptionId   String?
-  stripePriceId          String?
-  companyId              String?
-  userId                 String?
-  activatedAt            DateTime?
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  id                      String       @id @default(cuid())
+  companyNameTh           String
+  companyNameEn           String?
+  taxId                   String
+  addressTh               String
+  adminName               String
+  adminEmail              String
+  phone                   String?
+  plan                    BillingPlan
+  paymentMethod           String       @default("stripe")
+  couponCode              String?
+  subtotalAmount          Float?
+  discountAmount          Float        @default(0)
+  totalAmount             Float?
+  status                  SignupStatus @default(pending)
+  locale                  String       @default("th")
+  stripeCheckoutSessionId String?      @unique
+  stripeCustomerId        String?
+  stripeSubscriptionId    String?
+  stripePriceId           String?
+  companyId               String?
+  userId                  String?
+  activatedAt             DateTime?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
 
   transactions BillingTransaction[]
 
@@ -633,7 +715,7 @@ model LineUserLink {
   isActive    Boolean  @default(true)
   linkedAt    DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([lineUserId])
   @@map("line_user_links")
@@ -642,6 +724,7 @@ model LineUserLink {
 model LineGroupLink {
   id          String   @id @default(cuid())
   companyId   String
+  projectId   String?
   lineGroupId String   @unique
   groupName   String?
   isActive    Boolean  @default(true)
@@ -650,10 +733,12 @@ model LineGroupLink {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  linkedBy    User?    @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  linkedBy User?    @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+  @@index([companyId, projectId])
   @@index([companyId, isActive])
   @@index([lineGroupId])
   @@map("line_group_links")
@@ -662,6 +747,7 @@ model LineGroupLink {
 model ExpenseVoucher {
   id            String               @id @default(cuid())
   companyId     String
+  projectId     String?
   voucherNumber String
   status        ExpenseVoucherStatus @default(draft)
   voucherDate   DateTime
@@ -669,7 +755,7 @@ model ExpenseVoucher {
   notes         String?
   metadata      Json?
 
-  totalAmount   Decimal              @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal @default(0) @db.Decimal(12, 2)
 
   submittedBy   String?
   submittedAt   DateTime?
@@ -679,17 +765,19 @@ model ExpenseVoucher {
   rejectedAt    DateTime?
   rejectionNote String?
 
-  createdBy     String
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creator       User                 @relation("ExpenseVoucherCreatedBy", fields: [createdBy], references: [id])
-  items         ExpenseItem[]
-  approvalLogs  ApprovalLog[]
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  creator      User          @relation("ExpenseVoucherCreatedBy", fields: [createdBy], references: [id])
+  items        ExpenseItem[]
+  approvalLogs ApprovalLog[]
 
   @@unique([companyId, voucherNumber])
   @@index([companyId])
+  @@index([companyId, projectId])
   @@index([companyId, status])
   @@index([companyId, voucherDate])
   @@index([createdBy])
@@ -697,59 +785,59 @@ model ExpenseVoucher {
 }
 
 model ApprovalLog {
-  id         String               @id @default(cuid())
-  expenseId  String
-  action     ExpenseVoucherStatus
-  byUserId   String
-  note       String?
-  timestamp  DateTime             @default(now())
+  id        String               @id @default(cuid())
+  expenseId String
+  action    ExpenseVoucherStatus
+  byUserId  String
+  note      String?
+  timestamp DateTime             @default(now())
 
-  expense    ExpenseVoucher @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  expense ExpenseVoucher @relation(fields: [expenseId], references: [id], onDelete: Cascade)
 
   @@index([expenseId])
   @@map("approval_logs")
 }
 
 model ExpenseItem {
-  id            String         @id @default(cuid())
-  voucherId     String
-  description   String
-  category      String?
-  amount        Decimal        @db.Decimal(12, 2)
-  date          DateTime
-  notes         String?
-  metadata      Json?
+  id          String   @id @default(cuid())
+  voucherId   String
+  description String
+  category    String?
+  amount      Decimal  @db.Decimal(12, 2)
+  date        DateTime
+  notes       String?
+  metadata    Json?
 
   // Vendor info
-  vendorName    String?
-  vendorTaxId   String?
+  vendorName  String?
+  vendorTaxId String?
 
   // WHT
-  whtApplicable Boolean        @default(false)
-  whtRate       Decimal?       @db.Decimal(5, 2)
-  whtAmount     Decimal?       @db.Decimal(12, 2)
-  netAmount     Decimal?       @db.Decimal(12, 2)
+  whtApplicable Boolean  @default(false)
+  whtRate       Decimal? @db.Decimal(5, 2)
+  whtAmount     Decimal? @db.Decimal(12, 2)
+  netAmount     Decimal? @db.Decimal(12, 2)
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  voucher       ExpenseVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
-  attachments   ExpenseAttachment[]
+  voucher     ExpenseVoucher      @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  attachments ExpenseAttachment[]
 
   @@index([voucherId])
   @@map("expense_items")
 }
 
 model PettyCash {
-  id         String   @id @default(cuid())
-  companyId  String   @unique
-  cashierId  String?
-  balance    Decimal  @db.Decimal(12, 2) @default(0)
+  id        String  @id @default(cuid())
+  companyId String  @unique
+  cashierId String?
+  balance   Decimal @default(0) @db.Decimal(12, 2)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   // cashierId is a soft reference — no Prisma relation to avoid one-to-one constraint issues
 
   @@map("petty_cash")
@@ -763,9 +851,9 @@ model ExpenseAttachment {
   url           String
   evidenceType  EvidenceType       @default(receipt)
 
-  createdAt     DateTime           @default(now())
+  createdAt DateTime @default(now())
 
-  expenseItem   ExpenseItem        @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
+  expenseItem ExpenseItem @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
 
   @@index([expenseItemId])
   @@map("expense_attachments")
@@ -790,8 +878,8 @@ model WhtCertificate {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
 
   @@unique([companyId, certificateNumber])
   @@index([companyId])

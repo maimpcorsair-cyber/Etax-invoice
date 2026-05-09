@@ -22,6 +22,7 @@ purchaseInvoicesRouter.use(authenticate);
 const vatTypeEnum = z.enum(['vat7', 'vatExempt', 'vatZero']);
 
 const createPurchaseInvoiceSchema = z.object({
+  projectId: z.string().min(1).nullable().optional(),
   supplierName: z.string().min(1),
   supplierTaxId: z.string().regex(/^\d{13}$/, 'supplierTaxId must be 13 digits'),
   supplierBranch: z.string().optional().default('00000'),
@@ -40,6 +41,7 @@ const createPurchaseInvoiceSchema = z.object({
 const updatePurchaseInvoiceSchema = createPurchaseInvoiceSchema;
 
 const uploadDocumentSchema = z.object({
+  projectId: z.string().min(1).nullable().optional(),
   fileName: z.string().optional(),
   mimeType: z.string().min(1),
   fileBase64: z.string().min(1),
@@ -74,6 +76,16 @@ function documentDateRange(days = 30) {
   const from = new Date();
   from.setDate(from.getDate() - days);
   return from;
+}
+
+async function assertProjectBelongsToCompany(
+  companyId: string,
+  projectId: string | null | undefined,
+  tx: Prisma.TransactionClient,
+) {
+  if (!projectId) return;
+  const project = await tx.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
+  if (!project) throw new Error('Project not found');
 }
 
 async function findDuplicatePurchase(companyId: string, supplierTaxId: string, invoiceNumber: string) {
@@ -246,6 +258,7 @@ purchaseInvoicesRouter.get('/document-intakes/review', async (req, res) => {
         take: 50,
         select: {
           id: true,
+          projectId: true,
           source: true,
           fileName: true,
           mimeType: true,
@@ -290,6 +303,7 @@ purchaseInvoicesRouter.get('/document-intakes', authenticate, async (req, res) =
         take: 100,
         select: {
           id: true,
+          projectId: true,
           source: true,
           fileName: true,
           mimeType: true,
@@ -450,9 +464,11 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
     }
 
     let created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      await assertProjectBelongsToCompany(req.user!.companyId, body.projectId, tx);
       return tx.documentIntake.create({
         data: {
           companyId: req.user!.companyId,
+          projectId: body.projectId ?? null,
           userId: req.user!.userId,
           source: 'web',
           fileName: body.fileName,
@@ -583,7 +599,7 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
   try {
     const item = await prisma.documentIntake.findFirst({
       where: { id: req.params.id, companyId: req.user!.companyId },
-      select: { id: true, fileUrl: true, ocrResult: true },
+      select: { id: true, projectId: true, fileUrl: true, ocrResult: true },
     });
     if (!item) {
       res.status(404).json({ error: 'Document not found' });
@@ -642,6 +658,7 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
     const created = await prisma.purchaseInvoice.create({
       data: {
         companyId: req.user!.companyId,
+        projectId: item.projectId,
         ...normalized.payload,
         total: normalized.payload.subtotal + normalized.payload.vatAmount,
         createdBy: req.user!.userId,
@@ -824,9 +841,11 @@ purchaseInvoicesRouter.post('/', requireRole('admin', 'super_admin', 'accountant
     const total = body.subtotal + body.vatAmount;
 
     const created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      await assertProjectBelongsToCompany(req.user!.companyId, body.projectId, tx);
       return tx.purchaseInvoice.create({
         data: {
           companyId: req.user!.companyId,
+          projectId: body.projectId ?? null,
           supplierName: body.supplierName,
           supplierTaxId: body.supplierTaxId,
           supplierBranch: body.supplierBranch ?? '00000',
@@ -896,10 +915,12 @@ purchaseInvoicesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accoun
     }
 
     const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      await assertProjectBelongsToCompany(req.user!.companyId, body.projectId, tx);
       return tx.purchaseInvoice.update({
         where: { id: existing.id },
         data: {
           supplierName: body.supplierName,
+          projectId: body.projectId ?? null,
           supplierTaxId: body.supplierTaxId,
           supplierBranch: body.supplierBranch ?? '00000',
           invoiceNumber: body.invoiceNumber,

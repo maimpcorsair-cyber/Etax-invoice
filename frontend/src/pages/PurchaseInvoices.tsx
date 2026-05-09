@@ -15,7 +15,15 @@ import { EmptyState } from '../components/ui/AppChrome';
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
 type DocumentStatusFilter = 'action' | 'all' | 'saved' | 'failed';
 
+interface ProjectOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
 interface FormState {
+  projectId: string;
   supplierName: string;
   supplierTaxId: string;
   supplierBranch: string;
@@ -54,6 +62,7 @@ function startOfMonthIso() {
 }
 
 const EMPTY_FORM: FormState = {
+  projectId: '',
   supplierName: '',
   supplierTaxId: '',
   supplierBranch: '00000',
@@ -172,6 +181,8 @@ export default function PurchaseInvoices() {
   const [salesInvoices, setSalesInvoices] = useState<Invoice[]>([]);
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [uploadProjectId, setUploadProjectId] = useState('');
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null);
   const [documentTypeFilter, setDocumentTypeFilter] = useState<'all' | 'pdf' | 'image'>('all');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<DocumentStatusFilter>('action');
@@ -213,7 +224,7 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
-      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes, storageRes] = await Promise.all([
+      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes, storageRes, projectsRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -235,6 +246,9 @@ export default function PurchaseInvoices() {
         fetch('/api/purchase-invoices/storage/usage', {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        fetch('/api/projects?status=all', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       const json = await res.json();
       const attachPurchasesJson = await attachPurchasesRes.json();
@@ -243,6 +257,7 @@ export default function PurchaseInvoices() {
       const libraryJson = await libraryRes.json();
       const statsJson = await statsRes.json();
       const storageJson = await storageRes.json();
+      const projectsJson = await projectsRes.json();
       if (storageJson.data) setStorageUsage(storageJson.data);
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
@@ -252,6 +267,7 @@ export default function PurchaseInvoices() {
       setReviewIntakes(intakeJson.data ?? []);
       setDocumentLibrary(libraryJson.data ?? []);
       setDocumentStats(statsJson.data ?? null);
+      setProjects(projectsJson.data ?? []);
     } catch {
       setItems([]);
       setAttachPurchaseTargets([]);
@@ -259,6 +275,7 @@ export default function PurchaseInvoices() {
       setReviewIntakes([]);
       setDocumentLibrary([]);
       setDocumentStats(null);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -347,6 +364,10 @@ export default function PurchaseInvoices() {
     return source;
   }
 
+  function projectLabel(project: ProjectOption) {
+    return `${project.code} · ${project.name}`;
+  }
+
   function fileTypeLabel(doc: DocumentIntake) {
     if (doc.mimeType === 'application/pdf') return 'PDF';
     if (doc.mimeType.includes('image')) return isThai ? 'รูปภาพ' : 'Image';
@@ -392,7 +413,7 @@ export default function PurchaseInvoices() {
       return;
     }
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, projectId: uploadProjectId });
     setError('');
     setShowModal(true);
   }
@@ -401,6 +422,7 @@ export default function PurchaseInvoices() {
     setEditing(p);
     setReviewingDoc(null);
     setForm({
+      projectId: p.projectId ?? '',
       supplierName: p.supplierName,
       supplierTaxId: p.supplierTaxId,
       supplierBranch: p.supplierBranch ?? '00000',
@@ -427,6 +449,7 @@ export default function PurchaseInvoices() {
     setEditing(null);
     setReviewingDoc(doc);
     setForm({
+      projectId: doc.projectId ?? '',
       supplierName: result?.supplierName ?? '',
       supplierTaxId: (result?.supplierTaxId ?? '').replace(/\D/g, '').slice(0, 13),
       supplierBranch: result?.supplierBranch ?? '00000',
@@ -595,7 +618,7 @@ export default function PurchaseInvoices() {
       const res = await fetch('/api/purchase-invoices/document-intakes/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64 }),
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64, projectId: uploadProjectId || null }),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -646,6 +669,7 @@ export default function PurchaseInvoices() {
     setError('');
     try {
       const payload = {
+        projectId: form.projectId || null,
         supplierName: form.supplierName.trim(),
         supplierTaxId: form.supplierTaxId,
         supplierBranch: form.supplierBranch || undefined,
@@ -787,6 +811,21 @@ export default function PurchaseInvoices() {
                 ? 'ระบบอ่านใบกำกับ/ใบเสร็จจาก PDF หรือรูปภาพ ตรวจช่องสำคัญ แจ้งสิ่งที่ขาด แล้วบันทึกเป็นรายการซื้อเพื่อใช้ยื่น ภ.พ.30'
                 : 'The system reads supplier invoices and receipts from PDFs or images, flags missing fields, and turns approved documents into PP.30-ready purchase records.'}
             </p>
+            {projects.length > 0 && (
+              <label className="mt-4 block max-w-md text-xs font-semibold text-emerald-50/80">
+                {isThai ? 'โปรเจคสำหรับไฟล์อัปโหลด' : 'Upload project'}
+                <select
+                  value={uploadProjectId}
+                  onChange={(e) => setUploadProjectId(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-emerald-200"
+                >
+                  <option className="text-slate-900" value="">{isThai ? 'ยังไม่แยกโปรเจค' : 'No project'}</option>
+                  {projects.map((project) => (
+                    <option className="text-slate-900" key={project.id} value={project.id}>{projectLabel(project)}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="mt-5 flex flex-wrap gap-2">
               <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -857,21 +896,36 @@ export default function PurchaseInvoices() {
                   : `${actionDocuments.length} items need action · AI reads and prepares input VAT data`}
               </p>
             </div>
-            <label className={`btn-primary cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {isThai ? 'อัปโหลดเข้า AI' : 'Upload to AI'}
-              <input
-                type="file"
-                accept="application/pdf,image/jpeg,image/png,image/webp"
-                className="hidden"
-                disabled={uploading || isFreePlan}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.currentTarget.value = '';
-                  if (file) void uploadDocument(file);
-                }}
-              />
-            </label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {projects.length > 0 && (
+                <select
+                  value={uploadProjectId}
+                  onChange={(e) => setUploadProjectId(e.target.value)}
+                  className="input-field min-w-0 sm:w-64"
+                  aria-label={isThai ? 'โปรเจคสำหรับไฟล์อัปโหลด' : 'Upload project'}
+                >
+                  <option value="">{isThai ? 'ไม่ระบุโปรเจค' : 'No project'}</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>{projectLabel(project)}</option>
+                  ))}
+                </select>
+              )}
+              <label className={`btn-primary cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {isThai ? 'อัปโหลดเข้า AI' : 'Upload to AI'}
+                <input
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  disabled={uploading || isFreePlan}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.currentTarget.value = '';
+                    if (file) void uploadDocument(file);
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
           {documentStats && (
@@ -1380,6 +1434,21 @@ export default function PurchaseInvoices() {
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {projects.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <label className="label">{isThai ? 'โปรเจค / งบงาน' : 'Project / cost center'}</label>
+                    <select
+                      value={form.projectId}
+                      onChange={(e) => field('projectId', e.target.value)}
+                      className="input-field"
+                    >
+                      <option value="">{isThai ? 'ไม่ระบุโปรเจค' : 'No project'}</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>{projectLabel(project)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="label">
                     {isThai ? 'ชื่อผู้ขาย' : 'Supplier Name'} *
