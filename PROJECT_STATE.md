@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 22:33 Asia/Bangkok
+Last updated: 2026-05-09 23:08 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -29,6 +29,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added durable plan document:
+  - `docs/project-workspace-profit-plan.md`
+  - covers Project Workspace roadmap, LINE guest portal, Payment Voucher/non-VAT expenses, tax safety, pricing, costs, unit economics, and profitability assumptions
 - Updated commercial packaging toward Solo / Team:
   - internal `starter` plan is now presented as `Solo` at 299 THB/month
   - internal `business` plan is now presented as `Team` at 990 THB/month
