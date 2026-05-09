@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowRight,
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
+  Edit2,
   Loader2,
   Plus,
   Search,
@@ -84,6 +87,7 @@ const STATUS_CLASSES: Record<ProjectStatus, string> = {
 export default function Projects() {
   const { token, user, clearAuth } = useAuthStore();
   const { isThai, formatCurrency, formatDate } = useLanguage();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [status, setStatus] = useState<ProjectStatus | 'all'>('active');
@@ -313,11 +317,15 @@ export default function Projects() {
             const usedPercent = Math.min(project.summary.budgetUsedPercent || 0, 160);
             const progressWidth = `${Math.min(usedPercent, 100)}%`;
             return (
-              <button
+              <div
                 key={project.id}
-                type="button"
-                onClick={() => openEdit(project)}
-                className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary-200 hover:shadow-md"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/app/projects/${project.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') navigate(`/app/projects/${project.id}`);
+                }}
+                className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-100"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -337,11 +345,26 @@ export default function Projects() {
                       {project.customerName || project.description || (isThai ? 'ยังไม่มีรายละเอียด' : 'No description yet')}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">{isThai ? 'งบคงเหลือ' : 'Remaining'}</p>
-                    <p className={clsx('text-lg font-bold', project.summary.remainingAmount < 0 ? 'text-rose-600' : 'text-emerald-700')}>
-                      {formatCurrency(project.summary.remainingAmount)}
-                    </p>
+                  <div className="flex items-start justify-between gap-3 sm:block sm:text-right">
+                    <div>
+                      <p className="text-xs text-slate-500">{isThai ? 'งบคงเหลือ' : 'Remaining'}</p>
+                      <p className={clsx('text-lg font-bold', project.summary.remainingAmount < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                        {formatCurrency(project.summary.remainingAmount)}
+                      </p>
+                    </div>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEdit(project);
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        aria-label={isThai ? 'แก้ไขโปรเจค' : 'Edit project'}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -389,7 +412,11 @@ export default function Projects() {
                     </span>
                   )}
                 </div>
-              </button>
+                <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary-700">
+                  {isThai ? 'เปิด Workspace' : 'Open workspace'}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </div>
+              </div>
             );
           })}
         </div>

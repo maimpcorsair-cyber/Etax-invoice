@@ -149,6 +149,53 @@ function serializeProject(project: Prisma.ProjectGetPayload<{
   };
 }
 
+function documentKind(item: { mimeType: string; ocrResult: unknown; status: string }) {
+  const result = item.ocrResult as Record<string, unknown> | null;
+  const type = typeof result?.documentType === 'string' ? result.documentType : '';
+  const group = typeof result?.documentGroup === 'string' ? result.documentGroup : '';
+  if (type || group) return type || group;
+  if (item.mimeType === 'application/pdf') return 'pdf';
+  if (item.mimeType.includes('image')) return 'image';
+  return item.status === 'failed' ? 'unreadable' : 'unknown';
+}
+
+function missingTaxFields(result: unknown) {
+  const data = result as Record<string, unknown> | null;
+  if (!data) return ['ocr_result'];
+  return [
+    data.supplierName ? null : 'supplier_name',
+    data.supplierTaxId ? null : 'supplier_tax_id',
+    data.invoiceNumber ? null : 'document_number',
+    data.invoiceDate ? null : 'document_date',
+    data.total ? null : 'total_amount',
+  ].filter(Boolean) as string[];
+}
+
+function actionNeededForIntake(item: { id: string; status: string; fileName: string | null; mimeType: string; ocrResult: unknown; warnings: unknown; error: string | null }) {
+  const missing = missingTaxFields(item.ocrResult);
+  if (item.status === 'failed') {
+    return {
+      id: `intake:${item.id}:failed`,
+      severity: 'high',
+      type: 'ocr_failed',
+      title: item.fileName ?? 'Unreadable document',
+      message: item.error ?? 'OCR could not read this file',
+      documentIntakeId: item.id,
+    };
+  }
+  if (['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review'].includes(item.status)) {
+    return {
+      id: `intake:${item.id}:review`,
+      severity: missing.length > 0 ? 'medium' : 'low',
+      type: missing.length > 0 ? 'missing_tax_fields' : 'needs_review',
+      title: item.fileName ?? 'Document needs review',
+      message: missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'Review and confirm this document',
+      documentIntakeId: item.id,
+    };
+  }
+  return null;
+}
+
 projectsRouter.get('/users', async (req, res) => {
   try {
     const users = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
@@ -226,6 +273,162 @@ projectsRouter.get('/:id', async (req, res) => {
   } catch (err) {
     logger.error('Failed to get project', { error: err });
     res.status(500).json({ error: 'Failed to fetch project' });
+  }
+});
+
+projectsRouter.get('/:id/workspace', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const data = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const row = await tx.project.findFirst({
+        where: { id: req.params.id, companyId },
+        include: {
+          owner: { select: { id: true, name: true, email: true, role: true } },
+          approver: { select: { id: true, name: true, email: true, role: true } },
+          members: { include: { user: { select: { id: true, name: true, email: true, role: true } } } },
+        },
+      });
+      if (!row) return null;
+
+      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups] = await Promise.all([
+        projectBudgetSummary(companyId, row.id, tx),
+        tx.documentIntake.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+          select: {
+            id: true,
+            source: true,
+            fileName: true,
+            mimeType: true,
+            fileSize: true,
+            fileUrl: true,
+            status: true,
+            ocrResult: true,
+            warnings: true,
+            error: true,
+            targetType: true,
+            targetId: true,
+            purchaseInvoiceId: true,
+            processedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        tx.purchaseInvoice.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { invoiceDate: 'desc' },
+          take: 100,
+          select: {
+            id: true,
+            supplierName: true,
+            supplierTaxId: true,
+            invoiceNumber: true,
+            invoiceDate: true,
+            dueDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            vatType: true,
+            description: true,
+            category: true,
+            pdfUrl: true,
+            isPaid: true,
+            paidAt: true,
+            createdAt: true,
+          },
+        }),
+        tx.invoice.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { invoiceDate: 'desc' },
+          take: 100,
+          select: {
+            id: true,
+            invoiceNumber: true,
+            type: true,
+            status: true,
+            invoiceDate: true,
+            dueDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            pdfUrl: true,
+            isPaid: true,
+            paidAt: true,
+            buyer: { select: { id: true, nameTh: true, nameEn: true } },
+          },
+        }),
+        tx.expenseVoucher.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { voucherDate: 'desc' },
+          take: 100,
+          select: {
+            id: true,
+            voucherNumber: true,
+            status: true,
+            voucherDate: true,
+            description: true,
+            totalAmount: true,
+            submittedAt: true,
+            approvedAt: true,
+            rejectedAt: true,
+            createdAt: true,
+          },
+        }),
+        tx.lineGroupLink.findMany({
+          where: { companyId, projectId: row.id, isActive: true },
+          orderBy: { linkedAt: 'desc' },
+          select: { id: true, groupName: true, linkedAt: true },
+        }),
+      ]);
+
+      const project = serializeProject(row, summary);
+      const purchaseTotal = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.total), 0);
+      const purchaseVat = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.vatAmount), 0);
+      const revenueTotal = invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
+      const expenseTotal = expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
+      const actionNeeded = documentIntakes
+        .map(actionNeededForIntake)
+        .filter(Boolean);
+
+      return {
+        project,
+        workspaceSummary: {
+          purchaseTotal,
+          purchaseVat,
+          revenueTotal,
+          expenseTotal,
+          estimatedMargin: revenueTotal - purchaseTotal - expenseTotal,
+          actionNeededCount: actionNeeded.length,
+          filesCount: documentIntakes.length,
+          lineGroupCount: lineGroups.length,
+        },
+        actionNeeded,
+        documentIntakes: documentIntakes.map((item) => ({ ...item, kind: documentKind(item) })),
+        purchaseInvoices: purchaseInvoices.map((item) => ({
+          ...item,
+          subtotal: asNumber(item.subtotal),
+          vatAmount: asNumber(item.vatAmount),
+          total: asNumber(item.total),
+        })),
+        invoices: invoices.map((item) => ({
+          ...item,
+          subtotal: asNumber(item.subtotal),
+          vatAmount: asNumber(item.vatAmount),
+          total: asNumber(item.total),
+        })),
+        expenseVouchers: expenseVouchers.map((item) => ({ ...item, totalAmount: asNumber(item.totalAmount) })),
+        lineGroups,
+      };
+    });
+    if (!data) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+    res.json({ data });
+  } catch (err) {
+    logger.error('Failed to get project workspace', { error: err });
+    res.status(500).json({ error: 'Failed to fetch project workspace' });
   }
 });
 

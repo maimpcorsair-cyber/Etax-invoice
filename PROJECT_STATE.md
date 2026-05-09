@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 23:08 Asia/Bangkok
+Last updated: 2026-05-09 23:45 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -29,6 +29,18 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Workspace detail MVP:
+  - backend `GET /api/projects/:id/workspace`
+  - frontend route `/app/projects/:id`
+  - project list cards now open the workspace; edit remains a separate icon action
+  - workspace shows budget, committed cost, sales invoiced, estimated margin, action-needed documents, file library, purchases, sales invoices, expense vouchers, LINE groups, and team context
+  - file library previews PDF/JPG/PNG/WebP thumbnails where available and can open stored files
+  - upload from project workspace sends files to `/api/purchase-invoices/document-intakes/upload` with the current `projectId`
+- Verified locally:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
 - Added durable plan document:
   - `docs/project-workspace-profit-plan.md`
   - covers Project Workspace roadmap, LINE guest portal, Payment Voucher/non-VAT expenses, tax safety, pricing, costs, unit economics, and profitability assumptions
@@ -103,6 +115,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Recent Commits To Know
 
+- `3a8c210` docs: add project workspace profit plan
+- `b108bc4` feat: add solo team project packaging
+- `497606c` docs: record project deploy status
 - `ac604f4` ci: retry backend health after deploy
 - `383f08d` ci: allow pending migrations before deploy
 - `aa06e6c` feat: add project cost centers
@@ -144,22 +159,24 @@ Expected backend health after the latest backend fix:
 1. After deploy, confirm migration `20260509_project_cost_centers` ran on production.
 2. Open web app `https://etax-invoice.vercel.app/app/projects`.
 3. Create a project with budget, owner, and approver.
-4. Open Input VAT and upload a PDF/JPG with a project selected.
-5. Confirm the intake and saved purchase invoice keep the same `projectId`.
-6. In LINE, send a PDF that previously produced no reply.
-7. Confirm LINE sends a reply even if OCR cannot read it.
-8. Open web app `https://etax-invoice.vercel.app/app/purchase-invoices`.
-9. Check Input VAT document library:
+4. Click a project card and confirm `/app/projects/:id` opens.
+5. Upload PDF/JPG/PNG/WebP from the project workspace and confirm the file appears in the project file library.
+6. Open Input VAT and upload a PDF/JPG with a project selected.
+7. Confirm the intake and saved purchase invoice keep the same `projectId`.
+8. In LINE, send a PDF that previously produced no reply.
+9. Confirm LINE sends a reply even if OCR cannot read it.
+10. Open web app `https://etax-invoice.vercel.app/app/purchase-invoices`.
+11. Check Input VAT document library:
    - LINE-uploaded PDF/JPG appears.
    - thumbnail/preview opens.
    - OCR status is visible.
    - failed unreadable file remains available for manual review.
-10. Send a bank transfer slip and confirm reply includes sender/receiver/reference.
+12. Send a bank transfer slip and confirm reply includes sender/receiver/reference.
 
 ## Known Risks / Next Improvements
 
 - Production DB read-only debugging is not yet set up as a safe repeatable tool.
-- Projects v1 is usable for budget/project tagging, but next useful upgrades are:
+- Projects v1 is usable for budget/project tagging and workspace review, but next useful upgrades are:
   - project picker in LINE Admin group UI
   - project filter across Input VAT, expenses, and invoice lists
   - approval workflow by project owner/approver
