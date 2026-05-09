@@ -423,11 +423,22 @@ function smartMatchForIntake(
   if (!TAX_SAFETY_RISK_STATUSES.includes(item.taxSafety.status) && item.taxSafety.status !== 'supporting_only') return null;
 
   const data = item.ocrResult as Record<string, unknown> | null;
+  const meta = data?.documentMetadata as Record<string, unknown> | undefined;
   const amount = numberField(data, 'total') || numberField(data, 'amount') || numberField(data, 'paymentAmount');
   const payment = data?.payment as Record<string, unknown> | undefined;
   const paymentAmount = amount || numberField(payment ?? null, 'amount');
   const supplierName = textField(data, 'supplierName') || textField(payment ?? null, 'receiverName');
+  const referenceNumber = textField(meta ?? null, 'purchaseOrderNumber')
+    || textField(meta ?? null, 'quotationNumber')
+    || textField(meta ?? null, 'deliveryNoteNumber')
+    || textField(data, 'invoiceNumber')
+    || textField(payment ?? null, 'reference');
   const documentDate = dateField(data, 'invoiceDate') || dateField(data, 'paymentDate') || dateField(payment ?? null, 'date') || item.createdAt;
+  const role = item.taxSafety.status === 'unmatched_payment'
+    ? 'payment_proof'
+    : item.taxSafety.status === 'supporting_only'
+      ? 'supporting_document'
+      : 'tax_document';
 
   const candidates = purchases
     .map((purchase) => {
@@ -440,6 +451,13 @@ function smartMatchForIntake(
       if (supplierName && purchase.supplierName.toLowerCase().includes(supplierName.toLowerCase().slice(0, 12))) {
         score += 25;
         reasons.push('supplier');
+      }
+      if (referenceNumber && (
+        purchase.invoiceNumber.toLowerCase().includes(referenceNumber.toLowerCase())
+        || referenceNumber.toLowerCase().includes(purchase.invoiceNumber.toLowerCase())
+      )) {
+        score += 25;
+        reasons.push('reference');
       }
       const dayDiff = Math.abs((purchase.invoiceDate.getTime() - documentDate.getTime()) / 86400000);
       if (dayDiff <= 14) {
@@ -466,9 +484,11 @@ function smartMatchForIntake(
     documentIntakeId: item.id,
     fileName: item.fileName,
     status: item.status,
+    documentRole: role,
     taxSafety: item.taxSafety,
     amount: paymentAmount || null,
     supplierName: supplierName || null,
+    referenceNumber: referenceNumber || null,
     documentDate,
     candidates,
   };

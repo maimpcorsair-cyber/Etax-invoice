@@ -135,9 +135,11 @@ interface SmartMatch {
   documentIntakeId: string;
   fileName?: string | null;
   status: string;
+  documentRole?: 'payment_proof' | 'supporting_document' | 'tax_document';
   taxSafety: TaxSafety;
   amount?: number | null;
   supplierName?: string | null;
+  referenceNumber?: string | null;
   documentDate: string;
   candidates: SmartMatchCandidate[];
 }
@@ -872,7 +874,14 @@ function SmartMatchList({
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-950">{match.fileName || (isThai ? 'ไฟล์ไม่มีชื่อ' : 'Untitled file')}</p>
               <p className="mt-0.5 text-xs text-slate-500">
+                {match.documentRole === 'payment_proof'
+                  ? (isThai ? 'สลิป/หลักฐานจ่าย' : 'Payment proof')
+                  : match.documentRole === 'supporting_document'
+                    ? (isThai ? 'PO/ใบเสนอราคา/เอกสารแนบ' : 'PO/quotation/supporting')
+                    : (isThai ? 'เอกสารภาษี' : 'Tax document')}
+                {' · '}
                 {formatDate(match.documentDate)} · {match.amount ? formatCurrency(match.amount) : (isThai ? 'ไม่พบยอด' : 'No amount')} · {match.supplierName || (isThai ? 'ไม่พบคู่ค้า' : 'No vendor')}
+                {match.referenceNumber ? ` · Ref ${match.referenceNumber}` : ''}
               </p>
             </div>
             <TaxSafetyBadge taxSafety={match.taxSafety} />

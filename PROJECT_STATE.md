@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 20:35 Asia/Bangkok
+Last updated: 2026-05-10 21:22 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -88,6 +88,22 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Approval/Budget Guard v2:
+  - approving a submitted expense voucher now checks the linked project budget
+  - backend returns `409 PROJECT_OVER_BUDGET` with budget, committed cost, remaining amount, and overage amount when approval would keep/put the project over budget
+  - frontend asks for explicit confirmation before approving over budget
+- Added Smart Matching v2 metadata:
+  - project smart matches now label document role as `payment_proof`, `supporting_document`, or `tax_document`
+  - matching score now includes reference number hints from PO/quotation/delivery/reference metadata when available
+  - Project Workspace matching tab shows document role and reference number
+- Added Overage Billing foundation:
+  - backend `GET /api/billing/usage-overage`
+  - calculates included documents, used documents, remaining documents, overage documents, per-doc overage price, estimated overage THB, and status
+- Verified locally after Approval/Budget Guard + Smart Matching v2 + Overage foundation:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
 - Added Project Document Request Thread v1:
   - new `document_comments` table with tenant RLS for per-document requests, comments, and guest replies
   - Project Workspace file list shows recent comments/requests for each document

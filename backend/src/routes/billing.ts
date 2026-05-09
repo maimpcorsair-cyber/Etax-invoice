@@ -1123,6 +1123,40 @@ billingRouter.get('/access-policy', authenticate, async (req, res) => {
   }
 });
 
+billingRouter.get('/usage-overage', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
+  try {
+    const policy = await resolveCompanyAccessPolicy(req.user!.companyId);
+    const includedDocuments = policy.maxDocumentsPerMonth;
+    const usedDocuments = policy.usage.documentsThisMonth;
+    const overageDocuments = includedDocuments == null ? 0 : Math.max(0, usedDocuments - includedDocuments);
+    const unitPriceThb = policy.extraOcrDocumentThb ?? 0;
+    const estimatedOverageThb = Math.round(overageDocuments * unitPriceThb * 100) / 100;
+
+    res.json({
+      data: {
+        plan: policy.plan,
+        planLabel: policy.planLabel,
+        includedDocuments,
+        usedDocuments,
+        remainingDocuments: includedDocuments == null ? null : Math.max(0, includedDocuments - usedDocuments),
+        overageDocuments,
+        unitPriceThb,
+        estimatedOverageThb,
+        billable: overageDocuments > 0 && unitPriceThb > 0,
+        status: includedDocuments == null
+          ? 'unlimited'
+          : overageDocuments > 0
+            ? 'overage'
+            : usedDocuments >= includedDocuments * 0.8
+              ? 'near_limit'
+              : 'ok',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message || 'Failed to load overage usage' });
+  }
+});
+
 billingRouter.post('/portal-session', authenticate, requireRole('super_admin', 'admin'), async (req, res) => {
   const stripe = getStripeClient();
   if (!stripe) {

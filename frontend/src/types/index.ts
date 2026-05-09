@@ -384,6 +384,14 @@ export interface ExpenseVoucher {
   notes?: string | null;
   totalAmount: number;
   canApprove?: boolean;
+  budgetGuard?: {
+    project: { id: string; code: string; name: string };
+    budgetAmount: number;
+    committedAmount: number;
+    remainingAmount: number;
+    overBudgetAmount: number;
+    isOverBudget: boolean;
+  } | null;
   itemCount?: number;
   items?: ExpenseItem[];
   approvalLogs?: ApprovalLog[];

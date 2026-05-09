@@ -362,15 +362,26 @@ export default function Expenses() {
     }
   }
 
-  async function handleApprove(id: string) {
+  async function handleApprove(id: string, forceOverBudget = false) {
     setError('');
     try {
       const res = await fetch(`/api/expenses/${id}/approve`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ forceOverBudget }),
       });
       if (!res.ok) {
         const json = await res.json();
+        if (res.status === 409 && json.code === 'PROJECT_OVER_BUDGET' && json.budgetGuard && !forceOverBudget) {
+          const guard = json.budgetGuard as NonNullable<ExpenseVoucher['budgetGuard']>;
+          const ok = confirm(
+            isThai
+              ? `โปรเจค ${guard.project.code} เกินงบ ${formatCurrency(guard.overBudgetAmount)} หลังอนุมัติ\n\nงบ: ${formatCurrency(guard.budgetAmount)}\nต้นทุนผูกพัน: ${formatCurrency(guard.committedAmount)}\n\nยืนยันอนุมัติต่อหรือไม่?`
+              : `Project ${guard.project.code} is over budget by ${formatCurrency(guard.overBudgetAmount)} after approval.\n\nBudget: ${formatCurrency(guard.budgetAmount)}\nCommitted: ${formatCurrency(guard.committedAmount)}\n\nApprove anyway?`,
+          );
+          if (ok) return handleApprove(id, true);
+          return;
+        }
         throw new Error(json.error ?? 'Approve failed');
       }
       fetchVouchers();

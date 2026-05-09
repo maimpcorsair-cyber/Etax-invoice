@@ -54,6 +54,7 @@ Build in rounds so production keeps working and each round has a clear business 
 3. Smart Matching
    - match slips/supporting files to purchase invoices by amount, date, supplier/receiver, and project
    - goal: reduce manual chasing in LINE
+   - current: v2 labels payment proofs, supporting documents, and tax documents, and uses reference-number hints where available
 4. Export / Close-out Pack
    - Excel, Google Sheets, ZIP attachments, Drive folder structure
    - goal: one-click project handoff for owner/accountant/auditor
@@ -81,6 +82,12 @@ Current DBD foundation:
 - Optional env overrides: `DGA_BASE_URL`, `DGA_VALIDATE_PATH`, `DBD_PROFILE_PATH`, `DBD_SEARCH_BY_NAME_PATH`, `DBD_REQUEST_TIMEOUT_MS`
 
 Do not block Project Workspace launch on DBD credentials. DBD should enhance autofill and verification after Government API access is approved.
+
+Current approval/billing foundation:
+
+- Budget guard is active on project expense approval.
+- `GET /api/billing/usage-overage` estimates document overage from current plan policy.
+- Full automatic billing collection for overage is still pending Stripe/PromptPay automation.
 
 ## Target Workflow
 

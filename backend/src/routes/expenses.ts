@@ -52,6 +52,10 @@ const rejectSchema = z.object({
   rejectionNote: z.string().min(1),
 });
 
+const approveSchema = z.object({
+  forceOverBudget: z.boolean().optional().default(false),
+});
+
 const settingsSchema = z.object({
   expenseLimit: z.number().positive().nullable(),
 });
@@ -99,6 +103,37 @@ function publicExpenseProject(project: ExpenseApprovalContext['project']) {
   return { id: project.id, code: project.code, name: project.name };
 }
 
+async function getProjectBudgetGuard(companyId: string, projectId: string | null | undefined) {
+  if (!projectId) return null;
+  const [project, purchaseAll, expenseCommitted] = await Promise.all([
+    prisma.project.findFirst({
+      where: { id: projectId, companyId },
+      select: { id: true, code: true, name: true, budgetAmount: true },
+    }),
+    prisma.purchaseInvoice.aggregate({
+      where: { companyId, projectId },
+      _sum: { total: true },
+    }),
+    prisma.expenseVoucher.aggregate({
+      where: { companyId, projectId, status: { in: ['submitted', 'approved'] } },
+      _sum: { totalAmount: true },
+    }),
+  ]);
+  if (!project) return null;
+
+  const budgetAmount = Number(project.budgetAmount);
+  const committedAmount = Number(purchaseAll._sum.total ?? 0) + Number(expenseCommitted._sum.totalAmount ?? 0);
+  const overBudgetAmount = Math.max(0, committedAmount - budgetAmount);
+  return {
+    project: { id: project.id, code: project.code, name: project.name },
+    budgetAmount,
+    committedAmount,
+    remainingAmount: budgetAmount - committedAmount,
+    overBudgetAmount,
+    isOverBudget: budgetAmount > 0 && overBudgetAmount > 0,
+  };
+}
+
 /* ─── List ─── */
 expensesRouter.get('/', async (req, res) => {
   try {
@@ -135,6 +170,7 @@ expensesRouter.get('/', async (req, res) => {
       ...v,
       totalAmount: Number(v.totalAmount),
       canApprove: canApproveExpenseForUser(req, v),
+      budgetGuard: null,
       project: publicExpenseProject(v.project),
       itemCount: v.items.length,
       attachmentCount: v.items.reduce((sum, i) => sum + i.attachments.length, 0),
@@ -522,6 +558,7 @@ expensesRouter.post('/:id/submit', requireRole('admin', 'super_admin', 'accounta
 /* ─── Approve ─── */
 expensesRouter.post('/:id/approve', requireRole('viewer'), async (req, res) => {
   try {
+    const body = approveSchema.parse(req.body ?? {});
     const existing = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.expenseVoucher.findFirst({
         where: { id: req.params.id, companyId: req.user!.companyId },
@@ -534,6 +571,15 @@ expensesRouter.post('/:id/approve', requireRole('viewer'), async (req, res) => {
 
     const companyId = req.user!.companyId;
     const totalAmt = Number(existing.totalAmount);
+    const budgetGuard = await getProjectBudgetGuard(companyId, existing.projectId);
+    if (budgetGuard?.isOverBudget && !body.forceOverBudget) {
+      res.status(409).json({
+        error: 'Project budget would be exceeded. Confirm approval to continue.',
+        code: 'PROJECT_OVER_BUDGET',
+        budgetGuard,
+      });
+      return;
+    }
 
     // Approve, log, and deduct petty cash in one transaction
     const [updated] = await prisma.$transaction([
@@ -556,12 +602,16 @@ expensesRouter.post('/:id/approve', requireRole('viewer'), async (req, res) => {
     await auditLog({
       companyId, userId: req.user!.userId, role: req.user!.role,
       action: 'expense_voucher.approve', resourceType: 'expense_voucher', resourceId: updated.id,
-      details: { voucherNumber: updated.voucherNumber, totalAmount: Number(updated.totalAmount), projectId: existing.projectId },
+      details: { voucherNumber: updated.voucherNumber, totalAmount: Number(updated.totalAmount), projectId: existing.projectId, budgetGuard },
       ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',
     });
 
-    res.json({ data: { ...updated, totalAmount: Number(updated.totalAmount) } });
+    res.json({ data: { ...updated, totalAmount: Number(updated.totalAmount), budgetGuard } });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
     logger.error('Failed to approve expense voucher', { error: err });
     res.status(500).json({ error: 'Failed to approve expense voucher' });
   }
