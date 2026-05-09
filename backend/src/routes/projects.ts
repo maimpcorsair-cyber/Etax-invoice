@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
@@ -11,6 +12,7 @@ import { generateProjectExportExcel } from '../services/exportService';
 import { exportProjectToSheets, isSheetsConfigured } from '../services/googleSheetsService';
 import { downloadFromStorage } from '../services/storageService';
 import { createZip, ZipEntryInput } from '../services/zipService';
+import { sendLineText } from '../services/lineService';
 
 export const projectsRouter = Router();
 
@@ -50,6 +52,31 @@ const documentCommentPayloadSchema = z.object({
   message: z.string().trim().min(1).max(1200),
   kind: z.enum(['comment', 'request']).default('comment'),
 });
+
+const PROJECT_PORTAL_TTL = process.env.PROJECT_PORTAL_TTL ?? '7d';
+
+function getFrontendBaseUrl() {
+  const firstConfigured = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'https://etax-invoice.vercel.app')
+    .split(',')
+    .map((value) => value.trim())
+    .find(Boolean);
+  return (firstConfigured ?? 'https://etax-invoice.vercel.app').replace(/\/+$/, '');
+}
+
+function buildProjectPortalUrl(input: { companyId: string; projectId: string; groupLinkId: string }) {
+  const token = jwt.sign(
+    {
+      type: 'project_guest',
+      companyId: input.companyId,
+      projectId: input.projectId,
+      groupLinkId: input.groupLinkId,
+    },
+    process.env.JWT_SECRET!,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { expiresIn: PROJECT_PORTAL_TTL as any },
+  );
+  return `${getFrontendBaseUrl()}/project-portal/${token}`;
+}
 
 function normalizeCode(input?: string | null) {
   return input?.trim().toUpperCase().replace(/\s+/g, '-') || '';
@@ -819,6 +846,35 @@ projectsRouter.post('/:id/documents/:documentIntakeId/comments', requireRole('ad
       res.status(404).json({ error: 'Project document not found' });
       return;
     }
+
+    void (async () => {
+      try {
+        const groups = await prisma.lineGroupLink.findMany({
+          where: { companyId, projectId: req.params.id, isActive: true },
+          select: {
+            id: true,
+            lineGroupId: true,
+            groupName: true,
+            project: { select: { code: true, name: true } },
+          },
+        });
+        await Promise.allSettled(groups.map((group) => {
+          const portalUrl = buildProjectPortalUrl({ companyId, projectId: req.params.id, groupLinkId: group.id });
+          const projectLabel = group.project ? `${group.project.code} ${group.project.name}` : req.params.id;
+          const text = [
+            `📌 Billboy ขอเอกสารเพิ่มในโปรเจค ${projectLabel}`,
+            '',
+            body.message,
+            '',
+            'เปิดลิงก์เพื่อดูรายละเอียด ตอบกลับ หรือแนบไฟล์เพิ่ม:',
+            portalUrl,
+          ].join('\n');
+          return sendLineText(group.lineGroupId, text);
+        }));
+      } catch (notifyErr) {
+        logger.warn('Failed to send LINE project document request notification', { error: notifyErr, projectId: req.params.id, documentIntakeId: req.params.documentIntakeId });
+      }
+    })();
 
     await auditLog({
       companyId,

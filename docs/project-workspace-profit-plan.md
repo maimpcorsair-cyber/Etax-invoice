@@ -86,6 +86,7 @@ Do not block Project Workspace launch on DBD credentials. DBD should enhance aut
 Current approval/billing foundation:
 
 - Budget guard is active on project expense approval.
+- Project document requests now push LINE notifications to linked project groups with a fresh Project Portal link.
 - `GET /api/billing/usage-overage` estimates document overage from current plan policy.
 - Full automatic billing collection for overage is still pending Stripe/PromptPay automation.
 

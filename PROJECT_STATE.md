@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 21:22 Asia/Bangkok
+Last updated: 2026-05-10 21:55 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -94,6 +94,15 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added LINE notification for project document requests:
+  - when admin/accountant creates a request/comment on a project document, backend pushes a LINE message to active LINE groups linked to that project
+  - message includes project label, request text, and a fresh signed Project Portal link for reply/upload
+  - notification failure is non-blocking; the document request still succeeds
+- Verified locally after LINE request notification:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
 - Added Project Approval/Budget Guard v2:
   - approving a submitted expense voucher now checks the linked project budget
   - backend returns `409 PROJECT_OVER_BUDGET` with budget, committed cost, remaining amount, and overage amount when approval would keep/put the project over budget
