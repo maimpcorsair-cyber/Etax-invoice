@@ -12,20 +12,36 @@ jobs:
   check:
     name: Check All Services
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Check Render backend
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 20 \
-            https://etax-invoice-api.onrender.com/health)
+          STATUS="000"
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 10 \
+              --max-time 45 \
+              https://etax-invoice-api.onrender.com/health || true)
+            [ -n "$STATUS" ] || STATUS="000"
+            echo "Backend attempt $i: $STATUS"
+            [ "$STATUS" = "200" ] && break
+            sleep 10
+          done
           echo "Backend: $STATUS"
           [ "$STATUS" = "200" ] && echo "✅ Backend healthy" || echo "❌ Backend down ($STATUS)"
 
       - name: Check Vercel frontend
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 10 \
-            https://etax-invoice.vercel.app)
+          STATUS="000"
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 5 \
+              --max-time 20 \
+              https://etax-invoice.vercel.app || true)
+            [ -n "$STATUS" ] || STATUS="000"
+            echo "Frontend attempt $i: $STATUS"
+            [ "$STATUS" = "200" ] && break
+            sleep 5
+          done
           echo "Frontend: $STATUS"
           [ "$STATUS" = "200" ] && echo "✅ Frontend healthy" || echo "❌ Frontend down ($STATUS)"

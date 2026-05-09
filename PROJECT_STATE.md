@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 19:22 Asia/Bangkok
+Last updated: 2026-05-09 19:30 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -21,6 +21,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
 - GitHub CLI is logged in as `maimpcorsair-cyber`; `gh run list` works.
 - GitHub Actions `Deploy to Render` and `Typecheck` are working on `main`.
+- GitHub Actions `Health Check` now has retries and longer timeouts to reduce false failures from Render cold starts.
 
 ## Latest Work Completed
 
@@ -47,10 +48,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - separate file type chip (`PDF` / image)
   - clearer document kind label when OCR has not classified a file yet
 - Added `.vercel` to `.gitignore`.
+- Hardened `.github/workflows/health-check.yml` with 3 attempts, longer backend timeout, and longer frontend timeout.
 
 ## Recent Commits To Know
 
 - `7b92bbf` chore: ignore Vercel local config
+- `ad4c816` docs: require project state updates
+- `80cd323` docs: add project state handoff
 - `0fae480` chore: bump backend health version
 - `f8b62c8` fix: persist LINE document intake previews
 - `c4976f8` fix: add PDF raster OCR fallback for LINE
