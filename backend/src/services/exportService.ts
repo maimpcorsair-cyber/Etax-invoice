@@ -217,8 +217,8 @@ export async function generateProjectExportExcel(input: {
   };
   summary: Record<string, string | number>;
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
-  files: Array<{ fileName: string; source: string; kind: string; status: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
-  purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
+  files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
+  purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
   expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
   lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
@@ -250,12 +250,14 @@ export async function generateProjectExportExcel(input: {
   const filesSheet = addWorksheet(
     workbook,
     'Files',
-    ['File name', 'Source', 'Kind', 'Status', 'MIME type', 'Size bytes', 'Created at'],
+    ['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'MIME type', 'Size bytes', 'Created at'],
     input.files.map((item) => [
       item.fileName,
       item.source,
       item.kind,
       item.status,
+      item.taxSafetyStatus ?? '',
+      item.taxSafetyMessage ?? '',
       item.mimeType,
       item.fileSize,
       item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt,
@@ -265,7 +267,7 @@ export async function generateProjectExportExcel(input: {
   const purchaseSheet = addWorksheet(
     workbook,
     'Purchases',
-    ['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Paid'],
+    ['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid'],
     input.purchases.map((item) => [
       item.supplierName,
       item.supplierTaxId,
@@ -275,6 +277,8 @@ export async function generateProjectExportExcel(input: {
       item.subtotal,
       item.vatAmount,
       item.total,
+      item.taxSafetyStatus ?? '',
+      item.taxSafetyMessage ?? '',
       item.isPaid ? 'Yes' : 'No',
     ]),
   );

@@ -383,6 +383,7 @@ export interface ExpenseVoucher {
   description?: string | null;
   notes?: string | null;
   totalAmount: number;
+  canApprove?: boolean;
   itemCount?: number;
   items?: ExpenseItem[];
   approvalLogs?: ApprovalLog[];

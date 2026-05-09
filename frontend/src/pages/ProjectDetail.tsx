@@ -17,6 +17,7 @@ import {
   Receipt,
   RefreshCw,
   Send,
+  ShieldCheck,
   Upload,
   Users,
   WalletCards,
@@ -28,6 +29,7 @@ import { useLanguage } from '../hooks/useLanguage';
 
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
 type ProjectWorkspaceTab = 'overview' | 'action' | 'files' | 'purchases' | 'sales' | 'expenses';
+type TaxSafetyStatus = 'vat_claimable' | 'expense_only_no_vat' | 'needs_tax_invoice' | 'missing_required_fields' | 'unmatched_payment' | 'supporting_only' | 'needs_review';
 
 interface ProjectUser {
   id: string;
@@ -68,6 +70,9 @@ interface WorkspaceSummary {
   actionNeededCount: number;
   filesCount: number;
   lineGroupCount: number;
+  taxSafetyRiskCount?: number;
+  claimableVat?: number;
+  taxSafetyByStatus?: Record<string, number>;
 }
 
 interface ActionNeeded {
@@ -91,6 +96,7 @@ interface DocumentIntake {
   targetType?: string | null;
   targetId?: string | null;
   purchaseInvoiceId?: string | null;
+  taxSafety?: TaxSafety;
   processedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -111,8 +117,17 @@ interface PurchaseInvoice {
   category?: string | null;
   pdfUrl?: string | null;
   isPaid: boolean;
+  taxSafety?: TaxSafety;
   paidAt?: string | null;
   createdAt: string;
+}
+
+interface TaxSafety {
+  status: TaxSafetyStatus;
+  severity: 'ok' | 'info' | 'warning' | 'danger';
+  label: string;
+  message: string;
+  missingFields: string[];
 }
 
 interface SalesInvoice {
@@ -172,6 +187,16 @@ const ACTION_CLASSES: Record<ActionNeeded['severity'], string> = {
   high: 'border-rose-200 bg-rose-50 text-rose-700',
   medium: 'border-amber-200 bg-amber-50 text-amber-700',
   low: 'border-blue-200 bg-blue-50 text-blue-700',
+};
+
+const TAX_SAFETY_CLASSES: Record<TaxSafetyStatus, string> = {
+  vat_claimable: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  expense_only_no_vat: 'border-slate-200 bg-slate-50 text-slate-600',
+  needs_tax_invoice: 'border-amber-200 bg-amber-50 text-amber-700',
+  missing_required_fields: 'border-rose-200 bg-rose-50 text-rose-700',
+  unmatched_payment: 'border-amber-200 bg-amber-50 text-amber-700',
+  supporting_only: 'border-blue-200 bg-blue-50 text-blue-700',
+  needs_review: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
 function formatBytes(bytes: number) {
@@ -503,9 +528,12 @@ export default function ProjectDetail() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-4">
           <WorkspacePanel title={isThai ? 'งานที่ต้องตรวจ' : 'Needs attention'} icon={AlertTriangle}>
             <ActionList actions={workspace.actionNeeded.slice(0, 5)} isThai={isThai} />
+          </WorkspacePanel>
+          <WorkspacePanel title={isThai ? 'Tax Safety' : 'Tax safety'} icon={ShieldCheck}>
+            <TaxSafetyPanel summary={workspaceSummary} isThai={isThai} formatCurrency={formatCurrency} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
             <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} />
@@ -549,6 +577,7 @@ export default function ProjectDetail() {
               subtitle: `${item.invoiceNumber} · ${formatDate(item.invoiceDate)}`,
               amount: formatCurrency(item.total),
               meta: item.isPaid ? (isThai ? 'จ่ายแล้ว' : 'Paid') : (isThai ? 'ยังไม่จ่าย' : 'Unpaid'),
+              taxSafety: item.taxSafety,
               href: `/app/purchase-invoices?projectId=${project.id}`,
             }))}
           />
@@ -639,6 +668,60 @@ function ActionList({ actions, isThai }: { actions: ActionNeeded[]; isThai: bool
   );
 }
 
+function TaxSafetyPanel({
+  summary,
+  isThai,
+  formatCurrency,
+}: {
+  summary: WorkspaceSummary;
+  isThai: boolean;
+  formatCurrency: (value: number) => string;
+}) {
+  const riskCount = summary.taxSafetyRiskCount ?? 0;
+  const claimableVat = summary.claimableVat ?? 0;
+  const byStatus = summary.taxSafetyByStatus ?? {};
+  const rows = [
+    { status: 'vat_claimable' as const, label: isThai ? 'พร้อมเคลม VAT' : 'VAT claim ready', count: byStatus.vat_claimable ?? 0 },
+    { status: 'missing_required_fields' as const, label: isThai ? 'ข้อมูลภาษีไม่ครบ' : 'Missing tax fields', count: byStatus.missing_required_fields ?? 0 },
+    { status: 'unmatched_payment' as const, label: isThai ? 'สลิปยังไม่จับคู่' : 'Unmatched payments', count: byStatus.unmatched_payment ?? 0 },
+    { status: 'supporting_only' as const, label: isThai ? 'เอกสารประกอบ' : 'Supporting only', count: byStatus.supporting_only ?? 0 },
+  ];
+  return (
+    <div className="space-y-3">
+      <div className={clsx('rounded-lg border p-3', riskCount > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50')}>
+        <p className="text-xs font-semibold text-slate-600">{isThai ? 'Input VAT ที่พร้อมตรวจ' : 'Claimable input VAT'}</p>
+        <p className={clsx('mt-1 text-lg font-bold', riskCount > 0 ? 'text-amber-700' : 'text-emerald-700')}>{formatCurrency(claimableVat)}</p>
+        <p className="mt-1 text-xs text-slate-600">
+          {riskCount > 0
+            ? (isThai ? `มี ${riskCount} รายการที่ควรตรวจภาษีก่อนปิดงาน` : `${riskCount} items need tax review before close-out`)
+            : (isThai ? 'ยังไม่เจอความเสี่ยงภาษีในโปรเจคนี้' : 'No tax safety risk detected for this project')}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {rows.map((row) => (
+          <div key={row.status} className={clsx('rounded-lg border px-2 py-2', TAX_SAFETY_CLASSES[row.status])}>
+            <p className="text-[11px] font-semibold">{row.label}</p>
+            <p className="text-base font-bold">{row.count}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaxSafetyBadge({ taxSafety }: { taxSafety?: TaxSafety }) {
+  if (!taxSafety) return null;
+  return (
+    <span
+      className={clsx('inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold', TAX_SAFETY_CLASSES[taxSafety.status])}
+      title={taxSafety.message}
+    >
+      <ShieldCheck className="h-3 w-3" />
+      {taxSafety.label}
+    </span>
+  );
+}
+
 function DocumentList({
   docs,
   isThai,
@@ -666,6 +749,9 @@ function DocumentList({
               <p className="mt-0.5 text-xs text-slate-500">
                 {doc.kind} · {doc.status} · {formatBytes(doc.fileSize)} · {formatDate(doc.createdAt)}
               </p>
+              <div className="mt-1">
+                <TaxSafetyBadge taxSafety={doc.taxSafety} />
+              </div>
             </div>
             <button
               type="button"
@@ -752,7 +838,7 @@ function DataTable({
   rows,
   emptyText,
 }: {
-  rows: Array<{ id: string; title: string; subtitle: string; amount: string; meta: string; href: string }>;
+  rows: Array<{ id: string; title: string; subtitle: string; amount: string; meta: string; href: string; taxSafety?: TaxSafety }>;
   emptyText: string;
 }) {
   if (rows.length === 0) return <EmptyBlock text={emptyText} />;
@@ -763,6 +849,9 @@ function DataTable({
           <div className="min-w-0 flex-1 px-1">
             <p className="truncate text-sm font-semibold text-slate-950">{row.title}</p>
             <p className="mt-0.5 truncate text-xs text-slate-500">{row.subtitle}</p>
+            <div className="mt-1">
+              <TaxSafetyBadge taxSafety={row.taxSafety} />
+            </div>
           </div>
           <div className="text-right">
             <p className="text-sm font-bold text-slate-950">{row.amount}</p>

@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 00:57 Asia/Bangkok
+Last updated: 2026-05-10 01:02 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -46,6 +46,23 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Approval Workflow v1:
+  - project owner/approver can approve or reject submitted project expense vouchers
+  - admins and super admins keep global expense approval permission
+  - expense list/detail responses now include `canApprove` without exposing internal project member data
+  - frontend Payment Voucher page shows approve/reject actions when the current user can approve the voucher
+- Added Project Tax Safety Layer v1:
+  - project workspace files and purchase invoices now include `taxSafety`
+  - statuses include `vat_claimable`, `expense_only_no_vat`, `needs_tax_invoice`, `missing_required_fields`, `unmatched_payment`, `supporting_only`, and `needs_review`
+  - project workspace overview shows Tax Safety summary, claimable input VAT, and risk counts
+  - file list and purchase rows show tax safety chips
+  - project Excel export now includes tax safety status and notes for Files and Purchases
+- Verified locally after Approval Workflow + Tax Safety work:
+  - backend `npx tsc --noEmit`
+  - frontend `npx tsc --noEmit`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added LINE Project Admin + Debug v1:
   - admin can assign/unassign a linked LINE group to a project from Admin → LINE
   - backend `PATCH /api/line/admin/groups/:groupId/project`

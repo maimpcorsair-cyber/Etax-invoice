@@ -163,6 +163,10 @@ export default function Expenses() {
     return 'badge-danger';
   }
 
+  function canApproveVoucher(v: ExpenseVoucher | null) {
+    return Boolean(v && v.status === 'submitted' && (isAdmin || v.canApprove));
+  }
+
   function openCreate() {
     if (isFreePlan) {
       setError(t('expenses.limitExceeded', { limit: 0 }));
@@ -680,7 +684,7 @@ export default function Expenses() {
                     </button>
                   </>
                 )}
-                {v.status === 'submitted' && isAdmin && (
+                {canApproveVoucher(v) && (
                   <>
                     <button onClick={() => handleApprove(v.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100">
                       <ThumbsUp className="w-3.5 h-3.5" /> {t('expenses.approve')}
@@ -765,7 +769,7 @@ export default function Expenses() {
                             </button>
                           </>
                         )}
-                        {v.status === 'submitted' && isAdmin && (
+                        {canApproveVoucher(v) && (
                           <>
                             <button onClick={() => handleApprove(v.id)} className="p-1 text-green-600 hover:text-green-800" title={t('expenses.approve')}>
                               <ThumbsUp className="w-4 h-4" />
@@ -1118,7 +1122,7 @@ export default function Expenses() {
             </div>
 
             {/* Footer actions */}
-            {detailVoucher.status === 'submitted' && isAdmin && (
+            {canApproveVoucher(detailVoucher) && (
               <div className="border-t border-gray-100 px-5 py-4 flex gap-2">
                 <button
                   onClick={() => { setDetailVoucher(null); handleApprove(detailVoucher.id); }}

@@ -62,6 +62,43 @@ async function assertProjectBelongsToCompany(companyId: string, projectId: strin
   if (!project) throw new Error('Project not found');
 }
 
+type ExpenseApprovalContext = {
+  status: string;
+  project: {
+    id: string;
+    code?: string;
+    name?: string;
+    ownerId: string | null;
+    approverId: string | null;
+    members: Array<{ userId: string; role: string }>;
+  } | null;
+};
+
+const expenseProjectApprovalSelect = {
+  id: true,
+  code: true,
+  name: true,
+  ownerId: true,
+  approverId: true,
+  members: { select: { userId: true, role: true } },
+} satisfies Prisma.ProjectSelect;
+
+function canApproveExpenseForUser(req: Express.Request, voucher: ExpenseApprovalContext) {
+  if (voucher.status !== 'submitted') return false;
+  const role = req.user!.role;
+  if (role === 'admin' || role === 'super_admin') return true;
+  const project = voucher.project;
+  if (!project) return false;
+  const userId = req.user!.userId;
+  if (project.ownerId === userId || project.approverId === userId) return true;
+  return project.members.some((member) => member.userId === userId && ['owner', 'approver'].includes(member.role));
+}
+
+function publicExpenseProject(project: ExpenseApprovalContext['project']) {
+  if (!project) return null;
+  return { id: project.id, code: project.code, name: project.name };
+}
+
 /* ─── List ─── */
 expensesRouter.get('/', async (req, res) => {
   try {
@@ -87,7 +124,7 @@ expensesRouter.get('/', async (req, res) => {
       return tx.expenseVoucher.findMany({
         where,
         include: {
-          project: { select: { id: true, code: true, name: true } },
+          project: { select: expenseProjectApprovalSelect },
           items: { select: { id: true, attachments: { select: { id: true } } } },
         },
         orderBy: { voucherDate: 'desc' },
@@ -97,6 +134,8 @@ expensesRouter.get('/', async (req, res) => {
     const data = vouchers.map((v) => ({
       ...v,
       totalAmount: Number(v.totalAmount),
+      canApprove: canApproveExpenseForUser(req, v),
+      project: publicExpenseProject(v.project),
       itemCount: v.items.length,
       attachmentCount: v.items.reduce((sum, i) => sum + i.attachments.length, 0),
       items: undefined,
@@ -210,7 +249,7 @@ expensesRouter.get('/:id', async (req, res) => {
           approvalLogs: {
             orderBy: { timestamp: 'asc' },
           },
-          project: { select: { id: true, code: true, name: true } },
+          project: { select: expenseProjectApprovalSelect },
         },
       });
     });
@@ -222,6 +261,8 @@ expensesRouter.get('/:id', async (req, res) => {
       data: {
         ...voucher,
         totalAmount: Number(voucher.totalAmount),
+        canApprove: canApproveExpenseForUser(req, voucher),
+        project: publicExpenseProject(voucher.project),
         items: voucher.items.map((i) => ({ ...i, amount: Number(i.amount) })),
       },
     });
@@ -479,13 +520,17 @@ expensesRouter.post('/:id/submit', requireRole('admin', 'super_admin', 'accounta
 });
 
 /* ─── Approve ─── */
-expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (req, res) => {
+expensesRouter.post('/:id/approve', requireRole('viewer'), async (req, res) => {
   try {
     const existing = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-      return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId } });
+      return tx.expenseVoucher.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        include: { project: { select: expenseProjectApprovalSelect } },
+      });
     });
     if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
     if (existing.status !== 'submitted') { res.status(400).json({ error: 'Only submitted vouchers can be approved' }); return; }
+    if (!canApproveExpenseForUser(req, existing)) { res.status(403).json({ error: 'Only admins or project approvers can approve this voucher' }); return; }
 
     const companyId = req.user!.companyId;
     const totalAmt = Number(existing.totalAmount);
@@ -511,7 +556,7 @@ expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (
     await auditLog({
       companyId, userId: req.user!.userId, role: req.user!.role,
       action: 'expense_voucher.approve', resourceType: 'expense_voucher', resourceId: updated.id,
-      details: { voucherNumber: updated.voucherNumber, totalAmount: Number(updated.totalAmount) },
+      details: { voucherNumber: updated.voucherNumber, totalAmount: Number(updated.totalAmount), projectId: existing.projectId },
       ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',
     });
 
@@ -523,14 +568,18 @@ expensesRouter.post('/:id/approve', requireRole('admin', 'super_admin'), async (
 });
 
 /* ─── Reject ─── */
-expensesRouter.post('/:id/reject', requireRole('admin', 'super_admin'), async (req, res) => {
+expensesRouter.post('/:id/reject', requireRole('viewer'), async (req, res) => {
   try {
     const body = rejectSchema.parse(req.body);
     const existing = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-      return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId } });
+      return tx.expenseVoucher.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        include: { project: { select: expenseProjectApprovalSelect } },
+      });
     });
     if (!existing) { res.status(404).json({ error: 'Voucher not found' }); return; }
     if (existing.status !== 'submitted') { res.status(400).json({ error: 'Only submitted vouchers can be rejected' }); return; }
+    if (!canApproveExpenseForUser(req, existing)) { res.status(403).json({ error: 'Only admins or project approvers can reject this voucher' }); return; }
 
     const [updated] = await prisma.$transaction([
       prisma.expenseVoucher.update({
@@ -545,7 +594,7 @@ expensesRouter.post('/:id/reject', requireRole('admin', 'super_admin'), async (r
     await auditLog({
       companyId: req.user!.companyId, userId: req.user!.userId, role: req.user!.role,
       action: 'expense_voucher.reject', resourceType: 'expense_voucher', resourceId: updated.id,
-      details: { voucherNumber: updated.voucherNumber, rejectionNote: body.rejectionNote },
+      details: { voucherNumber: updated.voucherNumber, rejectionNote: body.rejectionNote, projectId: existing.projectId },
       ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',
     });
 

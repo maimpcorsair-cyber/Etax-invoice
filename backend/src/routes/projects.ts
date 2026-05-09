@@ -197,6 +197,191 @@ function actionNeededForIntake(item: { id: string; status: string; fileName: str
   return null;
 }
 
+type TaxSafetyStatus =
+  | 'vat_claimable'
+  | 'expense_only_no_vat'
+  | 'needs_tax_invoice'
+  | 'missing_required_fields'
+  | 'unmatched_payment'
+  | 'supporting_only'
+  | 'needs_review';
+
+type TaxSafety = {
+  status: TaxSafetyStatus;
+  severity: 'ok' | 'info' | 'warning' | 'danger';
+  label: string;
+  message: string;
+  missingFields: string[];
+};
+
+const TAX_SAFETY_RISK_STATUSES: TaxSafetyStatus[] = [
+  'needs_tax_invoice',
+  'missing_required_fields',
+  'unmatched_payment',
+  'needs_review',
+];
+
+function textField(data: Record<string, unknown> | null, key: string) {
+  const value = data?.[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function numberField(data: Record<string, unknown> | null, key: string) {
+  const value = data?.[key];
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value.replace(/,/g, '')) || 0;
+  return 0;
+}
+
+function taxSafetyForIntake(item: {
+  status: string;
+  mimeType: string;
+  ocrResult: unknown;
+  targetType?: string | null;
+  targetId?: string | null;
+  purchaseInvoiceId?: string | null;
+}): TaxSafety {
+  if (item.status === 'failed') {
+    return {
+      status: 'needs_review',
+      severity: 'danger',
+      label: 'Unreadable',
+      message: 'OCR could not read this document. Upload a clearer file before using it for tax.',
+      missingFields: ['ocr_result'],
+    };
+  }
+
+  const data = item.ocrResult as Record<string, unknown> | null;
+  const documentType = textField(data, 'documentType').toLowerCase();
+  const documentGroup = textField(data, 'documentGroup').toLowerCase();
+  const hasLinkedRecord = Boolean(item.purchaseInvoiceId || (item.targetType && item.targetId));
+  const isPayment = ['bank_transfer', 'payment_slip', 'payment_advice', 'slip'].some((token) =>
+    documentType.includes(token) || documentGroup.includes(token),
+  );
+  if (isPayment) {
+    return hasLinkedRecord
+      ? {
+          status: 'supporting_only',
+          severity: 'info',
+          label: 'Payment support',
+          message: 'Use this as payment evidence. Match it with a tax invoice before claiming input VAT.',
+          missingFields: [],
+        }
+      : {
+          status: 'unmatched_payment',
+          severity: 'warning',
+          label: 'Unmatched payment',
+          message: 'This looks like a payment slip. Link it to the purchase or voucher it paid for.',
+          missingFields: ['linked_purchase_or_voucher'],
+        };
+  }
+
+  const supportingKeywords = ['purchase_order', 'po', 'quotation', 'delivery_note', 'contract', 'estimate'];
+  if (supportingKeywords.some((token) => documentType.includes(token) || documentGroup.includes(token))) {
+    return {
+      status: 'supporting_only',
+      severity: 'info',
+      label: 'Supporting document',
+      message: 'Useful for project evidence, but not enough for input VAT claim by itself.',
+      missingFields: [],
+    };
+  }
+
+  const missing = missingTaxFields(item.ocrResult);
+  const vatAmount = numberField(data, 'vatAmount');
+  const total = numberField(data, 'total');
+  if (missing.length > 0) {
+    return {
+      status: total > 0 ? 'missing_required_fields' : 'needs_review',
+      severity: 'warning',
+      label: total > 0 ? 'Missing tax fields' : 'Needs review',
+      message: `Missing required tax data: ${missing.join(', ')}`,
+      missingFields: missing,
+    };
+  }
+  if (vatAmount > 0) {
+    return {
+      status: 'vat_claimable',
+      severity: 'ok',
+      label: 'Input VAT ready',
+      message: 'Required tax invoice fields and VAT amount were detected.',
+      missingFields: [],
+    };
+  }
+  return {
+    status: 'expense_only_no_vat',
+    severity: 'info',
+    label: 'Expense only',
+    message: 'Record this as expense evidence, but do not claim input VAT unless a valid tax invoice is attached.',
+    missingFields: [],
+  };
+}
+
+function taxSafetyForPurchase(item: {
+  supplierName: string | null;
+  supplierTaxId: string | null;
+  invoiceNumber: string | null;
+  invoiceDate: Date | string | null;
+  vatType: string;
+  vatAmount: Prisma.Decimal | number;
+  total: Prisma.Decimal | number;
+}): TaxSafety {
+  const missing = [
+    item.supplierName ? null : 'supplier_name',
+    item.supplierTaxId ? null : 'supplier_tax_id',
+    item.invoiceNumber ? null : 'document_number',
+    item.invoiceDate ? null : 'document_date',
+    asNumber(item.total) > 0 ? null : 'total_amount',
+  ].filter(Boolean) as string[];
+  const vatAmount = asNumber(item.vatAmount);
+  if (missing.length > 0) {
+    return {
+      status: 'missing_required_fields',
+      severity: 'warning',
+      label: 'Missing tax fields',
+      message: `Missing required tax data: ${missing.join(', ')}`,
+      missingFields: missing,
+    };
+  }
+  if (item.vatType === 'vat7' && vatAmount > 0) {
+    return {
+      status: 'vat_claimable',
+      severity: 'ok',
+      label: 'Input VAT ready',
+      message: 'This purchase has the required tax invoice fields for input VAT review.',
+      missingFields: [],
+    };
+  }
+  if (item.vatType === 'vat7' && vatAmount <= 0) {
+    return {
+      status: 'needs_tax_invoice',
+      severity: 'warning',
+      label: 'VAT unclear',
+      message: 'VAT type is 7% but VAT amount is zero. Check the source document.',
+      missingFields: ['vat_amount'],
+    };
+  }
+  return {
+    status: 'expense_only_no_vat',
+    severity: 'info',
+    label: 'No input VAT',
+    message: 'Keep as expense evidence; do not include in input VAT claim.',
+    missingFields: [],
+  };
+}
+
+function summarizeTaxSafety(items: Array<TaxSafety & { vatAmount?: number }>) {
+  const byStatus = items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.status] = (acc[item.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  return {
+    taxSafetyRiskCount: items.filter((item) => TAX_SAFETY_RISK_STATUSES.includes(item.status)).length,
+    claimableVat: items.reduce((sum, item) => sum + (item.status === 'vat_claimable' ? item.vatAmount ?? 0 : 0), 0),
+    taxSafetyByStatus: byStatus,
+  };
+}
+
 projectsRouter.get('/users', async (req, res) => {
   try {
     const users = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
@@ -388,9 +573,39 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
       const purchaseVat = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.vatAmount), 0);
       const revenueTotal = invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
       const expenseTotal = expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
-      const actionNeeded = documentIntakes
+      const documentIntakeRows = documentIntakes.map((item) => ({
+        ...item,
+        kind: documentKind(item),
+        taxSafety: taxSafetyForIntake(item),
+      }));
+      const purchaseInvoiceRows = purchaseInvoices.map((item) => {
+        const taxSafety = taxSafetyForPurchase(item);
+        return {
+          ...item,
+          subtotal: asNumber(item.subtotal),
+          vatAmount: asNumber(item.vatAmount),
+          total: asNumber(item.total),
+          taxSafety,
+        };
+      });
+      const taxSafetySummary = summarizeTaxSafety([
+        ...documentIntakeRows.map((item) => item.taxSafety),
+        ...purchaseInvoiceRows.map((item) => ({ ...item.taxSafety, vatAmount: item.vatAmount })),
+      ]);
+      const actionNeeded = documentIntakeRows
         .map(actionNeededForIntake)
-        .filter(Boolean);
+        .filter((item): item is NonNullable<ReturnType<typeof actionNeededForIntake>> => item !== null);
+      const taxSafetyActions = documentIntakeRows
+        .filter((item) => TAX_SAFETY_RISK_STATUSES.includes(item.taxSafety.status))
+        .map((item) => ({
+          id: `intake:${item.id}:tax-safety`,
+          severity: item.taxSafety.severity === 'danger' ? 'high' as const : 'medium' as const,
+          type: item.taxSafety.status,
+          title: item.fileName ?? 'Document needs tax review',
+          message: item.taxSafety.message,
+          documentIntakeId: item.id,
+        }));
+      const allActionNeeded = [...actionNeeded, ...taxSafetyActions];
 
       return {
         project,
@@ -400,18 +615,14 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           revenueTotal,
           expenseTotal,
           estimatedMargin: revenueTotal - purchaseTotal - expenseTotal,
-          actionNeededCount: actionNeeded.length,
+          actionNeededCount: allActionNeeded.length,
           filesCount: documentIntakes.length,
           lineGroupCount: lineGroups.length,
+          ...taxSafetySummary,
         },
-        actionNeeded,
-        documentIntakes: documentIntakes.map((item) => ({ ...item, kind: documentKind(item) })),
-        purchaseInvoices: purchaseInvoices.map((item) => ({
-          ...item,
-          subtotal: asNumber(item.subtotal),
-          vatAmount: asNumber(item.vatAmount),
-          total: asNumber(item.total),
-        })),
+        actionNeeded: allActionNeeded,
+        documentIntakes: documentIntakeRows,
+        purchaseInvoices: purchaseInvoiceRows,
         invoices: invoices.map((item) => ({
           ...item,
           subtotal: asNumber(item.subtotal),
@@ -462,6 +673,9 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
             ocrResult: true,
             warnings: true,
             error: true,
+            targetType: true,
+            targetId: true,
+            purchaseInvoiceId: true,
             createdAt: true,
           },
         }),
@@ -523,6 +737,18 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
       const actionNeeded = documentIntakes
         .map(actionNeededForIntake)
         .filter((item): item is NonNullable<ReturnType<typeof actionNeededForIntake>> => item !== null);
+      const fileRows = documentIntakes.map((item) => ({ ...item, kind: documentKind(item), taxSafety: taxSafetyForIntake(item) }));
+      const purchaseRows = purchaseInvoices.map((item) => ({
+        ...item,
+        subtotal: asNumber(item.subtotal),
+        vatAmount: asNumber(item.vatAmount),
+        total: asNumber(item.total),
+        taxSafety: taxSafetyForPurchase(item),
+      }));
+      const taxSafetySummary = summarizeTaxSafety([
+        ...fileRows.map((item) => item.taxSafety),
+        ...purchaseRows.map((item) => ({ ...item.taxSafety, vatAmount: item.vatAmount })),
+      ]);
 
       return {
         project: row,
@@ -539,10 +765,12 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
           CommittedAmount: summary.committedAmount,
           PaidAmount: summary.paidAmount,
           RemainingBudget: asNumber(row.budgetAmount) - summary.committedAmount,
+          TaxSafetyRiskCount: taxSafetySummary.taxSafetyRiskCount,
+          ClaimableVAT: taxSafetySummary.claimableVat,
         },
         actionNeeded,
-        documentIntakes,
-        purchaseInvoices,
+        documentIntakes: fileRows,
+        purchaseInvoices: purchaseRows,
         invoices,
         expenseVouchers,
         lineGroups,
@@ -569,8 +797,10 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
       files: exportData.documentIntakes.map((item) => ({
         fileName: item.fileName ?? item.id,
         source: item.source,
-        kind: documentKind(item),
+        kind: item.kind,
         status: item.status,
+        taxSafetyStatus: item.taxSafety.status,
+        taxSafetyMessage: item.taxSafety.message,
         mimeType: item.mimeType,
         fileSize: item.fileSize,
         createdAt: item.createdAt,
@@ -584,6 +814,8 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
         subtotal: asNumber(item.subtotal),
         vatAmount: asNumber(item.vatAmount),
         total: asNumber(item.total),
+        taxSafetyStatus: item.taxSafety.status,
+        taxSafetyMessage: item.taxSafety.message,
         isPaid: item.isPaid,
       })),
       sales: exportData.invoices.map((item) => ({
