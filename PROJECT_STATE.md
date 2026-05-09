@@ -47,6 +47,8 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Project Document Request Thread typecheck run: `25611781411` succeeded.
 - Latest verified Project Budget Guard + Overage foundation deploy run: `25612056644` succeeded.
 - Latest verified Project Budget Guard + Overage foundation typecheck run: `25612056652` succeeded.
+- Latest verified LINE Document Request Notification deploy run: `25612195136` succeeded.
+- Latest verified LINE Document Request Notification typecheck run: `25612195142` succeeded.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
@@ -88,6 +90,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
   - frontend `/app/projects` returned HTTP 200 from Vercel
 - Production checks after `c9d0880`:
+  - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
+  - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
+  - frontend `/app/projects` returned HTTP 200 from Vercel
+- Production checks after `62a3dc7`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
   - frontend `/app/projects` returned HTTP 200 from Vercel
