@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 00:55 Asia/Bangkok
+Last updated: 2026-05-10 00:57 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -29,6 +29,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified typecheck run: `25605830599` succeeded.
 - Latest verified project context deploy run: `25606879186` succeeded.
 - Latest verified project context typecheck run: `25606879199` succeeded.
+- Latest verified LINE project/export deploy run: `25607397903` succeeded.
+- Latest verified LINE project/export typecheck run: `25607397904` succeeded.
+- Production checks after `c7a2410`:
+  - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
+  - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
+  - frontend `/app/projects` returned HTTP 200 from Vercel
 - Production checks after `790e231`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
@@ -155,6 +161,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Recent Commits To Know
 
+- `c7a2410` feat: add line project admin and export pack
 - `790e231` feat: connect projects across document workflows
 - `d891e1d` feat: add project workspace detail
 - `3a8c210` docs: add project workspace profit plan
