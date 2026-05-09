@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 21:41 Asia/Bangkok
+Last updated: 2026-05-09 21:45 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -23,6 +23,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - GitHub Actions `Deploy to Render` and `Typecheck` are working on `main`.
 - GitHub Actions `Health Check` now has retries and longer timeouts to reduce false failures from Render cold starts.
 - `Deploy to Render` workflow now treats `prisma migrate status` as informational; `prisma migrate deploy` is the step that applies/fails migrations.
+- `Deploy to Render` smoke check now retries `/api/health` to tolerate Render cold starts after deploy hook.
 
 ## Latest Work Completed
 
@@ -52,6 +53,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Fixed deploy workflow migration gate:
   - previous `prisma migrate status` step failed when migrations were pending
   - workflow now continues to `prisma migrate deploy` for normal production releases
+- Fixed deploy workflow smoke check:
+  - previous immediate `/health` check could timeout during Render deploy/cold start
+  - workflow now retries `/api/health`
 - Fixed LINE account linking under database RLS.
 - Fixed LINE webhook link lookup under system RLS.
 - Improved LINE OCR replies for bank transfer slips:

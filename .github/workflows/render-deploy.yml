@@ -102,8 +102,14 @@ jobs:
 
       - name: Smoke check backend health
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 30 \
-            https://etax-invoice-api.onrender.com/health)
-          echo "Backend health: $STATUS"
-          [ "$STATUS" = "200" ]
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 25 \
+              https://etax-invoice-api.onrender.com/api/health || echo "000")
+            echo "Backend health attempt $i: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              exit 0
+            fi
+            sleep 15
+          done
+          exit 1
