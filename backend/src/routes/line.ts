@@ -5,6 +5,7 @@ import { authenticate, requireRole } from '../middleware/auth';
 import prisma from '../config/database';
 import redis from '../config/redis';
 import { logger } from '../config/logger';
+import { tenantRlsContext, withRlsContext } from '../config/rls';
 import {
   sendLineText,
   sendLineFlexMessage,
@@ -78,6 +79,15 @@ const PURCHASE_RECORD_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
   'credit_note',
   'debit_note',
 ]);
+
+function lineWebhookRlsContext(companyId: string, userId?: string | null) {
+  return {
+    companyId,
+    userId: userId ?? null,
+    role: 'line_webhook',
+    systemMode: false,
+  };
+}
 
 const REVIEW_ONLY_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
   'quotation',
@@ -714,16 +724,17 @@ lineRouter.get('/status', authenticate, async (req, res) => {
     const userId = req.user!.userId;
     const companyId = req.user!.companyId;
 
-    const [link, company] = await Promise.all([
-      prisma.lineUserLink.findUnique({
+    const { link, company } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const link = await tx.lineUserLink.findUnique({
         where: { userId },
         select: { displayName: true, isActive: true },
-      }),
-      prisma.company.findUnique({
+      });
+      const company = await tx.company.findUnique({
         where: { id: companyId },
         select: { lineNotifyEnabled: true, overdueReminderDays: true },
-      }),
-    ]);
+      });
+      return { link, company };
+    });
 
     res.json({
       data: {
@@ -763,7 +774,9 @@ lineRouter.delete('/unlink', authenticate, async (req, res) => {
   try {
     const userId = req.user!.userId;
 
-    await prisma.lineUserLink.deleteMany({ where: { userId } });
+    await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+      tx.lineUserLink.deleteMany({ where: { userId } }),
+    );
     res.json({ ok: true });
   } catch (err) {
     logger.error('[Line] DELETE /unlink failed', { err });
@@ -803,26 +816,28 @@ lineRouter.put('/settings', authenticate, requireRole('admin', 'super_admin'), a
 
 lineRouter.get('/admin/users', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
-    const users = await prisma.user.findMany({
-      where: { companyId: req.user!.companyId },
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        lineUserLink: {
-          select: {
-            lineUserId: true,
-            displayName: true,
-            pictureUrl: true,
-            isActive: true,
-            linkedAt: true,
+    const users = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+      tx.user.findMany({
+        where: { companyId: req.user!.companyId },
+        orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          lineUserLink: {
+            select: {
+              lineUserId: true,
+              displayName: true,
+              pictureUrl: true,
+              isActive: true,
+              linkedAt: true,
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     res.json({
       data: users.map((user) => ({
@@ -890,20 +905,24 @@ lineRouter.post('/admin/users/:userId/link-start', authenticate, requireRole('ad
 
 lineRouter.delete('/admin/users/:userId/unlink', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
-    const targetUser = await prisma.user.findFirst({
-      where: {
-        id: req.params.userId,
-        companyId: req.user!.companyId,
-      },
-      select: { id: true },
+    const deleted = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const targetUser = await tx.user.findFirst({
+        where: {
+          id: req.params.userId,
+          companyId: req.user!.companyId,
+        },
+        select: { id: true },
+      });
+
+      if (!targetUser) return null;
+      return tx.lineUserLink.deleteMany({ where: { userId: targetUser.id } });
     });
 
-    if (!targetUser) {
+    if (!deleted) {
       res.status(404).json({ error: 'User not found in this company' });
       return;
     }
 
-    await prisma.lineUserLink.deleteMany({ where: { userId: targetUser.id } });
     res.json({ ok: true });
   } catch (err) {
     logger.error('[Line] DELETE /admin/users/:userId/unlink failed', { err, userId: req.params.userId });
@@ -913,20 +932,22 @@ lineRouter.delete('/admin/users/:userId/unlink', authenticate, requireRole('admi
 
 lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
-    const groups = await prisma.lineGroupLink.findMany({
-      where: { companyId: req.user!.companyId },
-      orderBy: [{ isActive: 'desc' }, { linkedAt: 'desc' }],
-      select: {
-        id: true,
-        lineGroupId: true,
-        groupName: true,
-        isActive: true,
-        linkedAt: true,
-        linkedBy: {
-          select: { id: true, name: true, email: true },
+    const groups = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
+      tx.lineGroupLink.findMany({
+        where: { companyId: req.user!.companyId },
+        orderBy: [{ isActive: 'desc' }, { linkedAt: 'desc' }],
+        select: {
+          id: true,
+          lineGroupId: true,
+          groupName: true,
+          isActive: true,
+          linkedAt: true,
+          linkedBy: {
+            select: { id: true, name: true, email: true },
+          },
         },
-      },
-    });
+      }),
+    );
 
     res.json({
       data: groups.map((group) => ({
@@ -971,20 +992,24 @@ lineRouter.post('/admin/groups/link-start', authenticate, requireRole('admin', '
 
 lineRouter.delete('/admin/groups/:groupId', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
-    const existing = await prisma.lineGroupLink.findFirst({
-      where: {
-        id: req.params.groupId,
-        companyId: req.user!.companyId,
-      },
-      select: { id: true },
+    const deleted = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const existing = await tx.lineGroupLink.findFirst({
+        where: {
+          id: req.params.groupId,
+          companyId: req.user!.companyId,
+        },
+        select: { id: true },
+      });
+
+      if (!existing) return null;
+      return tx.lineGroupLink.delete({ where: { id: existing.id } });
     });
 
-    if (!existing) {
+    if (!deleted) {
       res.status(404).json({ error: 'Line group not found in this company' });
       return;
     }
 
-    await prisma.lineGroupLink.delete({ where: { id: existing.id } });
     res.json({ ok: true });
   } catch (err) {
     logger.error('[Line] DELETE /admin/groups/:groupId failed', { err, groupId: req.params.groupId });
@@ -1196,25 +1221,27 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
     return true;
   }
 
-  await prisma.lineGroupLink.upsert({
-    where: { lineGroupId },
-    create: {
-      companyId: company.id,
-      lineGroupId,
-      groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
-      isActive: true,
-      linkedById: otpRecord.issuedBy,
-    },
-    update: {
-      companyId: company.id,
-      groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
-      isActive: true,
-      linkedById: otpRecord.issuedBy,
-      linkedAt: new Date(),
-    },
-  });
+  await withRlsContext(prisma, lineWebhookRlsContext(company.id, otpRecord.issuedBy), async (tx) => {
+    await tx.lineGroupLink.upsert({
+      where: { lineGroupId },
+      create: {
+        companyId: company.id,
+        lineGroupId,
+        groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
+        isActive: true,
+        linkedById: otpRecord.issuedBy,
+      },
+      update: {
+        companyId: company.id,
+        groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
+        isActive: true,
+        linkedById: otpRecord.issuedBy,
+        linkedAt: new Date(),
+      },
+    });
 
-  await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
+    await tx.lineOtp.delete({ where: { id: otpRecord.id } });
+  });
   await sendLineText(
     context.replyTargetId,
     `เชื่อมกลุ่ม LINE กับ ${company.nameTh} สำเร็จแล้วครับ\n\nจากนี้สมาชิกในกลุ่มส่งรูป/PDF ใบเสร็จหรือใบกำกับภาษีให้ Billboy อ่านและเข้าคิวเอกสารของบริษัทได้เลย`,
@@ -1631,7 +1658,7 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
     // Step 1: Run the DB transaction (link user + consume OTP)
     let linkResult: { ok: true; userName: string | null } | { ok: false; reason: string };
     try {
-      linkResult = await prisma.$transaction(async (tx) => {
+      linkResult = await withRlsContext(prisma, lineWebhookRlsContext(otpRecord.companyId, otpRecord.userId), async (tx) => {
         const targetUser = await tx.user.findFirst({
           where: { id: otpRecord.userId!, companyId: otpRecord.companyId, isActive: true },
           select: { id: true, name: true, companyId: true },
