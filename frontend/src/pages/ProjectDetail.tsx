@@ -32,7 +32,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
-type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'files' | 'purchases' | 'sales' | 'expenses';
+type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'po' | 'files' | 'purchases' | 'sales' | 'expenses';
 type TaxSafetyStatus = 'vat_claimable' | 'expense_only_no_vat' | 'needs_tax_invoice' | 'missing_required_fields' | 'unmatched_payment' | 'supporting_only' | 'needs_review';
 
 interface ProjectUser {
@@ -74,6 +74,8 @@ interface WorkspaceSummary {
   actionNeededCount: number;
   filesCount: number;
   lineGroupCount: number;
+  purchaseOrderCount?: number;
+  purchaseOrderGapCount?: number;
   smartMatchCount?: number;
   taxSafetyRiskCount?: number;
   claimableVat?: number;
@@ -130,6 +132,18 @@ interface SmartMatchCandidate {
   reasons: string[];
 }
 
+interface SmartMatchPoCandidate {
+  id: string;
+  poNumber: string;
+  documentType: string;
+  vendorName?: string | null;
+  issueDate?: string | null;
+  total?: number | null;
+  status: string;
+  score: number;
+  reasons: string[];
+}
+
 interface SmartMatch {
   id: string;
   documentIntakeId: string;
@@ -142,6 +156,37 @@ interface SmartMatch {
   referenceNumber?: string | null;
   documentDate: string;
   candidates: SmartMatchCandidate[];
+  poCandidates?: SmartMatchPoCandidate[];
+  threeWay?: {
+    hasPo: boolean;
+    hasTaxInvoice: boolean;
+    hasPaymentProof: boolean;
+  };
+}
+
+interface ProjectPurchaseOrder {
+  id: string;
+  poNumber: string;
+  documentType: string;
+  vendorName?: string | null;
+  vendorTaxId?: string | null;
+  issueDate?: string | null;
+  expectedDate?: string | null;
+  subtotal?: number | null;
+  vatAmount?: number | null;
+  total?: number | null;
+  currency: string;
+  status: string;
+  source: string;
+  documentIntakeId?: string | null;
+  matchedPurchaseCount: number;
+  matchedPaymentCount: number;
+  purchaseMatches: Array<{ id: string; supplierName: string; invoiceNumber: string; total: number; isPaid: boolean }>;
+  paymentMatches: Array<{ id: string; fileName?: string | null }>;
+  missing: string[];
+  threeWayStatus: 'complete' | 'incomplete';
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface PurchaseInvoice {
@@ -212,6 +257,7 @@ interface ProjectWorkspace {
   workspaceSummary: WorkspaceSummary;
   actionNeeded: ActionNeeded[];
   smartMatches?: SmartMatch[];
+  purchaseOrders?: ProjectPurchaseOrder[];
   documentIntakes: DocumentIntake[];
   purchaseInvoices: PurchaseInvoice[];
   invoices: SalesInvoice[];
@@ -298,6 +344,7 @@ export default function ProjectDetail() {
       { id: 'overview' as const, label: isThai ? 'ภาพรวม' : 'Overview', count: null },
       { id: 'action' as const, label: isThai ? 'ต้องตรวจ' : 'Action', count: summary?.actionNeededCount ?? 0 },
       { id: 'matching' as const, label: isThai ? 'จับคู่' : 'Matching', count: summary?.smartMatchCount ?? workspace?.smartMatches?.length ?? 0 },
+      { id: 'po' as const, label: isThai ? 'PO' : 'PO', count: summary?.purchaseOrderCount ?? workspace?.purchaseOrders?.length ?? 0 },
       { id: 'files' as const, label: isThai ? 'ไฟล์' : 'Files', count: summary?.filesCount ?? 0 },
       { id: 'purchases' as const, label: isThai ? 'ขาซื้อ' : 'Purchases', count: workspace?.purchaseInvoices.length ?? 0 },
       { id: 'sales' as const, label: isThai ? 'ขาขาย' : 'Sales', count: workspace?.invoices.length ?? 0 },
@@ -702,6 +749,14 @@ export default function ProjectDetail() {
           <WorkspacePanel title={isThai ? 'Tax Safety' : 'Tax safety'} icon={ShieldCheck}>
             <TaxSafetyPanel summary={workspaceSummary} isThai={isThai} formatCurrency={formatCurrency} />
           </WorkspacePanel>
+          <WorkspacePanel title={isThai ? 'PO / 3-way' : 'PO / 3-way'} icon={FileText}>
+            <PurchaseOrderList
+              purchaseOrders={(workspace.purchaseOrders ?? []).slice(0, 4)}
+              isThai={isThai}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+            />
+          </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
             <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} onComment={requestDocumentComment} commentingId={commentingId} />
           </WorkspacePanel>
@@ -737,6 +792,17 @@ export default function ProjectDetail() {
             formatDate={formatDate}
             onAttach={attachPurchaseToIntake}
             matchingId={matchingId}
+          />
+        </WorkspacePanel>
+      )}
+
+      {activeTab === 'po' && (
+        <WorkspacePanel title={isThai ? 'PO model / จับคู่ 3 ทาง' : 'PO model / 3-way matching'} icon={FileText}>
+          <PurchaseOrderList
+            purchaseOrders={workspace.purchaseOrders ?? []}
+            isThai={isThai}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
           />
         </WorkspacePanel>
       )}
@@ -887,6 +953,30 @@ function SmartMatchList({
             <TaxSafetyBadge taxSafety={match.taxSafety} />
           </div>
           <div className="mt-3 space-y-2">
+            {match.poCandidates && match.poCandidates.length > 0 && (
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                <div className="mb-1 flex flex-wrap items-center gap-1 text-[11px] font-semibold text-blue-800">
+                  <span>{isThai ? 'PO ที่เกี่ยวข้อง' : 'Related PO'}</span>
+                  {match.threeWay && (
+                    <span className="rounded-full bg-white/80 px-2 py-0.5">
+                      {[
+                        match.threeWay.hasPo ? 'PO' : null,
+                        match.threeWay.hasTaxInvoice ? (isThai ? 'ใบซื้อ' : 'tax invoice') : null,
+                        match.threeWay.hasPaymentProof ? (isThai ? 'สลิป' : 'payment') : null,
+                      ].filter(Boolean).join(' + ')}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {match.poCandidates.map((po) => (
+                    <div key={po.id} className="flex items-center justify-between gap-2 text-xs text-blue-900">
+                      <span className="min-w-0 truncate">{po.poNumber} · {po.vendorName || (isThai ? 'ไม่พบคู่ค้า' : 'No vendor')}</span>
+                      <span className="shrink-0 font-semibold">{po.total ? formatCurrency(po.total) : (isThai ? 'ไม่พบยอด' : 'No amount')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {match.candidates.length === 0 ? (
               <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {isThai ? 'ยังไม่เจอใบซื้อที่น่าจะตรงกัน ให้เปิด Input VAT เพื่อเลือกจับคู่เอง' : 'No likely purchase match yet. Open Input VAT to attach manually.'}
@@ -973,6 +1063,76 @@ function TaxSafetyBadge({ taxSafety }: { taxSafety?: TaxSafety }) {
       <ShieldCheck className="h-3 w-3" />
       {taxSafety.label}
     </span>
+  );
+}
+
+function PurchaseOrderList({
+  purchaseOrders,
+  isThai,
+  formatCurrency,
+  formatDate,
+}: {
+  purchaseOrders: ProjectPurchaseOrder[];
+  isThai: boolean;
+  formatCurrency: (value: number) => string;
+  formatDate: (value: string) => string;
+}) {
+  if (purchaseOrders.length === 0) {
+    return <EmptyBlock text={isThai ? 'ยังไม่พบ PO/ใบเสนอราคา/ใบส่งของในโปรเจคนี้' : 'No PO, quotation, or delivery document found in this project yet'} />;
+  }
+  return (
+    <div className="divide-y divide-slate-100">
+      {purchaseOrders.map((po) => {
+        const complete = po.threeWayStatus === 'complete';
+        return (
+          <div key={po.id} className="py-3 first:pt-0 last:pb-0">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-bold text-slate-950">{po.poNumber}</p>
+                  <span className={clsx(
+                    'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                    complete ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700',
+                  )}>
+                    {complete ? (isThai ? 'ครบ 3-way' : '3-way complete') : (isThai ? 'ยังขาดเอกสาร' : 'Missing docs')}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {po.documentType} · {po.vendorName || (isThai ? 'ไม่พบคู่ค้า' : 'No vendor')} · {po.issueDate ? formatDate(po.issueDate) : (isThai ? 'ไม่พบวันที่' : 'No date')}
+                </p>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-sm font-bold text-slate-950">{po.total ? formatCurrency(po.total) : '-'}</p>
+                <p className="text-xs text-slate-500">{po.currency}</p>
+              </div>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <ThreeWayChip label="PO" ok />
+              <ThreeWayChip label={isThai ? 'ใบซื้อ/ภาษี' : 'Tax invoice'} ok={po.matchedPurchaseCount > 0} count={po.matchedPurchaseCount} />
+              <ThreeWayChip label={isThai ? 'สลิปจ่าย' : 'Payment'} ok={po.matchedPaymentCount > 0} count={po.matchedPaymentCount} />
+            </div>
+            {po.missing.length > 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                {isThai ? 'ควรตามเพิ่ม: ' : 'Request next: '}
+                {po.missing.map((item) => item === 'tax_invoice' ? (isThai ? 'ใบกำกับ/ใบซื้อ' : 'tax invoice') : (isThai ? 'สลิป/หลักฐานจ่าย' : 'payment proof')).join(', ')}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ThreeWayChip({ label, ok, count }: { label: string; ok: boolean; count?: number }) {
+  return (
+    <div className={clsx(
+      'flex items-center justify-between rounded-lg border px-2 py-1.5 text-xs font-semibold',
+      ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500',
+    )}>
+      <span>{label}</span>
+      <span>{ok ? (count ?? 1) : 0}</span>
+    </div>
   );
 }
 

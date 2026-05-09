@@ -347,6 +347,7 @@ export async function exportProjectToSheets(input: {
   summary: Record<string, string | number>;
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
   files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
+  purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
   purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
   expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
@@ -363,10 +364,11 @@ export async function exportProjectToSheets(input: {
         { properties: { title: 'Overview', sheetId: 0 } },
         { properties: { title: 'Action Needed', sheetId: 1 } },
         { properties: { title: 'Files', sheetId: 2 } },
-        { properties: { title: 'Purchases', sheetId: 3 } },
-        { properties: { title: 'Sales', sheetId: 4 } },
-        { properties: { title: 'Expenses', sheetId: 5 } },
-        { properties: { title: 'LINE Groups', sheetId: 6 } },
+        { properties: { title: 'PO 3-way', sheetId: 3 } },
+        { properties: { title: 'Purchases', sheetId: 4 } },
+        { properties: { title: 'Sales', sheetId: 5 } },
+        { properties: { title: 'Expenses', sheetId: 6 } },
+        { properties: { title: 'LINE Groups', sheetId: 7 } },
       ],
     },
   });
@@ -411,6 +413,12 @@ export async function exportProjectToSheets(input: {
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
+      range: 'PO 3-way!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['PO no.', 'Document type', 'Vendor', 'Vendor tax ID', 'Issue date', 'Total', 'Status', 'Matched purchases', 'Matched payments', 'Missing'], ...input.purchaseOrders.map((item) => [item.poNumber, item.documentType, item.vendorName ?? '', item.vendorTaxId ?? '', item.issueDate ? asDate(item.issueDate) : '', item.total ?? '', item.status, item.matchedPurchaseCount, item.matchedPaymentCount, item.missing.join(', ')])] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
       range: 'Sales!A1',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [['Invoice no.', 'Buyer', 'Type', 'Status', 'Invoice date', 'Subtotal', 'VAT', 'Total', 'Paid'], ...input.sales.map((item) => [item.invoiceNumber, item.buyerName, item.type, item.status, asDate(item.invoiceDate), item.subtotal, item.vatAmount, item.total, item.isPaid ? 'Yes' : 'No'])] },
@@ -432,7 +440,7 @@ export async function exportProjectToSheets(input: {
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: id,
     requestBody: {
-      requests: Array.from({ length: 7 }, (_, sheetId) => [
+      requests: Array.from({ length: 8 }, (_, sheetId) => [
         {
           repeatCell: {
             range: { sheetId, startRowIndex: 0, endRowIndex: 1 },

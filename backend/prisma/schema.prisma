@@ -156,6 +156,7 @@ model Company {
   subscription        CompanySubscription?
   billingTransactions BillingTransaction[]
   purchaseInvoices    PurchaseInvoice[]
+  projectPurchaseOrders ProjectPurchaseOrder[]
   projects            Project[]
   expenseVouchers     ExpenseVoucher[]
   pettyCash           PettyCash?
@@ -439,8 +440,9 @@ model DocumentIntake {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  project  Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  comments DocumentComment[]
+  project               Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  comments              DocumentComment[]
+  projectPurchaseOrders ProjectPurchaseOrder[]
 
   @@index([companyId, status, createdAt])
   @@index([companyId, projectId, createdAt])
@@ -555,6 +557,7 @@ model Project {
   members          ProjectMember[]
   invoices         Invoice[]
   purchaseInvoices PurchaseInvoice[]
+  projectPurchaseOrders ProjectPurchaseOrder[]
   documentIntakes  DocumentIntake[]
   documentComments DocumentComment[]
   expenseVouchers  ExpenseVoucher[]
@@ -582,6 +585,38 @@ model ProjectMember {
   @@index([userId])
   @@index([projectId, role])
   @@map("project_members")
+}
+
+model ProjectPurchaseOrder {
+  id               String   @id @default(cuid())
+  companyId        String
+  projectId        String
+  documentIntakeId String?
+  poNumber         String
+  documentType     String   @default("purchase_order")
+  vendorName       String?
+  vendorTaxId      String?
+  issueDate        DateTime?
+  expectedDate     DateTime?
+  subtotal         Float?
+  vatAmount        Float?
+  total            Float?
+  currency         String   @default("THB")
+  status           String   @default("open")
+  source           String   @default("document_intake")
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentIntake DocumentIntake? @relation(fields: [documentIntakeId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, projectId, poNumber])
+  @@index([companyId, projectId, issueDate])
+  @@index([companyId, projectId, status])
+  @@index([companyId, documentIntakeId])
+  @@map("project_purchase_orders")
 }
 
 model CompanySubscription {

@@ -105,6 +105,19 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project PO / 3-way Matching v1:
+  - new `project_purchase_orders` table with tenant RLS and Prisma model `ProjectPurchaseOrder`
+  - Project Workspace now syncs PO/quotation/delivery-note documents from OCR metadata into the PO model
+  - Smart Matching now scores document intake against both purchase invoices and project POs
+  - Project Workspace now has a PO tab and overview panel showing PO + tax invoice + payment proof status
+  - Project Excel export and Google Sheet sync now include a `PO 3-way` sheet
+- Verified locally after Project PO / 3-way Matching v1:
+  - `DATABASE_URL=... npx prisma validate --schema=backend/prisma/schema.prisma`
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added LINE notification for project document requests:
   - when admin/accountant creates a request/comment on a project document, backend pushes a LINE message to active LINE groups linked to that project
   - message includes project label, request text, and a fresh signed Project Portal link for reply/upload

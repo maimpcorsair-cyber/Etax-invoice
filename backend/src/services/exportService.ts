@@ -218,6 +218,7 @@ export async function generateProjectExportExcel(input: {
   summary: Record<string, string | number>;
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
   files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
+  purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
   purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
   expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
@@ -283,6 +284,24 @@ export async function generateProjectExportExcel(input: {
     ]),
   );
 
+  const poSheet = addWorksheet(
+    workbook,
+    'PO 3-way',
+    ['PO no.', 'Document type', 'Vendor', 'Vendor tax ID', 'Issue date', 'Total', 'Status', 'Matched purchases', 'Matched payments', 'Missing'],
+    input.purchaseOrders.map((item) => [
+      item.poNumber,
+      item.documentType,
+      item.vendorName ?? '',
+      item.vendorTaxId ?? '',
+      item.issueDate instanceof Date ? formatDateEn(item.issueDate) : item.issueDate ?? '',
+      item.total ?? '',
+      item.status,
+      item.matchedPurchaseCount,
+      item.matchedPaymentCount,
+      item.missing.join(', '),
+    ]),
+  );
+
   const salesSheet = addWorksheet(
     workbook,
     'Sales',
@@ -323,12 +342,13 @@ export async function generateProjectExportExcel(input: {
     ]),
   );
 
-  for (const sheet of [actionSheet, filesSheet, purchaseSheet, salesSheet, expenseSheet]) {
+  for (const sheet of [actionSheet, filesSheet, purchaseSheet, poSheet, salesSheet, expenseSheet]) {
     sheet.getRow(1).height = 22;
   }
   for (const sheet of [purchaseSheet, salesSheet]) {
     for (const key of ['F', 'G', 'H']) sheet.getColumn(key).numFmt = '#,##0.00';
   }
+  poSheet.getColumn('F').numFmt = '#,##0.00';
   expenseSheet.getColumn('E').numFmt = '#,##0.00';
 
   const buffer = await workbook.xlsx.writeBuffer();

@@ -276,6 +276,133 @@ function dateField(data: Record<string, unknown> | null, key: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function normalizedReference(value: string | null | undefined) {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9ก-๙]/gi, '');
+}
+
+function containsReference(left: string | null | undefined, right: string | null | undefined) {
+  const a = normalizedReference(left);
+  const b = normalizedReference(right);
+  return a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a));
+}
+
+function amountClose(left?: number | null, right?: number | null, tolerance = 1) {
+  return typeof left === 'number' && typeof right === 'number' && left > 0 && right > 0 && Math.abs(left - right) <= tolerance;
+}
+
+function nameLooksSimilar(left?: string | null, right?: string | null) {
+  if (!left || !right) return false;
+  const a = left.toLowerCase().trim();
+  const b = right.toLowerCase().trim();
+  const short = a.length < b.length ? a : b;
+  const long = a.length < b.length ? b : a;
+  return short.length >= 6 && long.includes(short.slice(0, 12));
+}
+
+function intakeFacts(item: { id: string; createdAt: Date; taxSafety: TaxSafety; ocrResult: unknown }) {
+  const data = item.ocrResult as Record<string, unknown> | null;
+  const meta = data?.documentMetadata as Record<string, unknown> | undefined;
+  const payment = data?.payment as Record<string, unknown> | undefined;
+  const amount = numberField(data, 'total') || numberField(data, 'amount') || numberField(data, 'paymentAmount');
+  const paymentAmount = amount || numberField(payment ?? null, 'amount');
+  const supplierName = textField(data, 'supplierName') || textField(payment ?? null, 'receiverName') || textField(payment ?? null, 'toName');
+  const referenceNumber = textField(meta ?? null, 'purchaseOrderNumber')
+    || textField(meta ?? null, 'quotationNumber')
+    || textField(meta ?? null, 'deliveryNoteNumber')
+    || textField(data, 'invoiceNumber')
+    || textField(payment ?? null, 'reference');
+  const documentDate = dateField(data, 'invoiceDate') || dateField(data, 'paymentDate') || dateField(payment ?? null, 'date') || item.createdAt;
+  const role = item.taxSafety.status === 'unmatched_payment'
+    ? 'payment_proof'
+    : item.taxSafety.status === 'supporting_only'
+      ? 'supporting_document'
+      : 'tax_document';
+  return { amount: paymentAmount || null, supplierName: supplierName || null, referenceNumber: referenceNumber || null, documentDate, role };
+}
+
+function purchaseOrderFromIntake(item: {
+  id: string;
+  fileName: string | null;
+  ocrResult: unknown;
+  createdAt: Date;
+}) {
+  const data = item.ocrResult as Record<string, unknown> | null;
+  const meta = data?.documentMetadata as Record<string, unknown> | undefined;
+  if (!data) return null;
+
+  const documentType = textField(data, 'documentType').toLowerCase();
+  const documentGroup = textField(data, 'documentGroup').toLowerCase();
+  const poNumber = textField(meta ?? null, 'purchaseOrderNumber');
+  const quotationNumber = textField(meta ?? null, 'quotationNumber');
+  const deliveryNoteNumber = textField(meta ?? null, 'deliveryNoteNumber');
+  const supportingType = poNumber
+    ? 'purchase_order'
+    : quotationNumber
+      ? 'quotation'
+      : deliveryNoteNumber
+        ? 'delivery_note'
+        : documentType.includes('contract') || documentGroup.includes('contract')
+          ? 'contract'
+          : '';
+  const isSupporting = supportingType
+    || ['purchase_order', 'po', 'quotation', 'delivery_note', 'contract'].some((token) =>
+      documentType.includes(token) || documentGroup.includes(token),
+    );
+  if (!isSupporting) return null;
+
+  const reference = poNumber || quotationNumber || deliveryNoteNumber || textField(data, 'invoiceNumber');
+  if (!reference || normalizedReference(reference).length < 3) return null;
+
+  return {
+    poNumber: reference,
+    documentType: supportingType || documentType || documentGroup || 'purchase_order',
+    vendorName: textField(data, 'supplierName') || null,
+    vendorTaxId: textField(data, 'supplierTaxId') || textField(meta ?? null, 'sellerTaxId') || null,
+    issueDate: dateField(data, 'invoiceDate') ?? item.createdAt,
+    subtotal: numberField(data, 'subtotal') || null,
+    vatAmount: numberField(data, 'vatAmount') || null,
+    total: numberField(data, 'total') || numberField(data, 'amount') || null,
+    metadata: {
+      sourceFileName: item.fileName,
+      documentIntakeId: item.id,
+      purchaseOrderNumber: poNumber || null,
+      quotationNumber: quotationNumber || null,
+      deliveryNoteNumber: deliveryNoteNumber || null,
+    },
+  };
+}
+
+async function syncProjectPurchaseOrdersFromIntakes(
+  companyId: string,
+  projectId: string,
+  intakes: Array<{ id: string; fileName: string | null; ocrResult: unknown; createdAt: Date }>,
+  tx: Prisma.TransactionClient,
+) {
+  const extracted = intakes
+    .map((item) => ({ item, po: purchaseOrderFromIntake(item) }))
+    .filter((entry): entry is { item: typeof entry.item; po: NonNullable<ReturnType<typeof purchaseOrderFromIntake>> } => Boolean(entry.po));
+
+  if (extracted.length === 0) return;
+
+  await tx.projectPurchaseOrder.createMany({
+    data: extracted.map(({ item, po }) => ({
+        companyId,
+        projectId,
+        documentIntakeId: item.id,
+        poNumber: po.poNumber,
+        documentType: po.documentType,
+        vendorName: po.vendorName,
+        vendorTaxId: po.vendorTaxId,
+        issueDate: po.issueDate,
+        subtotal: po.subtotal,
+        vatAmount: po.vatAmount,
+        total: po.total,
+        metadata: po.metadata,
+      })),
+    skipDuplicates: true,
+  });
+}
+
 function taxSafetyForIntake(item: {
   status: string;
   mimeType: string;
@@ -445,48 +572,47 @@ function smartMatchForIntake(
     total: number;
     isPaid: boolean;
   }>,
+  purchaseOrders: Array<{
+    id: string;
+    poNumber: string;
+    documentType: string;
+    vendorName: string | null;
+    issueDate: Date | null;
+    total: number | null;
+    status: string;
+  }>,
 ) {
   if (item.purchaseInvoiceId || (item.targetType && item.targetId)) return null;
   if (!TAX_SAFETY_RISK_STATUSES.includes(item.taxSafety.status) && item.taxSafety.status !== 'supporting_only') return null;
 
-  const data = item.ocrResult as Record<string, unknown> | null;
-  const meta = data?.documentMetadata as Record<string, unknown> | undefined;
-  const amount = numberField(data, 'total') || numberField(data, 'amount') || numberField(data, 'paymentAmount');
-  const payment = data?.payment as Record<string, unknown> | undefined;
-  const paymentAmount = amount || numberField(payment ?? null, 'amount');
-  const supplierName = textField(data, 'supplierName') || textField(payment ?? null, 'receiverName');
-  const referenceNumber = textField(meta ?? null, 'purchaseOrderNumber')
-    || textField(meta ?? null, 'quotationNumber')
-    || textField(meta ?? null, 'deliveryNoteNumber')
-    || textField(data, 'invoiceNumber')
-    || textField(payment ?? null, 'reference');
-  const documentDate = dateField(data, 'invoiceDate') || dateField(data, 'paymentDate') || dateField(payment ?? null, 'date') || item.createdAt;
-  const role = item.taxSafety.status === 'unmatched_payment'
-    ? 'payment_proof'
-    : item.taxSafety.status === 'supporting_only'
-      ? 'supporting_document'
-      : 'tax_document';
+  const facts = intakeFacts(item);
 
   const candidates = purchases
     .map((purchase) => {
       let score = 0;
       const reasons: string[] = [];
-      if (paymentAmount > 0 && Math.abs(purchase.total - paymentAmount) < 1) {
+      if (amountClose(facts.amount, purchase.total)) {
         score += 60;
         reasons.push('amount');
       }
-      if (supplierName && purchase.supplierName.toLowerCase().includes(supplierName.toLowerCase().slice(0, 12))) {
+      if (nameLooksSimilar(facts.supplierName, purchase.supplierName)) {
         score += 25;
         reasons.push('supplier');
       }
-      if (referenceNumber && (
-        purchase.invoiceNumber.toLowerCase().includes(referenceNumber.toLowerCase())
-        || referenceNumber.toLowerCase().includes(purchase.invoiceNumber.toLowerCase())
-      )) {
+      if (containsReference(facts.referenceNumber, purchase.invoiceNumber)) {
         score += 25;
         reasons.push('reference');
       }
-      const dayDiff = Math.abs((purchase.invoiceDate.getTime() - documentDate.getTime()) / 86400000);
+      const poSupport = purchaseOrders.find((po) =>
+        containsReference(facts.referenceNumber, po.poNumber)
+        || amountClose(facts.amount, po.total)
+        || nameLooksSimilar(facts.supplierName, po.vendorName),
+      );
+      if (poSupport && (amountClose(purchase.total, poSupport.total) || nameLooksSimilar(purchase.supplierName, poSupport.vendorName))) {
+        score += 20;
+        reasons.push('po');
+      }
+      const dayDiff = Math.abs((purchase.invoiceDate.getTime() - facts.documentDate.getTime()) / 86400000);
       if (dayDiff <= 14) {
         score += Math.max(0, 15 - Math.round(dayDiff));
         reasons.push('date');
@@ -506,18 +632,108 @@ function smartMatchForIntake(
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
+  const poCandidates = purchaseOrders
+    .map((po) => {
+      let score = 0;
+      const reasons: string[] = [];
+      if (containsReference(facts.referenceNumber, po.poNumber)) {
+        score += 70;
+        reasons.push('reference');
+      }
+      if (amountClose(facts.amount, po.total)) {
+        score += 35;
+        reasons.push('amount');
+      }
+      if (nameLooksSimilar(facts.supplierName, po.vendorName)) {
+        score += 25;
+        reasons.push('vendor');
+      }
+      if (po.issueDate) {
+        const dayDiff = Math.abs((po.issueDate.getTime() - facts.documentDate.getTime()) / 86400000);
+        if (dayDiff <= 30) {
+          score += Math.max(0, 15 - Math.round(dayDiff / 2));
+          reasons.push('date');
+        }
+      }
+      return {
+        id: po.id,
+        poNumber: po.poNumber,
+        documentType: po.documentType,
+        vendorName: po.vendorName,
+        issueDate: po.issueDate,
+        total: po.total,
+        status: po.status,
+        score,
+        reasons,
+      };
+    })
+    .filter((candidate) => candidate.score >= 25)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
   return {
     id: `intake:${item.id}`,
     documentIntakeId: item.id,
     fileName: item.fileName,
     status: item.status,
-    documentRole: role,
+    documentRole: facts.role,
     taxSafety: item.taxSafety,
-    amount: paymentAmount || null,
-    supplierName: supplierName || null,
-    referenceNumber: referenceNumber || null,
-    documentDate,
+    amount: facts.amount,
+    supplierName: facts.supplierName,
+    referenceNumber: facts.referenceNumber,
+    documentDate: facts.documentDate,
     candidates,
+    poCandidates,
+    threeWay: {
+      hasPo: poCandidates.length > 0 || facts.role === 'supporting_document',
+      hasTaxInvoice: candidates.length > 0 || facts.role === 'tax_document',
+      hasPaymentProof: facts.role === 'payment_proof',
+    },
+  };
+}
+
+function purchaseOrderHealth(
+  po: {
+    id: string;
+    poNumber: string;
+    documentType: string;
+    vendorName: string | null;
+    vendorTaxId?: string | null;
+    issueDate: Date | null;
+    total: number | null;
+    status: string;
+  },
+  purchases: Array<{ id: string; supplierName: string; invoiceNumber: string; invoiceDate: Date; total: number; isPaid: boolean }>,
+  intakes: Array<{ id: string; fileName: string | null; createdAt: Date; ocrResult: unknown; taxSafety: TaxSafety }>,
+) {
+  const purchaseMatches = purchases
+    .filter((purchase) =>
+      containsReference(purchase.invoiceNumber, po.poNumber)
+      || (amountClose(purchase.total, po.total) && nameLooksSimilar(purchase.supplierName, po.vendorName)),
+    )
+    .map((purchase) => ({ id: purchase.id, supplierName: purchase.supplierName, invoiceNumber: purchase.invoiceNumber, total: purchase.total, isPaid: purchase.isPaid }));
+  const paymentMatches = intakes
+    .filter((item) => {
+      const facts = intakeFacts(item);
+      return facts.role === 'payment_proof' && (
+        containsReference(facts.referenceNumber, po.poNumber)
+        || amountClose(facts.amount, po.total)
+        || nameLooksSimilar(facts.supplierName, po.vendorName)
+      );
+    })
+    .map((item) => ({ id: item.id, fileName: item.fileName }));
+  const missing = [
+    purchaseMatches.length === 0 ? 'tax_invoice' : null,
+    paymentMatches.length === 0 ? 'payment_proof' : null,
+  ].filter(Boolean) as string[];
+  return {
+    ...po,
+    matchedPurchaseCount: purchaseMatches.length,
+    matchedPaymentCount: paymentMatches.length,
+    purchaseMatches: purchaseMatches.slice(0, 3),
+    paymentMatches: paymentMatches.slice(0, 3),
+    missing,
+    threeWayStatus: missing.length === 0 ? 'complete' : 'incomplete',
   };
 }
 
@@ -729,6 +945,31 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         }),
       ]);
 
+      await syncProjectPurchaseOrdersFromIntakes(companyId, row.id, documentIntakes, tx);
+      const purchaseOrders = await tx.projectPurchaseOrder.findMany({
+        where: { companyId, projectId: row.id },
+        orderBy: [{ issueDate: 'desc' }, { updatedAt: 'desc' }],
+        take: 100,
+        select: {
+          id: true,
+          poNumber: true,
+          documentType: true,
+          vendorName: true,
+          vendorTaxId: true,
+          issueDate: true,
+          expectedDate: true,
+          subtotal: true,
+          vatAmount: true,
+          total: true,
+          currency: true,
+          status: true,
+          source: true,
+          documentIntakeId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
       const project = serializeProject(row, summary);
       const purchaseTotal = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.total), 0);
       const purchaseVat = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.vatAmount), 0);
@@ -751,12 +992,19 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           taxSafety,
         };
       });
+      const purchaseOrderRows = purchaseOrders.map((item) => ({
+        ...item,
+        subtotal: item.subtotal ?? null,
+        vatAmount: item.vatAmount ?? null,
+        total: item.total ?? null,
+      }));
+      const purchaseOrderHealthRows = purchaseOrderRows.map((item) => purchaseOrderHealth(item, purchaseInvoiceRows, documentIntakeRows));
       const taxSafetySummary = summarizeTaxSafety([
         ...documentIntakeRows.map((item) => item.taxSafety),
         ...purchaseInvoiceRows.map((item) => ({ ...item.taxSafety, vatAmount: item.vatAmount })),
       ]);
       const smartMatches = documentIntakeRows
-        .map((item) => smartMatchForIntake(item, purchaseInvoiceRows))
+        .map((item) => smartMatchForIntake(item, purchaseInvoiceRows, purchaseOrderRows))
         .filter((item): item is NonNullable<ReturnType<typeof smartMatchForIntake>> => item !== null);
       const actionNeeded = documentIntakeRows
         .map(actionNeededForIntake)
@@ -784,11 +1032,14 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           actionNeededCount: allActionNeeded.length,
           filesCount: documentIntakes.length,
           lineGroupCount: lineGroups.length,
+          purchaseOrderCount: purchaseOrderRows.length,
+          purchaseOrderGapCount: purchaseOrderHealthRows.filter((item) => item.threeWayStatus !== 'complete').length,
           smartMatchCount: smartMatches.length,
           ...taxSafetySummary,
         },
         actionNeeded: allActionNeeded,
         smartMatches,
+        purchaseOrders: purchaseOrderHealthRows,
         documentIntakes: documentIntakeRows,
         purchaseInvoices: purchaseInvoiceRows,
         invoices: invoices.map((item) => ({
@@ -972,6 +1223,7 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
           orderBy: { invoiceDate: 'desc' },
           take: 1000,
           select: {
+            id: true,
             supplierName: true,
             supplierTaxId: true,
             invoiceNumber: true,
@@ -1033,6 +1285,27 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
         total: asNumber(item.total),
         taxSafety: taxSafetyForPurchase(item),
       }));
+      await syncProjectPurchaseOrdersFromIntakes(companyId, row.id, documentIntakes, tx);
+      const purchaseOrders = await tx.projectPurchaseOrder.findMany({
+        where: { companyId, projectId: row.id },
+        orderBy: [{ issueDate: 'desc' }, { updatedAt: 'desc' }],
+        take: 1000,
+        select: {
+          id: true,
+          poNumber: true,
+          documentType: true,
+          vendorName: true,
+          vendorTaxId: true,
+          issueDate: true,
+          total: true,
+          status: true,
+        },
+      });
+      const purchaseOrderRows = purchaseOrders.map((item) => ({
+        ...item,
+        total: item.total ?? null,
+      }));
+      const purchaseOrderHealthRows = purchaseOrderRows.map((item) => purchaseOrderHealth(item, purchaseRows, fileRows));
       const taxSafetySummary = summarizeTaxSafety([
         ...fileRows.map((item) => item.taxSafety),
         ...purchaseRows.map((item) => ({ ...item.taxSafety, vatAmount: item.vatAmount })),
@@ -1049,6 +1322,8 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
           EstimatedMargin: revenueTotal - purchaseTotal - expenseTotal,
           ActionNeededCount: actionNeeded.length,
           FilesCount: documentIntakes.length,
+          POs: purchaseOrderRows.length,
+          POGaps: purchaseOrderHealthRows.filter((item) => item.threeWayStatus !== 'complete').length,
           LINEGroupCount: lineGroups.length,
           CommittedAmount: summary.committedAmount,
           PaidAmount: summary.paidAmount,
@@ -1058,6 +1333,7 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
         },
         actionNeeded,
         documentIntakes: fileRows,
+        purchaseOrders: purchaseOrderHealthRows,
         purchaseInvoices: purchaseRows,
         invoices,
         expenseVouchers,
@@ -1092,6 +1368,18 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
         mimeType: item.mimeType,
         fileSize: item.fileSize,
         createdAt: item.createdAt,
+      })),
+      purchaseOrders: exportData.purchaseOrders.map((item) => ({
+        poNumber: item.poNumber,
+        documentType: item.documentType,
+        vendorName: item.vendorName,
+        vendorTaxId: item.vendorTaxId,
+        issueDate: item.issueDate,
+        total: item.total,
+        status: item.status,
+        matchedPurchaseCount: item.matchedPurchaseCount,
+        matchedPaymentCount: item.matchedPaymentCount,
+        missing: item.missing,
       })),
       purchases: exportData.purchaseInvoices.map((item) => ({
         supplierName: item.supplierName,
@@ -1191,6 +1479,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
           orderBy: { invoiceDate: 'desc' },
           take: 1000,
           select: {
+            id: true,
             supplierName: true,
             supplierTaxId: true,
             invoiceNumber: true,
@@ -1245,6 +1534,27 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         taxSafety: taxSafetyForPurchase(item),
       }));
       const fileRows = documentIntakes.map((item) => ({ ...item, kind: documentKind(item), taxSafety: taxSafetyForIntake(item) }));
+      await syncProjectPurchaseOrdersFromIntakes(companyId, row.id, documentIntakes, tx);
+      const purchaseOrders = await tx.projectPurchaseOrder.findMany({
+        where: { companyId, projectId: row.id },
+        orderBy: [{ issueDate: 'desc' }, { updatedAt: 'desc' }],
+        take: 1000,
+        select: {
+          id: true,
+          poNumber: true,
+          documentType: true,
+          vendorName: true,
+          vendorTaxId: true,
+          issueDate: true,
+          total: true,
+          status: true,
+        },
+      });
+      const purchaseOrderRows = purchaseOrders.map((item) => ({
+        ...item,
+        total: item.total ?? null,
+      }));
+      const purchaseOrderHealthRows = purchaseOrderRows.map((item) => purchaseOrderHealth(item, purchaseRows, fileRows));
       const purchaseTotal = purchaseRows.reduce((sum, item) => sum + item.total, 0);
       const purchaseVat = purchaseRows.reduce((sum, item) => sum + item.vatAmount, 0);
       const revenueTotal = invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
@@ -1267,6 +1577,8 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
           EstimatedMargin: revenueTotal - purchaseTotal - expenseTotal,
           ActionNeededCount: actionNeeded.length,
           FilesCount: documentIntakes.length,
+          POs: purchaseOrderRows.length,
+          POGaps: purchaseOrderHealthRows.filter((item) => item.threeWayStatus !== 'complete').length,
           LINEGroupCount: lineGroups.length,
           CommittedAmount: summary.committedAmount,
           PaidAmount: summary.paidAmount,
@@ -1276,6 +1588,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         },
         actionNeeded,
         files: fileRows,
+        purchaseOrders: purchaseOrderHealthRows,
         purchases: purchaseRows,
         invoices,
         expenseVouchers,
@@ -1310,6 +1623,18 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         mimeType: item.mimeType,
         fileSize: item.fileSize,
         createdAt: item.createdAt,
+      })),
+      purchaseOrders: exportData.purchaseOrders.map((item) => ({
+        poNumber: item.poNumber,
+        documentType: item.documentType,
+        vendorName: item.vendorName,
+        vendorTaxId: item.vendorTaxId,
+        issueDate: item.issueDate,
+        total: item.total,
+        status: item.status,
+        matchedPurchaseCount: item.matchedPurchaseCount,
+        matchedPaymentCount: item.matchedPaymentCount,
+        missing: item.missing,
       })),
       purchases: exportData.purchases.map((item) => ({
         supplierName: item.supplierName,

@@ -490,13 +490,16 @@ Already implemented:
   - unmatched slips/supporting documents
   - likely purchase candidates
   - attach document intake to purchase invoice from the project workspace
+- Project PO / 3-way Matching v1:
+  - persisted `project_purchase_orders` model from PO/quotation/delivery-note OCR metadata
+  - PO tab in Project Workspace
+  - matching now shows related PO candidates plus likely purchase invoice candidates
+  - Project Excel and Google Sheet exports include `PO 3-way`
 - LINE/OCR live-status usage telemetry and estimated OCR cost.
 
 Still needed:
 
-- Guest project portal.
 - Smarter tax safety queue and matching beyond v1:
-  - PO to purchase invoice
   - slip to receiver/vendor
   - non-VAT expense to payment voucher
 - Billing automation for overage/add-on seats.
