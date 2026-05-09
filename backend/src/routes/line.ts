@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { authenticate, requireRole } from '../middleware/auth';
@@ -29,11 +30,20 @@ import { rasterizePdfToPngPages } from '../services/pdfRasterService';
 export const lineRouter = Router();
 
 const OTP_TTL = 600; // 10 minutes
+const PROJECT_PORTAL_TTL = process.env.PROJECT_PORTAL_TTL ?? '7d';
 const lineWebhookDiagnostics: {
   lastWebhookAt?: string;
   lastEventCount?: number;
   lastUnhandledError?: { at: string; eventType?: string; message: string };
 } = {};
+
+function getFrontendBaseUrl() {
+  const firstConfigured = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'https://etax-invoice.vercel.app')
+    .split(',')
+    .map((value) => value.trim())
+    .find(Boolean);
+  return (firstConfigured ?? 'https://etax-invoice.vercel.app').replace(/\/+$/, '');
+}
 
 const REQUIRED_OCR_FIELDS: Array<{ key: keyof OcrResult; label: string; hint: string }> = [
   { key: 'supplierName',  label: 'ชื่อผู้ขาย',                      hint: 'เช่น บริษัท ABC จำกัด' },
@@ -1077,6 +1087,57 @@ lineRouter.patch('/admin/groups/:groupId/project', authenticate, requireRole('ad
     }
     logger.error('[Line] PATCH /admin/groups/:groupId/project failed', { err, groupId: req.params.groupId });
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to update Line group project' });
+  }
+});
+
+lineRouter.post('/admin/groups/:groupId/portal-link', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const group = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.lineGroupLink.findFirst({
+        where: { id: req.params.groupId, companyId: req.user!.companyId, isActive: true },
+        select: {
+          id: true,
+          companyId: true,
+          projectId: true,
+          groupName: true,
+          project: { select: { id: true, code: true, name: true } },
+        },
+      });
+    });
+
+    if (!group) {
+      res.status(404).json({ error: 'Line group not found in this company' });
+      return;
+    }
+    if (!group.projectId || !group.project) {
+      res.status(400).json({ error: 'Assign this LINE group to a project before creating a guest portal link' });
+      return;
+    }
+
+    const token = jwt.sign(
+      {
+        type: 'project_guest',
+        companyId: group.companyId,
+        projectId: group.projectId,
+        groupLinkId: group.id,
+      },
+      process.env.JWT_SECRET!,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { expiresIn: PROJECT_PORTAL_TTL as any },
+    );
+    const url = `${getFrontendBaseUrl()}/project-portal/${token}`;
+
+    res.json({
+      data: {
+        url,
+        expiresIn: PROJECT_PORTAL_TTL,
+        project: group.project,
+        groupName: group.groupName,
+      },
+    });
+  } catch (err) {
+    logger.error('[Line] POST /admin/groups/:groupId/portal-link failed', { err, groupId: req.params.groupId });
+    res.status(500).json({ error: 'Failed to create project guest portal link' });
   }
 });
 

@@ -32,6 +32,7 @@ const InvoiceVerify = React.lazy(() => import('./pages/InvoiceVerify'));
 const PurchaseInvoices = React.lazy(() => import('./pages/PurchaseInvoices'));
 const Projects = React.lazy(() => import('./pages/Projects'));
 const ProjectDetail = React.lazy(() => import('./pages/ProjectDetail'));
+const ProjectGuestPortal = React.lazy(() => import('./pages/ProjectGuestPortal'));
 const Expenses = React.lazy(() => import('./pages/Expenses'));
 const VatSummary = React.lazy(() => import('./pages/VatSummary'));
 const Pp30Filing = React.lazy(() => import('./pages/Pp30Filing'));
@@ -158,6 +159,7 @@ export default function App() {
           <Route path="/billing/success" element={<BillingSuccess />} />
           <Route path="/billing/cancel" element={<BillingCancel />} />
           <Route path="/invoices/verify/:id" element={<InvoiceVerify />} />
+          <Route path="/project-portal/:token" element={<ProjectGuestPortal />} />
           <Route
             path="/app"
             element={

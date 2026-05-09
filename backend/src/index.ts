@@ -28,6 +28,7 @@ import { lineRouter, lineWebhookHandler } from './routes/line';
 import { aiChatRouter } from './routes/aiChat';
 import { projectsRouter } from './routes/projects';
 import { dbdRouter } from './routes/dbd';
+import { projectPortalRouter } from './routes/projectPortal';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -74,6 +75,7 @@ app.get('/api/health', healthHandler);
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 app.use('/api/auth', authRouter);
+app.use('/api/project-portal', projectPortalRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/invoices', authenticate, invoicesRouter);
 app.use('/api/invoices/:invoiceId/payments', authenticate, paymentsRouter);

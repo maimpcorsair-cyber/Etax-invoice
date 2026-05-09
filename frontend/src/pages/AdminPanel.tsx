@@ -1708,6 +1708,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   const [groupOtp, setGroupOtp] = useState<null | { otp: string }>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [groupProjectSavingId, setGroupProjectSavingId] = useState<string | null>(null);
+  const [groupPortalSavingId, setGroupPortalSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!policy?.canUseLineOa) { setLoading(false); return; }
@@ -1880,6 +1881,32 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       setMsg({ type: 'err', text: (e as Error).message });
     } finally {
       setGroupProjectSavingId(null);
+    }
+  }
+
+  async function handleCreateGroupPortalLink(group: LineManagedGroup) {
+    setMsg(null);
+    setGroupPortalSavingId(group.id);
+    try {
+      const res = await fetch(`/api/line/admin/groups/${group.id}/portal-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json() as { data?: { url: string; expiresIn: string }; error?: string };
+      if (!res.ok || !json.data?.url) throw new Error(json.error ?? 'Failed');
+      await navigator.clipboard.writeText(json.data.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      setMsg({
+        type: 'ok',
+        text: isThai
+          ? `คัดลอกลิงก์ Project Portal แล้ว ใช้ได้ ${json.data.expiresIn}`
+          : `Project portal link copied. Valid for ${json.data.expiresIn}.`,
+      });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setGroupPortalSavingId(null);
     }
   }
 
@@ -2198,6 +2225,12 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                   {group.linkedAt && <p className="truncate text-[11px] text-gray-400">{new Date(group.linkedAt).toLocaleString()}</p>}
                 </div>
                 <div className="col-span-3 flex flex-wrap gap-2 md:col-span-1">
+                  {group.projectId && (
+                    <button className="btn-secondary text-xs" onClick={() => void handleCreateGroupPortalLink(group)} disabled={groupPortalSavingId === group.id}>
+                      {groupPortalSavingId === group.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                      {isThai ? 'ลิงก์ดูโปรเจค' : 'Portal link'}
+                    </button>
+                  )}
                   <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => void handleGroupUnlink(group)}>
                     <Unlink2 className="w-3.5 h-3.5" />
                     {isThai ? 'ถอด' : 'Unlink'}
