@@ -62,7 +62,7 @@ app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) }
 app.use('/api/', rateLimitMiddleware);
 
 const healthHandler = (_req: express.Request, res: express.Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2026-05-09c' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2026-05-09d' });
 };
 
 app.get('/health', healthHandler);
