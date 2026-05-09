@@ -156,3 +156,4 @@ Cert:         backend/certs/test-company.p12 / etax-dev-password
 - After any cert change: `/sign-test`
 - Before committing: `/typecheck` then `/review`
 - If backend misbehaves: `/logs error` first, then `/health`
+- Before final reply, update `PROJECT_STATE.md` when the work changes production/deploy status, CLI/tooling status, schema/database state, LINE/OCR behavior, important risks, or next verification steps. Keep it short and do not include secrets.

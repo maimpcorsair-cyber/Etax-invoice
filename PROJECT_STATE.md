@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 18:45 Asia/Bangkok
+Last updated: 2026-05-09 19:22 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
+
+## Maintenance Rule
+
+- Read this file before starting any non-trivial work.
+- Update this file before the final reply when a task changes production status, deploy state, CLI/tooling status, database/schema state, LINE/OCR behavior, important risks, or next verification steps.
+- Keep updates short and factual. Prefer latest state, latest commit, exact command, exact URL, and exact health/version over long narrative.
+- Do not paste secrets, tokens, certificate contents, `.env` values, or local auth state into this file.
+- If only exploratory work happened and nothing durable changed, leave this file unchanged.
 
 ## Current Production Status
 
@@ -56,6 +64,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - This file is Claude permission/local config only.
 - It should normally stay local and should not be committed unless the user explicitly wants shared Claude permissions.
 - Current diff only broadens allowed Claude bash commands around `git add`, `git commit`, and `git push`; no production code or secret was involved.
+- `PROJECT_STATE.md` maintenance rule was added so future AI sessions update this file when durable state changes.
 
 ## How To Verify Deploy Quickly
 
@@ -108,3 +117,4 @@ Expected backend health after the latest backend fix:
 - For LINE webhooks without a JWT request user, use the existing RLS helper pattern (`withSystemRlsContext` or a scoped RLS context) before Prisma reads/writes that touch tenant data.
 - Do not commit certificates, `.env` secrets, `.vercel`, or local Claude/Codex auth state.
 - Prefer `rg` for search and verify with real runtime checks, not config inspection only.
+- Before final replies after meaningful work, check whether `PROJECT_STATE.md` needs an update.

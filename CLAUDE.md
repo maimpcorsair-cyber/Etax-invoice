@@ -117,6 +117,9 @@ npx prisma migrate dev --name <name>
 pkill -f "tsx watch"; cd backend && npx tsx watch src/index.ts &
 ```
 
+## Handoff hygiene
+- Before final reply, update `PROJECT_STATE.md` when the work changes production/deploy status, CLI/tooling status, schema/database state, LINE/OCR behavior, important risks, or next verification steps. Keep it short and do not include secrets.
+
 ## Slash commands
 `/typecheck` `/health` `/db-shell "SQL"` `/logs [pattern]`
 `/restart-backend` `/restart-frontend` `/migrate [name]`
