@@ -57,49 +57,80 @@ function getServiceAccountAuth() {
   });
 }
 
-const FOLDER_NAME = 'ETax Expenses';
+const FOLDER_NAME = 'Billboy';
+
+function escapeDriveQuery(value: string) {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function sanitizeDriveName(value: string) {
+  return value.replace(/['"\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 180) || 'Untitled';
+}
+
+async function ensureChildFolder(
+  driveClient: ReturnType<typeof google.drive>,
+  name: string,
+  parentId?: string,
+): Promise<string> {
+  const safeName = sanitizeDriveName(name);
+  const escapedName = escapeDriveQuery(safeName);
+  const parentClause = parentId ? ` and '${parentId}' in parents` : '';
+  const existing = await driveClient.files.list({
+    q: `name='${escapedName}' and mimeType='application/vnd.google-apps.folder'${parentClause} and trashed=false`,
+    fields: 'files(id)',
+    spaces: 'drive',
+  });
+
+  if (existing.data.files?.length) return existing.data.files[0].id!;
+
+  const created = await driveClient.files.create({
+    requestBody: {
+      name: safeName,
+      mimeType: 'application/vnd.google-apps.folder',
+      ...(parentId ? { parents: [parentId] } : {}),
+    },
+    fields: 'id',
+  });
+  return created.data.id!;
+}
+
+export type DriveDocumentFolder =
+  | '01_PO'
+  | '02_Tax_Invoices'
+  | '03_Transfer_Slips'
+  | '04_Photos'
+  | '05_Exports'
+  | '99_Other';
+
+export interface DriveUploadOptions {
+  projectCode?: string | null;
+  projectName?: string | null;
+  documentFolder?: DriveDocumentFolder | null;
+}
 
 async function ensureFolder(
   driveClient: ReturnType<typeof google.drive>,
   companyName: string,
+  options: DriveUploadOptions = {},
 ): Promise<string> {
-  const rootQ = await driveClient.files.list({
-    q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id)',
-    spaces: 'drive',
-  });
+  const rootId = await ensureChildFolder(driveClient, FOLDER_NAME);
+  const companyId = await ensureChildFolder(driveClient, companyName, rootId);
 
-  let rootId: string;
-  if (rootQ.data.files?.length) {
-    rootId = rootQ.data.files[0].id!;
-  } else {
-    const f = await driveClient.files.create({
-      requestBody: { name: FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
-      fields: 'id',
-    });
-    rootId = f.data.id!;
-  }
+  if (!options.projectCode && !options.projectName) return companyId;
 
-  const safeName = companyName.replace(/['"\\]/g, '');
-  const subQ = await driveClient.files.list({
-    q: `name='${safeName}' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`,
-    fields: 'files(id)',
-    spaces: 'drive',
-  });
-
-  if (subQ.data.files?.length) return subQ.data.files[0].id!;
-
-  const sub = await driveClient.files.create({
-    requestBody: { name: safeName, mimeType: 'application/vnd.google-apps.folder', parents: [rootId] },
-    fields: 'id',
-  });
-  return sub.data.id!;
+  const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId);
+  const projectFolderName = sanitizeDriveName(
+    [options.projectCode, options.projectName].filter(Boolean).join(' '),
+  );
+  const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId);
+  return ensureChildFolder(driveClient, options.documentFolder ?? '99_Other', projectId);
 }
 
 export interface DriveUploadResult {
   fileId: string;
   url: string;
   fileName: string;
+  folderId: string;
   /** Whether the file landed in the user's personal Drive (true) or service account Drive (false) */
   userDrive: boolean;
 }
@@ -114,6 +145,7 @@ export async function uploadToDrive(
   mimeType: string,
   companyName: string,
   userRefreshToken?: string | null,
+  options: DriveUploadOptions = {},
 ): Promise<DriveUploadResult> {
   let auth: Auth.OAuth2Client | Auth.GoogleAuth;
   let userDrive = false;
@@ -131,7 +163,7 @@ export async function uploadToDrive(
 
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
 
-  const folderId = await ensureFolder(driveClient, companyName);
+  const folderId = await ensureFolder(driveClient, companyName, options);
 
   const res = await driveClient.files.create({
     requestBody: { name: originalName, parents: [folderId] },
@@ -152,5 +184,5 @@ export async function uploadToDrive(
   }
 
   const url = res.data.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`;
-  return { fileId, url, fileName, userDrive };
+  return { fileId, url, fileName, folderId, userDrive };
 }

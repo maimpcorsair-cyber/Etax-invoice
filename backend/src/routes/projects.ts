@@ -6,6 +6,7 @@ import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { auditLog } from '../services/auditService';
 import { logger } from '../config/logger';
+import { getLimitErrorMessage, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 
 export const projectsRouter = Router();
 
@@ -232,6 +233,15 @@ projectsRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), asyn
   try {
     const body = projectPayloadSchema.parse(req.body);
     const companyId = req.user!.companyId;
+    const policy = await resolveCompanyAccessPolicy(companyId);
+    if (!policy.canUseProjects) {
+      res.status(403).json({ error: 'Upgrade your plan to use project workspaces' });
+      return;
+    }
+    if (policy.maxProjects !== null && policy.usage.projects >= policy.maxProjects) {
+      res.status(403).json({ error: getLimitErrorMessage('projects', policy) });
+      return;
+    }
 
     const created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       await ensureProjectUsersInCompany(companyId, [body.ownerId, body.approverId, ...body.memberIds], tx);

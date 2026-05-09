@@ -15,7 +15,7 @@ export type AccessFeature =
   | 'send_invoice_email'
   | 'billing_portal';
 
-export type UsageLimitedResource = 'documents' | 'customers' | 'products' | 'users';
+export type UsageLimitedResource = 'documents' | 'customers' | 'products' | 'users' | 'projects' | 'lineGroups';
 
 export interface CompanyAccessPolicy {
   plan: EffectivePlan;
@@ -35,15 +35,24 @@ export interface CompanyAccessPolicy {
   canSendInvoiceEmail: boolean;
   canUseBillingPortal: boolean;
   canUseLineOa: boolean;
+  canUseProjects: boolean;
+  canUseProjectDriveFolders: boolean;
   maxUsers: number | null;
   maxDocumentsPerMonth: number | null;
   maxCustomers: number | null;
   maxProducts: number | null;
+  maxProjects: number | null;
+  maxLineGroups: number | null;
+  includedTeamSeats: number | null;
+  extraTeamSeatMonthlyThb: number | null;
+  extraOcrDocumentThb: number | null;
   usage: {
     documentsThisMonth: number;
     users: number;
     customers: number;
     products: number;
+    projects: number;
+    lineGroups: number;
   };
 }
 
@@ -66,14 +75,21 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canSendInvoiceEmail: false,
     canUseBillingPortal: false,
     canUseLineOa: true,
+    canUseProjects: true,
+    canUseProjectDriveFolders: false,
     maxUsers: 1,
     maxDocumentsPerMonth: 20,
     maxCustomers: 50,
     maxProducts: 50,
+    maxProjects: 1,
+    maxLineGroups: 1,
+    includedTeamSeats: 1,
+    extraTeamSeatMonthlyThb: null,
+    extraOcrDocumentThb: null,
   },
   starter: {
     plan: 'starter',
-    planLabel: 'Starter',
+    planLabel: 'Solo',
     isPaidPlan: true,
     canCreateInvoice: true,
     canSubmitToRD: true,
@@ -87,14 +103,21 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canSendInvoiceEmail: true,
     canUseBillingPortal: true,
     canUseLineOa: true,
+    canUseProjects: true,
+    canUseProjectDriveFolders: false,
     maxUsers: 3,
     maxDocumentsPerMonth: 150,
     maxCustomers: 500,
     maxProducts: 500,
+    maxProjects: 10,
+    maxLineGroups: 3,
+    includedTeamSeats: 3,
+    extraTeamSeatMonthlyThb: 99,
+    extraOcrDocumentThb: 1,
   },
   business: {
     plan: 'business',
-    planLabel: 'Business',
+    planLabel: 'Team',
     isPaidPlan: true,
     canCreateInvoice: true,
     canSubmitToRD: true,
@@ -108,10 +131,17 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canSendInvoiceEmail: true,
     canUseBillingPortal: true,
     canUseLineOa: true,
+    canUseProjects: true,
+    canUseProjectDriveFolders: true,
     maxUsers: 8,
     maxDocumentsPerMonth: 800,
     maxCustomers: 5000,
     maxProducts: 5000,
+    maxProjects: 50,
+    maxLineGroups: 20,
+    includedTeamSeats: 8,
+    extraTeamSeatMonthlyThb: 149,
+    extraOcrDocumentThb: 0.75,
   },
   enterprise: {
     plan: 'enterprise',
@@ -129,10 +159,17 @@ const planDefinitions: Record<EffectivePlan, PlanDefinition> = {
     canSendInvoiceEmail: true,
     canUseBillingPortal: true,
     canUseLineOa: true,
+    canUseProjects: true,
+    canUseProjectDriveFolders: true,
     maxUsers: null,
     maxDocumentsPerMonth: null,
     maxCustomers: null,
     maxProducts: null,
+    maxProjects: null,
+    maxLineGroups: null,
+    includedTeamSeats: null,
+    extraTeamSeatMonthlyThb: null,
+    extraOcrDocumentThb: null,
   },
 };
 
@@ -164,7 +201,17 @@ export function getAccessErrorMessage(feature: AccessFeature, plan: EffectivePla
 
 export async function resolveCompanyAccessPolicy(companyId: string): Promise<CompanyAccessPolicy> {
   const { subscription, usage } = await withRlsContext(prisma, { companyId, role: 'tenant', systemMode: false }, async (tx) => {
-    const [subscriptionRecord, userCount, customerCount, productCount, documentsThisMonth] = await Promise.all([
+    const [
+      subscriptionRecord,
+      userCount,
+      customerCount,
+      productCount,
+      invoiceCount,
+      purchaseInvoiceCount,
+      intakeCount,
+      projectCount,
+      lineGroupCount,
+    ] = await Promise.all([
       tx.companySubscription.findUnique({
         where: { companyId },
         select: { plan: true, status: true },
@@ -178,11 +225,32 @@ export async function resolveCompanyAccessPolicy(companyId: string): Promise<Com
             createdAt: { gte: getMonthStart() },
           },
         }),
+        tx.purchaseInvoice.count({
+          where: {
+            companyId,
+            createdAt: { gte: getMonthStart() },
+          },
+        }),
+        tx.documentIntake.count({
+          where: {
+            companyId,
+            createdAt: { gte: getMonthStart() },
+          },
+        }),
+        tx.project.count({ where: { companyId, status: { not: 'archived' } } }),
+        tx.lineGroupLink.count({ where: { companyId, isActive: true } }),
       ]);
 
     return {
       subscription: subscriptionRecord,
-      usage: { userCount, customerCount, productCount, documentsThisMonth },
+      usage: {
+        userCount,
+        customerCount,
+        productCount,
+        documentsThisMonth: invoiceCount + purchaseInvoiceCount + intakeCount,
+        projectCount,
+        lineGroupCount,
+      },
     };
   });
 
@@ -201,6 +269,8 @@ export async function resolveCompanyAccessPolicy(companyId: string): Promise<Com
       users: usage.userCount,
       customers: usage.customerCount,
       products: usage.productCount,
+      projects: usage.projectCount,
+      lineGroups: usage.lineGroupCount,
     },
   };
 }
@@ -244,6 +314,10 @@ export function getUsageLimit(policy: CompanyAccessPolicy, resource: UsageLimite
       return policy.maxProducts;
     case 'users':
       return policy.maxUsers;
+    case 'projects':
+      return policy.maxProjects;
+    case 'lineGroups':
+      return policy.maxLineGroups;
     default:
       return null;
   }
@@ -259,6 +333,10 @@ export function getUsageValue(policy: CompanyAccessPolicy, resource: UsageLimite
       return policy.usage.products;
     case 'users':
       return policy.usage.users;
+    case 'projects':
+      return policy.usage.projects;
+    case 'lineGroups':
+      return policy.usage.lineGroups;
     default:
       return 0;
   }
@@ -270,6 +348,8 @@ export function getLimitErrorMessage(resource: UsageLimitedResource, policy: Com
     customers: 'customer limit',
     products: 'product limit',
     users: 'user limit',
+    projects: 'project limit',
+    lineGroups: 'LINE group limit',
   };
   const limit = getUsageLimit(policy, resource);
   return `Your company has reached the ${labels[resource]} for the ${policy.planLabel} plan${limit ? ` (${limit})` : ''}`;

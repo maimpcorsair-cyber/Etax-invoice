@@ -17,6 +17,8 @@ const features = [
 
 type PricingPlan = {
   key: 'free' | 'starter' | 'business' | 'enterprise';
+  nameTh: string;
+  nameEn: string;
   price: string;
   limitTh: string;
   limitEn: string;
@@ -27,10 +29,10 @@ type PricingPlan = {
 };
 
 const pricingPlans: PricingPlan[] = [
-  { key: 'free', price: 'ฟรี', limitTh: 'ทดลอง 20 เอกสาร/เดือน', limitEn: 'Try 20 docs/month', summaryTh: 'สำหรับทดลองอ่านเอกสาร ออก draft และดู workflow ก่อนใช้งานจริง', summaryEn: 'Best for testing document intake, drafts, and the workflow before going live.', priceEn: 'Free' },
-  { key: 'starter', price: '790', limitTh: 'สูงสุด 150 ใบ/เดือน', limitEn: 'Up to 150 docs/month', summaryTh: 'สำหรับเจ้าของธุรกิจที่ต้องอ่านบิล เก็บหลักฐาน และออก e-Tax จริง', summaryEn: 'Best for owner-led businesses that need OCR, evidence, and real e-Tax.' },
-  { key: 'business', price: '1,990', limitTh: 'สูงสุด 800 ใบ/เดือน', limitEn: 'Up to 800 docs/month', summaryTh: 'สำหรับทีมบัญชีที่ต้องตรวจเอกสาร ซื้อ-ขาย ส่ง RD และ export ทุกเดือน', summaryEn: 'Best for accounting teams handling purchases, sales, RD submission, and exports.', popular: true },
-  { key: 'enterprise', price: 'ติดต่อเรา', limitTh: 'ไม่จำกัด + SLA', limitEn: 'Unlimited + SLA', summaryTh: 'สำหรับองค์กรที่ต้องการโควตา โมเดลตรวจเอกสาร และ workflow เฉพาะ', summaryEn: 'Best for high-volume companies with custom verification and workflow needs.', priceEn: 'Contact us' },
+  { key: 'free', nameTh: 'Free', nameEn: 'Free', price: 'ฟรี', limitTh: 'ทดลอง 20 เอกสาร/เดือน · 1 โปรเจค', limitEn: 'Try 20 docs/month · 1 project', summaryTh: 'สำหรับทดลองอ่านเอกสาร ออก draft และดู workflow ก่อนใช้งานจริง', summaryEn: 'Best for testing document intake, drafts, and the workflow before going live.', priceEn: 'Free' },
+  { key: 'starter', nameTh: 'Solo', nameEn: 'Solo', price: '299', limitTh: '150 ใบ/เดือน · 10 โปรเจค · 3 ผู้ใช้', limitEn: '150 docs/month · 10 projects · 3 users', summaryTh: 'สำหรับเจ้าของใช้คนเดียวเป็นหลัก แต่เชิญบัญชี/ผู้ช่วยเข้ามาช่วยตรวจได้', summaryEn: 'Best for owner-led teams: one main admin with a bookkeeper or helper invited in.' },
+  { key: 'business', nameTh: 'Team', nameEn: 'Team', price: '990', limitTh: '800 ใบ/เดือน · 50 โปรเจค · 8 ผู้ใช้', limitEn: '800 docs/month · 50 projects · 8 users', summaryTh: 'สำหรับทีมที่มีหลายไซต์งาน ต้องแยกโปรเจค LINE group Drive folder และ export ทุกเดือน', summaryEn: 'Best for multi-site teams that need projects, LINE groups, Drive folders, and exports.', popular: true },
+  { key: 'enterprise', nameTh: 'Enterprise', nameEn: 'Enterprise', price: 'ติดต่อเรา', limitTh: 'ไม่จำกัด + SLA', limitEn: 'Unlimited + SLA', summaryTh: 'สำหรับองค์กรที่ต้องการโควตา โมเดลตรวจเอกสาร และ workflow เฉพาะ', summaryEn: 'Best for high-volume companies with custom verification and workflow needs.', priceEn: 'Contact us' },
 ];
 
 const documentOpsPillars = [
@@ -150,13 +152,13 @@ export default function Landing() {
       { icon: Send, available: true, th: 'ส่งข้อมูลไป RD ได้จริง', en: 'Real RD submission included' },
       { icon: FileCheck, available: true, th: 'อ่านเอกสารเว็บ/LINE พร้อมรอยืนยัน', en: 'Web/LINE AI intake with review queue' },
       { icon: ShieldCheck, available: true, th: 'Certificate, email และ Excel export', en: 'Certificate, email, and Excel export' },
-      { icon: Users, available: true, th: 'สูงสุด 3 ผู้ใช้', en: 'Up to 3 users' },
+      { icon: Users, available: true, th: '10 โปรเจค, 3 ผู้ใช้, 3 กลุ่ม LINE', en: '10 projects, 3 users, 3 LINE groups' },
     ],
     business: [
       { icon: Users, available: true, th: 'สูงสุด 8 ผู้ใช้พร้อม role ภายในทีม', en: 'Up to 8 users with internal roles' },
       { icon: ScrollText, available: true, th: 'Audit logs, template และ status เอกสาร', en: 'Audit logs, templates, and document statuses' },
-      { icon: FileSpreadsheet, available: true, th: 'Excel, Google Sheets และ Drive workflow', en: 'Excel, Google Sheets, and Drive workflow' },
-      { icon: ShieldCheck, available: true, th: 'เหมาะกับงาน production ซื้อ-ขายเต็มรูปแบบ', en: 'Production-ready for purchase and sales operations' },
+      { icon: FileSpreadsheet, available: true, th: '50 โปรเจค, Drive folder และ Google Sheets', en: '50 projects, Drive folders, and Google Sheets' },
+      { icon: ShieldCheck, available: true, th: 'เหมาะกับหลายไซต์งานและอนุมัติงบ', en: 'Production-ready for multi-site budget approval' },
     ],
     enterprise: [
       { icon: Files, available: true, th: 'โควตาเอกสารและผู้ใช้ตามสัญญา', en: 'Custom document and user limits' },
@@ -176,6 +178,16 @@ export default function Landing() {
       labelTh: 'AI อ่านเอกสารซื้อ/สลิป/ใบเสร็จ',
       labelEn: 'AI purchase, slip, and receipt intake',
       values: { free: { th: 'เว็บทดลอง', en: 'Web trial' }, starter: { th: 'เว็บ + LINE', en: 'Web + LINE' }, business: { th: 'เว็บ + LINE + queue', en: 'Web + LINE + queue' }, enterprise: { th: 'กำหนดเอง', en: 'Custom' } },
+    },
+    {
+      labelTh: 'Project Room / แยกงบงาน',
+      labelEn: 'Project rooms and budget control',
+      values: { free: { th: '1 โปรเจค', en: '1 project' }, starter: { th: '10 โปรเจค', en: '10 projects' }, business: { th: '50 โปรเจค', en: '50 projects' }, enterprise: { th: 'ตามสัญญา', en: 'By contract' } },
+    },
+    {
+      labelTh: 'LINE group ต่อโปรเจค',
+      labelEn: 'LINE groups per project',
+      values: { free: { th: '1 กลุ่ม', en: '1 group' }, starter: { th: '3 กลุ่ม', en: '3 groups' }, business: { th: '20 กลุ่ม', en: '20 groups' }, enterprise: { th: 'ตามสัญญา', en: 'By contract' } },
     },
     {
       labelTh: 'ส่งข้อมูลไปกรมสรรพากร',
@@ -855,7 +867,7 @@ export default function Landing() {
                 )}
 
                 <div className="mb-6">
-                  <h3 className="font-bold text-xl text-gray-900 capitalize mb-2">{plan.key}</h3>
+                  <h3 className="font-bold text-xl text-gray-900 mb-2">{isThai ? plan.nameTh : plan.nameEn}</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold text-primary-600">
                       {planPriceLabel(plan)}
@@ -926,8 +938,8 @@ export default function Landing() {
                 {isThai ? 'เปรียบเทียบสิทธิ์การใช้งาน' : 'Feature comparison'}
               </div>
               {pricingPlans.map((plan) => (
-                <div key={`head-${plan.key}`} className="px-4 py-4 text-center text-sm font-semibold text-gray-700 capitalize">
-                  {plan.key}
+                <div key={`head-${plan.key}`} className="px-4 py-4 text-center text-sm font-semibold text-gray-700">
+                  {isThai ? plan.nameTh : plan.nameEn}
                 </div>
               ))}
             </div>

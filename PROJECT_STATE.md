@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 21:47 Asia/Bangkok
+Last updated: 2026-05-09 22:33 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -29,6 +29,21 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Updated commercial packaging toward Solo / Team:
+  - internal `starter` plan is now presented as `Solo` at 299 THB/month
+  - internal `business` plan is now presented as `Team` at 990 THB/month
+  - policy now exposes project, LINE group, Drive-folder, included-seat, extra-seat, and extra-OCR limits
+  - monthly document usage now counts invoices + purchase invoices + document intakes, not only sales invoices
+- Added project usage gating:
+  - Free: 1 project / 1 LINE group
+  - Solo: 10 projects / 3 LINE groups / 3 users
+  - Team: 50 projects / 20 LINE groups / 8 users
+  - Enterprise: custom/unlimited
+- Added Google Drive project-folder foundation:
+  - root folder is now `Billboy`
+  - supports company/project/category nesting
+  - target project folder format: `Billboy / Company / Projects / PRJ... / 02_Tax_Invoices`
+  - existing Drive uploads remain backward compatible when no project is passed
 - Added Project / Cost Center foundation:
   - new `projects` and `project_members` tables
   - tenant-safe RLS policies for project data
@@ -145,6 +160,9 @@ Expected backend health after the latest backend fix:
   - project picker in LINE Admin group UI
   - project filter across Input VAT, expenses, and invoice lists
   - approval workflow by project owner/approver
+  - wire Drive uploads from project/category into the new Drive folder foundation
+  - add Google Sheet/Excel export per project
+- Pricing labels changed in app config, but Stripe price env names are still `STRIPE_PRICE_STARTER_MONTHLY` and `STRIPE_PRICE_BUSINESS_MONTHLY`; Stripe dashboard prices should be updated to match 299/990 before charging real customers.
 - LINE webhook observability should be improved with a compact admin/debug view:
   - message id
   - company id

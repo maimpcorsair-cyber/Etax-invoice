@@ -499,15 +499,24 @@ export interface CompanyAccessPolicy {
   canSendInvoiceEmail: boolean;
   canUseBillingPortal: boolean;
   canUseLineOa: boolean;
+  canUseProjects: boolean;
+  canUseProjectDriveFolders: boolean;
   maxUsers: number | null;
   maxDocumentsPerMonth: number | null;
   maxCustomers: number | null;
   maxProducts: number | null;
+  maxProjects: number | null;
+  maxLineGroups: number | null;
+  includedTeamSeats: number | null;
+  extraTeamSeatMonthlyThb: number | null;
+  extraOcrDocumentThb: number | null;
   usage: {
     documentsThisMonth: number;
     users: number;
     customers: number;
     products: number;
+    projects: number;
+    lineGroups: number;
   };
 }
 

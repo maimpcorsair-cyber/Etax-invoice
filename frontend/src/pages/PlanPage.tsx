@@ -9,6 +9,8 @@ import {
   Users,
   FileText,
   Package,
+  BriefcaseBusiness,
+  MessageCircle,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
@@ -34,6 +36,8 @@ interface PlanDef {
   users: string;
   customers: string;
   products: string;
+  projects: string;
+  lineGroups: string;
 }
 
 const PLANS: PlanDef[] = [
@@ -51,12 +55,14 @@ const PLANS: PlanDef[] = [
     users: '1',
     customers: '50',
     products: '50',
+    projects: '1',
+    lineGroups: '1',
   },
   {
     key: 'starter',
-    nameTh: 'สตาร์ทเตอร์',
-    nameEn: 'Starter',
-    price: '฿790',
+    nameTh: 'โซโล',
+    nameEn: 'Solo',
+    price: '฿299',
     priceSub: '/เดือน',
     color: 'border-blue-200',
     badgeColor: 'bg-blue-100 text-blue-700',
@@ -66,12 +72,14 @@ const PLANS: PlanDef[] = [
     users: '3',
     customers: '500',
     products: '500',
+    projects: '10',
+    lineGroups: '3',
   },
   {
     key: 'business',
-    nameTh: 'บิสสิเนส',
-    nameEn: 'Business',
-    price: '฿1,990',
+    nameTh: 'ทีม',
+    nameEn: 'Team',
+    price: '฿990',
     priceSub: '/เดือน',
     color: 'border-purple-200',
     badgeColor: 'bg-purple-100 text-purple-700',
@@ -81,6 +89,8 @@ const PLANS: PlanDef[] = [
     users: '8',
     customers: '5,000',
     products: '5,000',
+    projects: '50',
+    lineGroups: '20',
   },
   {
     key: 'enterprise',
@@ -96,6 +106,8 @@ const PLANS: PlanDef[] = [
     users: 'ไม่จำกัด',
     customers: 'ไม่จำกัด',
     products: 'ไม่จำกัด',
+    projects: 'ไม่จำกัด',
+    lineGroups: 'ไม่จำกัด',
   },
 ];
 
@@ -137,6 +149,21 @@ const FEATURE_ROWS: FeatureRow[] = [
       business: { th: 'เว็บ + LINE + Drive/Sheets', en: 'Web + LINE + Drive/Sheets' },
       enterprise: { th: 'กำหนดเอง', en: 'Custom' },
     },
+  },
+  {
+    labelTh: 'Project Room / คุมงบโปรเจค',
+    labelEn: 'Project rooms and budget control',
+    values: {
+      free: { th: '1 โปรเจค', en: '1 project' },
+      starter: { th: '10 โปรเจค', en: '10 projects' },
+      business: { th: '50 โปรเจค', en: '50 projects' },
+      enterprise: { th: 'ตามสัญญา', en: 'By contract' },
+    },
+  },
+  {
+    labelTh: 'Google Drive folder ต่อโปรเจค',
+    labelEn: 'Google Drive folder per project',
+    values: { free: false, starter: false, business: true, enterprise: true },
   },
   {
     labelTh: 'ตรวจสลิป/ใบเสร็จ/เอกสารค่าใช้จ่าย',
@@ -424,6 +451,18 @@ export default function PlanPage() {
               icon={<Users className="w-4 h-4" />}
             />
             <UsageBar
+              label={isThai ? 'โปรเจค / Projects' : 'Projects'}
+              used={policy.usage.projects}
+              max={policy.maxProjects}
+              icon={<BriefcaseBusiness className="w-4 h-4" />}
+            />
+            <UsageBar
+              label={isThai ? 'กลุ่ม LINE / LINE groups' : 'LINE groups'}
+              used={policy.usage.lineGroups}
+              max={policy.maxLineGroups}
+              icon={<MessageCircle className="w-4 h-4" />}
+            />
+            <UsageBar
               label={isThai ? 'ลูกค้า / Customers' : 'Customers'}
               used={policy.usage.customers}
               max={policy.maxCustomers}
@@ -506,6 +545,8 @@ export default function PlanPage() {
                   { labelTh: 'ผู้ใช้', labelEn: 'Users', field: 'users' as const },
                   { labelTh: 'ลูกค้า', labelEn: 'Customers', field: 'customers' as const },
                   { labelTh: 'สินค้า', labelEn: 'Products', field: 'products' as const },
+                  { labelTh: 'โปรเจค', labelEn: 'Projects', field: 'projects' as const },
+                  { labelTh: 'กลุ่ม LINE', labelEn: 'LINE groups', field: 'lineGroups' as const },
                 ] as const
               ).map((row) => (
                 <tr key={row.field}>
@@ -610,6 +651,10 @@ export default function PlanPage() {
                     <span className="font-medium text-gray-800">{plan.customers}</span>
                     <span className="text-gray-500">{isThai ? 'สินค้า' : 'Products'}</span>
                     <span className="font-medium text-gray-800">{plan.products}</span>
+                    <span className="text-gray-500">{isThai ? 'โปรเจค' : 'Projects'}</span>
+                    <span className="font-medium text-gray-800">{plan.projects}</span>
+                    <span className="text-gray-500">{isThai ? 'กลุ่ม LINE' : 'LINE groups'}</span>
+                    <span className="font-medium text-gray-800">{plan.lineGroups}</span>
                   </div>
                   <div className="border-t border-gray-100 pt-2 space-y-1.5">
                     {FEATURE_ROWS.map((row) => {
