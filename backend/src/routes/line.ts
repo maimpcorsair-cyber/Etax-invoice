@@ -1628,8 +1628,10 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
       return;
     }
 
+    // Step 1: Run the DB transaction (link user + consume OTP)
+    let linkResult: { ok: true; userName: string | null } | { ok: false; reason: string };
     try {
-      const linkResult = await prisma.$transaction(async (tx) => {
+      linkResult = await prisma.$transaction(async (tx) => {
         const targetUser = await tx.user.findFirst({
           where: { id: otpRecord.userId!, companyId: otpRecord.companyId, isActive: true },
           select: { id: true, name: true, companyId: true },
@@ -1664,36 +1666,36 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
           },
         });
 
-        // Consume the OTP
         await tx.lineOtp.delete({ where: { id: otpRecord.id } });
 
         return { ok: true as const, userName: targetUser.name };
       });
-
-      if (!linkResult.ok) {
-        if (linkResult.reason === 'line_already_linked') {
-          await sendLineText(lineUserId, 'บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว กรุณาให้แอดมินถอดการเชื่อมต่อก่อนแล้วลองใหม่');
-          return;
-        }
-        await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
-        await sendLineText(lineUserId, 'ไม่พบผู้ใช้ที่เชื่อมกับรหัสนี้ หรือผู้ใช้ถูกปิดใช้งานแล้ว กรุณาขอรหัสใหม่จากแอดมิน');
-        return;
-      }
-
-      await sendLineText(
-        lineUserId,
-        `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถส่งรูปใบกำกับภาษี, สลิปโอน, PO หรือเอกสารอื่นๆ มาได้เลยครับ`,
-      );
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       const errCode = (err as { code?: string }).code;
-      logger.error('[Line] OTP link transaction failed', { err: errMsg, errCode, otp: otp.slice(0, 3) + '***' });
+      logger.error('[Line] OTP link DB transaction failed', { err: errMsg, errCode, otp: otp.slice(0, 3) + '***' });
 
       if (errCode === 'P2002') {
         await sendLineText(lineUserId, 'บัญชี LINE นี้หรือผู้ใช้นี้ถูกเชื่อมแล้ว กรุณาให้แอดมินตรวจสอบสถานะการเชื่อมต่อ');
       } else {
-        await sendLineText(lineUserId, 'เกิดข้อผิดพลาดในการเชื่อมบัญชี กรุณาลองใหม่หรือแจ้งแอดมิน');
+        await sendLineText(lineUserId, `เชื่อมไม่สำเร็จ: ${errMsg.slice(0, 80)}`);
       }
+      return;
+    }
+
+    // Step 2: Send response message (outside try-catch so DB errors don't mix with LINE API errors)
+    if (!linkResult.ok) {
+      if (linkResult.reason === 'line_already_linked') {
+        await sendLineText(lineUserId, 'บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว กรุณาให้แอดมินถอดการเชื่อมต่อก่อนแล้วลองใหม่');
+      } else {
+        await prisma.lineOtp.delete({ where: { id: otpRecord.id } }).catch(() => {});
+        await sendLineText(lineUserId, 'ไม่พบผู้ใช้ที่เชื่อมกับรหัสนี้ หรือผู้ใช้ถูกปิดใช้งานแล้ว กรุณาขอรหัสใหม่จากแอดมิน');
+      }
+    } else {
+      await sendLineText(
+        lineUserId,
+        `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถส่งรูปใบกำกับภาษี, สลิปโอน, PO หรือเอกสารอื่นๆ มาได้เลยครับ`,
+      ).catch(sendErr => logger.warn('[Line] Success message send failed (link IS done)', { sendErr }));
     }
     return;
   }
