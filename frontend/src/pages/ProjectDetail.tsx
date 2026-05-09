@@ -188,6 +188,7 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState<ProjectWorkspaceTab>('overview');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -301,6 +302,33 @@ export default function ProjectDetail() {
     window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
   }
 
+  async function downloadProjectExport() {
+    if (!token || !workspace) return;
+    setExporting(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/export/excel`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Export failed');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const safeCode = workspace.project.code.replace(/[^A-Z0-9-_]/gi, '_');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `project-${safeCode}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -368,6 +396,15 @@ export default function ProjectDetail() {
           >
             <RefreshCw className="h-4 w-4" />
             {isThai ? 'รีเฟรช' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadProjectExport()}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {isThai ? 'Export Excel' : 'Export Excel'}
           </button>
           <Link
             to={`/app/invoices/new?projectId=${project.id}`}

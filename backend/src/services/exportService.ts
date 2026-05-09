@@ -205,6 +205,133 @@ export async function generateInvoiceExcel(invoices: InvoiceRow[]): Promise<Buff
   return Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 }
 
+export async function generateProjectExportExcel(input: {
+  project: {
+    code: string;
+    name: string;
+    customerName?: string | null;
+    budgetAmount: number;
+    status: string;
+    ownerName?: string | null;
+    approverName?: string | null;
+  };
+  summary: Record<string, string | number>;
+  actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
+  files: Array<{ fileName: string; source: string; kind: string; status: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
+  purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
+  sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
+  expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
+  lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
+}): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Billboy';
+  workbook.created = new Date();
+
+  const projectRows = [
+    ['Project code', input.project.code],
+    ['Project name', input.project.name],
+    ['Customer / site', input.project.customerName ?? ''],
+    ['Status', input.project.status],
+    ['Owner', input.project.ownerName ?? ''],
+    ['Approver', input.project.approverName ?? ''],
+    ['Budget', input.project.budgetAmount],
+    ...Object.entries(input.summary).map(([key, value]) => [key, value]),
+  ];
+  const overview = addWorksheet(workbook, 'Overview', ['Metric', 'Value'], projectRows);
+  overview.getColumn(2).numFmt = '#,##0.00';
+
+  const actionSheet = addWorksheet(
+    workbook,
+    'Action Needed',
+    ['Severity', 'Type', 'Title', 'Message'],
+    input.actionNeeded.map((item) => [item.severity, item.type, item.title, item.message]),
+  );
+
+  const filesSheet = addWorksheet(
+    workbook,
+    'Files',
+    ['File name', 'Source', 'Kind', 'Status', 'MIME type', 'Size bytes', 'Created at'],
+    input.files.map((item) => [
+      item.fileName,
+      item.source,
+      item.kind,
+      item.status,
+      item.mimeType,
+      item.fileSize,
+      item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt,
+    ]),
+  );
+
+  const purchaseSheet = addWorksheet(
+    workbook,
+    'Purchases',
+    ['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Paid'],
+    input.purchases.map((item) => [
+      item.supplierName,
+      item.supplierTaxId,
+      item.invoiceNumber,
+      item.invoiceDate instanceof Date ? formatDateEn(item.invoiceDate) : item.invoiceDate,
+      item.vatType,
+      item.subtotal,
+      item.vatAmount,
+      item.total,
+      item.isPaid ? 'Yes' : 'No',
+    ]),
+  );
+
+  const salesSheet = addWorksheet(
+    workbook,
+    'Sales',
+    ['Invoice no.', 'Buyer', 'Type', 'Status', 'Invoice date', 'Subtotal', 'VAT', 'Total', 'Paid'],
+    input.sales.map((item) => [
+      item.invoiceNumber,
+      item.buyerName,
+      item.type,
+      item.status,
+      item.invoiceDate instanceof Date ? formatDateEn(item.invoiceDate) : item.invoiceDate,
+      item.subtotal,
+      item.vatAmount,
+      item.total,
+      item.isPaid ? 'Yes' : 'No',
+    ]),
+  );
+
+  const expenseSheet = addWorksheet(
+    workbook,
+    'Expenses',
+    ['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total'],
+    input.expenses.map((item) => [
+      item.voucherNumber,
+      item.status,
+      item.voucherDate instanceof Date ? formatDateEn(item.voucherDate) : item.voucherDate,
+      item.description,
+      item.totalAmount,
+    ]),
+  );
+
+  addWorksheet(
+    workbook,
+    'LINE Groups',
+    ['Group name', 'Linked at'],
+    input.lineGroups.map((item) => [
+      item.groupName,
+      item.linkedAt instanceof Date ? item.linkedAt.toISOString() : item.linkedAt,
+    ]),
+  );
+
+  for (const sheet of [actionSheet, filesSheet, purchaseSheet, salesSheet, expenseSheet]) {
+    sheet.getRow(1).height = 22;
+  }
+  for (const sheet of [purchaseSheet, salesSheet]) {
+    for (const key of ['F', 'G', 'H']) sheet.getColumn(key).numFmt = '#,##0.00';
+  }
+  expenseSheet.getColumn('E').numFmt = '#,##0.00';
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  logger.info(`Project export generated: ${input.project.code}`);
+  return Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+}
+
 export async function generateCustomerExcel(customers: {
   nameTh: string;
   nameEn?: string | null;

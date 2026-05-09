@@ -1,6 +1,6 @@
 # Billboy Project Workspace + Profit Plan
 
-Last updated: 2026-05-09 23:08 Asia/Bangkok
+Last updated: 2026-05-10 00:55 Asia/Bangkok
 
 This document is the working plan for turning Billboy from an OCR/e-Tax tool into a project-aware operating system for SME accounting, field teams, and project owners.
 
@@ -421,18 +421,23 @@ Already implemented:
 - `projectId` on invoices, purchase invoices, document intakes, expense vouchers, and LINE group links.
 - `/api/projects` CRUD and assignment endpoint.
 - `/app/projects` list page.
+- `/app/projects/:id` Project Workspace with overview, action-needed, files, purchases, sales, expenses, LINE groups, upload, and Excel export.
 - Input VAT upload and manual purchase invoice can carry `projectId`.
+- Input VAT, sales invoices, and expenses support project filtering.
+- Invoice Builder and Expenses can be opened with `?projectId=...` and keep project context.
+- Admin LINE group UI can assign linked LINE groups to a project.
+- LINE live-status debug includes recent document project/source/file context.
 - LINE intake can inherit `projectId` from linked group.
 - Solo/Team customer-facing packaging.
 - Access policy exposes project and LINE group limits.
 - Google Drive service can create project/category folder paths.
+- Project Excel export pack.
 
 Still needed:
 
-- Project detail workspace.
-- Upload/files tab inside project.
-- Project filters across Input VAT, invoices, expenses.
-- LINE Admin UI to assign group to project.
 - Guest project portal.
-- Export Excel/Google Sheet per project.
+- Google Sheet sync per project.
+- ZIP attachment pack per project.
 - Direct Drive upload wiring with project/category.
+- Approval workflow by project owner/approver.
+- Tax safety queue and smart matching.

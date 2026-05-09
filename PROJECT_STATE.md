@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 00:25 Asia/Bangkok
+Last updated: 2026-05-10 00:55 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -40,6 +40,21 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added LINE Project Admin + Debug v1:
+  - admin can assign/unassign a linked LINE group to a project from Admin → LINE
+  - backend `PATCH /api/line/admin/groups/:groupId/project`
+  - LINE live status recent document list now includes file name, source, project, target info, and purchase invoice linkage
+  - Admin LINE group list now shows current project chip/link
+- Added Project Export Pack v1:
+  - backend `GET /api/projects/:id/export/excel`
+  - project export workbook includes Overview, Action Needed, Files, Purchases, Sales, Expenses, and LINE Groups sheets
+  - Project Workspace now has an Export Excel button
+- Verified locally after LINE Admin + Project Export work:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added Project Context Everywhere v1:
   - Sales invoices can now store/update `projectId`
   - Sales invoice list supports `projectId` filtering and shows project chips
@@ -204,11 +219,12 @@ Expected backend health after the latest backend fix:
 
 - Production DB read-only debugging is not yet set up as a safe repeatable tool.
 - Projects v1 is usable for budget/project tagging and workspace review, but next useful upgrades are:
-  - project picker in LINE Admin group UI
-  - project filter across Input VAT, expenses, and invoice lists is now implemented in v1
+  - project picker in LINE Admin group UI is now implemented in v1
+  - project Excel export is now implemented in v1
+  - project filter across Input VAT, expenses, and invoice lists is implemented in v1
   - approval workflow by project owner/approver
   - wire Drive uploads from project/category into the new Drive folder foundation
-  - add Google Sheet/Excel export per project
+  - add Google Sheet sync and ZIP attachment pack per project
 - Pricing labels changed in app config, but Stripe price env names are still `STRIPE_PRICE_STARTER_MONTHLY` and `STRIPE_PRICE_BUSINESS_MONTHLY`; Stripe dashboard prices should be updated to match 299/990 before charging real customers.
 - LINE webhook observability should be improved with a compact admin/debug view:
   - message id

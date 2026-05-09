@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/auth';
 import { auditLog } from '../services/auditService';
 import { logger } from '../config/logger';
 import { getLimitErrorMessage, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
+import { generateProjectExportExcel } from '../services/exportService';
 
 export const projectsRouter = Router();
 
@@ -429,6 +430,193 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
   } catch (err) {
     logger.error('Failed to get project workspace', { error: err });
     res.status(500).json({ error: 'Failed to fetch project workspace' });
+  }
+});
+
+projectsRouter.get('/:id/export/excel', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const exportData = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const row = await tx.project.findFirst({
+        where: { id: req.params.id, companyId },
+        include: {
+          owner: { select: { name: true } },
+          approver: { select: { name: true } },
+        },
+      });
+      if (!row) return null;
+
+      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups] = await Promise.all([
+        projectBudgetSummary(companyId, row.id, tx),
+        tx.documentIntake.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { createdAt: 'desc' },
+          take: 1000,
+          select: {
+            id: true,
+            source: true,
+            fileName: true,
+            mimeType: true,
+            fileSize: true,
+            status: true,
+            ocrResult: true,
+            warnings: true,
+            error: true,
+            createdAt: true,
+          },
+        }),
+        tx.purchaseInvoice.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { invoiceDate: 'desc' },
+          take: 1000,
+          select: {
+            supplierName: true,
+            supplierTaxId: true,
+            invoiceNumber: true,
+            invoiceDate: true,
+            vatType: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            isPaid: true,
+          },
+        }),
+        tx.invoice.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { invoiceDate: 'desc' },
+          take: 1000,
+          select: {
+            invoiceNumber: true,
+            type: true,
+            status: true,
+            invoiceDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            isPaid: true,
+            buyer: { select: { nameTh: true, nameEn: true } },
+          },
+        }),
+        tx.expenseVoucher.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: { voucherDate: 'desc' },
+          take: 1000,
+          select: {
+            voucherNumber: true,
+            status: true,
+            voucherDate: true,
+            description: true,
+            totalAmount: true,
+          },
+        }),
+        tx.lineGroupLink.findMany({
+          where: { companyId, projectId: row.id, isActive: true },
+          orderBy: { linkedAt: 'desc' },
+          select: { groupName: true, linkedAt: true },
+        }),
+      ]);
+
+      const purchaseTotal = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.total), 0);
+      const purchaseVat = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.vatAmount), 0);
+      const revenueTotal = invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
+      const expenseTotal = expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
+      const actionNeeded = documentIntakes
+        .map(actionNeededForIntake)
+        .filter((item): item is NonNullable<ReturnType<typeof actionNeededForIntake>> => item !== null);
+
+      return {
+        project: row,
+        summary,
+        workspaceSummary: {
+          PurchaseTotal: purchaseTotal,
+          PurchaseVAT: purchaseVat,
+          RevenueTotal: revenueTotal,
+          ExpenseTotal: expenseTotal,
+          EstimatedMargin: revenueTotal - purchaseTotal - expenseTotal,
+          ActionNeededCount: actionNeeded.length,
+          FilesCount: documentIntakes.length,
+          LINEGroupCount: lineGroups.length,
+          CommittedAmount: summary.committedAmount,
+          PaidAmount: summary.paidAmount,
+          RemainingBudget: asNumber(row.budgetAmount) - summary.committedAmount,
+        },
+        actionNeeded,
+        documentIntakes,
+        purchaseInvoices,
+        invoices,
+        expenseVouchers,
+        lineGroups,
+      };
+    });
+
+    if (!exportData) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const buffer = await generateProjectExportExcel({
+      project: {
+        code: exportData.project.code,
+        name: exportData.project.name,
+        customerName: exportData.project.customerName,
+        budgetAmount: asNumber(exportData.project.budgetAmount),
+        status: exportData.project.status,
+        ownerName: exportData.project.owner?.name ?? null,
+        approverName: exportData.project.approver?.name ?? null,
+      },
+      summary: exportData.workspaceSummary,
+      actionNeeded: exportData.actionNeeded,
+      files: exportData.documentIntakes.map((item) => ({
+        fileName: item.fileName ?? item.id,
+        source: item.source,
+        kind: documentKind(item),
+        status: item.status,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        createdAt: item.createdAt,
+      })),
+      purchases: exportData.purchaseInvoices.map((item) => ({
+        supplierName: item.supplierName,
+        supplierTaxId: item.supplierTaxId,
+        invoiceNumber: item.invoiceNumber,
+        invoiceDate: item.invoiceDate,
+        vatType: item.vatType,
+        subtotal: asNumber(item.subtotal),
+        vatAmount: asNumber(item.vatAmount),
+        total: asNumber(item.total),
+        isPaid: item.isPaid,
+      })),
+      sales: exportData.invoices.map((item) => ({
+        invoiceNumber: item.invoiceNumber,
+        buyerName: item.buyer.nameTh || item.buyer.nameEn || '',
+        type: item.type,
+        status: item.status,
+        invoiceDate: item.invoiceDate,
+        subtotal: asNumber(item.subtotal),
+        vatAmount: asNumber(item.vatAmount),
+        total: asNumber(item.total),
+        isPaid: item.isPaid,
+      })),
+      expenses: exportData.expenseVouchers.map((item) => ({
+        voucherNumber: item.voucherNumber,
+        status: item.status,
+        voucherDate: item.voucherDate,
+        description: item.description ?? '',
+        totalAmount: asNumber(item.totalAmount),
+      })),
+      lineGroups: exportData.lineGroups.map((item) => ({
+        groupName: item.groupName ?? 'LINE Group',
+        linkedAt: item.linkedAt,
+      })),
+    });
+
+    const safeCode = exportData.project.code.replace(/[^A-Z0-9-_]/gi, '_');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="project-${safeCode}-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.send(buffer);
+  } catch (err) {
+    logger.error('Failed to export project', { error: err, projectId: req.params.id });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to export project' });
   }
 });
 

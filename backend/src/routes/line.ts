@@ -1038,6 +1038,48 @@ lineRouter.post('/admin/groups/link-start', authenticate, requireRole('admin', '
   }
 });
 
+lineRouter.patch('/admin/groups/:groupId/project', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const body = z.object({ projectId: z.string().min(1).nullable() }).parse(req.body);
+    const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const existing = await tx.lineGroupLink.findFirst({
+        where: { id: req.params.groupId, companyId: req.user!.companyId },
+        select: { id: true },
+      });
+      if (!existing) return null;
+      if (body.projectId) {
+        const project = await tx.project.findFirst({
+          where: { id: body.projectId, companyId: req.user!.companyId },
+          select: { id: true },
+        });
+        if (!project) throw new Error('Project not found');
+      }
+      return tx.lineGroupLink.update({
+        where: { id: existing.id },
+        data: { projectId: body.projectId },
+        select: {
+          id: true,
+          projectId: true,
+          project: { select: { id: true, code: true, name: true, status: true } },
+        },
+      });
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: 'Line group not found in this company' });
+      return;
+    }
+    res.json({ data: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('[Line] PATCH /admin/groups/:groupId/project failed', { err, groupId: req.params.groupId });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to update Line group project' });
+  }
+});
+
 lineRouter.delete('/admin/groups/:groupId', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
     const deleted = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
@@ -1125,8 +1167,14 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       select: {
         id: true,
         source: true,
+        fileName: true,
         mimeType: true,
         status: true,
+        projectId: true,
+        project: { select: { id: true, code: true, name: true } },
+        targetType: true,
+        targetId: true,
+        purchaseInvoiceId: true,
         error: true,
         createdAt: true,
         updatedAt: true,

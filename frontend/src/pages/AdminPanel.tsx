@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight, ScrollText, Zap, MessageCircle, Link2, Unlink2, Copy, Check, Bell, Settings } from 'lucide-react';
+import { Users, FileText, Building, Key, Server, CreditCard, Upload, CheckCircle, XCircle, Loader2, AlertTriangle, Save, Sparkles, FlaskConical, Lock, ArrowRight, ScrollText, Zap, MessageCircle, Link2, Unlink2, Copy, Check, Bell, Settings, BriefcaseBusiness } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -1653,11 +1653,14 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   type LineManagedGroup = {
     id: string;
     groupName?: string | null;
+    projectId?: string | null;
+    project?: { id: string; code: string; name: string; status: string } | null;
     isActive: boolean;
     linkedAt?: string | null;
     lineGroupIdMasked?: string | null;
     linkedBy?: { id: string; name: string; email: string } | null;
   };
+  type ProjectOption = { id: string; code: string; name: string; status: string };
   const [lineStatus, setLineStatus] = useState<{
     linked: boolean;
     displayName?: string;
@@ -1683,7 +1686,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     };
     redis?: { ok: boolean; error?: string };
     documentIntakesSchema?: { ok: boolean; missingColumns: string[]; error?: string };
-    recentDocumentIntakes?: { ok: boolean; items: Array<{ id: string; status: string; mimeType: string; error?: string | null; createdAt: string; updatedAt: string }> };
+    recentDocumentIntakes?: { ok: boolean; items: Array<{ id: string; source: string; fileName?: string | null; status: string; mimeType: string; projectId?: string | null; project?: { id: string; code: string; name: string } | null; targetType?: string | null; targetId?: string | null; purchaseInvoiceId?: string | null; error?: string | null; createdAt: string; updatedAt: string }> };
     linkedUsers?: { ok: boolean; count: number };
     linkedGroups?: { ok: boolean; count: number };
     documentOps?: {
@@ -1700,6 +1703,8 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   const [managedGroups, setManagedGroups] = useState<LineManagedGroup[]>([]);
   const [managedGroupsLoading, setManagedGroupsLoading] = useState(false);
   const [groupOtp, setGroupOtp] = useState<null | { otp: string }>(null);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [groupProjectSavingId, setGroupProjectSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!policy?.canUseLineOa) { setLoading(false); return; }
@@ -1743,10 +1748,21 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     }
   }
 
+  async function loadProjects() {
+    try {
+      const res = await fetch('/api/projects?status=all', { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json() as { data?: ProjectOption[] };
+      setProjects(json.data ?? []);
+    } catch {
+      setProjects([]);
+    }
+  }
+
   useEffect(() => {
     if (!policy?.canUseLineOa) return;
     void loadManagedUsers();
     void loadManagedGroups();
+    void loadProjects();
   }, [token, policy?.canUseLineOa]);
 
   useEffect(() => {
@@ -1841,6 +1857,26 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       setMsg({ type: 'ok', text: isThai ? 'ถอดการเชื่อมต่อกลุ่ม LINE แล้ว' : 'LINE group unlinked.' });
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
+    }
+  }
+
+  async function handleGroupProjectChange(group: LineManagedGroup, projectId: string) {
+    setMsg(null);
+    setGroupProjectSavingId(group.id);
+    try {
+      const res = await fetch(`/api/line/admin/groups/${group.id}/project`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ projectId: projectId || null }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Failed');
+      await loadManagedGroups();
+      setMsg({ type: 'ok', text: isThai ? 'อัปเดตโปรเจคของกลุ่ม LINE แล้ว' : 'LINE group project updated.' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setGroupProjectSavingId(null);
     }
   }
 
@@ -2112,9 +2148,10 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         )}
 
         <div className="overflow-hidden rounded-xl border border-gray-100">
-          <div className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 md:grid-cols-[1.4fr_.8fr_.9fr_.8fr]">
+          <div className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 md:grid-cols-[1.25fr_.7fr_1.15fr_.8fr_.7fr]">
             <span>{isThai ? 'กลุ่ม' : 'Group'}</span>
             <span>{isThai ? 'สถานะ' : 'Status'}</span>
+            <span className="hidden md:block">{isThai ? 'โปรเจค' : 'Project'}</span>
             <span>{isThai ? 'ผู้เชื่อม' : 'Linked by'}</span>
             <span className="hidden md:block">{isThai ? 'จัดการ' : 'Action'}</span>
           </div>
@@ -2125,7 +2162,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
               </div>
             )}
             {managedGroups.map((group) => (
-              <div key={group.id} className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 px-3 py-3 text-sm md:grid-cols-[1.4fr_.8fr_.9fr_.8fr] md:items-center">
+              <div key={group.id} className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 px-3 py-3 text-sm md:grid-cols-[1.25fr_.7fr_1.15fr_.8fr_.7fr] md:items-center">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-gray-900">{group.groupName ?? (isThai ? 'LINE Group' : 'LINE Group')}</p>
                   {group.lineGroupIdMasked && <p className="mt-1 truncate text-[11px] text-gray-400">{group.lineGroupIdMasked}</p>}
@@ -2134,6 +2171,25 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                   {group.isActive ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                   {group.isActive ? (isThai ? 'เชื่อมแล้ว' : 'Linked') : (isThai ? 'ปิดอยู่' : 'Inactive')}
                 </span>
+                <div className="col-span-3 md:col-span-1">
+                  <select
+                    value={group.projectId ?? ''}
+                    onChange={(event) => void handleGroupProjectChange(group, event.target.value)}
+                    disabled={groupProjectSavingId === group.id}
+                    className="input-field w-full text-xs"
+                  >
+                    <option value="">{isThai ? 'ไม่ผูกโปรเจค' : 'No project'}</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+                    ))}
+                  </select>
+                  {group.project && (
+                    <Link to={`/app/projects/${group.project.id}`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary-700 hover:underline">
+                      <BriefcaseBusiness className="h-3 w-3" />
+                      {group.project.code}
+                    </Link>
+                  )}
+                </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs text-gray-600">{group.linkedBy?.name ?? '-'}</p>
                   {group.linkedAt && <p className="truncate text-[11px] text-gray-400">{new Date(group.linkedAt).toLocaleString()}</p>}
@@ -2297,8 +2353,12 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                 <div className="divide-y divide-gray-100">
                   {liveStatus.recentDocumentIntakes.items.slice(0, 5).map((item) => (
                     <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                      <span className="text-gray-600">{item.mimeType}</span>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-700">{item.fileName || item.mimeType}</p>
+                        <p className="truncate text-gray-400">{item.source} · {item.mimeType}</p>
+                      </div>
                       <span className="font-medium text-gray-900">{item.status}</span>
+                      <span className="text-gray-500">{item.project ? `${item.project.code}` : (isThai ? 'ไม่มีโปรเจค' : 'No project')}</span>
                       <span className="text-gray-400">{new Date(item.createdAt).toLocaleTimeString()}</span>
                     </div>
                   ))}
