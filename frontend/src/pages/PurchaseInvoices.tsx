@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, AlertTriangle, FileCheck2,
@@ -174,6 +174,7 @@ function DocumentThumbnail({ docId, mimeType, fileUrl, token, isPdf }: DocumentT
 export default function PurchaseInvoices() {
   const { isThai, formatCurrency, formatDate } = useLanguage();
   const { token } = useAuthStore();
+  const [searchParams] = useSearchParams();
   const { policy } = useCompanyAccessPolicy();
 
   const [items, setItems] = useState<PurchaseInvoice[]>([]);
@@ -182,7 +183,8 @@ export default function PurchaseInvoices() {
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [uploadProjectId, setUploadProjectId] = useState('');
+  const [uploadProjectId, setUploadProjectId] = useState(searchParams.get('projectId') ?? '');
+  const [projectFilter, setProjectFilter] = useState(searchParams.get('projectId') ?? '');
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null);
   const [documentTypeFilter, setDocumentTypeFilter] = useState<'all' | 'pdf' | 'image'>('all');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<DocumentStatusFilter>('action');
@@ -224,6 +226,7 @@ export default function PurchaseInvoices() {
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       if (search) params.set('search', search);
+      if (projectFilter) params.set('projectId', projectFilter);
       const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes, storageRes, projectsRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -279,7 +282,7 @@ export default function PurchaseInvoices() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, search, vatTypeFilter, documentTypeFilter, token]);
+  }, [from, to, search, projectFilter, vatTypeFilter, documentTypeFilter, token]);
 
   useEffect(() => {
     const t = setTimeout(fetchItems, 300);
@@ -1240,6 +1243,17 @@ export default function PurchaseInvoices() {
               <option value="vatZero">VAT 0%</option>
             </select>
           </div>
+          {projects.length > 0 && (
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-500 mb-1">{isThai ? 'โปรเจค' : 'Project'}</label>
+              <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="input-field w-auto">
+                <option value="">{isThai ? 'ทุกโปรเจค' : 'All projects'}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

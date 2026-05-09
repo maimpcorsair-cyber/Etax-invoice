@@ -369,6 +369,20 @@ export default function ProjectDetail() {
             <RefreshCw className="h-4 w-4" />
             {isThai ? 'รีเฟรช' : 'Refresh'}
           </button>
+          <Link
+            to={`/app/invoices/new?projectId=${project.id}`}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Send className="h-4 w-4" />
+            {isThai ? 'ออกใบขาย' : 'New sales invoice'}
+          </Link>
+          <Link
+            to={`/app/expenses?projectId=${project.id}`}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Inbox className="h-4 w-4" />
+            {isThai ? 'ทำใบเบิก' : 'New voucher'}
+          </Link>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {isThai ? 'อัปโหลดเข้าโปรเจค' : 'Upload to project'}
@@ -498,7 +512,7 @@ export default function ProjectDetail() {
               subtitle: `${item.invoiceNumber} · ${formatDate(item.invoiceDate)}`,
               amount: formatCurrency(item.total),
               meta: item.isPaid ? (isThai ? 'จ่ายแล้ว' : 'Paid') : (isThai ? 'ยังไม่จ่าย' : 'Unpaid'),
-              href: '/app/purchase-invoices',
+              href: `/app/purchase-invoices?projectId=${project.id}`,
             }))}
           />
         </WorkspacePanel>
@@ -530,7 +544,7 @@ export default function ProjectDetail() {
               subtitle: `${item.description || (isThai ? 'ไม่มีรายละเอียด' : 'No description')} · ${formatDate(item.voucherDate)}`,
               amount: formatCurrency(item.totalAmount),
               meta: item.status,
-              href: '/app/expenses',
+              href: `/app/expenses?projectId=${project.id}`,
             }))}
           />
         </WorkspacePanel>

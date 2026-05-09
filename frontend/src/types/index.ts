@@ -172,6 +172,8 @@ export type RDSubmissionStatus = 'pending' | 'in_progress' | 'success' | 'failed
 export interface Invoice {
   id: string;
   companyId: string;
+  projectId?: string | null;
+  project?: { id: string; code: string; name: string } | null;
   invoiceNumber: string;
   type: InvoiceType;
   status: InvoiceStatus;
@@ -373,6 +375,8 @@ export interface ApprovalLog {
 
 export interface ExpenseVoucher {
   id: string;
+  projectId?: string | null;
+  project?: { id: string; code: string; name: string } | null;
   voucherNumber: string;
   status: ExpenseVoucherStatus;
   voucherDate: string;

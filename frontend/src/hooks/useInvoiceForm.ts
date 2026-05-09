@@ -247,7 +247,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     return true;
   };
 
-  const buildPayload = (customerId: string, asDraft: boolean) => ({
+  const buildPayload = (customerId: string, asDraft: boolean, projectId?: string | null) => ({
+    projectId: projectId || null,
     type: docType,
     language: docLanguage,
     invoiceDate,
@@ -286,7 +287,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     return true;
   };
 
-  const handleSaveDraft = async (customerId: string, invoiceId?: string) => {
+  const handleSaveDraft = async (customerId: string, invoiceId?: string, projectId?: string | null) => {
     setSubmitMessage(null);
     setSubmitMessageType(null);
     if (!validate(customerId)) return;
@@ -295,7 +296,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       const res = await fetch(invoiceId ? `/api/invoices/${invoiceId}` : '/api/invoices', {
         method: invoiceId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(buildPayload(customerId, true)),
+        body: JSON.stringify(buildPayload(customerId, true, projectId)),
       });
       if (!res.ok) { await handleApiError(res); return; }
       setSubmitMessage(isThai ? 'บันทึกร่างเรียบร้อย สามารถแก้ไขและออกเอกสารได้ในภายหลัง' : 'Draft saved. You can edit and issue the document later.');
@@ -309,7 +310,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     }
   };
 
-  const handleIssue = async (customerId: string, invoiceId?: string, onIssued?: (id: string) => void) => {
+  const handleIssue = async (customerId: string, invoiceId?: string, onIssued?: (id: string) => void, projectId?: string | null) => {
     setSubmitMessage(null);
     setSubmitMessageType(null);
     if (!validate(customerId)) return;
@@ -329,7 +330,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
         const res = await fetch('/api/invoices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(buildPayload(customerId, false)),
+          body: JSON.stringify(buildPayload(customerId, false, projectId)),
         });
         if (!res.ok) { await handleApiError(res); return; }
         const json = (await res.json()) as { data: { id: string } };
@@ -350,8 +351,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     }
   };
 
-  const handleSave = async (_asDraft: boolean, customerId: string, invoiceId?: string) => {
-    return handleIssue(customerId, invoiceId);
+  const handleSave = async (_asDraft: boolean, customerId: string, invoiceId?: string, projectId?: string | null) => {
+    return handleIssue(customerId, invoiceId, undefined, projectId);
   };
 
   return {

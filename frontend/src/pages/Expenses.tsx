@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, Wallet,
   AlertTriangle, Send, ThumbsUp, ThumbsDown,
   Link as LinkIcon, Image as ImageIcon, FileText, PlusCircle, MinusCircle,
   Eye, CheckCircle2, XCircle, Clock, ArrowRight,
   Upload, Sheet, HardDrive,
+  BriefcaseBusiness,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
@@ -41,6 +43,13 @@ interface ItemForm {
   attachments: AttachmentForm[];
 }
 
+interface ProjectOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
 const todayIso = () => new Date().toISOString().split('T')[0];
 
 function startOfMonthIso() {
@@ -66,6 +75,7 @@ export default function Expenses() {
   const { t } = useTranslation();
   const { isThai, formatCurrency, formatDate } = useLanguage();
   const { token, user } = useAuthStore();
+  const [searchParams] = useSearchParams();
   const { policy } = useCompanyAccessPolicy();
   const { status: driveStatus, connecting: driveConnecting, connect: connectDrive, disconnect: disconnectDrive } = useDriveStatus();
 
@@ -75,6 +85,8 @@ export default function Expenses() {
   const [from, setFrom] = useState(startOfMonthIso());
   const [to, setTo] = useState(todayIso());
   const [statusFilter, setStatusFilter] = useState<ExpenseVoucherStatus | 'all'>('all');
+  const [projectFilter, setProjectFilter] = useState(searchParams.get('projectId') ?? '');
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [expenseLimit, setExpenseLimit] = useState<number | null>(null);
   const [pettyCash, setPettyCash] = useState<PettyCash | null>(null);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
@@ -83,6 +95,7 @@ export default function Expenses() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ExpenseVoucher | null>(null);
   const [voucherDate, setVoucherDate] = useState(todayIso());
+  const [voucherProjectId, setVoucherProjectId] = useState(searchParams.get('projectId') ?? '');
   const [voucherDesc, setVoucherDesc] = useState('');
   const [voucherNotes, setVoucherNotes] = useState('');
   const [items, setItems] = useState<ItemForm[]>([emptyItem()]);
@@ -110,24 +123,28 @@ export default function Expenses() {
       if (to) params.set('dateTo', to);
       if (search) params.set('search', search);
       if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (projectFilter) params.set('projectId', projectFilter);
 
-      const [vRes, sRes, pcRes] = await Promise.all([
+      const [vRes, sRes, pcRes, projectsRes] = await Promise.all([
         fetch(`/api/expenses?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/expenses/settings', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/expenses/petty-cash', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/projects?status=all', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const vJson = await vRes.json();
       const sJson = await sRes.json();
       const pcJson = await pcRes.json();
+      const projectsJson = await projectsRes.json().catch(() => ({ data: [] }));
       setVouchers(vJson.data ?? []);
       setExpenseLimit(sJson.data?.expenseLimit ?? null);
       setPettyCash(pcJson.data ?? null);
+      setProjects(projectsJson.data ?? []);
     } catch {
       setVouchers([]);
     } finally {
       setLoading(false);
     }
-  }, [from, to, search, statusFilter, token]);
+  }, [from, to, search, statusFilter, projectFilter, token]);
 
   useEffect(() => {
     const timer = setTimeout(fetchVouchers, 300);
@@ -153,6 +170,7 @@ export default function Expenses() {
     }
     setEditing(null);
     setVoucherDate(todayIso());
+    setVoucherProjectId(projectFilter);
     setVoucherDesc('');
     setVoucherNotes('');
     setItems([emptyItem()]);
@@ -171,6 +189,7 @@ export default function Expenses() {
       const full = json.data as ExpenseVoucher;
       setEditing(full);
       setVoucherDate(full.voucherDate.split('T')[0]);
+      setVoucherProjectId(full.projectId ?? '');
       setVoucherDesc(full.description ?? '');
       setVoucherNotes(full.notes ?? '');
       setItems(
@@ -272,6 +291,7 @@ export default function Expenses() {
     setError('');
     try {
       const payload = {
+        projectId: voucherProjectId || null,
         voucherDate,
         description: voucherDesc.trim() || undefined,
         notes: voucherNotes.trim() || undefined,
@@ -410,7 +430,7 @@ export default function Expenses() {
       const res = await fetch('/api/expenses/export/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ dateFrom: from, dateTo: to, status: statusFilter !== 'all' ? statusFilter : undefined }),
+        body: JSON.stringify({ dateFrom: from, dateTo: to, status: statusFilter !== 'all' ? statusFilter : undefined, projectId: projectFilter || undefined }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Export failed');
@@ -590,6 +610,17 @@ export default function Expenses() {
               <option value="rejected">{t('expenses.status.rejected')}</option>
             </select>
           </div>
+          {projects.length > 0 && (
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-500 mb-1">{isThai ? 'โปรเจค' : 'Project'}</label>
+              <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="input-field w-auto">
+                <option value="">{isThai ? 'ทุกโปรเจค' : 'All projects'}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -625,6 +656,12 @@ export default function Expenses() {
               </div>
               {v.rejectionNote && (
                 <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{v.rejectionNote}</p>
+              )}
+              {v.project && (
+                <p className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                  <BriefcaseBusiness className="h-3 w-3" />
+                  {v.project.code} · {v.project.name}
+                </p>
               )}
               <div className="flex items-center gap-2 pt-1 flex-wrap">
                 <button onClick={() => openDetail(v)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100">
@@ -668,6 +705,7 @@ export default function Expenses() {
                 <th className="table-header">{t('expenses.voucherNumber')}</th>
                 <th className="table-header">{t('expenses.voucherDate')}</th>
                 <th className="table-header">{t('expenses.description')}</th>
+                <th className="table-header hidden lg:table-cell">{isThai ? 'โปรเจค' : 'Project'}</th>
                 <th className="table-header text-center">{t('expenses.expenseItem')}</th>
                 <th className="table-header text-right">{t('expenses.total')}</th>
                 <th className="table-header">{t('common.status')}</th>
@@ -676,9 +714,9 @@ export default function Expenses() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-500" /></td></tr>
+                <tr><td colSpan={8} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-500" /></td></tr>
               ) : vouchers.length === 0 ? (
-                <tr><td colSpan={7} className="py-12">
+                <tr><td colSpan={8} className="py-12">
                   <EmptyState
                     title={t('expenses.noItems')}
                     description={isThai ? 'สร้าง voucher แรกเพื่อเริ่ม workflow ส่งอนุมัติและแนบหลักฐานค่าใช้จ่าย' : 'Create the first voucher to start approval and evidence tracking.'}
@@ -691,6 +729,16 @@ export default function Expenses() {
                     <td className="table-cell font-mono text-xs font-medium">{v.voucherNumber}</td>
                     <td className="table-cell text-gray-600 whitespace-nowrap">{formatDate(v.voucherDate)}</td>
                     <td className="table-cell text-gray-500 text-sm max-w-[200px] truncate">{v.description ?? '—'}</td>
+                    <td className="table-cell hidden lg:table-cell">
+                      {v.project ? (
+                        <a href={`/app/projects/${v.project.id}`} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200">
+                          <BriefcaseBusiness className="h-3 w-3" />
+                          {v.project.code}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="table-cell text-center">{v.itemCount ?? 0}</td>
                     <td className="table-cell text-right font-semibold">{formatCurrency(v.totalAmount)}</td>
                     <td className="table-cell">
@@ -736,7 +784,7 @@ export default function Expenses() {
             {!loading && vouchers.length > 0 && (
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                 <tr>
-                  <td colSpan={4} className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{t('expenses.total')}</td>
+                  <td colSpan={5} className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{t('expenses.total')}</td>
                   <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">{formatCurrency(totalAmount)}</td>
                   <td colSpan={2} />
                 </tr>
@@ -767,6 +815,17 @@ export default function Expenses() {
                   <label className="label">{t('expenses.voucherDate')} *</label>
                   <input type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} className="input-field" />
                 </div>
+                {projects.length > 0 && (
+                  <div>
+                    <label className="label">{isThai ? 'โปรเจค / งาน' : 'Project / job'}</label>
+                    <select value={voucherProjectId} onChange={(e) => setVoucherProjectId(e.target.value)} className="input-field">
+                      <option value="">{isThai ? 'ไม่ผูกโปรเจค' : 'No project'}</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="label">{t('expenses.description')}</label>
                   <input value={voucherDesc} onChange={(e) => setVoucherDesc(e.target.value)} className="input-field" />

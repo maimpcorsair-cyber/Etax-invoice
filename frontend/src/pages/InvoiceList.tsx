@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
   ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle,
+  BriefcaseBusiness,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -38,10 +39,18 @@ const PAYMENT_METHODS: Record<string, string> = {
   other: 'อื่นๆ',
 };
 
+interface ProjectOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
 export default function InvoiceList() {
   const { t } = useTranslation();
   const { isThai, formatCurrency, formatDate } = useLanguage();
   const { token, user } = useAuthStore();
+  const [searchParams] = useSearchParams();
   const { policy } = useCompanyAccessPolicy();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -49,6 +58,8 @@ export default function InvoiceList() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<InvoiceType | 'all'>('all');
+  const [projectFilter, setProjectFilter] = useState(searchParams.get('projectId') ?? '');
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 1 });
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState<'excel' | 'sheets' | null>(null);
@@ -82,6 +93,7 @@ export default function InvoiceList() {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (search) params.set('search', search);
       if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (projectFilter) params.set('projectId', projectFilter);
 
       const res = await fetch(`/api/invoices?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -103,12 +115,20 @@ export default function InvoiceList() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, typeFilter, token]);
+  }, [search, statusFilter, typeFilter, projectFilter, token]);
 
   useEffect(() => {
     const t = setTimeout(() => fetchInvoices(1), 300);
     return () => clearTimeout(t);
   }, [fetchInvoices]);
+
+  useEffect(() => {
+    if (!token) return;
+    void fetch('/api/projects?status=all', { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.ok ? res.json() : { data: [] })
+      .then((json) => setProjects(json.data ?? []))
+      .catch(() => setProjects([]));
+  }, [token]);
 
   /* ── Export ── */
   async function handleExcelExport() {
@@ -121,6 +141,7 @@ export default function InvoiceList() {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (projectFilter) params.set('projectId', projectFilter);
       const res = await fetch(`/api/invoices/export/excel?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error();
       const blob = await res.blob();
@@ -142,7 +163,7 @@ export default function InvoiceList() {
       const res = await fetch('/api/invoices/export/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ search, status: statusFilter !== 'all' ? statusFilter : undefined }),
+        body: JSON.stringify({ search, status: statusFilter !== 'all' ? statusFilter : undefined, projectId: projectFilter || undefined }),
       });
       if (!res.ok) throw new Error();
       const { url } = await res.json() as { url: string };
@@ -383,6 +404,14 @@ export default function InvoiceList() {
               <option key={s} value={s}>{t(`invoice.status.${s}`)}</option>
             ))}
           </select>
+          {projects.length > 0 && (
+            <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="input-field w-auto">
+              <option value="">{isThai ? 'ทุกโปรเจค' : 'All projects'}</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+              ))}
+            </select>
+          )}
           <div className="relative" ref={exportRef}>
             <button onClick={() => setExportOpen(!exportOpen)} className="btn-secondary gap-2" disabled={exporting !== null || !policy?.canExportExcel}>
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -460,6 +489,12 @@ export default function InvoiceList() {
                   <span className="text-gray-400 text-xs">{formatDate(inv.invoiceDate)}</span>
                   <span className="font-bold text-primary-700 text-sm">{formatCurrency(inv.total)}</span>
                 </div>
+                {inv.project && (
+                  <p className="mb-2 inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                    <BriefcaseBusiness className="h-3 w-3" />
+                    {inv.project.code} · {inv.project.name}
+                  </p>
+                )}
 
                 {/* Row 4: actions */}
                 <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
@@ -532,6 +567,7 @@ export default function InvoiceList() {
                 <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ประเภท' : 'Type'}</th>
                 <th className="table-header" scope="col">{t('customer.title')}</th>
                 <th className="table-header hidden sm:table-cell" scope="col">{t('invoice.date')}</th>
+                <th className="table-header hidden lg:table-cell" scope="col">{isThai ? 'โปรเจค' : 'Project'}</th>
                 <th className="table-header text-right" scope="col">{t('common.amount')}</th>
                 <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ชำระแล้ว' : 'Payment'}</th>
                 <th className="table-header" scope="col">{t('common.status')}</th>
@@ -541,11 +577,11 @@ export default function InvoiceList() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={9} className="text-center py-12">
+                <tr><td colSpan={10} className="text-center py-12">
                   <Loader2 className="w-8 h-8 mx-auto animate-spin text-gray-300" />
                 </td></tr>
               ) : invoices.length === 0 ? (
-                <tr><td colSpan={9} className="py-12">
+                <tr><td colSpan={10} className="py-12">
                   <EmptyState
                     title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
                     description={isThai ? 'สร้างเอกสารแรกเพื่อเริ่ม tracking การชำระเงินและการส่ง RD' : 'Create the first document to start tracking payment and RD submissions.'}
@@ -575,6 +611,16 @@ export default function InvoiceList() {
                           : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ?? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'}
                       </td>
                       <td className="table-cell text-gray-500 hidden sm:table-cell">{formatDate(inv.invoiceDate)}</td>
+                      <td className="table-cell hidden lg:table-cell">
+                        {inv.project ? (
+                          <Link to={`/app/projects/${inv.project.id}`} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200">
+                            <BriefcaseBusiness className="h-3 w-3" />
+                            {inv.project.code}
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
                       <td className="table-cell text-right font-semibold">{formatCurrency(inv.total)}</td>
                       <td className="table-cell hidden sm:table-cell">
                         {inv.isPaid ? (

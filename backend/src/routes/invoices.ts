@@ -36,6 +36,7 @@ const itemSchema = z.object({
 });
 
 const createInvoiceSchema = z.object({
+  projectId: z.string().min(1).nullable().optional(),
   type: z.enum(['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note']),
   language: z.enum(['th', 'en', 'both']),
   invoiceDate: z.string(),
@@ -114,6 +115,12 @@ async function queueRdSubmission(invoiceId: string) {
   });
 }
 
+async function assertProjectBelongsToCompany(companyId: string, projectId: string | null | undefined) {
+  if (!projectId) return;
+  const project = await prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
+  if (!project) throw new Error('Project not found');
+}
+
 async function enqueueInvoicePdf(invoiceId: string, language: string) {
   try {
     // Timeout after 5 s — if Redis is unreachable we must not block the HTTP response
@@ -154,9 +161,10 @@ invoicesRouter.get('/export/excel', async (req, res) => {
       return;
     }
 
-    const { status, search } = req.query;
+    const { status, search, projectId } = req.query;
     const where: Record<string, unknown> = { companyId: req.user!.companyId };
     if (status) where.status = status;
+    if (typeof projectId === 'string' && projectId) where.projectId = projectId;
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search as string, mode: 'insensitive' } },
@@ -209,9 +217,10 @@ invoicesRouter.post('/export/sheets', async (req, res) => {
       return;
     }
 
-    const { status, search } = req.body as { status?: string; search?: string };
+    const { status, search, projectId } = req.body as { status?: string; search?: string; projectId?: string };
     const where: Record<string, unknown> = { companyId: req.user!.companyId };
     if (status) where.status = status;
+    if (projectId) where.projectId = projectId;
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
@@ -256,13 +265,14 @@ invoicesRouter.post('/export/sheets', async (req, res) => {
 
 invoicesRouter.get('/', async (req, res) => {
   try {
-    const { page = '1', limit = '20', status, search } = req.query;
+    const { page = '1', limit = '20', status, search, projectId } = req.query;
     const pageNumber = parseInt(page as string);
     const limitNumber = parseInt(limit as string);
     const skip = (pageNumber - 1) * limitNumber;
 
     const where: Record<string, unknown> = { companyId: req.user!.companyId };
     if (status) where.status = status;
+    if (typeof projectId === 'string' && projectId) where.projectId = projectId;
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search as string, mode: 'insensitive' } },
@@ -273,7 +283,17 @@ invoicesRouter.get('/', async (req, res) => {
 
     const { invoices, total } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       const [items, count] = await Promise.all([
-        tx.invoice.findMany({ where, skip, take: limitNumber, orderBy: { createdAt: 'desc' }, include: { buyer: { select: { nameTh: true, nameEn: true, taxId: true } }, items: true } }),
+        tx.invoice.findMany({
+          where,
+          skip,
+          take: limitNumber,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            buyer: { select: { nameTh: true, nameEn: true, taxId: true } },
+            project: { select: { id: true, code: true, name: true } },
+            items: true,
+          },
+        }),
         tx.invoice.count({ where }),
       ]);
       return { invoices: items, total: count };
@@ -330,6 +350,7 @@ invoicesRouter.post('/', async (req, res) => {
     }
 
     const body = createInvoiceSchema.parse(req.body);
+    await assertProjectBelongsToCompany(req.user!.companyId, body.projectId);
     const { calculated, subtotal, totalVat, total } = calculateTotals(body.items);
 
     const [customer, company] = await Promise.all([
@@ -388,6 +409,7 @@ invoicesRouter.post('/', async (req, res) => {
         status: 'draft',
         invoiceDate: new Date(body.invoiceDate),
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        projectId: body.projectId ?? null,
         companyId: req.user!.companyId,
         buyerId: body.customerId,
         seller: sellerJson,
@@ -421,7 +443,7 @@ invoicesRouter.post('/', async (req, res) => {
           })),
         },
       },
-      include: { items: true, buyer: true },
+      include: { items: true, buyer: true, project: { select: { id: true, code: true, name: true } } },
     });
     });
 
@@ -507,7 +529,7 @@ invoicesRouter.get('/:id', async (req, res) => {
     const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.invoice.findFirst({
         where: { id: req.params.id, companyId: req.user!.companyId },
-        include: { items: true, buyer: true },
+        include: { items: true, buyer: true, project: { select: { id: true, code: true, name: true } } },
       });
     });
     if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
@@ -563,6 +585,7 @@ invoicesRouter.patch('/:id', async (req, res) => {
     }
 
     const { calculated, subtotal, totalVat, total } = calculateTotals(body.items);
+    await assertProjectBelongsToCompany(req.user!.companyId, body.projectId);
     const [customer, company] = await Promise.all([
       withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
         return tx.customer.findFirst({
@@ -602,6 +625,7 @@ invoicesRouter.patch('/:id', async (req, res) => {
           language: body.language,
           invoiceDate: new Date(body.invoiceDate),
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
+          projectId: body.projectId ?? null,
           buyerId: body.customerId,
           seller: sellerJson,
           subtotal,

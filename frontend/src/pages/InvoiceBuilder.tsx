@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Eye, Download, Maximize2 } from 'lucide-react';
+import { BriefcaseBusiness, Eye, Download, Maximize2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -95,6 +95,13 @@ const STEPPER_STEPS: { key: SectionKey; labelTh: string; labelEn: string }[] = [
   { key: 'seller',     labelTh: 'ผู้ขาย',   labelEn: 'Seller' },
 ];
 
+interface ProjectOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
 export default function InvoiceBuilder() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -116,9 +123,19 @@ export default function InvoiceBuilder() {
   const [templates, setTemplates] = useState<DocumentTemplateOption[]>([]);
   const [issuedInvoiceId, setIssuedInvoiceId] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
 
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
+
+  useEffect(() => {
+    if (!token) return;
+    void fetch('/api/projects?status=all', { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.ok ? res.json() : { data: [] })
+      .then((json) => setProjects(json.data ?? []))
+      .catch(() => setProjects([]));
+  }, [token]);
 
   // Mobile/tablet tab state
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form');
@@ -479,6 +496,7 @@ export default function InvoiceBuilder() {
         if (!res.ok || !json.data) throw new Error(json.error ?? 'Failed to load invoice');
         if (!active) return;
         form.hydrateFromInvoice(json.data);
+        setProjectId(json.data.projectId ?? '');
         customer.setSelectedCustomerId(json.data.buyer.id);
         customer.setCustomerSearch(isThai ? json.data.buyer.nameTh : (json.data.buyer.nameEn ?? json.data.buyer.nameTh));
         setIsDraft(json.data.status === 'draft' && (json.data.invoiceNumber?.startsWith('DRAFT-') ?? false));
@@ -579,6 +597,23 @@ export default function InvoiceBuilder() {
             onReferenceDocNumberChange={form.setReferenceDocNumber}
           />
         </div>
+        {projects.length > 0 && (
+          <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <BriefcaseBusiness className="h-4 w-4 text-primary-600" />
+              <h2 className="text-sm font-bold text-slate-900">{isThai ? 'โปรเจค / งาน' : 'Project / job'}</h2>
+            </div>
+            <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="input-field">
+              <option value="">{isThai ? 'ไม่ผูกโปรเจค' : 'No project'}</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-500">
+              {isThai ? 'ใบขายนี้จะไปแสดงใน Project Workspace และใช้คำนวณรายรับ/กำไรของโปรเจค' : 'This sales invoice appears in the Project Workspace and counts toward project revenue and margin.'}
+            </p>
+          </div>
+        )}
         <div ref={buyerRef} className="xl:col-span-2">
           <BuyerCard
             customers={customer.customers}
@@ -884,11 +919,11 @@ export default function InvoiceBuilder() {
           saving={form.saving}
           previewLoading={preview.previewLoading}
           validationErrors={validationErrors}
-          onSaveDraft={() => form.handleSaveDraft(customer.selectedCustomerId, id)}
+          onSaveDraft={() => form.handleSaveDraft(customer.selectedCustomerId, id, projectId)}
           onPreview={handlePreviewClick}
           onIssue={() => form.handleIssue(customer.selectedCustomerId, id, (issuedId) => {
             setIssuedInvoiceId(issuedId);
-          })}
+          }, projectId)}
         />
 
         {loadingInvoice && (

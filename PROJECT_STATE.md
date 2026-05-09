@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-09 23:52 Asia/Bangkok
+Last updated: 2026-05-10 00:22 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -34,6 +34,20 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Context Everywhere v1:
+  - Sales invoices can now store/update `projectId`
+  - Sales invoice list supports `projectId` filtering and shows project chips
+  - Invoice Builder has a project picker and honors `/app/invoices/new?projectId=...`
+  - Input VAT purchase list supports `projectId` filtering and honors `/app/purchase-invoices?projectId=...`
+  - Payment Voucher / Expenses can now store/update `projectId`
+  - Expenses list supports `projectId` filtering and shows project chips
+  - Project Workspace quick actions now open new sales invoice or expenses with the current project preselected
+- Verified locally after Project Context Everywhere v1:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added Project Workspace detail MVP:
   - backend `GET /api/projects/:id/workspace`
   - frontend route `/app/projects/:id`
@@ -184,7 +198,7 @@ Expected backend health after the latest backend fix:
 - Production DB read-only debugging is not yet set up as a safe repeatable tool.
 - Projects v1 is usable for budget/project tagging and workspace review, but next useful upgrades are:
   - project picker in LINE Admin group UI
-  - project filter across Input VAT, expenses, and invoice lists
+  - project filter across Input VAT, expenses, and invoice lists is now implemented in v1
   - approval workflow by project owner/approver
   - wire Drive uploads from project/category into the new Drive folder foundation
   - add Google Sheet/Excel export per project

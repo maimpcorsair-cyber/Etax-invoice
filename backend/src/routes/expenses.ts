@@ -39,6 +39,7 @@ const expenseItemSchema = z.object({
 });
 
 const createVoucherSchema = z.object({
+  projectId: z.string().min(1).nullable().optional(),
   voucherDate: z.string().min(1),
   description: z.string().optional(),
   notes: z.string().optional(),
@@ -55,14 +56,21 @@ const settingsSchema = z.object({
   expenseLimit: z.number().positive().nullable(),
 });
 
+async function assertProjectBelongsToCompany(companyId: string, projectId: string | null | undefined) {
+  if (!projectId) return;
+  const project = await prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
+  if (!project) throw new Error('Project not found');
+}
+
 /* ─── List ─── */
 expensesRouter.get('/', async (req, res) => {
   try {
-    const { status, dateFrom, dateTo, search } = req.query;
+    const { status, dateFrom, dateTo, search, projectId } = req.query;
     const companyId = req.user!.companyId;
 
     const where: Prisma.ExpenseVoucherWhereInput = { companyId };
     if (status && status !== 'all') where.status = status as never;
+    if (typeof projectId === 'string' && projectId) where.projectId = projectId;
     if (dateFrom || dateTo) {
       where.voucherDate = {};
       if (dateFrom) where.voucherDate.gte = new Date(dateFrom as string);
@@ -78,7 +86,10 @@ expensesRouter.get('/', async (req, res) => {
     const vouchers = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.expenseVoucher.findMany({
         where,
-        include: { items: { select: { id: true, attachments: { select: { id: true } } } } },
+        include: {
+          project: { select: { id: true, code: true, name: true } },
+          items: { select: { id: true, attachments: { select: { id: true } } } },
+        },
         orderBy: { voucherDate: 'desc' },
       });
     });
@@ -199,6 +210,7 @@ expensesRouter.get('/:id', async (req, res) => {
           approvalLogs: {
             orderBy: { timestamp: 'asc' },
           },
+          project: { select: { id: true, code: true, name: true } },
         },
       });
     });
@@ -265,6 +277,7 @@ expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), asyn
     }
 
     const body = createVoucherSchema.parse(req.body);
+    await assertProjectBelongsToCompany(req.user!.companyId, body.projectId);
     const limit = await getExpenseLimit(req.user!.companyId);
 
     if (limit !== null) {
@@ -283,6 +296,7 @@ expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), asyn
       return tx.expenseVoucher.create({
         data: {
           companyId: req.user!.companyId,
+          projectId: body.projectId ?? null,
           voucherNumber,
           voucherDate: new Date(body.voucherDate),
           description: body.description,
@@ -334,6 +348,7 @@ expensesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accountant'), 
   try {
     const body = updateVoucherSchema.parse(req.body);
     const companyId = req.user!.companyId;
+    await assertProjectBelongsToCompany(companyId, body.projectId);
 
     const existing = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.expenseVoucher.findFirst({ where: { id: req.params.id, companyId } });
@@ -359,6 +374,7 @@ expensesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accountant'), 
         where: { id: existing.id },
         data: {
           voucherDate: new Date(body.voucherDate),
+          projectId: body.projectId ?? null,
           description: body.description,
           notes: body.notes,
           totalAmount,
@@ -640,16 +656,18 @@ expensesRouter.post('/export/sheets', requireRole('admin', 'super_admin', 'accou
   }
 
   try {
-    const { dateFrom, dateTo, status } = z.object({
+    const { dateFrom, dateTo, status, projectId } = z.object({
       dateFrom: z.string().optional(),
       dateTo: z.string().optional(),
       status: z.string().optional(),
+      projectId: z.string().optional(),
     }).parse(req.body);
 
     const companyId = req.user!.companyId;
 
     const where: Prisma.ExpenseVoucherWhereInput = { companyId };
     if (status && status !== 'all') where.status = status as never;
+    if (projectId) where.projectId = projectId;
     if (dateFrom || dateTo) {
       where.voucherDate = {};
       if (dateFrom) where.voucherDate.gte = new Date(dateFrom);

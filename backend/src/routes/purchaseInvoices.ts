@@ -192,12 +192,13 @@ type ListQuery = {
 /* ─── List ─── */
 purchaseInvoicesRouter.get('/', async (req, res) => {
   try {
-    const { from, to, search, page = '1', limit = '20' } = req.query as ListQuery;
+    const { from, to, search, page = '1', limit = '20', projectId } = req.query as ListQuery & { projectId?: string };
     const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
     const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
     const skip = (pageNumber - 1) * limitNumber;
 
     const where: Prisma.PurchaseInvoiceWhereInput = { companyId: req.user!.companyId };
+    if (projectId) where.projectId = projectId;
     if (from || to) {
       where.invoiceDate = {};
       if (from) (where.invoiceDate as Prisma.DateTimeFilter).gte = new Date(from);
