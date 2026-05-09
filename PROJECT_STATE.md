@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 01:32 Asia/Bangkok
+Last updated: 2026-05-10 02:10 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -58,6 +58,17 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Smart Matching v1:
+  - project workspace now returns `smartMatches` for unmatched slips/supporting documents and likely purchase candidates
+  - Project Workspace has a Matching tab and overview matching panel
+  - candidate scoring uses amount, supplier/receiver name, and date proximity
+  - users can attach a matched document intake to a purchase invoice directly from the project workspace
+- Verified locally after Smart Matching v1:
+  - backend `npx tsc --noEmit`
+  - frontend `npx tsc --noEmit`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added Project Close-out / Phase 5 v1:
   - backend `POST /api/projects/:id/export/sheets` creates a Google Sheet with Overview, Action Needed, Files, Purchases, Sales, Expenses, and LINE Groups
   - backend `GET /api/projects/:id/export/zip` downloads a project attachment ZIP from storage-backed or DB-backed document intakes and includes `_links.txt` for link-only files

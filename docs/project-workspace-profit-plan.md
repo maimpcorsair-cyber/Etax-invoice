@@ -437,14 +437,17 @@ Already implemented:
 - Project Drive upload wiring for direct uploads and project document intake mirrors.
 - Approval workflow by project owner/approver.
 - Project tax safety summary/status chips.
+- Smart Matching v1 in Project Workspace:
+  - unmatched slips/supporting documents
+  - likely purchase candidates
+  - attach document intake to purchase invoice from the project workspace
 - LINE/OCR live-status usage telemetry and estimated OCR cost.
 
 Still needed:
 
 - Guest project portal.
-- Smarter tax safety queue and matching:
+- Smarter tax safety queue and matching beyond v1:
   - PO to purchase invoice
-  - purchase invoice to payment slip
   - slip to receiver/vendor
   - non-VAT expense to payment voucher
 - Billing automation for overage/add-on seats.

@@ -15,6 +15,7 @@ import {
   FileText,
   FolderOpen,
   Inbox,
+  Link2,
   Loader2,
   Receipt,
   RefreshCw,
@@ -30,7 +31,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
-type ProjectWorkspaceTab = 'overview' | 'action' | 'files' | 'purchases' | 'sales' | 'expenses';
+type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'files' | 'purchases' | 'sales' | 'expenses';
 type TaxSafetyStatus = 'vat_claimable' | 'expense_only_no_vat' | 'needs_tax_invoice' | 'missing_required_fields' | 'unmatched_payment' | 'supporting_only' | 'needs_review';
 
 interface ProjectUser {
@@ -72,6 +73,7 @@ interface WorkspaceSummary {
   actionNeededCount: number;
   filesCount: number;
   lineGroupCount: number;
+  smartMatchCount?: number;
   taxSafetyRiskCount?: number;
   claimableVat?: number;
   taxSafetyByStatus?: Record<string, number>;
@@ -102,6 +104,29 @@ interface DocumentIntake {
   processedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface SmartMatchCandidate {
+  id: string;
+  supplierName: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  total: number;
+  isPaid: boolean;
+  score: number;
+  reasons: string[];
+}
+
+interface SmartMatch {
+  id: string;
+  documentIntakeId: string;
+  fileName?: string | null;
+  status: string;
+  taxSafety: TaxSafety;
+  amount?: number | null;
+  supplierName?: string | null;
+  documentDate: string;
+  candidates: SmartMatchCandidate[];
 }
 
 interface PurchaseInvoice {
@@ -171,6 +196,7 @@ interface ProjectWorkspace {
   project: Project;
   workspaceSummary: WorkspaceSummary;
   actionNeeded: ActionNeeded[];
+  smartMatches?: SmartMatch[];
   documentIntakes: DocumentIntake[];
   purchaseInvoices: PurchaseInvoice[];
   invoices: SalesInvoice[];
@@ -218,6 +244,7 @@ export default function ProjectDetail() {
   const [exporting, setExporting] = useState(false);
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
+  const [matchingId, setMatchingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -254,6 +281,7 @@ export default function ProjectDetail() {
     return [
       { id: 'overview' as const, label: isThai ? 'ภาพรวม' : 'Overview', count: null },
       { id: 'action' as const, label: isThai ? 'ต้องตรวจ' : 'Action', count: summary?.actionNeededCount ?? 0 },
+      { id: 'matching' as const, label: isThai ? 'จับคู่' : 'Matching', count: summary?.smartMatchCount ?? workspace?.smartMatches?.length ?? 0 },
       { id: 'files' as const, label: isThai ? 'ไฟล์' : 'Files', count: summary?.filesCount ?? 0 },
       { id: 'purchases' as const, label: isThai ? 'ขาซื้อ' : 'Purchases', count: workspace?.purchaseInvoices.length ?? 0 },
       { id: 'sales' as const, label: isThai ? 'ขาขาย' : 'Sales', count: workspace?.invoices.length ?? 0 },
@@ -402,6 +430,27 @@ export default function ProjectDetail() {
       setError(err instanceof Error ? err.message : 'ZIP export failed');
     } finally {
       setZipDownloading(false);
+    }
+  }
+
+  async function attachPurchaseToIntake(match: SmartMatch, candidate: SmartMatchCandidate) {
+    if (!token) return;
+    setMatchingId(`${match.documentIntakeId}:${candidate.id}`);
+    setError('');
+    try {
+      const res = await fetch(`/api/purchase-invoices/document-intakes/${match.documentIntakeId}/attach-purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ purchaseInvoiceId: candidate.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Failed to match document');
+      await fetchWorkspace();
+      setActiveTab('matching');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to match document');
+    } finally {
+      setMatchingId(null);
     }
   }
 
@@ -601,6 +650,16 @@ export default function ProjectDetail() {
           <WorkspacePanel title={isThai ? 'งานที่ต้องตรวจ' : 'Needs attention'} icon={AlertTriangle}>
             <ActionList actions={workspace.actionNeeded.slice(0, 5)} isThai={isThai} />
           </WorkspacePanel>
+          <WorkspacePanel title={isThai ? 'จับคู่เอกสาร' : 'Smart matching'} icon={Link2}>
+            <SmartMatchList
+              matches={(workspace.smartMatches ?? []).slice(0, 3)}
+              isThai={isThai}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+              onAttach={attachPurchaseToIntake}
+              matchingId={matchingId}
+            />
+          </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'Tax Safety' : 'Tax safety'} icon={ShieldCheck}>
             <TaxSafetyPanel summary={workspaceSummary} isThai={isThai} formatCurrency={formatCurrency} />
           </WorkspacePanel>
@@ -627,6 +686,19 @@ export default function ProjectDetail() {
       {activeTab === 'action' && (
         <WorkspacePanel title={isThai ? 'เอกสารที่ต้องจัดการ' : 'Documents needing action'} icon={AlertTriangle}>
           <ActionList actions={workspace.actionNeeded} isThai={isThai} />
+        </WorkspacePanel>
+      )}
+
+      {activeTab === 'matching' && (
+        <WorkspacePanel title={isThai ? 'Smart Matching / จับคู่สลิปกับเอกสารซื้อ' : 'Smart matching / match slips to purchases'} icon={Link2}>
+          <SmartMatchList
+            matches={workspace.smartMatches ?? []}
+            isThai={isThai}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+            onAttach={attachPurchaseToIntake}
+            matchingId={matchingId}
+          />
         </WorkspacePanel>
       )}
 
@@ -730,6 +802,73 @@ function ActionList({ actions, isThai }: { actions: ActionNeeded[]; isThai: bool
               <p className="mt-1 text-xs opacity-80">{action.message}</p>
             </div>
             <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold">{action.type}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SmartMatchList({
+  matches,
+  isThai,
+  formatCurrency,
+  formatDate,
+  onAttach,
+  matchingId,
+}: {
+  matches: SmartMatch[];
+  isThai: boolean;
+  formatCurrency: (value: number) => string;
+  formatDate: (value: string) => string;
+  onAttach: (match: SmartMatch, candidate: SmartMatchCandidate) => void | Promise<void>;
+  matchingId: string | null;
+}) {
+  if (matches.length === 0) {
+    return <EmptyBlock text={isThai ? 'ไม่มีสลิปหรือเอกสารที่ต้องจับคู่ตอนนี้' : 'No unmatched slips or supporting documents right now'} />;
+  }
+  return (
+    <div className="space-y-3">
+      {matches.map((match) => (
+        <div key={match.id} className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-950">{match.fileName || (isThai ? 'ไฟล์ไม่มีชื่อ' : 'Untitled file')}</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {formatDate(match.documentDate)} · {match.amount ? formatCurrency(match.amount) : (isThai ? 'ไม่พบยอด' : 'No amount')} · {match.supplierName || (isThai ? 'ไม่พบคู่ค้า' : 'No vendor')}
+              </p>
+            </div>
+            <TaxSafetyBadge taxSafety={match.taxSafety} />
+          </div>
+          <div className="mt-3 space-y-2">
+            {match.candidates.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {isThai ? 'ยังไม่เจอใบซื้อที่น่าจะตรงกัน ให้เปิด Input VAT เพื่อเลือกจับคู่เอง' : 'No likely purchase match yet. Open Input VAT to attach manually.'}
+              </div>
+            ) : (
+              match.candidates.map((candidate) => {
+                const actionId = `${match.documentIntakeId}:${candidate.id}`;
+                return (
+                  <div key={candidate.id} className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-slate-800">{candidate.supplierName} · {candidate.invoiceNumber}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {formatDate(candidate.invoiceDate)} · {formatCurrency(candidate.total)} · {isThai ? 'คะแนน' : 'score'} {candidate.score} · {candidate.reasons.join(', ')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void onAttach(match, candidate)}
+                      disabled={matchingId === actionId}
+                      className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+                    >
+                      {matchingId === actionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+                      {isThai ? 'จับคู่' : 'Match'}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       ))}

@@ -236,6 +236,14 @@ function numberField(data: Record<string, unknown> | null, key: string) {
   return 0;
 }
 
+function dateField(data: Record<string, unknown> | null, key: string) {
+  const value = data?.[key];
+  if (value instanceof Date) return value;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function taxSafetyForIntake(item: {
   status: string;
   mimeType: string;
@@ -382,6 +390,82 @@ function summarizeTaxSafety(items: Array<TaxSafety & { vatAmount?: number }>) {
     taxSafetyRiskCount: items.filter((item) => TAX_SAFETY_RISK_STATUSES.includes(item.status)).length,
     claimableVat: items.reduce((sum, item) => sum + (item.status === 'vat_claimable' ? item.vatAmount ?? 0 : 0), 0),
     taxSafetyByStatus: byStatus,
+  };
+}
+
+function smartMatchForIntake(
+  item: {
+    id: string;
+    fileName: string | null;
+    createdAt: Date;
+    status: string;
+    ocrResult: unknown;
+    taxSafety: TaxSafety;
+    targetType?: string | null;
+    targetId?: string | null;
+    purchaseInvoiceId?: string | null;
+  },
+  purchases: Array<{
+    id: string;
+    supplierName: string;
+    invoiceNumber: string;
+    invoiceDate: Date;
+    total: number;
+    isPaid: boolean;
+  }>,
+) {
+  if (item.purchaseInvoiceId || (item.targetType && item.targetId)) return null;
+  if (!TAX_SAFETY_RISK_STATUSES.includes(item.taxSafety.status) && item.taxSafety.status !== 'supporting_only') return null;
+
+  const data = item.ocrResult as Record<string, unknown> | null;
+  const amount = numberField(data, 'total') || numberField(data, 'amount') || numberField(data, 'paymentAmount');
+  const payment = data?.payment as Record<string, unknown> | undefined;
+  const paymentAmount = amount || numberField(payment ?? null, 'amount');
+  const supplierName = textField(data, 'supplierName') || textField(payment ?? null, 'receiverName');
+  const documentDate = dateField(data, 'invoiceDate') || dateField(data, 'paymentDate') || dateField(payment ?? null, 'date') || item.createdAt;
+
+  const candidates = purchases
+    .map((purchase) => {
+      let score = 0;
+      const reasons: string[] = [];
+      if (paymentAmount > 0 && Math.abs(purchase.total - paymentAmount) < 1) {
+        score += 60;
+        reasons.push('amount');
+      }
+      if (supplierName && purchase.supplierName.toLowerCase().includes(supplierName.toLowerCase().slice(0, 12))) {
+        score += 25;
+        reasons.push('supplier');
+      }
+      const dayDiff = Math.abs((purchase.invoiceDate.getTime() - documentDate.getTime()) / 86400000);
+      if (dayDiff <= 14) {
+        score += Math.max(0, 15 - Math.round(dayDiff));
+        reasons.push('date');
+      }
+      return {
+        id: purchase.id,
+        supplierName: purchase.supplierName,
+        invoiceNumber: purchase.invoiceNumber,
+        invoiceDate: purchase.invoiceDate,
+        total: purchase.total,
+        isPaid: purchase.isPaid,
+        score,
+        reasons,
+      };
+    })
+    .filter((candidate) => candidate.score >= 25)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  return {
+    id: `intake:${item.id}`,
+    documentIntakeId: item.id,
+    fileName: item.fileName,
+    status: item.status,
+    taxSafety: item.taxSafety,
+    amount: paymentAmount || null,
+    supplierName: supplierName || null,
+    documentDate,
+    candidates,
   };
 }
 
@@ -599,6 +683,9 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         ...documentIntakeRows.map((item) => item.taxSafety),
         ...purchaseInvoiceRows.map((item) => ({ ...item.taxSafety, vatAmount: item.vatAmount })),
       ]);
+      const smartMatches = documentIntakeRows
+        .map((item) => smartMatchForIntake(item, purchaseInvoiceRows))
+        .filter((item): item is NonNullable<ReturnType<typeof smartMatchForIntake>> => item !== null);
       const actionNeeded = documentIntakeRows
         .map(actionNeededForIntake)
         .filter((item): item is NonNullable<ReturnType<typeof actionNeededForIntake>> => item !== null);
@@ -625,9 +712,11 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           actionNeededCount: allActionNeeded.length,
           filesCount: documentIntakes.length,
           lineGroupCount: lineGroups.length,
+          smartMatchCount: smartMatches.length,
           ...taxSafetySummary,
         },
         actionNeeded: allActionNeeded,
+        smartMatches,
         documentIntakes: documentIntakeRows,
         purchaseInvoices: purchaseInvoiceRows,
         invoices: invoices.map((item) => ({
