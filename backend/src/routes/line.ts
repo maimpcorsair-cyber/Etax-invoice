@@ -5,7 +5,7 @@ import { authenticate, requireRole } from '../middleware/auth';
 import prisma from '../config/database';
 import redis from '../config/redis';
 import { logger } from '../config/logger';
-import { tenantRlsContext, withRlsContext } from '../config/rls';
+import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import {
   sendLineText,
   sendLineFlexMessage,
@@ -417,10 +417,10 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
 async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, companyId: string, fallbackId: string, createdByUserId?: string) {
   const link = createdByUserId
     ? { userId: createdByUserId }
-    : await prisma.lineUserLink.findUnique({
+    : await withSystemRlsContext(prisma, (tx) => tx.lineUserLink.findUnique({
         where: { lineUserId },
         select: { userId: true },
-      });
+      }));
 
   if (!link?.userId) {
     throw new Error('Line user link not found while saving OCR purchase invoice');
@@ -1250,23 +1250,25 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
 }
 
 async function resolveLineConversationContext(context: LineMessageContext) {
-  const [senderLink, groupLink] = await Promise.all([
-    context.senderLineUserId
-      ? prisma.lineUserLink.findUnique({
-          where: { lineUserId: context.senderLineUserId },
-          include: { user: { include: { company: true } } },
-        })
-      : Promise.resolve(null),
-    (context.lineGroupId ?? context.lineRoomId)
-      ? prisma.lineGroupLink.findUnique({
-          where: { lineGroupId: context.lineGroupId ?? context.lineRoomId },
-          include: {
-            company: true,
-            linkedBy: { select: { id: true, isActive: true } },
-          },
-        })
-      : Promise.resolve(null),
-  ]);
+  const [senderLink, groupLink] = await withSystemRlsContext(prisma, async (tx) =>
+    Promise.all([
+      context.senderLineUserId
+        ? tx.lineUserLink.findUnique({
+            where: { lineUserId: context.senderLineUserId },
+            include: { user: { include: { company: true } } },
+          })
+        : Promise.resolve(null),
+      (context.lineGroupId ?? context.lineRoomId)
+        ? tx.lineGroupLink.findUnique({
+            where: { lineGroupId: context.lineGroupId ?? context.lineRoomId },
+            include: {
+              company: true,
+              linkedBy: { select: { id: true, isActive: true } },
+            },
+          })
+        : Promise.resolve(null),
+    ]),
+  );
 
   if (context.lineGroupId || context.lineRoomId) {
     if (!groupLink?.isActive) {
@@ -2384,10 +2386,10 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 
       // SECURITY: Always derive companyId from the verified lineUserLink — never trust
       // companyId from the OCR session JSON (attacker could inject any companyId there).
-      const link = await prisma.lineUserLink.findUnique({
+      const link = await withSystemRlsContext(prisma, (tx) => tx.lineUserLink.findUnique({
         where: { lineUserId },
         include: { user: { select: { companyId: true } } },
-      });
+      }));
       if (!link) {
         await sendLineText(lineUserId, 'ขอโทษ ไม่พบข้อมูลบริษัท กรุณาเชื่อมบัญชีใหม่');
         return;
