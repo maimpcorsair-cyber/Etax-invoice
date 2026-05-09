@@ -8,6 +8,7 @@ import {
   FileText,
   Loader2,
   ReceiptText,
+  Upload,
   WalletCards,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -84,29 +85,69 @@ export default function ProjectGuestPortal() {
   const { token } = useParams();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function loadPortal(cancelledRef?: { current: boolean }) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/project-portal/${token}`);
+      const json = await res.json() as { data?: PortalData; error?: string };
+      if (!res.ok || !json.data) throw new Error(json.error ?? 'เปิด Project Portal ไม่สำเร็จ');
+      if (!cancelledRef?.current) setData(json.data);
+    } catch (err) {
+      if (!cancelledRef?.current) setError(err instanceof Error ? err.message : 'เปิด Project Portal ไม่สำเร็จ');
+    } finally {
+      if (!cancelledRef?.current) setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadPortal() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/project-portal/${token}`);
-        const json = await res.json() as { data?: PortalData; error?: string };
-        if (!res.ok || !json.data) throw new Error(json.error ?? 'เปิด Project Portal ไม่สำเร็จ');
-        if (!cancelled) setData(json.data);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'เปิด Project Portal ไม่สำเร็จ');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void loadPortal();
+    const cancelledRef = { current: false };
+    void loadPortal(cancelledRef);
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [token]);
+
+  async function handleUpload(file: File | null) {
+    if (!file || !token) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setError('รองรับเฉพาะ PDF, JPG, PNG หรือ WebP');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('ไฟล์ใหญ่เกิน 10MB');
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(reader.error ?? new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`/api/project-portal/${token}/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64 }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'อัปโหลดไม่สำเร็จ');
+      setNotice('ส่งไฟล์เข้าโปรเจคแล้ว บัญชีจะตรวจเอกสารต่อ');
+      await loadPortal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const health = useMemo(() => {
     if (!data) return { label: '', className: '' };
@@ -167,6 +208,17 @@ export default function ProjectGuestPortal() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        {notice && (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+            {notice}
+          </div>
+        )}
+        {error && (
+          <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {error}
+          </div>
+        )}
+
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric title="งบโครงการ" value={formatCurrency(project.budgetAmount)} icon={WalletCards} />
           <Metric title="ต้นทุนผูกพัน" value={formatCurrency(summary.committedCost)} icon={ReceiptText} tone={summary.remainingBudget < 0 ? 'danger' : 'default'} />
@@ -211,6 +263,30 @@ export default function ProjectGuestPortal() {
                 ))
               )}
             </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-950">ส่งเอกสารเพิ่มเข้าโปรเจค</h2>
+              <p className="mt-1 text-xs text-slate-500">ไฟล์ที่ส่งจากหน้านี้จะเข้าคิวให้บัญชีตรวจ ไม่แก้ข้อมูลภาษีอัตโนมัติ</p>
+            </div>
+            <label className={clsx('inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white', uploading ? 'bg-slate-400' : 'bg-primary-600 hover:bg-primary-700')}>
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {uploading ? 'กำลังอัปโหลด...' : 'อัปโหลด PDF/JPG'}
+              <input
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  event.currentTarget.value = '';
+                  void handleUpload(file);
+                }}
+              />
+            </label>
           </div>
         </section>
 

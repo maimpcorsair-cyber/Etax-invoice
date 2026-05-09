@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 19:18 Asia/Bangkok
+Last updated: 2026-05-10 20:10 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -76,6 +76,16 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added LINE Project Guest Upload v1:
+  - public portal users can upload PDF/JPG/PNG/WebP into the linked project
+  - backend `POST /api/project-portal/:token/upload`
+  - uploaded files are saved as `DocumentIntake` with `source: project_guest`, `projectId`, and `status: needs_review`
+  - guest uploads are intentionally review-only; they do not create purchase invoices, claim VAT, expose exports, or expose original file download links to guests
+- Verified locally after LINE Project Guest Upload v1:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
 - Added LINE Project Guest Portal foundation:
   - admin can create a 7-day signed Project Portal link for a LINE group that is already assigned to a project
   - backend `POST /api/line/admin/groups/:groupId/portal-link`
