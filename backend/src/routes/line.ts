@@ -252,16 +252,22 @@ async function safeRedisSetex(key: string, ttlSeconds: number, value: string) {
 
 async function createLineLinkOtp(payload: LineOtpPayload) {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  await redis.setex(`line:otp:${otp}`, OTP_TTL, JSON.stringify(payload));
+  const otpKey = `line:otp:${otp}`;
 
-  // Verify OTP was stored before responding; otherwise users can receive a code
-  // that LINE cannot redeem after a Redis cold start or transient write lag.
-  const stored = await redis.get(`line:otp:${otp}`);
+  if (redis.status !== 'ready') {
+    logger.warn('[Line] Redis not ready for OTP creation, connecting...', { status: redis.status });
+    await redis.connect();
+  }
+
+  await redis.setex(otpKey, OTP_TTL, JSON.stringify(payload));
+
+  const stored = await redis.get(otpKey);
   if (!stored) {
     logger.error('[Line] OTP write verification failed — Redis may be lagging (cold start?)');
     return null;
   }
 
+  logger.info('[Line] OTP created', { otpKey, type: payload.type, redisStatus: redis.status });
   return otp;
 }
 
@@ -1611,81 +1617,120 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
   const otpMatch = trimmed.match(/^(?:\/link\s+)?(\d{6})$/);
   if (otpMatch) {
     const otp = otpMatch[1];
+    const otpKey = `line:otp:${otp}`;
+
+    // Ensure Redis is reachable before OTP lookup (handles cold-start / reconnect)
     try {
-      const stored = await redis.get(`line:otp:${otp}`);
-      if (stored) {
-        const { type, userId, companyId } = JSON.parse(stored) as LineOtpPayload;
+      if (redis.status !== 'ready') {
+        logger.warn('[Line] Redis not ready for OTP lookup, connecting...', { status: redis.status });
+        await redis.connect();
+      }
+      await redis.ping();
+    } catch (pingErr) {
+      logger.error('[Line] Redis unreachable for OTP lookup', { pingErr, status: redis.status });
+      await sendLineText(lineUserId, 'ระบบสะดุดชั่วคราว กรุณาลองส่ง OTP อีกครั้งใน 10 วินาที 🙏');
+      return;
+    }
 
-        if (type === 'group') {
-          await sendLineText(lineUserId, 'รหัสนี้ใช้สำหรับเชื่อม LINE group กรุณาส่งรหัสในกลุ่มที่ต้องการเชื่อม');
-          return;
-        }
+    // Read OTP with one retry on transient failure
+    let stored: string | null = null;
+    let redisGetFailed = false;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        stored = await redis.get(otpKey);
+        redisGetFailed = false;
+        break;
+      } catch (err) {
+        redisGetFailed = true;
+        logger.warn(`[Line] OTP Redis GET attempt ${attempt} failed`, { err, otpKey });
+        if (attempt === 1) await new Promise(r => setTimeout(r, 500));
+      }
+    }
 
-        if (!userId) {
-          await safeRedisDel(`line:otp:${otp}`);
-          await sendLineText(lineUserId, 'รหัสนี้ไม่สมบูรณ์ กรุณาขอรหัสใหม่จากระบบ');
-          return;
-        }
+    if (redisGetFailed) {
+      logger.error('[Line] OTP Redis GET failed after 2 attempts', { otpKey });
+      await sendLineText(lineUserId, 'ระบบสะดุดชั่วคราว กรุณาลองส่ง OTP อีกครั้ง 🙏');
+      return;
+    }
 
-        const linkResult = await prisma.$transaction(async (tx) => {
-          const targetUser = await tx.user.findFirst({
-            where: { id: userId, companyId, isActive: true },
-            select: { id: true, name: true, companyId: true },
-          });
+    logger.info('[Line] OTP lookup', { otpKey, found: !!stored, redisStatus: redis.status, lineUser: lineUserId.slice(0, 8) });
 
-          if (!targetUser) {
-            return { ok: false as const, reason: 'user_not_found' as const };
-          }
+    if (!stored) {
+      await sendLineText(lineUserId, 'OTP ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอ OTP ใหม่จากระบบ');
+      return;
+    }
 
-          const existingLineLink = await tx.lineUserLink.findUnique({
-            where: { lineUserId: senderLineUserId },
-            select: { userId: true },
-          });
+    try {
+      const { type, userId, companyId } = JSON.parse(stored) as LineOtpPayload;
 
-          if (existingLineLink && existingLineLink.userId !== targetUser.id) {
-            return { ok: false as const, reason: 'line_already_linked' as const };
-          }
-
-          await tx.lineUserLink.upsert({
-            where: { userId: targetUser.id },
-            create: {
-              userId: targetUser.id,
-              lineUserId: senderLineUserId,
-              displayName: targetUser.name,
-              isActive: true,
-            },
-            update: {
-              lineUserId: senderLineUserId,
-              displayName: targetUser.name,
-              isActive: true,
-              linkedAt: new Date(),
-            },
-          });
-
-          return { ok: true as const, userName: targetUser.name };
-        });
-
-        if (!linkResult.ok) {
-          if (linkResult.reason === 'line_already_linked') {
-            await sendLineText(lineUserId, 'บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว กรุณาให้แอดมินถอดการเชื่อมต่อก่อนแล้วลองใหม่');
-            return;
-          }
-          await safeRedisDel(`line:otp:${otp}`);
-          await sendLineText(lineUserId, 'ไม่พบผู้ใช้ที่เชื่อมกับรหัสนี้ หรือผู้ใช้ถูกปิดใช้งานแล้ว กรุณาขอรหัสใหม่จากแอดมิน');
-          return;
-        }
-
-        await safeRedisDel(`line:otp:${otp}`);
-        await sendLineText(
-          lineUserId,
-          `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
-        );
+      if (type === 'group') {
+        await sendLineText(lineUserId, 'รหัสนี้ใช้สำหรับเชื่อม LINE group กรุณาส่งรหัสในกลุ่มที่ต้องการเชื่อม');
         return;
       }
+
+      if (!userId) {
+        await safeRedisDel(`line:otp:${otp}`);
+        await sendLineText(lineUserId, 'รหัสนี้ไม่สมบูรณ์ กรุณาขอรหัสใหม่จากระบบ');
+        return;
+      }
+
+      const linkResult = await prisma.$transaction(async (tx) => {
+        const targetUser = await tx.user.findFirst({
+          where: { id: userId, companyId, isActive: true },
+          select: { id: true, name: true, companyId: true },
+        });
+
+        if (!targetUser) {
+          return { ok: false as const, reason: 'user_not_found' as const };
+        }
+
+        const existingLineLink = await tx.lineUserLink.findUnique({
+          where: { lineUserId: senderLineUserId },
+          select: { userId: true },
+        });
+
+        if (existingLineLink && existingLineLink.userId !== targetUser.id) {
+          return { ok: false as const, reason: 'line_already_linked' as const };
+        }
+
+        await tx.lineUserLink.upsert({
+          where: { userId: targetUser.id },
+          create: {
+            userId: targetUser.id,
+            lineUserId: senderLineUserId,
+            displayName: targetUser.name,
+            isActive: true,
+          },
+          update: {
+            lineUserId: senderLineUserId,
+            displayName: targetUser.name,
+            isActive: true,
+            linkedAt: new Date(),
+          },
+        });
+
+        return { ok: true as const, userName: targetUser.name };
+      });
+
+      if (!linkResult.ok) {
+        if (linkResult.reason === 'line_already_linked') {
+          await sendLineText(lineUserId, 'บัญชี LINE นี้ถูกเชื่อมกับผู้ใช้อื่นแล้ว กรุณาให้แอดมินถอดการเชื่อมต่อก่อนแล้วลองใหม่');
+          return;
+        }
+        await safeRedisDel(`line:otp:${otp}`);
+        await sendLineText(lineUserId, 'ไม่พบผู้ใช้ที่เชื่อมกับรหัสนี้ หรือผู้ใช้ถูกปิดใช้งานแล้ว กรุณาขอรหัสใหม่จากแอดมิน');
+        return;
+      }
+
+      await safeRedisDel(`line:otp:${otp}`);
+      await sendLineText(
+        lineUserId,
+        `เชื่อมบัญชีสำเร็จ! ยินดีต้อนรับคุณ ${linkResult.userName ?? ''} 🎉\n\nตอนนี้คุณสามารถถามคำถามเกี่ยวกับบัญชีและภาษีได้เลย`,
+      );
     } catch (err) {
-      logger.error('[Line] OTP link failed', { err });
+      logger.error('[Line] OTP link transaction failed', { err, otpKey });
+      await sendLineText(lineUserId, 'เกิดข้อผิดพลาดในการเชื่อมบัญชี กรุณาลองส่ง OTP อีกครั้ง');
     }
-    await sendLineText(lineUserId, 'OTP ไม่ถูกต้องหรือหมดอายุแล้ว กรุณาขอ OTP ใหม่จากระบบ');
     return;
   }
 
@@ -2569,6 +2614,16 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
 
   // Always respond 200 immediately; process events async
   res.json({ ok: true });
+
+  // Proactively ensure Redis is connected before processing events (handles cold-start with lazyConnect)
+  if (redis.status !== 'ready') {
+    try {
+      await redis.connect();
+      logger.info('[Line] Redis connected proactively for webhook', { status: redis.status });
+    } catch (err) {
+      logger.warn('[Line] Redis proactive connect failed — will retry per-command', { err, status: redis.status });
+    }
+  }
 
   for (const event of body.events ?? []) {
     const replyTargetId = event.source.groupId ?? event.source.roomId ?? event.source.userId;
