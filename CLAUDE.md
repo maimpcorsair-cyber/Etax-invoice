@@ -3,6 +3,8 @@
 ETDA ขมธอ. 3-2560 — submits XAdES-BES signed XML to Revenue Department API.
 **Product ขายจริง** — multi-tenant SaaS สำหรับออกใบกำกับภาษีอิเล็กทรอนิกส์
 
+> **Start here for handoff:** read [`PROJECT_STATE.md`](PROJECT_STATE.md) first for the latest production/deploy/OCR status, recent commits, dirty local state, and next verification steps.
+
 ## Stack
 - **Frontend** `frontend/` — React 18 + Vite 5 + TypeScript 5 + Tailwind 3 + Zustand, port 3000
 - **Backend** `backend/` — Node 20 + Express 4 + TypeScript 5 + Zod + BullMQ 5, port 4000
@@ -74,14 +76,13 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 - `render-deploy.yml` — trigger Render deploy on push to main, report status back to GitHub
 - `health-check.yml` — check Vercel + Render every 10 min
 
-## Pending GitHub Secrets (ต้องใส่ก่อน render-deploy workflow จะทำงาน)
-- `RENDER_DEPLOY_HOOK_URL` — Render → etax-invoice-api → Settings → Deploy Hook
-- `RENDER_WORKER_DEPLOY_HOOK_URL` — Render → etax-invoice-worker → Settings → Deploy Hook
-- `RENDER_API_KEY` — Render → Account Settings → API Keys
+## Deploy status
+- `render-deploy.yml` is currently working on `main`; backend deploys have been verified through GitHub Actions and Render health.
+- See `PROJECT_STATE.md` for the current verified backend health version and CLI status.
 
 ## MCP tools ที่ใช้งานได้
 - `mcp__postgres__query` ✅ — query production DB ได้ตรงๆ
-- `mcp__github__*` ⚠️ — ต้อง add `GITHUB_PERSONAL_ACCESS_TOKEN` ใน `~/.claude/settings.json` → env section
+- `gh` CLI ✅ — logged in locally as `maimpcorsair-cyber`; use for Actions/deploy run checks
 - `context7` ✅ — library docs
 - `playwright` ✅ — E2E browser testing
 
@@ -90,7 +91,7 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 2. 🔴 **Puppeteer บน Render** — ต้องเพิ่ม Chrome buildpack หรือใช้ Render paid tier (PDF ออกไม่ได้บน production)
 3. 🟡 **Signup/Onboarding flow** — ยังไม่ได้ทดสอบ end-to-end (users = 0 ใน DB)
 4. 🟡 **Certificate upload UI** — ทุก company ยังไม่มี cert, ส่ง RD production ไม่ได้
-5. 🟢 **Render deploy status** — รอใส่ GitHub Secrets 3 ตัวข้างบน
+5. 🟢 **Render/Vercel deploy visibility** — `gh`, `curl`, and `vercel` CLI are connected locally
 
 ## Gotchas
 1. **Prisma client sync** — after `prisma generate` at root:

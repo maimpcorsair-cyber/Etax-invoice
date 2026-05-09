@@ -2,6 +2,8 @@
 
 Full-stack e-Tax Invoice application compliant with **ETDA ขมธอ. 3-2560** (Thai Electronic Transactions Development Agency standard), submitting signed + timestamped XML documents to the **Revenue Department (กรมสรรพากร)** via their e-Tax API.
 
+> **Start here for handoff:** read [`PROJECT_STATE.md`](PROJECT_STATE.md) first for the latest production/deploy/OCR status, recent commits, dirty local state, and next verification steps.
+
 ## Stack
 
 | Layer | Tech |
