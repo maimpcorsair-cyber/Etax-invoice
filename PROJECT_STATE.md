@@ -41,6 +41,8 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified DBD API foundation typecheck run: `25610525049` succeeded.
 - Latest verified LINE Project Guest Portal deploy run: `25611329399` succeeded.
 - Latest verified LINE Project Guest Portal typecheck run: `25611329397` succeeded.
+- Latest verified LINE Project Guest Upload deploy run: `25611538817` succeeded.
+- Latest verified LINE Project Guest Upload typecheck run: `25611538818` succeeded.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
@@ -70,6 +72,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
   - frontend `/app/projects` returned HTTP 200 from Vercel
 - Production checks after `596941a`:
+  - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
+  - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
+  - frontend `/app/projects` returned HTTP 200 from Vercel
+- Production checks after `8627b69`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
   - frontend `/app/projects` returned HTTP 200 from Vercel
