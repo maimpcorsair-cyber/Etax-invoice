@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 18:36 Asia/Bangkok
+Last updated: 2026-05-10 19:02 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -75,6 +75,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - If a popup cannot open, the app falls back to navigating the current tab.
 - Latest verified Project Drive connect flow guard typecheck run: `25627650711` succeeded.
 - Vercel production frontend deploy was Ready 2026-05-10 18:36 Asia/Bangkok.
+- Production Google Drive service account is configured:
+  - `/api/drive/status` returned `oauthConfigured:true`, `serviceAccountConfigured:true`, `driveUsable:true`, `mode:"service_account"`, `requiredEnv:[]`.
+  - `POST /api/projects/cmozbu2ow001l10l2rl5mym9i/drive/folder` returned a Google Drive `folderUrl` with `userDrive:false`.
 - Project Drive connect flow guard is deployed:
   - Production status showed `oauthConfigured:true`, `serviceAccountConfigured:false`, `driveUsable:true`, but `connected:false` for the demo admin user.
   - Project detail now redirects to the Google Drive OAuth flow before attempting folder creation when no service account exists and the user has not completed Drive linking.
