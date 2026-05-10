@@ -55,6 +55,7 @@ const uploadDocumentSchema = z.object({
   fileName: z.string().optional(),
   mimeType: z.string().min(1),
   fileBase64: z.string().min(1),
+  duplicatePolicy: z.enum(['ask', 'rename', 'replace', 'skip']).optional(),
 });
 
 const attachDocumentSchema = z.object({
@@ -86,6 +87,44 @@ async function assertProjectBelongsToCompany(
   if (!projectId) return;
   const project = await tx.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
   if (!project) throw new Error('Project not found');
+}
+
+function normalizeUploadFileName(fileName?: string | null) {
+  return (fileName ?? '').trim().replace(/\s+/g, ' ');
+}
+
+async function findProjectDocumentDuplicates(input: {
+  companyId: string;
+  projectId?: string | null;
+  fileName?: string | null;
+  fileSize: number;
+}) {
+  const fileName = normalizeUploadFileName(input.fileName);
+  if (!input.projectId || !fileName) return [];
+  const rows = await prisma.documentIntake.findMany({
+    where: {
+      companyId: input.companyId,
+      projectId: input.projectId,
+      fileName: { equals: fileName, mode: 'insensitive' },
+      status: { not: 'rejected' },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    select: {
+      id: true,
+      fileName: true,
+      fileSize: true,
+      mimeType: true,
+      status: true,
+      source: true,
+      driveUrl: true,
+      createdAt: true,
+    },
+  });
+  return rows.map((row) => ({
+    ...row,
+    sameSize: row.fileSize === input.fileSize,
+  }));
 }
 
 async function findDuplicatePurchase(companyId: string, supplierTaxId: string, invoiceNumber: string) {
@@ -419,6 +458,32 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       return;
     }
 
+    const duplicatePolicy = body.duplicatePolicy ?? 'ask';
+    const duplicates = await findProjectDocumentDuplicates({
+      companyId: req.user!.companyId,
+      projectId: body.projectId,
+      fileName: body.fileName,
+      fileSize: buffer.length,
+    });
+    if (duplicates.length && duplicatePolicy === 'ask') {
+      res.status(409).json({
+        code: 'DUPLICATE_PROJECT_DOCUMENT',
+        error: 'Duplicate project document',
+        message: 'A document with the same file name already exists in this project',
+        duplicates,
+        options: ['rename', 'replace', 'skip'],
+      });
+      return;
+    }
+    if (duplicates.length && duplicatePolicy === 'skip') {
+      res.status(200).json({
+        skipped: true,
+        duplicate: duplicates[0],
+        data: duplicates[0],
+      });
+      return;
+    }
+
     const quota = await checkStorageQuota(req.user!.companyId, buffer.length);
     if (!quota.allowed) {
       res.status(413).json({ error: 'Storage quota exceeded / พื้นที่เก็บข้อมูลเต็ม' });
@@ -449,6 +514,9 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
           fileUrl,
           storageKey,
           status: 'processing',
+          warnings: duplicates.length
+            ? [`duplicate_upload:${duplicatePolicy}`, duplicates[0].sameSize ? 'duplicate_upload_size:same' : 'duplicate_upload_size:different'] as unknown as Prisma.InputJsonValue
+            : undefined,
         },
       });
     });
@@ -489,6 +557,7 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
       void syncDocumentIntakeToProjectDrive(created.id, {
         companyId: req.user!.companyId,
         preferredUserId: req.user!.userId,
+        duplicatePolicy: duplicatePolicy === 'ask' ? 'rename' : duplicatePolicy,
       });
     }
 

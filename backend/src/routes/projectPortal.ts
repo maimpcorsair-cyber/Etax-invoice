@@ -42,6 +42,32 @@ const guestCommentSchema = z.object({
 
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
+function normalizeUploadFileName(fileName?: string | null) {
+  return (fileName ?? '').trim().replace(/\s+/g, ' ');
+}
+
+async function findGuestUploadDuplicates(input: {
+  companyId: string;
+  projectId: string;
+  fileName?: string | null;
+  fileSize: number;
+}) {
+  const fileName = normalizeUploadFileName(input.fileName);
+  if (!fileName) return [];
+  const rows = await prisma.documentIntake.findMany({
+    where: {
+      companyId: input.companyId,
+      projectId: input.projectId,
+      fileName: { equals: fileName, mode: 'insensitive' },
+      status: { not: 'rejected' },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+    select: { id: true, fileName: true, fileSize: true, status: true, source: true, driveUrl: true, createdAt: true },
+  });
+  return rows.map((row) => ({ ...row, sameSize: row.fileSize === input.fileSize }));
+}
+
 function asNumber(value: Prisma.Decimal | number | null | undefined) {
   if (value == null) return 0;
   if (typeof value === 'number') return value;
@@ -385,6 +411,16 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
       return;
     }
 
+    const duplicates = await findGuestUploadDuplicates({
+      companyId: payload.companyId,
+      projectId: payload.projectId,
+      fileName: body.fileName,
+      fileSize: buffer.length,
+    });
+    const duplicateWarnings = duplicates.length
+      ? ['duplicate_upload:rename', duplicates[0].sameSize ? 'duplicate_upload_size:same' : 'duplicate_upload_size:different']
+      : [];
+
     let fileUrl: string | undefined;
     let storageKey: string | undefined;
     const storageReady = isStorageConfigured();
@@ -409,7 +445,7 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
           fileUrl,
           storageKey,
           status: 'processing',
-          warnings: ['uploaded_by_project_guest'] as Prisma.InputJsonValue,
+          warnings: ['uploaded_by_project_guest', ...duplicateWarnings] as Prisma.InputJsonValue,
           error: null,
         },
         select: {
@@ -436,6 +472,7 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
           ocrResult: result as unknown as Prisma.InputJsonValue,
           warnings: [
             'uploaded_by_project_guest',
+            ...duplicateWarnings,
             ...documentIntakeWarningsForOcr(result, analysis.stages),
           ] as Prisma.InputJsonValue,
           error: hasUsefulData ? null : 'OCR returned no useful fields',
@@ -474,6 +511,7 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
     void syncDocumentIntakeToProjectDrive(created.id, {
       companyId: payload.companyId,
       preferredUserId: group.linkedById,
+      duplicatePolicy: 'rename',
     });
 
     res.status(201).json({

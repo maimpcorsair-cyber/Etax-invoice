@@ -22,10 +22,15 @@ type IntakeForDrive = {
   fileBase64: string | null;
   storageKey: string | null;
   ocrResult: Prisma.JsonValue | null;
+  warnings?: Prisma.JsonValue | null;
 };
 
 function asObject(value: Prisma.JsonValue | null): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asStringArray(value: Prisma.JsonValue | null | undefined) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
 function driveFolderForIntake(intake: IntakeForDrive): DriveDocumentFolder {
@@ -65,7 +70,12 @@ function selectDriveRefreshToken(input: {
 
 export async function syncDocumentIntakeToProjectDrive(
   intakeId: string,
-  options: { companyId: string; preferredUserId?: string | null; force?: boolean },
+  options: {
+    companyId: string;
+    preferredUserId?: string | null;
+    force?: boolean;
+    duplicatePolicy?: 'rename' | 'replace' | 'skip' | 'error';
+  },
 ) {
   if (!isDriveConfigured()) {
     await withSystemRlsContext(prisma, (tx) => tx.documentIntake.updateMany({
@@ -88,6 +98,7 @@ export async function syncDocumentIntakeToProjectDrive(
       fileBase64: true,
       storageKey: true,
       ocrResult: true,
+      warnings: true,
       driveSyncStatus: true,
       driveFileId: true,
     },
@@ -147,8 +158,19 @@ export async function syncDocumentIntakeToProjectDrive(
         projectName: project.name,
         documentFolder: driveFolderForIntake(intake),
         shareWithEmails: [company?.email, companyOwner?.email, user?.email].filter(Boolean) as string[],
+        duplicatePolicy: options.duplicatePolicy ?? 'rename',
       },
     );
+
+    const warnings = asStringArray(intake.warnings);
+    const duplicateWarnings = result.duplicate
+      ? [
+        `drive_duplicate:${result.duplicate.policy}`,
+        result.duplicate.existingSize === intake.fileSize
+          ? 'drive_duplicate_size:same'
+          : `drive_duplicate_size:${result.duplicate.existingSize ?? 'unknown'}:${intake.fileSize}`,
+      ]
+      : [];
 
     await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
       where: { id: intake.id },
@@ -161,6 +183,10 @@ export async function syncDocumentIntakeToProjectDrive(
         driveSyncError: null,
         driveSyncedAt: new Date(),
         driveUserDrive: result.userDrive,
+        fileName: result.fileName,
+        warnings: duplicateWarnings.length
+          ? Array.from(new Set([...warnings, ...duplicateWarnings])) as Prisma.InputJsonValue
+          : undefined,
       },
     }));
 

@@ -484,6 +484,21 @@ export default function ProjectDetail() {
     });
   }
 
+  function askDuplicatePolicy(payload: any): 'rename' | 'replace' | 'skip' | null {
+    const duplicate = payload?.duplicates?.[0];
+    const sizeText = duplicate
+      ? duplicate.sameSize
+        ? (isThai ? 'ขนาดไฟล์เท่ากัน' : 'same file size')
+        : (isThai ? `ขนาดไฟล์ต่างกัน: เดิม ${duplicate.fileSize} bytes / ใหม่ไฟล์นี้ ${duplicate.fileName ?? ''}` : `different size: existing ${duplicate.fileSize} bytes`)
+      : '';
+    const message = isThai
+      ? `พบไฟล์ชื่อซ้ำในโปรเจคนี้\n${duplicate?.fileName ?? ''}\n${sizeText}\n\nพิมพ์ rename = เก็บเป็นชื่อใหม่อัตโนมัติ\nพิมพ์ replace = เขียนทับไฟล์ชื่อเดิมใน Google Drive\nพิมพ์ skip = ไม่อัปโหลดซ้ำ`
+      : `A file with the same name already exists in this project.\n${duplicate?.fileName ?? ''}\n${sizeText}\n\nType rename = keep both with an auto name\nType replace = overwrite the same Google Drive file\nType skip = do not upload`;
+    const answer = window.prompt(message, 'rename')?.trim().toLowerCase();
+    if (answer === 'replace' || answer === 'skip' || answer === 'rename') return answer;
+    return null;
+  }
+
   async function handleUpload(file?: File | null) {
     if (!token || !workspace || !file) return;
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
@@ -495,19 +510,36 @@ export default function ProjectDetail() {
     setError('');
     try {
       const fileBase64 = await fileToBase64(file);
-      const res = await fetch('/api/purchase-invoices/document-intakes/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+      const payload = {
           fileName: file.name,
           mimeType: file.type,
           fileBase64,
           projectId: workspace.project.id,
-        }),
+      };
+      let res = await fetch('/api/purchase-invoices/document-intakes/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
+      if (res.status === 409) {
+        const duplicate = await res.json().catch(() => ({}));
+        if (duplicate.code === 'DUPLICATE_PROJECT_DOCUMENT') {
+          const duplicatePolicy = askDuplicatePolicy(duplicate);
+          if (!duplicatePolicy) return;
+          res = await fetch('/api/purchase-invoices/document-intakes/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ...payload, duplicatePolicy }),
+          });
+        }
+      }
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error || 'Upload failed');
+      }
+      const json = await res.json().catch(() => ({}));
+      if (json.skipped) {
+        setError(isThai ? 'ข้ามการอัปโหลด เพราะมีไฟล์ชื่อนี้อยู่แล้ว' : 'Skipped upload because this file already exists');
       }
       setActiveTab('files');
       await fetchWorkspace();

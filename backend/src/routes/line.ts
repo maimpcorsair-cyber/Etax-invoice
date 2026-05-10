@@ -979,6 +979,7 @@ async function updateDocumentIntake(
       void syncDocumentIntakeToProjectDrive(id, {
         companyId: updated.companyId,
         preferredUserId: updated.userId,
+        duplicatePolicy: 'rename',
       });
     }
   } catch (err) {

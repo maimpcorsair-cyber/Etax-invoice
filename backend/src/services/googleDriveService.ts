@@ -128,6 +128,7 @@ export interface DriveUploadOptions {
   documentFolder?: DriveDocumentFolder | null;
   shareAnyone?: boolean;
   shareWithEmails?: string[];
+  duplicatePolicy?: 'rename' | 'replace' | 'skip' | 'error';
 }
 
 function driveFolderUrl(folderId: string) {
@@ -170,6 +171,13 @@ export interface DriveUploadResult {
   projectFolderUrl?: string;
   /** Whether the file landed in the user's personal Drive (true) or service account Drive (false) */
   userDrive: boolean;
+  duplicate?: {
+    policy: 'rename' | 'replace' | 'skip';
+    existingFileId?: string;
+    existingFileName?: string;
+    existingSize?: number | null;
+    requestedFileName: string;
+  };
 }
 
 function uniqueEmails(emails?: string[]) {
@@ -225,6 +233,64 @@ function buildDriveAuth(userRefreshToken?: string | null): { auth: Auth.OAuth2Cl
   return { auth: getServiceAccountAuth(), userDrive: false };
 }
 
+function splitFileName(name: string) {
+  const trimmed = sanitizeDriveName(name);
+  const dot = trimmed.lastIndexOf('.');
+  if (dot <= 0 || dot === trimmed.length - 1) return { base: trimmed, ext: '' };
+  return { base: trimmed.slice(0, dot), ext: trimmed.slice(dot) };
+}
+
+async function findDriveFileByName(
+  driveClient: ReturnType<typeof google.drive>,
+  folderId: string,
+  fileName: string,
+) {
+  const escapedName = escapeDriveQuery(sanitizeDriveName(fileName));
+  const existing = await driveClient.files.list({
+    q: `name='${escapedName}' and '${folderId}' in parents and trashed=false`,
+    fields: 'files(id,name,size,webViewLink)',
+    spaces: 'drive',
+    pageSize: 10,
+  });
+  return existing.data.files?.[0] ?? null;
+}
+
+async function resolveDriveDuplicate(
+  driveClient: ReturnType<typeof google.drive>,
+  folderId: string,
+  requestedName: string,
+  fileSize: number,
+  policy: DriveUploadOptions['duplicatePolicy'] = 'rename',
+) {
+  const safeName = sanitizeDriveName(requestedName);
+  const existing = await findDriveFileByName(driveClient, folderId, safeName);
+  if (!existing) return { fileName: safeName };
+
+  const duplicate = {
+    existingFileId: existing.id ?? undefined,
+    existingFileName: existing.name ?? safeName,
+    existingSize: existing.size ? Number(existing.size) : null,
+    requestedFileName: safeName,
+  };
+
+  if (policy === 'error') {
+    const sizeText = duplicate.existingSize === fileSize ? 'same size' : `existing size ${duplicate.existingSize ?? 'unknown'}, new size ${fileSize}`;
+    throw new Error(`Duplicate Drive file: ${safeName} (${sizeText})`);
+  }
+  if (policy === 'skip') return { fileName: safeName, existing, duplicate: { policy, ...duplicate } };
+  if (policy === 'replace') return { fileName: safeName, existing, duplicate: { policy, ...duplicate } };
+
+  const { base, ext } = splitFileName(safeName);
+  for (let index = 2; index <= 200; index += 1) {
+    const candidate = `${base} (${index})${ext}`;
+    const candidateExists = await findDriveFileByName(driveClient, folderId, candidate);
+    if (!candidateExists) {
+      return { fileName: candidate, duplicate: { policy: 'rename' as const, ...duplicate } };
+    }
+  }
+  throw new Error(`Could not generate a unique Drive file name for ${safeName}`);
+}
+
 export async function ensureProjectDriveFolder(input: {
   companyName: string;
   projectCode: string;
@@ -278,11 +344,43 @@ export async function uploadToDrive(
     await shareDriveFileWithEmails(driveClient, folder.projectFolderId, options.shareWithEmails, 'writer');
   }
 
-  const res = await driveClient.files.create({
-    requestBody: { name: originalName, parents: [folder.targetFolderId] },
+  const duplicateResolution = await resolveDriveDuplicate(
+    driveClient,
+    folder.targetFolderId,
+    originalName,
+    fileBuffer.length,
+    options.duplicatePolicy ?? 'rename',
+  );
+
+  if (duplicateResolution.existing && duplicateResolution.duplicate?.policy === 'skip') {
+    const fileId = duplicateResolution.existing.id!;
+    return {
+      fileId,
+      url: duplicateResolution.existing.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`,
+      fileName: duplicateResolution.existing.name ?? duplicateResolution.fileName,
+      folderId: folder.targetFolderId,
+      folderUrl: folder.targetFolderUrl,
+      projectFolderId: folder.projectFolderId,
+      projectFolderUrl: folder.projectFolderUrl,
+      userDrive,
+      duplicate: duplicateResolution.duplicate,
+    };
+  }
+
+  const writeRequest = {
     media: { mimeType, body: Readable.from(fileBuffer) },
     fields: 'id,name,webViewLink',
-  });
+  };
+  const res = duplicateResolution.existing && duplicateResolution.duplicate?.policy === 'replace'
+    ? await driveClient.files.update({
+      fileId: duplicateResolution.existing.id!,
+      requestBody: { name: duplicateResolution.fileName },
+      ...writeRequest,
+    })
+    : await driveClient.files.create({
+      requestBody: { name: duplicateResolution.fileName, parents: [folder.targetFolderId] },
+      ...writeRequest,
+    });
 
   const fileId = res.data.id!;
   const fileName = res.data.name ?? originalName;
@@ -308,5 +406,6 @@ export async function uploadToDrive(
     projectFolderId: folder.projectFolderId,
     projectFolderUrl: folder.projectFolderUrl,
     userDrive,
+    duplicate: duplicateResolution.duplicate,
   };
 }
