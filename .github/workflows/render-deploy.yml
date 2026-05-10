@@ -16,7 +16,7 @@ jobs:
   deploy:
     name: Migrate and Deploy Backend
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     concurrency:
       group: production-backend-deploy
       cancel-in-progress: false
@@ -126,7 +126,7 @@ jobs:
             exit 0
           fi
           echo "Waiting for deploy $DEPLOY_ID..."
-          for i in $(seq 1 20); do
+          for i in $(seq 1 80); do
             sleep 15
             RESULT=$(curl -s \
               -H "Authorization: Bearer $RENDER_API_KEY" \
@@ -141,7 +141,7 @@ jobs:
               exit 1
             fi
           done
-          echo "Timeout waiting for deploy (5 min)"
+          echo "Timeout waiting for deploy (20 min)"
           exit 1
 
       - name: Smoke check backend health
