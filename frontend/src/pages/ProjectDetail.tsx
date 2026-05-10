@@ -30,6 +30,7 @@ import type { LucideIcon } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
+import { useDriveStatus } from '../hooks/useDriveStatus';
 
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
 type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'po' | 'files' | 'purchases' | 'sales' | 'expenses';
@@ -331,6 +332,7 @@ export default function ProjectDetail() {
   const { id } = useParams();
   const { token, clearAuth } = useAuthStore();
   const { isThai, formatCurrency, formatDate } = useLanguage();
+  const { status: driveStatus, connect: connectDrive, refresh: refreshDriveStatus } = useDriveStatus();
   const [workspace, setWorkspace] = useState<ProjectWorkspace | null>(null);
   const [activeTab, setActiveTab] = useState<ProjectWorkspaceTab>('overview');
   const [loading, setLoading] = useState(true);
@@ -520,6 +522,11 @@ export default function ProjectDetail() {
   async function openProjectDriveFolder() {
     if (!token || !workspace) return;
     const currentUrl = workspace.driveFolder?.url || workspace.project.driveFolderUrl;
+    if (!currentUrl && driveStatus?.oauthConfigured && !driveStatus.connected && !driveStatus.serviceAccountConfigured) {
+      setError(isThai ? 'กรุณาเชื่อม Google Drive ก่อน ระบบกำลังพาไปยืนยันกับ Google' : 'Please connect Google Drive first. Redirecting to Google...');
+      await connectDrive(`${window.location.pathname}${window.location.search}`);
+      return;
+    }
     const popup = currentUrl ? null : window.open('', '_blank');
     if (popup) {
       popup.opener = null;
@@ -548,6 +555,7 @@ export default function ProjectDetail() {
         popup.close();
       }
       await fetchWorkspace();
+      await refreshDriveStatus();
     } catch (err) {
       if (popup) popup.close();
       setError(err instanceof Error ? err.message : 'Google Drive folder failed');

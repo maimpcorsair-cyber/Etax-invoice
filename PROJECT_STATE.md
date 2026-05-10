@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 15:44 Asia/Bangkok
+Last updated: 2026-05-10 18:32 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -73,6 +73,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Project detail popup-block fix is implemented locally and pending deploy:
   - Drive folder and Google Sheet buttons now open a placeholder tab synchronously on click, then redirect it after the async API call.
   - If a popup cannot open, the app falls back to navigating the current tab.
+- Project Drive connect flow guard is implemented locally and pending deploy:
+  - Production status showed `oauthConfigured:true`, `serviceAccountConfigured:false`, `driveUsable:true`, but `connected:false` for the demo admin user.
+  - Project detail now redirects to the Google Drive OAuth flow before attempting folder creation when no service account exists and the user has not completed Drive linking.
 - Google Drive OAuth hardening is deployed:
   - `/api/drive/status` now reports `oauthConfigured`, `serviceAccountConfigured`, missing env names, and redirect URI.
   - `/api/drive/connect` now stores OAuth state in DB table `drive_oauth_states` instead of process memory.
