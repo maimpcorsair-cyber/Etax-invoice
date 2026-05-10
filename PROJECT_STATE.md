@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 14:35 Asia/Bangkok
+Last updated: 2026-05-10 14:52 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -62,7 +62,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Project Google Drive Workspace deploy run: `25622268180` succeeded.
 - Latest verified Project Google Drive Workspace typecheck run: `25622268183` succeeded.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 with project Drive fields after deploy.
-- Google Drive OAuth hardening is implemented locally and pending commit/deploy:
+- Latest verified Google Drive OAuth hardening deploy run: `25623077465` succeeded.
+- Latest verified Google Drive OAuth hardening typecheck run: `25623077463` succeeded.
+- Vercel production frontend deploy was Ready 2026-05-10 14:52 Asia/Bangkok.
+- Production `GET /api/drive/status` after deploy returned `oauthConfigured:false`, `serviceAccountConfigured:false`, `driveUsable:false`, and missing env `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_REDIRECT_URI`.
+- Production `GET /api/drive/connect?returnPath=/app/settings` after deploy returned HTTP 503 with the new structured missing-env payload instead of the older generic failure.
+- Google Drive OAuth hardening is deployed:
   - `/api/drive/status` now reports `oauthConfigured`, `serviceAccountConfigured`, missing env names, and redirect URI.
   - `/api/drive/connect` now stores OAuth state in DB table `drive_oauth_states` instead of process memory.
   - Drive/Sheets service-account config supports `GOOGLE_SERVICE_ACCOUNT_JSON` in addition to `GOOGLE_SERVICE_ACCOUNT_KEY` and `GOOGLE_APPLICATION_CREDENTIALS`.
