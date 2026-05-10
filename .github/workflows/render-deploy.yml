@@ -8,8 +8,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'backend/**'
+      - 'backend/src/**'
+      - 'backend/prisma/**'
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
+      - 'backend/tsconfig*.json'
+      - 'backend/Dockerfile'
+      - 'backend/.dockerignore'
+      - 'prisma/**'
       - 'package*.json'
+      - 'render.yaml'
       - '.github/workflows/render-deploy.yml'
 
 jobs:
