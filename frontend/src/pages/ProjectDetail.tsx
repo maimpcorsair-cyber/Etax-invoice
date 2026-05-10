@@ -52,6 +52,9 @@ interface Project {
   customerName?: string | null;
   driveFolderId?: string | null;
   driveFolderUrl?: string | null;
+  googleSheetId?: string | null;
+  googleSheetUrl?: string | null;
+  googleSheetSyncedAt?: string | null;
   budgetAmount: number;
   status: ProjectStatus;
   owner?: ProjectUser | null;
@@ -317,6 +320,7 @@ interface ProjectWorkspace {
   expenseVouchers: ExpenseVoucher[];
   lineGroups: LineGroup[];
   driveFolder?: { id: string; url: string } | null;
+  googleSheet?: { id: string; url: string; syncedAt?: string | null } | null;
 }
 
 const STATUS_CLASSES: Record<ProjectStatus, string> = {
@@ -615,6 +619,7 @@ export default function ProjectDetail() {
       if (url) {
         if (popup) popup.location.href = url;
         else window.location.href = url;
+        await fetchWorkspace();
       } else if (popup) {
         popup.close();
       }
@@ -964,10 +969,10 @@ export default function ProjectDetail() {
             type="button"
             onClick={() => void syncProjectSheet()}
             disabled={sheetSyncing}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
           >
             {sheetSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-            {isThai ? 'Sync Sheet' : 'Sync Sheet'}
+            {workspace.googleSheet?.url || project.googleSheetUrl ? (isThai ? 'เปิด/Sync ตาราง' : 'Open/Sync Sheet') : (isThai ? 'สร้างตารางโปรเจค' : 'Create project sheet')}
           </button>
           <button
             type="button"

@@ -1319,6 +1319,9 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         driveFolder: row.driveFolderId && row.driveFolderUrl
           ? { id: row.driveFolderId, url: row.driveFolderUrl }
           : null,
+        googleSheet: row.googleSheetId && row.googleSheetUrl
+          ? { id: row.googleSheetId, url: row.googleSheetUrl, syncedAt: row.googleSheetSyncedAt }
+          : null,
       };
     });
     if (!data) {

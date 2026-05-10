@@ -32,6 +32,12 @@ const TYPE_EN: Record<string, string> = {
   debit_note: 'Debit Note',
 };
 
+function isGooglePermissionError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code) : '';
+  return code === '403' || /permission|forbidden|caller does not have permission/i.test(message);
+}
+
 /**
  * Creates a new Google Spreadsheet with bilingual invoice data.
  * Returns the spreadsheet URL.
@@ -343,8 +349,19 @@ export async function exportProjectToSheets(input: {
   if (id) {
     try {
       await sheets.spreadsheets.get({ spreadsheetId: id, fields: 'spreadsheetId' });
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: id,
+        requestBody: {
+          requests: [{
+            updateSpreadsheetProperties: {
+              properties: { title },
+              fields: 'title',
+            },
+          }],
+        },
+      });
     } catch (err) {
-      logger.warn('Existing project workbook is not accessible; creating a new one', { error: err, spreadsheetId: id, projectCode: input.project.code });
+      logger.warn('Existing project workbook is not writable; creating a new one', { error: err, spreadsheetId: id, projectCode: input.project.code });
       id = '';
     }
   }
@@ -376,6 +393,11 @@ export async function exportProjectToSheets(input: {
   await sheets.spreadsheets.values.batchClear({
     spreadsheetId: id,
     requestBody: { ranges: sheetTitles.map((sheetTitle) => `'${sheetTitle}'!A:Z`) },
+  }).catch((err) => {
+    if (isGooglePermissionError(err) && input.project.googleSheetId) {
+      throw new Error(`Existing project workbook is not writable: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    throw err;
   });
 
   const asDate = (value: Date | string) => value instanceof Date ? formatDate(value) : value;
