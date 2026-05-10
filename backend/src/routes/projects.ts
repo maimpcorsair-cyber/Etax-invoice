@@ -999,30 +999,56 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         }),
       ]);
 
-      await syncProjectPurchaseOrdersFromIntakes(companyId, row.id, documentIntakes, tx);
-      const purchaseOrders = await tx.projectPurchaseOrder.findMany({
-        where: { companyId, projectId: row.id },
-        orderBy: [{ issueDate: 'desc' }, { updatedAt: 'desc' }],
-        take: 100,
-        select: {
-          id: true,
-          poNumber: true,
-          documentType: true,
-          vendorName: true,
-          vendorTaxId: true,
-          issueDate: true,
-          expectedDate: true,
-          subtotal: true,
-          vatAmount: true,
-          total: true,
-          currency: true,
-          status: true,
-          source: true,
-          documentIntakeId: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+      let purchaseOrders: Array<{
+        id: string;
+        poNumber: string;
+        documentType: string;
+        vendorName: string | null;
+        vendorTaxId: string | null;
+        issueDate: Date | null;
+        expectedDate: Date | null;
+        subtotal: number | null;
+        vatAmount: number | null;
+        total: number | null;
+        currency: string;
+        status: string;
+        source: string;
+        documentIntakeId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }> = [];
+      try {
+        await syncProjectPurchaseOrdersFromIntakes(companyId, row.id, documentIntakes, tx);
+        purchaseOrders = await tx.projectPurchaseOrder.findMany({
+          where: { companyId, projectId: row.id },
+          orderBy: [{ issueDate: 'desc' }, { updatedAt: 'desc' }],
+          take: 100,
+          select: {
+            id: true,
+            poNumber: true,
+            documentType: true,
+            vendorName: true,
+            vendorTaxId: true,
+            issueDate: true,
+            expectedDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            currency: true,
+            status: true,
+            source: true,
+            documentIntakeId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      } catch (poErr) {
+        logger.warn('Project workspace PO/3-way section unavailable; continuing without PO rows', {
+          error: poErr instanceof Error ? poErr.message : String(poErr),
+          projectId: row.id,
+          companyId,
+        });
+      }
 
       const project = serializeProject(row, summary);
       const purchaseTotal = purchaseInvoices.reduce((sum, item) => sum + asNumber(item.total), 0);
