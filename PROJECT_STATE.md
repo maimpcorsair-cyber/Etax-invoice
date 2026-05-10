@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 01:45 Asia/Bangkok
+Last updated: 2026-05-11 02:09 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -113,6 +113,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified LINE Group Cost Guard deploy run: `25636196850` succeeded.
 - Latest verified LINE Group Cost Guard typecheck run: `25636196849` succeeded.
 - Production backend `/api/health` after LINE Group Cost Guard deploy returned `status: ok`, `version: 2026-05-09d`.
+- Latest verified Google Sign-In audience mismatch fix deploy run: `25636985010` succeeded.
+- Latest verified Google Sign-In audience mismatch fix typecheck run: `25636985005` succeeded.
+- Production backend/frontend `/api/health` after Google Sign-In audience mismatch fix returned `status: ok`, `version: 2026-05-09d`.
+- Production `/api/auth/google/config` returned `enabled:true` and backend client id `420889491125-i138802hjg1v8dul3spnaf6l58ieo5rb.apps.googleusercontent.com`.
+- Production login chunk `Login-DdWwkQLi.js` confirms the login page fetches `/api/auth/google/config` before falling back to bundled `VITE_GOOGLE_CLIENT_ID`.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.
@@ -129,7 +134,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Private 1:1 LINE chat still keeps the existing reply-token with push fallback behavior.
   - `/api/line/admin/ocr-health` now reports `groupSilentMode` and the current webhook reply mode.
   - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed.
-- Google Sign-In audience mismatch fix is implemented locally and pending deploy:
+- Google Sign-In audience mismatch fix is deployed:
   - Login page now fetches `/api/auth/google/config` first so the Google button uses the backend `GOOGLE_CLIENT_ID` instead of a potentially stale `VITE_GOOGLE_CLIENT_ID`.
   - If backend config is unavailable, the login page can still fall back to `VITE_GOOGLE_CLIENT_ID`.
   - Backend no longer exposes raw Google `Wrong recipient, payload audience != requiredAudience` errors to users; it returns a clearer configuration mismatch message and logs the raw detail server-side.
