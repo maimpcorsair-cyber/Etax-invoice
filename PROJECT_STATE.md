@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 11:33 Asia/Bangkok
+Last updated: 2026-05-10 13:05 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -56,6 +56,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Overage Billing Automation typecheck run: `25612930778` succeeded.
 - Latest verified Document OCR Hardening deploy run: `25619891540` succeeded.
 - Latest verified Document OCR Hardening typecheck run: `25619891538` succeeded.
+- Latest verified Project Workspace production fix deploy run: `25621254346` succeeded.
+- Latest verified Project Workspace production fix typecheck run: `25621254343` succeeded.
+- Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 after the fix.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
@@ -127,6 +130,16 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Fixed Project Workspace production 500:
+  - reproduced `Failed to fetch project workspace` on production for project `cmozbu2ow001l10l2rl5mym9i`
+  - root cause was schema drift: `document_comments` migration existed under root `prisma/migrations` but not under `backend/prisma/migrations`, while Render deploy runs migrations from `backend`
+  - added `backend/prisma/migrations/20260510_document_comments/migration.sql`
+  - guarded Project Workspace PO sync/query so a PO table issue cannot take down the whole workspace response
+  - tightened workspace error detail to `super_admin + debug=1` only
+- Fixed Render deploy verification:
+  - `Deploy to Render` now prefers Render API, handles `202 Queued` by locating the queued deploy via List deploys, waits for the deploy to become `live`, and has a 20-minute wait window
+  - previous green deploy runs could skip waiting when the API/deploy hook did not return a deploy id, so `/api/health` could pass against the old live instance
+  - verified deploy run `25621254346` waited for Render and succeeded
 - Added Document OCR Hardening v1:
   - new shared backend `documentOcrService` now drives LINE, web upload, and Project Guest Portal upload through the same pipeline
   - PDF path now tries text extraction, PDF OCR, rasterized page fallback, and bank-slip specialist fallback
