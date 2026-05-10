@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 03:46 Asia/Bangkok
+Last updated: 2026-05-11 04:05 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -144,6 +144,14 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified GitHub: Typecheck run `25639103709` succeeded in `49s`; Render deploy run `25639103701` succeeded in `9m23s`.
   - Production `/api/health` after deploy returned HTTP 200 in about `0.98s`.
   - Vercel production frontend contains `ProjectDetail-DPBJ19Qm.js` with `ตรวจและจัดประเภทเอกสาร`, `ตรวจ/จัดประเภทเอกสาร`, `บันทึกเป็นภาษีซื้อ`, and `สร้าง Payment Voucher`.
+- Project duplicate Drive upload guard is deployed:
+  - Web uploads to a project now return duplicate metadata before storing when another non-rejected document in the same project has the same file name; frontend prompts for `rename`, `replace`, or `skip`.
+  - Google Drive sync now checks the destination project subfolder before writing; default policy is auto-rename, with support for replace/skip/error.
+  - Guest portal and LINE/project uploads do not block chat users; duplicates auto-rename and add warnings such as `duplicate_upload:rename` and `drive_duplicate:rename`.
+  - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25639491233` succeeded in `54s`; Render deploy run `25639491244` succeeded in `9m42s`.
+  - Production `/api/health` after deploy returned HTTP 200 in about `1.01s`.
+  - Vercel production frontend contains `ProjectDetail-BcelSyjh.js` and `PurchaseInvoices-BFHMr-GJ.js` with the duplicate upload prompt copy.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.
