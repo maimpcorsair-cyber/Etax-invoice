@@ -1734,8 +1734,8 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
       const row = await tx.project.findFirst({
         where: { id: req.params.id, companyId },
         include: {
-          owner: { select: { name: true } },
-          approver: { select: { name: true } },
+          owner: { select: { name: true, email: true } },
+          approver: { select: { name: true, email: true } },
         },
       });
       if (!row) return null;
@@ -1998,13 +1998,13 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       const row = await tx.project.findFirst({
         where: { id: req.params.id, companyId },
         include: {
-          owner: { select: { name: true } },
-          approver: { select: { name: true } },
+          owner: { select: { name: true, email: true } },
+          approver: { select: { name: true, email: true } },
         },
       });
       if (!row) return null;
 
-      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups] = await Promise.all([
+      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups, projectMembers, company] = await Promise.all([
         projectBudgetSummary(companyId, row.id, tx),
         tx.documentIntake.findMany({
           where: { companyId, projectId: row.id },
@@ -2044,6 +2044,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
             vatAmount: true,
             total: true,
             isPaid: true,
+            pdfUrl: true,
           },
         }),
         tx.invoice.findMany({
@@ -2072,12 +2073,30 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
             voucherDate: true,
             description: true,
             totalAmount: true,
+            items: {
+              select: {
+                attachments: {
+                  take: 1,
+                  select: { url: true },
+                },
+              },
+            },
           },
         }),
         tx.lineGroupLink.findMany({
           where: { companyId, projectId: row.id, isActive: true },
           orderBy: { linkedAt: 'desc' },
           select: { groupName: true, linkedAt: true },
+        }),
+        tx.projectMember.findMany({
+          where: { projectId: row.id },
+          select: { user: { select: { email: true } } },
+        }),
+        tx.company.findUnique({
+          where: { id: companyId },
+          select: {
+            email: true,
+          },
         }),
       ]);
 
@@ -2148,6 +2167,13 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         invoices,
         expenseVouchers,
         lineGroups,
+        shareEmails: [
+          req.user!.email,
+          company?.email,
+          row.owner?.email,
+          row.approver?.email,
+          ...projectMembers.map((member) => member.user.email),
+        ],
       };
     });
 
@@ -2170,7 +2196,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       }
     }
 
-    const url = await exportProjectToSheets({
+    const sheet = await exportProjectToSheets({
       project: {
         code: exportData.project.code,
         name: exportData.project.name,
@@ -2180,8 +2206,9 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         ownerName: exportData.project.owner?.name ?? null,
         approverName: exportData.project.approver?.name ?? null,
         driveFolderId,
+        googleSheetId: exportData.project.googleSheetId,
       },
-      sharedWithEmail: req.user!.email,
+      sharedWithEmails: exportData.shareEmails,
       summary: exportData.workspaceSummary,
       actionNeeded: exportData.actionNeeded,
       files: exportData.files.map((item) => ({
@@ -2222,6 +2249,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         taxSafetyStatus: item.taxSafety.status,
         taxSafetyMessage: item.taxSafety.message,
         isPaid: item.isPaid,
+        attachmentUrl: item.pdfUrl,
       })),
       sales: exportData.invoices.map((item) => ({
         invoiceNumber: item.invoiceNumber,
@@ -2240,12 +2268,22 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         voucherDate: item.voucherDate,
         description: item.description ?? '',
         totalAmount: asNumber(item.totalAmount),
+        attachmentUrl: item.items.flatMap((expenseItem) => expenseItem.attachments.map((attachment) => attachment.url))[0] ?? null,
       })),
       lineGroups: exportData.lineGroups.map((item) => ({
         groupName: item.groupName ?? 'LINE Group',
         linkedAt: item.linkedAt,
       })),
     });
+
+    await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.project.update({
+      where: { id: exportData.project.id },
+      data: {
+        googleSheetId: sheet.spreadsheetId,
+        googleSheetUrl: sheet.url,
+        googleSheetSyncedAt: new Date(),
+      },
+    }));
 
     await auditLog({
       companyId,
@@ -2254,13 +2292,13 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       action: 'project.export_sheets',
       resourceType: 'project',
       resourceId: exportData.project.id,
-      details: { url, code: exportData.project.code },
+      details: { url: sheet.url, code: exportData.project.code, created: sheet.created },
       ipAddress: req.ip ?? '',
       userAgent: req.get('user-agent') ?? '',
       language: 'th',
     });
 
-    res.json({ data: { url } });
+    res.json({ data: { url: sheet.url, spreadsheetId: sheet.spreadsheetId, created: sheet.created } });
   } catch (err) {
     logger.error('Failed to export project to Google Sheets', { error: err, projectId: req.params.id });
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to export project to Google Sheets' });

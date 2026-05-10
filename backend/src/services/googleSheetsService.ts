@@ -178,7 +178,7 @@ export interface ExpenseSheetRow {
 function getAuthWithDrive() {
   return buildGoogleServiceAccountAuth([
     'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive',
   ]);
 }
 
@@ -320,38 +320,66 @@ export async function exportProjectToSheets(input: {
     ownerName?: string | null;
     approverName?: string | null;
     driveFolderId?: string | null;
+    googleSheetId?: string | null;
   };
-  sharedWithEmail?: string | null;
+  sharedWithEmails?: Array<string | null | undefined>;
   summary: Record<string, string | number>;
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
   files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string; driveSyncStatus?: string | null; driveUrl?: string | null; driveFolderUrl?: string | null }>;
   purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
   purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean; attachmentUrl?: string | null }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
-  expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
+  expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number; attachmentUrl?: string | null }>;
   lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
-}): Promise<string> {
+}): Promise<{ spreadsheetId: string; url: string; created: boolean }> {
   const auth = getAuthWithDrive();
   const sheets = google.sheets({ version: 'v4', auth });
   const drive = google.drive({ version: 'v3', auth });
-  const title = `${input.project.code} ${input.project.name} - Project Export ${new Date().toISOString().slice(0, 10)}`;
-  const spreadsheet = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: { title },
-      sheets: [
-        { properties: { title: 'Overview', sheetId: 0 } },
-        { properties: { title: 'Action Needed', sheetId: 1 } },
-        { properties: { title: 'Files', sheetId: 2 } },
-        { properties: { title: 'PO 3-way', sheetId: 3 } },
-        { properties: { title: 'Purchases', sheetId: 4 } },
-        { properties: { title: 'Sales', sheetId: 5 } },
-        { properties: { title: 'Expenses', sheetId: 6 } },
-        { properties: { title: 'LINE Groups', sheetId: 7 } },
-      ],
-    },
+  const title = `${input.project.code} ${input.project.name} - Billboy Project Workbook`;
+  const sheetTitles = ['Workflow', 'Overview', 'Action Needed', 'Files', 'PO 3-way', 'Purchases', 'Sales', 'Expenses', 'LINE Groups'];
+  let id = input.project.googleSheetId ?? '';
+  let created = false;
+
+  if (id) {
+    try {
+      await sheets.spreadsheets.get({ spreadsheetId: id, fields: 'spreadsheetId' });
+    } catch (err) {
+      logger.warn('Existing project workbook is not accessible; creating a new one', { error: err, spreadsheetId: id, projectCode: input.project.code });
+      id = '';
+    }
+  }
+
+  if (!id) {
+    const spreadsheet = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: { title },
+        sheets: sheetTitles.map((sheetTitle, index) => ({ properties: { title: sheetTitle, sheetId: index } })),
+      },
+    });
+    id = spreadsheet.data.spreadsheetId!;
+    created = true;
+  } else {
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: id, fields: 'sheets(properties(sheetId,title))' });
+    const existing = new Set((spreadsheet.data.sheets ?? []).map((sheet) => sheet.properties?.title).filter(Boolean));
+    const addRequests = sheetTitles
+      .filter((sheetTitle) => !existing.has(sheetTitle))
+      .map((sheetTitle) => ({ addSheet: { properties: { title: sheetTitle } } }));
+    if (addRequests.length) {
+      await sheets.spreadsheets.batchUpdate({ spreadsheetId: id, requestBody: { requests: addRequests } });
+    }
+  }
+
+  const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId: id, fields: 'sheets(properties(sheetId,title))' });
+  const sheetIds = (sheetMeta.data.sheets ?? [])
+    .map((sheet) => sheet.properties?.sheetId)
+    .filter((sheetId): sheetId is number => typeof sheetId === 'number');
+  await sheets.spreadsheets.values.batchClear({
+    spreadsheetId: id,
+    requestBody: { ranges: sheetTitles.map((sheetTitle) => `'${sheetTitle}'!A:Z`) },
   });
-  const id = spreadsheet.data.spreadsheetId!;
+
   const asDate = (value: Date | string) => value instanceof Date ? formatDate(value) : value;
+  const linkFormula = (url?: string | null, label = 'Open') => (url ? `=HYPERLINK("${String(url).replace(/"/g, '""')}","${label}")` : '');
 
   const overviewRows = [
     ['Project code', input.project.code],
@@ -364,7 +392,24 @@ export async function exportProjectToSheets(input: {
     ...Object.entries(input.summary).map(([key, value]) => [key, value]),
   ];
 
+  const workflowRows = [
+    ['Step', 'What to record', 'Required evidence', 'Where it appears'],
+    ['1. Collect', 'Upload PDF/JPG, LINE files, PO, slips, and receipts into this project', 'Original file link in Google Drive', 'Files'],
+    ['2. Classify', 'Mark each document as tax invoice, receipt, payment proof, PO, delivery note, or supporting document', 'Reviewer note and Drive link', 'Action Needed / Files'],
+    ['3. Input VAT', 'Confirm valid purchase tax invoices and receipts', 'Tax invoice PDF/JPG link', 'Purchases'],
+    ['4. PO 3-way', 'Match PO, supplier invoice, and payment slip', 'PO link, invoice link, payment proof link', 'PO 3-way'],
+    ['5. Sales VAT', 'Issue project-related sales invoices', 'Invoice PDF/XML from Billboy', 'Sales'],
+    ['6. Expense claim', 'Record small expenses or no-tax documents as Payment Voucher', 'Receipt/photo/chat/map evidence link', 'Expenses'],
+    ['7. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
+  ];
+
   await Promise.all([
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Workflow!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: workflowRows },
+    }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
       range: 'Overview!A1',
@@ -375,19 +420,19 @@ export async function exportProjectToSheets(input: {
       spreadsheetId: id,
       range: 'Action Needed!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['Severity', 'Type', 'Title', 'Message'], ...input.actionNeeded.map((item) => [item.severity, item.type, item.title, item.message])] },
+      requestBody: { values: [['Severity', 'Type', 'Title', 'Message', 'Next action'], ...input.actionNeeded.map((item) => [item.severity, item.type, item.title, item.message, 'Review in Billboy project workspace'])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
       range: 'Files!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'Drive sync', 'Drive file', 'Drive folder', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.driveSyncStatus ?? '', item.driveUrl ?? '', item.driveFolderUrl ?? '', item.mimeType, item.fileSize, asDate(item.createdAt)])] },
+      requestBody: { values: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'Drive sync', 'Open file', 'Open folder', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.driveSyncStatus ?? '', linkFormula(item.driveUrl), linkFormula(item.driveFolderUrl, 'Folder'), item.mimeType, item.fileSize, asDate(item.createdAt)])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
       range: 'Purchases!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid', 'Attachment'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No', item.attachmentUrl ?? ''])] },
+      requestBody: { values: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid', 'Attachment'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No', linkFormula(item.attachmentUrl)])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
@@ -405,7 +450,7 @@ export async function exportProjectToSheets(input: {
       spreadsheetId: id,
       range: 'Expenses!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total'], ...input.expenses.map((item) => [item.voucherNumber, item.status, asDate(item.voucherDate), item.description, item.totalAmount])] },
+      requestBody: { values: [['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total', 'Attachment'], ...input.expenses.map((item) => [item.voucherNumber, item.status, asDate(item.voucherDate), item.description, item.totalAmount, linkFormula(item.attachmentUrl)])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
@@ -418,7 +463,7 @@ export async function exportProjectToSheets(input: {
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: id,
     requestBody: {
-      requests: Array.from({ length: 8 }, (_, sheetId) => [
+      requests: sheetIds.flatMap((sheetId) => [
         {
           repeatCell: {
             range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
@@ -457,21 +502,26 @@ export async function exportProjectToSheets(input: {
       logger.warn('Could not move project sheet into Drive project folder', { error: err, folderId: input.project.driveFolderId });
     }
   }
-  if (input.sharedWithEmail) {
+  const shareTargets = Array.from(new Set(
+    (input.sharedWithEmails ?? [])
+      .map((email) => email?.trim().toLowerCase())
+      .filter((email): email is string => !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+  ));
+  await Promise.all(shareTargets.map(async (email) => {
     try {
       await drive.permissions.create({
         fileId: id,
-        requestBody: { role: 'writer', type: 'user', emailAddress: input.sharedWithEmail },
+        requestBody: { role: 'writer', type: 'user', emailAddress: email },
         sendNotificationEmail: false,
       });
     } catch (err) {
-      logger.warn('Could not share project sheet with user', { error: err, email: input.sharedWithEmail });
+      logger.warn('Could not share project sheet with user', { error: err, email });
     }
-  }
+  }));
 
   const url = `https://docs.google.com/spreadsheets/d/${id}`;
-  logger.info(`Project Sheets export created: ${url} (${input.project.code})`);
-  return url;
+  logger.info(`Project Sheets workbook synced: ${url} (${input.project.code})`);
+  return { spreadsheetId: id, url, created };
 }
 
 /* ── PP.30 / VAT summary sheet ─────────────────────────────────────────────── */
