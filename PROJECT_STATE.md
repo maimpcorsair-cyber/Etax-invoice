@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 23:22 Asia/Bangkok
+Last updated: 2026-05-10 23:28 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -20,6 +20,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
 - GitHub CLI is logged in as `maimpcorsair-cyber`; `gh run list` works.
+- Serena MCP is installed locally:
+  - `serena` is `/Users/domdom/.local/bin/serena`, version `1.2.0`.
+  - `serena init` and `serena setup codex` completed successfully.
+  - Codex user config `~/.codex/config.toml` has `[mcp_servers.serena]` using `/Users/domdom/.local/bin/serena start-mcp-server --context=codex --project-from-cwd`.
+  - Shell PATH was made persistent in `~/.zshrc`.
+  - Project config `.serena/project.yml` exists with `typescript` language support.
+  - `serena project health-check /Users/domdom/Documents/GitHub/Etax-invoice` passed; TypeScript language server was installed under `~/.serena`.
 - GitHub Actions `Deploy to Render` and `Typecheck` are working on `main`.
 - GitHub Actions `Health Check` now has retries and longer timeouts to reduce false failures from Render cold starts.
 - `Deploy to Render` workflow now treats `prisma migrate status` as informational; `prisma migrate deploy` is the step that applies/fails migrations.

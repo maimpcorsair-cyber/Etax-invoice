@@ -89,6 +89,16 @@ Project-scoped in `.mcp.json`:
 
 Run `/mcp` in Codex to see live status.
 
+### Serena MCP
+
+This project is configured for Serena MCP via the user-level Codex config. Serena should be used for project onboarding, symbol search, file/module overview, reference lookup, cross-file impact analysis, and safe refactoring.
+
+- Before non-trivial edits, inspect relevant symbols and references with Serena when the tool is available.
+- Avoid blind grep-based edits unless the task is a simple text-only change.
+- If Serena is unavailable in the current session, fall back to `rg`/file reads and state that Serena was unavailable.
+- After editing, run the relevant checks and summarize the result.
+- Serena was installed from the official Quick Start, not from an MCP/plugin marketplace.
+
 ## Key conventions
 
 ### Multi-tenancy
