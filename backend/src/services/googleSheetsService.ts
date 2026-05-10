@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { logger } from '../config/logger';
+import { buildGoogleServiceAccountAuth, isDriveServiceAccountConfigured } from './googleDriveService';
 
 interface InvoiceSheetRow {
   invoiceNumber: string;
@@ -17,18 +18,7 @@ interface InvoiceSheetRow {
 }
 
 function getAuth() {
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountKey) {
-    const credentials = JSON.parse(serviceAccountKey);
-    return new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-  }
-  return new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
+  return buildGoogleServiceAccountAuth(['https://www.googleapis.com/auth/spreadsheets']);
 }
 
 function formatDate(date: Date): string {
@@ -186,28 +176,14 @@ export interface ExpenseSheetRow {
 }
 
 function getAuthWithDrive() {
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountKey) {
-    const credentials = JSON.parse(serviceAccountKey);
-    return new google.auth.GoogleAuth({
-      credentials,
-      scopes: [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file',
-      ],
-    });
-  }
-  return new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: [
-      'https://www.googleapis.com/auth/spreadsheets',
-      'https://www.googleapis.com/auth/drive.file',
-    ],
-  });
+  return buildGoogleServiceAccountAuth([
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive.file',
+  ]);
 }
 
 export function isSheetsConfigured(): boolean {
-  return !!(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  return isDriveServiceAccountConfigured();
 }
 
 /**

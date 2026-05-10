@@ -3,8 +3,14 @@ import { useAuthStore } from '../store/authStore';
 
 export interface DriveStatus {
   configured: boolean;
+  oauthConfigured?: boolean;
+  serviceAccountConfigured?: boolean;
+  driveUsable?: boolean;
   connected: boolean;
   linkedAt: string | null;
+  mode?: 'user_oauth' | 'service_account' | 'not_configured';
+  requiredEnv?: string[];
+  redirectUri?: string;
 }
 
 export function useDriveStatus() {
@@ -12,6 +18,8 @@ export function useDriveStatus() {
   const [status, setStatus] = useState<DriveStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -19,8 +27,8 @@ export function useDriveStatus() {
       const res = await fetch('/api/drive/status', { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       setStatus(json.data);
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get Google Drive status');
     } finally {
       setLoading(false);
     }
@@ -33,6 +41,7 @@ export function useDriveStatus() {
     const params = new URLSearchParams(window.location.search);
     const drive = params.get('drive');
     if (drive) {
+      setLastResult(drive);
       // Remove the query param without reloading
       const url = new URL(window.location.href);
       url.searchParams.delete('drive');
@@ -41,18 +50,26 @@ export function useDriveStatus() {
     }
   }, [refresh]);
 
-  async function connect() {
-    if (!token) return;
+  async function connect(returnPath = `${window.location.pathname}${window.location.search}`) {
+    if (!token) return false;
     setConnecting(true);
+    setError(null);
     try {
-      const res = await fetch('/api/drive/connect', { headers: { Authorization: `Bearer ${token}` } });
+      const params = new URLSearchParams({ returnPath });
+      const res = await fetch(`/api/drive/connect?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       if (json.data?.url) {
         window.location.href = json.data.url;
+        return true;
       }
-    } catch {
+      const missing = json.details?.missingEnv?.length ? ` (${json.details.missingEnv.join(', ')})` : '';
+      setError(`${json.error ?? 'Google Drive is not configured'}${missing}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to connect Google Drive');
+    } finally {
       setConnecting(false);
     }
+    return false;
   }
 
   async function disconnect() {
@@ -61,5 +78,5 @@ export function useDriveStatus() {
     await refresh();
   }
 
-  return { status, loading, connecting, connect, disconnect, refresh };
+  return { status, loading, connecting, error, lastResult, connect, disconnect, refresh };
 }

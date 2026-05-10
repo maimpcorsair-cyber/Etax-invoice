@@ -4,10 +4,14 @@ import { logger } from '../config/logger';
 
 export function isDriveConfigured(): boolean {
   // Configured if service account OR user OAuth credentials are set
+  return isDriveServiceAccountConfigured() || isUserDriveOAuthConfigured();
+}
+
+export function isDriveServiceAccountConfigured(): boolean {
   return !!(
     process.env.GOOGLE_SERVICE_ACCOUNT_KEY ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS
   );
 }
 
@@ -15,12 +19,16 @@ export function isUserDriveOAuthConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+export function getDriveRedirectUri(): string {
+  return process.env.GOOGLE_DRIVE_REDIRECT_URI ?? `${process.env.API_URL ?? 'http://localhost:4000'}/api/drive/callback`;
+}
+
 /** Build OAuth2 client for the Authorization Code flow (per-user Drive). */
 export function buildOAuth2Client(): Auth.OAuth2Client {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_DRIVE_REDIRECT_URI ?? `${process.env.API_URL ?? 'http://localhost:4000'}/api/drive/callback`,
+    getDriveRedirectUri(),
   );
 }
 
@@ -43,18 +51,30 @@ export async function exchangeCodeForTokens(code: string): Promise<{ accessToken
   return { accessToken: tokens.access_token ?? '', refreshToken: tokens.refresh_token };
 }
 
-function getServiceAccountAuth() {
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+function parseServiceAccountKey() {
+  const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY ?? process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (key) {
-    return new google.auth.GoogleAuth({
-      credentials: JSON.parse(key),
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
-    });
+    return JSON.parse(key);
+  }
+  return null;
+}
+
+export function buildGoogleServiceAccountAuth(scopes: string[]) {
+  const credentials = parseServiceAccountKey();
+  if (credentials) {
+    return new google.auth.GoogleAuth({ credentials, scopes });
+  }
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    throw new Error('Google Drive service account is not configured');
   }
   return new google.auth.GoogleAuth({
     keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    scopes,
   });
+}
+
+function getServiceAccountAuth() {
+  return buildGoogleServiceAccountAuth(['https://www.googleapis.com/auth/drive.file']);
 }
 
 const FOLDER_NAME = 'Billboy';
@@ -156,6 +176,9 @@ function buildDriveAuth(userRefreshToken?: string | null): { auth: Auth.OAuth2Cl
     const oauthClient = buildOAuth2Client();
     oauthClient.setCredentials({ refresh_token: userRefreshToken });
     return { auth: oauthClient, userDrive: true };
+  }
+  if (!isDriveServiceAccountConfigured()) {
+    throw new Error('Google Drive is not configured: connect user Drive or set service account credentials');
   }
   return { auth: getServiceAccountAuth(), userDrive: false };
 }

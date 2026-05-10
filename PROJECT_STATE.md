@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 13:42 Asia/Bangkok
+Last updated: 2026-05-10 14:35 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -62,6 +62,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Project Google Drive Workspace deploy run: `25622268180` succeeded.
 - Latest verified Project Google Drive Workspace typecheck run: `25622268183` succeeded.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 with project Drive fields after deploy.
+- Google Drive OAuth hardening is implemented locally and pending commit/deploy:
+  - `/api/drive/status` now reports `oauthConfigured`, `serviceAccountConfigured`, missing env names, and redirect URI.
+  - `/api/drive/connect` now stores OAuth state in DB table `drive_oauth_states` instead of process memory.
+  - Drive/Sheets service-account config supports `GOOGLE_SERVICE_ACCOUNT_JSON` in addition to `GOOGLE_SERVICE_ACCOUNT_KEY` and `GOOGLE_APPLICATION_CREDENTIALS`.
+  - Settings/Expenses UI now explains whether project sync is using service account or personal Drive OAuth.
+  - Production before this fix returned `/api/drive/status` with `configured:false` and `/api/drive/connect` HTTP 503 because Google OAuth env was missing.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`

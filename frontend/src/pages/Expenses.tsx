@@ -77,7 +77,7 @@ export default function Expenses() {
   const { token, user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const { policy } = useCompanyAccessPolicy();
-  const { status: driveStatus, connecting: driveConnecting, connect: connectDrive, disconnect: disconnectDrive } = useDriveStatus();
+  const { status: driveStatus, connecting: driveConnecting, error: driveError, connect: connectDrive, disconnect: disconnectDrive } = useDriveStatus();
 
   const [vouchers, setVouchers] = useState<ExpenseVoucher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -543,8 +543,15 @@ export default function Expenses() {
         </div>
       )}
 
+      {driveError && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {driveError}
+        </div>
+      )}
+
       {/* Google Drive connect banner */}
-      {driveStatus?.configured && !driveStatus.connected && (
+      {driveStatus?.oauthConfigured && !driveStatus.connected && (
         <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
           <HardDrive className="w-5 h-5 text-blue-600 shrink-0" />
           <div className="flex-1 min-w-0">
@@ -552,7 +559,7 @@ export default function Expenses() {
             <p className="text-xs text-blue-600 mt-0.5">{t('expenses.driveConnectDesc', 'Upload attachments directly to your Drive — files stay in your account')}</p>
           </div>
           <button
-            onClick={connectDrive}
+            onClick={() => void connectDrive()}
             disabled={driveConnecting}
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
           >
@@ -562,7 +569,7 @@ export default function Expenses() {
         </div>
       )}
 
-      {driveStatus?.configured && driveStatus.connected && (
+      {driveStatus?.connected && (
         <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
           <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
           <p className="text-sm text-green-800 flex-1">

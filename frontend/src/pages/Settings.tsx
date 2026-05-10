@@ -74,8 +74,14 @@ interface IntegrationStatus {
 
 interface DriveStatus {
   configured: boolean;
+  oauthConfigured?: boolean;
+  serviceAccountConfigured?: boolean;
+  driveUsable?: boolean;
   connected: boolean;
   linkedAt?: string | null;
+  mode?: 'user_oauth' | 'service_account' | 'not_configured';
+  requiredEnv?: string[];
+  redirectUri?: string;
 }
 
 interface LineStatus {
@@ -473,10 +479,12 @@ export default function Settings() {
 
   const connectDrive = async () => {
     if (!token) return;
-    const res = await fetch('/api/drive/connect', { headers: authHeaders });
-    const json = await res.json() as { data?: { url: string }; error?: string };
+    const params = new URLSearchParams({ returnPath: `${window.location.pathname}${window.location.search}` });
+    const res = await fetch(`/api/drive/connect?${params.toString()}`, { headers: authHeaders });
+    const json = await res.json() as { data?: { url: string }; error?: string; details?: { missingEnv?: string[] } };
     if (!res.ok || !json.data?.url) {
-      setError(json.error ?? 'Google Drive is not configured');
+      const missing = json.details?.missingEnv?.length ? `: ${json.details.missingEnv.join(', ')}` : '';
+      setError(`${json.error ?? (isThai ? 'ยังเชื่อม Google Drive ไม่ได้' : 'Google Drive is not configured')}${missing}`);
       return;
     }
     window.location.href = json.data.url;
@@ -846,15 +854,37 @@ export default function Settings() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 font-semibold text-slate-900"><Cloud className="h-4 w-4 text-blue-600" /> Google Drive</div>
-                  <StatusPill ok={driveStatus?.connected} label={driveStatus?.connected ? (isThai ? 'เชื่อมแล้ว' : 'Connected') : (isThai ? 'ยังไม่เชื่อม' : 'Not linked')} />
+                  <StatusPill
+                    ok={driveStatus?.connected || driveStatus?.serviceAccountConfigured}
+                    label={driveStatus?.connected
+                      ? (isThai ? 'เชื่อมแล้ว' : 'Connected')
+                      : driveStatus?.serviceAccountConfigured
+                        ? (isThai ? 'พร้อม sync' : 'Sync ready')
+                        : (isThai ? 'ยังไม่พร้อม' : 'Not ready')}
+                  />
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {driveStatus?.configured
-                    ? (isThai ? 'ระบบพร้อมเชื่อมบัญชี Google Drive ของผู้ใช้' : 'User Drive OAuth is configured.')
-                    : (isThai ? 'ยังไม่ได้ตั้งค่า Google OAuth บน server' : 'Google OAuth is not configured on the server.')}
+                  {driveStatus?.connected
+                    ? (isThai ? 'ไฟล์จะเก็บใน Google Drive ของบัญชีผู้ใช้นี้' : 'Files will be stored in this user Google Drive.')
+                    : driveStatus?.oauthConfigured
+                      ? (isThai ? 'ระบบพร้อมให้ผู้ใช้เชื่อมบัญชี Google Drive ส่วนตัว' : 'User Drive OAuth is ready to connect.')
+                      : driveStatus?.serviceAccountConfigured
+                        ? (isThai ? 'โปรเจคยัง sync เข้า Drive กลางของระบบได้ แต่ถ้าต้องการเก็บใน Drive ของผู้ใช้ ให้ตั้งค่า OAuth เพิ่ม' : 'Project sync can use the service account Drive. Add OAuth to store files in each user Drive.')
+                        : (isThai ? 'ยังไม่ได้ตั้งค่า Google Drive บน server' : 'Google Drive is not configured on the server.')}
                 </p>
-                <button type="button" onClick={() => void connectDrive()} disabled={!driveStatus?.configured} className="btn-secondary mt-3 text-sm">
-                  {driveStatus?.connected ? (isThai ? 'เชื่อมใหม่' : 'Reconnect') : (isThai ? 'เชื่อม Google Drive' : 'Connect Drive')}
+                {driveStatus?.requiredEnv?.length ? (
+                  <p className="mt-2 text-xs leading-5 text-amber-700">
+                    {isThai ? 'ต้องเพิ่ม env: ' : 'Missing env: '}
+                    <span className="font-mono">{driveStatus.requiredEnv.join(', ')}</span>
+                    {driveStatus.redirectUri ? (
+                      <span className="block text-slate-500">
+                        Redirect URI: <span className="font-mono">{driveStatus.redirectUri}</span>
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
+                <button type="button" onClick={() => void connectDrive()} disabled={!driveStatus?.oauthConfigured} className="btn-secondary mt-3 text-sm">
+                  {driveStatus?.connected ? (isThai ? 'เชื่อมใหม่' : 'Reconnect') : (isThai ? 'เชื่อม Google Drive ของฉัน' : 'Connect my Drive')}
                 </button>
               </div>
 

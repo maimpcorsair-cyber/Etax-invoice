@@ -194,6 +194,7 @@ model User {
   projectMembers   ProjectMember[]
   lineUserLink     LineUserLink?
   linkedLineGroups LineGroupLink[]   @relation("LineGroupLinkedBy")
+  driveOAuthStates DriveOAuthState[]
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -201,6 +202,23 @@ model User {
   // Role-based filtering within a tenant (e.g., list all accountants)
   @@index([companyId, role])
   @@map("users")
+}
+
+model DriveOAuthState {
+  id         String   @id @default(cuid())
+  state      String   @unique
+  userId     String
+  companyId  String
+  returnPath String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([expiresAt])
+  @@map("drive_oauth_states")
 }
 
 model Customer {
