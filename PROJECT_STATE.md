@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 23:07 Asia/Bangkok
+Last updated: 2026-05-10 23:22 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -87,6 +87,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - The backend now shares the project folder with company email, company Drive owner email, and the current/preferred user email as `writer`.
   - Existing service-account-owned project folders are re-shared when `POST /api/projects/:id/drive/folder` is called, so older Google Drive links can recover from "The caller does not have permission".
   - This fixes Google Drive links opening with "The caller does not have permission" while still avoiding public `anyone with link` sharing.
+- Latest verified Service Account Drive folder re-share deploy run: `25633410156` succeeded.
+- Latest verified Service Account Drive folder re-share typecheck run: `25633410142` succeeded.
+- Production backend `/api/health` after deploy returned `status: ok`, `version: 2026-05-09d`.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.
