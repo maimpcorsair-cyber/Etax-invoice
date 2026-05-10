@@ -45,6 +45,11 @@ function isGooglePermissionError(err: unknown) {
   return code === '403' || /permission|forbidden|caller does not have permission/i.test(message);
 }
 
+function isGoogleDriveQuotaError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /storage quota|quota has been exceeded|storageQuotaExceeded/i.test(message);
+}
+
 /**
  * Creates a new Google Spreadsheet with bilingual invoice data.
  * Returns the spreadsheet URL.
@@ -480,7 +485,25 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
   let created = false;
 
   if (process.env.PROJECT_SHEETS_USE_DRIVE_UPLOAD !== 'false') {
-    return uploadProjectWorkbookViaDrive(input, title);
+    try {
+      return await uploadProjectWorkbookViaDrive(input, title);
+    } catch (err) {
+      if (input.userRefreshToken && isDriveServiceAccountConfigured() && (isGoogleDriveQuotaError(err) || isGooglePermissionError(err))) {
+        logger.warn('Project workbook upload through user Drive failed; retrying with service account root', {
+          error: err,
+          projectCode: input.project.code,
+        });
+        return uploadProjectWorkbookViaDrive({
+          ...input,
+          userRefreshToken: null,
+          project: {
+            ...input.project,
+            driveFolderId: null,
+          },
+        }, title);
+      }
+      throw err;
+    }
   }
 
   if (id) {
