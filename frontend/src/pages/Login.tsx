@@ -56,23 +56,22 @@ export default function Login() {
   }, [authReady, ownerMode, token, user]);
 
   useEffect(() => {
-    // Use build-time env var first (instant, no backend round-trip)
     const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-    if (envClientId) {
-      setGoogleConfig({ enabled: true, clientId: envClientId });
-      return;
-    }
 
-    // Fallback: fetch from backend (slower — avoid in production by setting VITE_GOOGLE_CLIENT_ID)
     let active = true;
     async function loadGoogleConfig() {
       try {
         const res = await fetch('/api/auth/google/config');
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (active && envClientId) setGoogleConfig({ enabled: true, clientId: envClientId });
+          return;
+        }
         const data = await res.json() as GoogleConfigResponse;
         if (active) setGoogleConfig(data);
       } catch {
-        if (active) setGoogleConfig({ enabled: false, clientId: null });
+        if (active) setGoogleConfig(envClientId
+          ? { enabled: true, clientId: envClientId }
+          : { enabled: false, clientId: null });
       }
     }
     loadGoogleConfig();

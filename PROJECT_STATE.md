@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 01:32 Asia/Bangkok
+Last updated: 2026-05-11 01:45 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -110,6 +110,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Migration file exists in both root and `backend/prisma/migrations`; the first deploy only had the root migration and caused workspace HTTP 500 from missing `line_group_links.sourceType`, fixed by commit `4c78134`.
 - Latest verified Project LINE Guest-to-User invite deploy run: `25635475979` succeeded.
 - Latest verified Project LINE Guest-to-User invite typecheck run: `25635475975` succeeded.
+- Latest verified LINE Group Cost Guard deploy run: `25636196850` succeeded.
+- Latest verified LINE Group Cost Guard typecheck run: `25636196849` succeeded.
+- Production backend `/api/health` after LINE Group Cost Guard deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.
@@ -120,12 +123,17 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Accepting an invite links `line_user_links`, updates `line_project_members.linkedUserId`, and upserts `project_members`.
   - LINE group members can type `เข้าทีม`/`join` to get their invite link; unlinked members who send a project document get one throttled invite nudge per 24h.
   - Backend/frontend typecheck and production builds passed locally.
-- LINE Group Cost Guard is implemented locally and pending deploy:
+- LINE Group Cost Guard is deployed:
   - Group/room webhook handling now runs in reply-only mode by default, so failed/expired reply tokens do not fall back to push messages.
   - LINE group text silent mode is enabled by default with `LINE_GROUP_SILENT_MODE !== 'false'`; regular group chat is ignored unless it is a link code or supported Billboy command.
   - Private 1:1 LINE chat still keeps the existing reply-token with push fallback behavior.
   - `/api/line/admin/ocr-health` now reports `groupSilentMode` and the current webhook reply mode.
   - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed.
+- Google Sign-In audience mismatch fix is implemented locally and pending deploy:
+  - Login page now fetches `/api/auth/google/config` first so the Google button uses the backend `GOOGLE_CLIENT_ID` instead of a potentially stale `VITE_GOOGLE_CLIENT_ID`.
+  - If backend config is unavailable, the login page can still fall back to `VITE_GOOGLE_CLIENT_ID`.
+  - Backend no longer exposes raw Google `Wrong recipient, payload audience != requiredAudience` errors to users; it returns a clearer configuration mismatch message and logs the raw detail server-side.
+  - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.

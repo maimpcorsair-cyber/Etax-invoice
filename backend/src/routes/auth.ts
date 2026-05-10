@@ -10,6 +10,7 @@ import {
   acceptProjectLineMemberInvite,
   ProjectLineInviteError,
 } from '../services/projectLineInviteService';
+import { logger } from '../config/logger';
 
 export const authRouter = Router();
 
@@ -246,7 +247,15 @@ authRouter.post('/google', async (req, res) => {
     }
 
     if (err instanceof Error) {
-      res.status(401).json({ error: err.message || 'Google authentication failed' });
+      if (err.message.includes('Wrong recipient') || err.message.includes('payload audience')) {
+        logger.warn('[Auth] Google Sign-In audience mismatch', { message: err.message });
+        res.status(401).json({
+          error: 'Google Sign-In configuration mismatch. Please refresh the page and try again, or ask the admin to check GOOGLE_CLIENT_ID.',
+        });
+        return;
+      }
+
+      res.status(401).json({ error: 'Google authentication failed' });
       return;
     }
 
