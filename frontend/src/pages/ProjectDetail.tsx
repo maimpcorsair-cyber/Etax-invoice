@@ -487,6 +487,12 @@ export default function ProjectDetail() {
 
   async function syncProjectSheet() {
     if (!token || !workspace) return;
+    const popup = window.open('', '_blank');
+    if (popup) {
+      popup.opener = null;
+      popup.document.title = isThai ? 'กำลังเปิด Google Sheet...' : 'Opening Google Sheet...';
+      popup.document.body.innerHTML = `<p style="font:14px system-ui,sans-serif;padding:24px;color:#334155">${isThai ? 'กำลังเตรียม Google Sheet...' : 'Preparing Google Sheet...'}</p>`;
+    }
     setSheetSyncing(true);
     setError('');
     try {
@@ -497,8 +503,14 @@ export default function ProjectDetail() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Google Sheets export failed');
       const url = json.data?.url;
-      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      if (url) {
+        if (popup) popup.location.href = url;
+        else window.location.href = url;
+      } else if (popup) {
+        popup.close();
+      }
     } catch (err) {
+      if (popup) popup.close();
       setError(err instanceof Error ? err.message : 'Google Sheets export failed');
     } finally {
       setSheetSyncing(false);
@@ -507,12 +519,19 @@ export default function ProjectDetail() {
 
   async function openProjectDriveFolder() {
     if (!token || !workspace) return;
+    const currentUrl = workspace.driveFolder?.url || workspace.project.driveFolderUrl;
+    const popup = currentUrl ? null : window.open('', '_blank');
+    if (popup) {
+      popup.opener = null;
+      popup.document.title = isThai ? 'กำลังเปิด Google Drive...' : 'Opening Google Drive...';
+      popup.document.body.innerHTML = `<p style="font:14px system-ui,sans-serif;padding:24px;color:#334155">${isThai ? 'กำลังเตรียมโฟลเดอร์ Google Drive...' : 'Preparing Google Drive folder...'}</p>`;
+    }
     setDriveOpening(true);
     setError('');
     try {
-      const currentUrl = workspace.driveFolder?.url || workspace.project.driveFolderUrl;
       if (currentUrl) {
-        window.open(currentUrl, '_blank', 'noopener,noreferrer');
+        const opened = window.open(currentUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.href = currentUrl;
         return;
       }
       const res = await fetch(`/api/projects/${workspace.project.id}/drive/folder`, {
@@ -522,9 +541,15 @@ export default function ProjectDetail() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Google Drive folder failed');
       const url = json.data?.folderUrl;
-      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      if (url) {
+        if (popup) popup.location.href = url;
+        else window.location.href = url;
+      } else if (popup) {
+        popup.close();
+      }
       await fetchWorkspace();
     } catch (err) {
+      if (popup) popup.close();
       setError(err instanceof Error ? err.message : 'Google Drive folder failed');
     } finally {
       setDriveOpening(false);

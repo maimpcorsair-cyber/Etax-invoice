@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 14:52 Asia/Bangkok
+Last updated: 2026-05-10 15:44 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -67,6 +67,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Vercel production frontend deploy was Ready 2026-05-10 14:52 Asia/Bangkok.
 - Production `GET /api/drive/status` after deploy returned `oauthConfigured:false`, `serviceAccountConfigured:false`, `driveUsable:false`, and missing env `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_REDIRECT_URI`.
 - Production `GET /api/drive/connect?returnPath=/app/settings` after deploy returned HTTP 503 with the new structured missing-env payload instead of the older generic failure.
+- Production Google Drive OAuth env was later set on Render and verified:
+  - `/api/drive/status` returned `oauthConfigured:true`, `driveUsable:true`, `requiredEnv:[]`, `connected:false`.
+  - `/api/drive/connect?returnPath=/app/settings` returned HTTP 200 with a Google OAuth URL.
+- Project detail popup-block fix is implemented locally and pending deploy:
+  - Drive folder and Google Sheet buttons now open a placeholder tab synchronously on click, then redirect it after the async API call.
+  - If a popup cannot open, the app falls back to navigating the current tab.
 - Google Drive OAuth hardening is deployed:
   - `/api/drive/status` now reports `oauthConfigured`, `serviceAccountConfigured`, missing env names, and redirect URI.
   - `/api/drive/connect` now stores OAuth state in DB table `drive_oauth_states` instead of process memory.
