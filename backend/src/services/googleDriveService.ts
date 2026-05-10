@@ -202,6 +202,17 @@ async function shareDriveFileWithEmails(
   }));
 }
 
+export async function shareServiceAccountDriveItem(
+  fileId: string,
+  emails?: string[],
+  role: 'reader' | 'writer' = 'writer',
+) {
+  if (!fileId || !isDriveServiceAccountConfigured()) return;
+
+  const driveClient = google.drive({ version: 'v3', auth: getServiceAccountAuth() as never });
+  await shareDriveFileWithEmails(driveClient, fileId, emails, role);
+}
+
 function buildDriveAuth(userRefreshToken?: string | null): { auth: Auth.OAuth2Client | Auth.GoogleAuth; userDrive: boolean } {
   if (userRefreshToken && isUserDriveOAuthConfigured()) {
     const oauthClient = buildOAuth2Client();

@@ -7,6 +7,7 @@ import {
   DriveDocumentFolder,
   ensureProjectDriveFolder,
   isDriveConfigured,
+  shareServiceAccountDriveItem,
   uploadToDrive,
 } from './googleDriveService';
 
@@ -222,14 +223,18 @@ export async function ensureProjectDriveFolderForUser(input: {
     return { company: companyRecord, project: projectRecord, user: preferredUser, companyOwner: owner };
   });
   if (!project) return null;
+  const shareWithEmails = [company?.email, companyOwner?.email, user?.email].filter(Boolean) as string[];
+  const selectedRefreshToken = selectDriveRefreshToken({
+    companyOwnerToken: companyOwner?.googleRefreshToken,
+    preferredUserToken: user?.googleRefreshToken,
+  });
+
   if (project.driveFolderId && project.driveFolderUrl) {
+    await shareServiceAccountDriveItem(project.driveFolderId, shareWithEmails, 'writer');
     return {
       folderId: project.driveFolderId,
       folderUrl: project.driveFolderUrl,
-      userDrive: !!selectDriveRefreshToken({
-        companyOwnerToken: companyOwner?.googleRefreshToken,
-        preferredUserToken: user?.googleRefreshToken,
-      }),
+      userDrive: !!selectedRefreshToken,
     };
   }
 
@@ -237,11 +242,8 @@ export async function ensureProjectDriveFolderForUser(input: {
     companyName: company?.nameEn ?? company?.nameTh ?? input.companyId,
     projectCode: project.code,
     projectName: project.name,
-    userRefreshToken: selectDriveRefreshToken({
-      companyOwnerToken: companyOwner?.googleRefreshToken,
-      preferredUserToken: user?.googleRefreshToken,
-    }),
-    shareWithEmails: [company?.email, companyOwner?.email, user?.email].filter(Boolean) as string[],
+    userRefreshToken: selectedRefreshToken,
+    shareWithEmails,
   });
 
   await withSystemRlsContext(prisma, (tx) => tx.project.updateMany({
