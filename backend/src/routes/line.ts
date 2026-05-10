@@ -18,6 +18,10 @@ import {
   verifyLineSignature,
   withLineReplyToken,
   getLineMessagingDiagnostics,
+  getLineGroupMemberCount,
+  getLineGroupMemberProfile,
+  getLineGroupSummary,
+  getLineRoomMemberCount,
   OverdueInvoice,
 } from '../services/lineService';
 import { askBillboy, buildCompanyContext, getOcrProductionReadiness, testOcrProvider, OcrResult } from '../services/aiService';
@@ -101,6 +105,7 @@ type LineOtpPayload = {
   type?: 'user' | 'group';
   userId?: string;
   companyId: string;
+  projectId?: string | null;
   issuedBy?: string;
 };
 
@@ -272,6 +277,7 @@ async function createLineLinkOtp(payload: LineOtpPayload) {
       type: payload.type ?? 'user',
       userId: payload.userId,
       companyId: payload.companyId,
+      projectId: payload.projectId ?? null,
       issuedBy: payload.issuedBy,
       expiresAt: new Date(Date.now() + OTP_TTL * 1000),
     },
@@ -285,6 +291,102 @@ function maskLineUserId(lineUserId?: string | null) {
   if (!lineUserId) return null;
   if (lineUserId.length <= 10) return 'linked';
   return `${lineUserId.slice(0, 3)}…${lineUserId.slice(-4)}`;
+}
+
+async function getLineConversationInfo(context: LineMessageContext) {
+  const lineGroupId = context.lineGroupId ?? context.lineRoomId;
+  if (!lineGroupId) return {};
+
+  const [summary, memberCount] = await Promise.all([
+    context.lineGroupId ? getLineGroupSummary(context.lineGroupId) : Promise.resolve(null),
+    context.lineGroupId
+      ? getLineGroupMemberCount(context.lineGroupId)
+      : getLineRoomMemberCount(lineGroupId),
+  ]);
+
+  return {
+    sourceType: context.lineGroupId ? 'group' : 'room',
+    groupName: summary?.groupName ?? (context.lineGroupId ? 'LINE Group' : 'LINE Room'),
+    pictureUrl: summary?.pictureUrl ?? null,
+    memberCount,
+  };
+}
+
+async function recordLineProjectMemberActivity(input: {
+  groupLink: {
+    id: string;
+    companyId: string;
+    projectId: string | null;
+    lineGroupId: string;
+  };
+  sourceType?: string;
+  senderLineUserId?: string;
+  senderDisplayName?: string | null;
+  senderPictureUrl?: string | null;
+  incrementDocumentCount?: boolean;
+}) {
+  const now = new Date();
+  let displayName = input.senderDisplayName ?? null;
+  let pictureUrl = input.senderPictureUrl ?? null;
+
+  if (input.senderLineUserId && input.sourceType === 'group' && (!displayName || !pictureUrl)) {
+    const profile = await getLineGroupMemberProfile(input.groupLink.lineGroupId, input.senderLineUserId);
+    displayName = displayName ?? profile?.displayName ?? null;
+    pictureUrl = pictureUrl ?? profile?.pictureUrl ?? null;
+  }
+
+  const linkedUser = input.senderLineUserId
+    ? await prisma.lineUserLink.findUnique({
+        where: { lineUserId: input.senderLineUserId },
+        select: { userId: true, isActive: true, user: { select: { companyId: true, name: true } } },
+      })
+    : null;
+  const linkedUserId = linkedUser?.isActive && linkedUser.user.companyId === input.groupLink.companyId ? linkedUser.userId : null;
+  displayName = displayName ?? linkedUser?.user.name ?? null;
+
+  await withSystemRlsContext(prisma, async (tx) => {
+    await tx.lineGroupLink.update({
+      where: { id: input.groupLink.id },
+      data: {
+        sourceType: input.sourceType ?? 'group',
+        lastMessageAt: now,
+        lastSenderLineUserId: input.senderLineUserId,
+        lastSenderDisplayName: displayName,
+      },
+    });
+
+    if (!input.groupLink.projectId || !input.senderLineUserId) return;
+
+    await tx.lineProjectMember.upsert({
+      where: {
+        lineGroupLinkId_lineUserId: {
+          lineGroupLinkId: input.groupLink.id,
+          lineUserId: input.senderLineUserId,
+        },
+      },
+      create: {
+        companyId: input.groupLink.companyId,
+        projectId: input.groupLink.projectId,
+        lineGroupLinkId: input.groupLink.id,
+        lineUserId: input.senderLineUserId,
+        displayName,
+        pictureUrl,
+        linkedUserId,
+        role: linkedUserId ? 'linked_user' : 'line_guest',
+        documentCount: input.incrementDocumentCount ? 1 : 0,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      },
+      update: {
+        displayName,
+        pictureUrl,
+        linkedUserId,
+        role: linkedUserId ? 'linked_user' : undefined,
+        documentCount: input.incrementDocumentCount ? { increment: 1 } : undefined,
+        lastSeenAt: now,
+      },
+    });
+  });
 }
 
 function buildOcrTextSummary(result: OcrResult, note?: string) {
@@ -986,7 +1088,13 @@ lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'
           id: true,
           projectId: true,
           lineGroupId: true,
+          sourceType: true,
           groupName: true,
+          pictureUrl: true,
+          memberCount: true,
+          lastMessageAt: true,
+          lastSenderDisplayName: true,
+          lastSyncedAt: true,
           isActive: true,
           linkedAt: true,
           project: {
@@ -1005,6 +1113,12 @@ lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'
         groupName: group.groupName,
         projectId: group.projectId,
         project: group.project,
+        sourceType: group.sourceType,
+        pictureUrl: group.pictureUrl,
+        memberCount: group.memberCount,
+        lastMessageAt: group.lastMessageAt,
+        lastSenderDisplayName: group.lastSenderDisplayName,
+        lastSyncedAt: group.lastSyncedAt,
         isActive: group.isActive,
         linkedAt: group.linkedAt,
         lineGroupIdMasked: maskLineUserId(group.lineGroupId),
@@ -1019,9 +1133,25 @@ lineRouter.get('/admin/groups', authenticate, requireRole('admin', 'super_admin'
 
 lineRouter.post('/admin/groups/link-start', authenticate, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
+    const body = z.object({ projectId: z.string().min(1).optional().nullable() }).parse(req.body ?? {});
+    if (body.projectId) {
+      const projectId = body.projectId;
+      const project = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+        tx.project.findFirst({
+          where: { id: projectId, companyId: req.user!.companyId },
+          select: { id: true },
+        }),
+      );
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+    }
+
     const otp = await createLineLinkOtp({
       type: 'group',
       companyId: req.user!.companyId,
+      projectId: body.projectId ?? null,
       issuedBy: req.user!.userId,
     });
 
@@ -1375,7 +1505,7 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
   const lineGroupId = context.lineGroupId ?? context.lineRoomId;
   if (!lineGroupId) return false;
 
-  const otpMatch = text.trim().match(/^(?:\/link-group\s+|\/link\s+)?(\d{6})$/);
+  const otpMatch = text.trim().match(/^(?:\/link-group\s+|\/link\s+|ผูกโปรเจค\s+|ผูกกลุ่ม\s+)?(\d{6})$/i);
   if (!otpMatch) return false;
 
   const otp = otpMatch[1];
@@ -1402,19 +1532,31 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
     return true;
   }
 
+  const lineInfo = await getLineConversationInfo(context);
+
   await withRlsContext(prisma, lineWebhookRlsContext(company.id, otpRecord.issuedBy), async (tx) => {
     await tx.lineGroupLink.upsert({
       where: { lineGroupId },
       create: {
         companyId: company.id,
+        projectId: otpRecord.projectId ?? null,
         lineGroupId,
-        groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
+        sourceType: lineInfo.sourceType ?? (context.lineGroupId ? 'group' : 'room'),
+        groupName: lineInfo.groupName ?? (context.lineGroupId ? 'LINE Group' : 'LINE Room'),
+        pictureUrl: lineInfo.pictureUrl ?? null,
+        memberCount: lineInfo.memberCount ?? null,
+        lastSyncedAt: new Date(),
         isActive: true,
         linkedById: otpRecord.issuedBy,
       },
       update: {
         companyId: company.id,
-        groupName: context.lineGroupId ? 'LINE Group' : 'LINE Room',
+        projectId: otpRecord.projectId ?? undefined,
+        sourceType: lineInfo.sourceType ?? (context.lineGroupId ? 'group' : 'room'),
+        groupName: lineInfo.groupName ?? (context.lineGroupId ? 'LINE Group' : 'LINE Room'),
+        pictureUrl: lineInfo.pictureUrl ?? null,
+        memberCount: lineInfo.memberCount ?? null,
+        lastSyncedAt: new Date(),
         isActive: true,
         linkedById: otpRecord.issuedBy,
         linkedAt: new Date(),
@@ -1425,7 +1567,7 @@ async function handleGroupLinkOtp(context: LineMessageContext, text: string): Pr
   });
   await sendLineText(
     context.replyTargetId,
-    `เชื่อมกลุ่ม LINE กับ ${company.nameTh} สำเร็จแล้วครับ\n\nจากนี้สมาชิกในกลุ่มส่งรูป/PDF ใบเสร็จหรือใบกำกับภาษีให้ Billboy อ่านและเข้าคิวเอกสารของบริษัทได้เลย`,
+    `เชื่อมกลุ่ม LINE กับ ${company.nameTh} สำเร็จแล้วครับ${otpRecord.projectId ? '\nเอกสารจากกลุ่มนี้จะเข้าโปรเจคที่เลือกอัตโนมัติ' : ''}\n\nจากนี้สมาชิกในกลุ่มส่งรูป/PDF ใบเสร็จหรือใบกำกับภาษีให้ Billboy อ่านและเข้าคิวเอกสารได้เลย`,
   );
   return true;
 }
@@ -1464,6 +1606,14 @@ async function resolveLineConversationContext(context: LineMessageContext) {
     if (!fallbackUserId) {
       return { ok: false as const, reason: 'no_active_user' as const };
     }
+
+    await recordLineProjectMemberActivity({
+      groupLink,
+      sourceType: context.lineGroupId ? 'group' : 'room',
+      senderLineUserId: context.senderLineUserId,
+      senderDisplayName: senderBelongsToGroupCompany ? senderLink.user.name : null,
+      senderPictureUrl: senderBelongsToGroupCompany ? senderLink.pictureUrl : null,
+    }).catch((err) => logger.warn('[Line] group member activity update failed', { err, lineGroupId: groupLink.lineGroupId }));
 
     return {
       ok: true as const,
@@ -2226,6 +2376,16 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       mimeType: contentType,
       buffer,
     });
+    if (resolved.groupLink && messageContext.senderLineUserId) {
+      void recordLineProjectMemberActivity({
+        groupLink: resolved.groupLink,
+        sourceType: messageContext.lineGroupId ? 'group' : 'room',
+        senderLineUserId: messageContext.senderLineUserId,
+        senderDisplayName: resolved.senderLink?.user.name ?? null,
+        senderPictureUrl: resolved.senderLink?.pictureUrl ?? null,
+        incrementDocumentCount: true,
+      }).catch((err) => logger.warn('[Line] group document sender update failed', { err, lineGroupId: resolved.groupLink?.lineGroupId }));
+    }
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
 

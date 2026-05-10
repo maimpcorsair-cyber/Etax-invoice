@@ -195,6 +195,7 @@ model User {
   createdProjects  Project[]         @relation("ProjectCreatedBy")
   projectMembers   ProjectMember[]
   lineUserLink     LineUserLink?
+  lineProjectMembers LineProjectMember[]
   linkedLineGroups LineGroupLink[]   @relation("LineGroupLinkedBy")
   driveOAuthStates DriveOAuthState[]
 
@@ -297,13 +298,18 @@ model Invoice {
   discountAmount Float @default(0) @map("discount")
   total          Float
 
+  // WHT (withholding tax)
+  whtRate          String? @map("wht_rate")
+  whtAmount        Float?  @map("wht_amount")
+  whtCertificateId String? @map("wht_certificate_id")
+
+  // Cancellation
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by")
+  cancelReason String?   @map("cancel_reason")
+
   notes         String?
   paymentMethod String?
-
-  // WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ)
-  whtAmount        Float?  @default(0)
-  whtRate          String? // "1" | "3" | "5" | null — percentage stored as string for JSONB safety
-  whtCertificateId String? // FK → WhtCertificate
 
   // RD submission
   rdSubmissionStatus RDSubmissionStatus?
@@ -324,24 +330,19 @@ model Invoice {
   paidAt     DateTime?
   paidAmount Float?
 
-  // Cancellation
-  cancelledAt  DateTime?
-  cancelledBy  String?
-  cancelReason String?
-
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company          Company         @relation(fields: [companyId], references: [id])
-  project          Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  buyer            Customer        @relation(fields: [buyerId], references: [id])
-  creator          User            @relation("CreatedBy", fields: [createdBy], references: [id])
+  company          Company          @relation(fields: [companyId], references: [id])
+  project          Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buyer            Customer         @relation(fields: [buyerId], references: [id])
+  creator          User             @relation("CreatedBy", fields: [createdBy], references: [id])
   items            InvoiceItem[]
-  referenceInvoice Invoice?        @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
-  relatedDocuments Invoice[]       @relation("InvoiceReference")
+  referenceInvoice Invoice?         @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
+  relatedDocuments Invoice[]        @relation("InvoiceReference")
   payments         Payment[]
-  whtCertificate   WhtCertificate?
+  whtCertificates  WhtCertificate[]
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
@@ -593,6 +594,7 @@ model Project {
   documentComments DocumentComment[]
   expenseVouchers  ExpenseVoucher[]
   lineGroupLinks   LineGroupLink[]
+  lineProjectMembers LineProjectMember[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -784,6 +786,21 @@ model PendingSignup {
   @@map("pending_signups")
 }
 
+model LineOtp {
+  id        String   @id @default(cuid())
+  otp       String   @unique
+  type      String   @default("user")
+  userId    String?
+  companyId String
+  projectId String?
+  issuedBy  String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([companyId, projectId])
+  @@map("line_otps")
+}
+
 model LineUserLink {
   id          String   @id @default(cuid())
   userId      String   @unique
@@ -799,25 +816,19 @@ model LineUserLink {
   @@map("line_user_links")
 }
 
-model LineOtp {
-  id        String   @id @default(cuid())
-  otp       String   @unique
-  type      String   @default("user")
-  userId    String?
-  companyId String
-  issuedBy  String?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@map("line_otps")
-}
-
 model LineGroupLink {
   id          String   @id @default(cuid())
   companyId   String
   projectId   String?
   lineGroupId String   @unique
+  sourceType  String   @default("group")
   groupName   String?
+  pictureUrl  String?
+  memberCount Int?
+  lastMessageAt DateTime?
+  lastSenderLineUserId String?
+  lastSenderDisplayName String?
+  lastSyncedAt DateTime?
   isActive    Boolean  @default(true)
   linkedById  String?
   linkedAt    DateTime @default(now())
@@ -827,12 +838,40 @@ model LineGroupLink {
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   linkedBy User?    @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+  members  LineProjectMember[]
 
   @@index([companyId])
   @@index([companyId, projectId])
   @@index([companyId, isActive])
   @@index([lineGroupId])
   @@map("line_group_links")
+}
+
+model LineProjectMember {
+  id              String   @id @default(cuid())
+  companyId       String
+  projectId       String
+  lineGroupLinkId String
+  lineUserId      String
+  displayName     String?
+  pictureUrl      String?
+  linkedUserId    String?
+  role            String   @default("line_guest")
+  documentCount   Int      @default(0)
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lineGroupLink LineGroupLink @relation(fields: [lineGroupLinkId], references: [id], onDelete: Cascade)
+  linkedUser    User?         @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([lineGroupLinkId, lineUserId])
+  @@index([companyId, projectId])
+  @@index([companyId, lineUserId])
+  @@index([projectId, role])
+  @@map("line_project_members")
 }
 
 model ExpenseVoucher {
@@ -950,45 +989,30 @@ model ExpenseAttachment {
   @@map("expense_attachments")
 }
 
-// ─── WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ) ─────────────────────
 model WhtCertificate {
-  id        String  @id @default(cuid())
-  companyId String
-  invoiceId String?
-
-  // Certificate number: WHT-{COMPANY_TAXID}-{YYYYMM}-{SEQ}
-  certificateNumber String @unique
-
-  // WHT details
-  whtRate     String // "1" | "3" | "5" — อัตราหักภาษี ตามมาตรา 40
-  whtAmount   Float
-  totalAmount Float // ยอดรายได้ก่อนหักภาษี (ก่อน WHT)
-  netAmount   Float // ยอดสุทธิหลังหัก WHT = totalAmount - whtAmount
-
-  // Recipient (ผู้ถูกหักภาษี)
-  recipientName   String
-  recipientTaxId  String
-  recipientBranch String @default("00000")
-
-  // Income type — ประเภทของเงินได้ (Thai tax law section 40)
-  // 1 = ค่าจ้าง (m40(1)), 2 = ค่าเช่า/ดอกเบี้ย (m40(2)), 4 = ค่าบริการ/นายหน้า (m40(4)(ก))
-  incomeType String // "1" | "2" | "4" | null
-
-  paymentDate DateTime
-
-  // PDF storage
-  pdfUrl String?
-
-  createdBy String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  companyId         String   @map("company_id")
+  invoiceId         String?  @map("invoice_id")
+  certificateNumber String   @map("certificate_number")
+  whtRate           String   @map("wht_rate")
+  whtAmount         Float    @map("wht_amount")
+  totalAmount       Float    @map("total_amount")
+  netAmount         Float    @map("net_amount")
+  recipientName     String   @map("recipient_name")
+  recipientTaxId    String   @map("recipient_tax_id")
+  recipientBranch   String   @default("00000") @map("recipient_branch")
+  incomeType        String?  @map("income_type")
+  paymentDate       DateTime @map("payment_date")
+  pdfUrl            String?  @map("pdf_url")
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoice Invoice? @relation(fields: [invoiceId], references: [id])
 
-  @@unique([invoiceId])
+  @@unique([companyId, certificateNumber])
   @@index([companyId])
-  @@index([companyId, createdAt])
-  @@index([invoiceId])
+  @@index([companyId, paymentDate])
   @@map("wht_certificates")
 }

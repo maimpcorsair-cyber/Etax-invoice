@@ -33,7 +33,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useDriveStatus } from '../hooks/useDriveStatus';
 
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
-type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'po' | 'files' | 'purchases' | 'sales' | 'expenses';
+type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'po' | 'files' | 'line' | 'purchases' | 'sales' | 'expenses';
 type TaxSafetyStatus = 'vat_claimable' | 'expense_only_no_vat' | 'needs_tax_invoice' | 'missing_required_fields' | 'unmatched_payment' | 'supporting_only' | 'needs_review';
 
 interface ProjectUser {
@@ -281,8 +281,26 @@ interface ExpenseVoucher {
 
 interface LineGroup {
   id: string;
+  sourceType?: string | null;
   groupName?: string | null;
+  pictureUrl?: string | null;
+  memberCount?: number | null;
+  lastMessageAt?: string | null;
+  lastSenderDisplayName?: string | null;
+  lastSyncedAt?: string | null;
   linkedAt: string;
+  members?: LineProjectMember[];
+}
+
+interface LineProjectMember {
+  id: string;
+  lineUserId: string;
+  displayName?: string | null;
+  pictureUrl?: string | null;
+  role: string;
+  documentCount: number;
+  lastSeenAt: string;
+  linkedUser?: ProjectUser | null;
 }
 
 interface ProjectWorkspace {
@@ -322,6 +340,21 @@ const TAX_SAFETY_CLASSES: Record<TaxSafetyStatus, string> = {
   needs_review: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
+const LINE_PROJECT_ROLES = [
+  { value: 'line_guest', labelTh: 'LINE guest', labelEn: 'LINE guest' },
+  { value: 'staff', labelTh: 'ผู้ส่งเอกสาร', labelEn: 'Staff' },
+  { value: 'viewer', labelTh: 'ดูอย่างเดียว', labelEn: 'Viewer' },
+  { value: 'approver', labelTh: 'ผู้อนุมัติ', labelEn: 'Approver' },
+  { value: 'accountant', labelTh: 'บัญชี', labelEn: 'Accountant' },
+  { value: 'project_owner', labelTh: 'เจ้าของโปรเจค', labelEn: 'Project owner' },
+  { value: 'linked_user', labelTh: 'ผู้ใช้ระบบ', labelEn: 'Linked user' },
+];
+
+function lineRoleLabel(role: string, isThai: boolean) {
+  const found = LINE_PROJECT_ROLES.find((item) => item.value === role);
+  return found ? (isThai ? found.labelTh : found.labelEn) : role;
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -345,6 +378,10 @@ export default function ProjectDetail() {
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [voucherCreatingId, setVoucherCreatingId] = useState<string | null>(null);
+  const [lineLinking, setLineLinking] = useState(false);
+  const [lineRefreshingId, setLineRefreshingId] = useState<string | null>(null);
+  const [lineRoleUpdatingId, setLineRoleUpdatingId] = useState<string | null>(null);
+  const [lineLinkCode, setLineLinkCode] = useState<{ otp: string; command: string; expiresInSeconds: number } | null>(null);
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -384,6 +421,7 @@ export default function ProjectDetail() {
       { id: 'matching' as const, label: isThai ? 'จับคู่' : 'Matching', count: summary?.smartMatchCount ?? workspace?.smartMatches?.length ?? 0 },
       { id: 'po' as const, label: isThai ? 'PO' : 'PO', count: summary?.purchaseOrderCount ?? workspace?.purchaseOrders?.length ?? 0 },
       { id: 'files' as const, label: isThai ? 'ไฟล์' : 'Files', count: summary?.filesCount ?? 0 },
+      { id: 'line' as const, label: isThai ? 'LINE ทีม' : 'LINE team', count: summary?.lineGroupCount ?? workspace?.lineGroups?.length ?? 0 },
       { id: 'purchases' as const, label: isThai ? 'ขาซื้อ' : 'Purchases', count: workspace?.purchaseInvoices.length ?? 0 },
       { id: 'sales' as const, label: isThai ? 'ขาขาย' : 'Sales', count: workspace?.invoices.length ?? 0 },
       { id: 'expenses' as const, label: isThai ? 'เบิกจ่าย' : 'Expenses', count: workspace?.expenseVouchers.length ?? 0 },
@@ -584,6 +622,65 @@ export default function ProjectDetail() {
     }
   }
 
+  async function generateLineGroupLinkCode() {
+    if (!token || !workspace) return;
+    setLineLinking(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/line/link-start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'LINE group link failed');
+      setLineLinkCode(json.data);
+      setActiveTab('line');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'LINE group link failed');
+    } finally {
+      setLineLinking(false);
+    }
+  }
+
+  async function refreshLineGroup(group: LineGroup) {
+    if (!token || !workspace) return;
+    setLineRefreshingId(group.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/line/groups/${group.id}/refresh`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'LINE group refresh failed');
+      await fetchWorkspace();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'LINE group refresh failed');
+    } finally {
+      setLineRefreshingId(null);
+    }
+  }
+
+  async function updateLineMemberRole(member: LineProjectMember, role: string) {
+    if (!token || !workspace) return;
+    setLineRoleUpdatingId(member.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/line/members/${member.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'LINE member role update failed');
+      await fetchWorkspace();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'LINE member role update failed');
+    } finally {
+      setLineRoleUpdatingId(null);
+    }
+  }
+
   async function downloadAttachmentZip() {
     if (!token || !workspace) return;
     setZipDownloading(true);
@@ -772,6 +869,15 @@ export default function ProjectDetail() {
           </button>
           <button
             type="button"
+            onClick={() => void generateLineGroupLinkCode()}
+            disabled={lineLinking}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+          >
+            {lineLinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+            {isThai ? 'ผูก LINE กลุ่ม' : 'Link LINE group'}
+          </button>
+          <button
+            type="button"
             onClick={() => void downloadAttachmentZip()}
             disabled={zipDownloading}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -906,13 +1012,21 @@ export default function ProjectDetail() {
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'LINE / ทีม' : 'LINE / team'} icon={Users}>
             <div className="space-y-3">
+              {lineLinkCode && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-xs font-semibold text-emerald-900">{isThai ? 'ส่งรหัสนี้ใน LINE group' : 'Send this code in the LINE group'}</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-emerald-900">{lineLinkCode.otp}</p>
+                </div>
+              )}
               {workspace.lineGroups.length === 0 ? (
                 <EmptyBlock text={isThai ? 'ยังไม่ได้ผูกกลุ่ม LINE กับโปรเจคนี้' : 'No LINE group linked to this project yet'} />
               ) : (
                 workspace.lineGroups.map((group) => (
                   <div key={group.id} className="rounded-lg border border-slate-200 p-3">
                     <p className="font-semibold text-slate-900">{group.groupName || (isThai ? 'กลุ่ม LINE' : 'LINE group')}</p>
-                    <p className="text-xs text-slate-500">{formatDate(group.linkedAt)}</p>
+                    <p className="text-xs text-slate-500">
+                      {(group.memberCount ?? group.members?.length ?? 0)} {isThai ? 'สมาชิก' : 'members'} · {formatDate(group.lastMessageAt ?? group.linkedAt)}
+                    </p>
                   </div>
                 ))
               )}
@@ -954,6 +1068,122 @@ export default function ProjectDetail() {
       {activeTab === 'files' && (
         <WorkspacePanel title={isThai ? 'ไฟล์ทั้งหมดของโปรเจค' : 'Project file library'} icon={FolderOpen}>
           <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
+        </WorkspacePanel>
+      )}
+
+      {activeTab === 'line' && (
+        <WorkspacePanel title={isThai ? 'LINE groups และสมาชิกในโปรเจค' : 'Project LINE groups and members'} icon={MessageCircle}>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-emerald-950">{isThai ? 'ผูก LINE group กับโปรเจคนี้' : 'Link a LINE group to this project'}</p>
+                <p className="mt-1 text-sm text-emerald-800">
+                  {isThai ? 'เพิ่ม Billboy เข้ากลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนั้น เอกสารใหม่จะเข้าโปรเจคนี้อัตโนมัติ' : 'Add Billboy to the group, then send the 6-digit code there. New documents will route into this project automatically.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void generateLineGroupLinkCode()}
+                disabled={lineLinking}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+              >
+                {lineLinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                {isThai ? 'สร้างรหัสผูกกลุ่ม' : 'Generate code'}
+              </button>
+            </div>
+
+            {lineLinkCode && (
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase text-slate-500">{isThai ? 'รหัสใช้ได้ 10 นาที' : 'Code expires in 10 minutes'}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <span className="font-mono text-3xl font-bold tracking-widest text-slate-950">{lineLinkCode.otp}</span>
+                  <button
+                    type="button"
+                    onClick={() => void navigator.clipboard?.writeText(lineLinkCode.command || lineLinkCode.otp)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {isThai ? 'คัดลอกคำสั่ง' : 'Copy command'}
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{lineLinkCode.command}</p>
+              </div>
+            )}
+
+            {workspace.lineGroups.length === 0 ? (
+              <EmptyBlock text={isThai ? 'ยังไม่มี LINE group ที่ผูกกับโปรเจคนี้' : 'No LINE group is linked to this project yet'} />
+            ) : (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {workspace.lineGroups.map((group) => (
+                  <div key={group.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 gap-3">
+                        {group.pictureUrl ? (
+                          <img src={group.pictureUrl} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+                        ) : (
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                            <MessageCircle className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate font-bold text-slate-950">{group.groupName || (isThai ? 'กลุ่ม LINE' : 'LINE group')}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {(group.memberCount ?? group.members?.length ?? 0)} {isThai ? 'สมาชิก' : 'members'}
+                            {group.lastMessageAt ? ` · ${isThai ? 'ล่าสุด' : 'last'} ${formatDate(group.lastMessageAt)}` : ''}
+                          </p>
+                          {group.lastSenderDisplayName && (
+                            <p className="mt-1 text-xs text-slate-500">{isThai ? 'คนส่งล่าสุด' : 'Last sender'}: {group.lastSenderDisplayName}</p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void refreshLineGroup(group)}
+                        disabled={lineRefreshingId === group.id}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {lineRefreshingId === group.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        {isThai ? 'อัปเดตชื่อ' : 'Refresh'}
+                      </button>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {(group.members ?? []).length === 0 ? (
+                        <EmptyBlock text={isThai ? 'ยังไม่มี activity จากสมาชิกในกลุ่มนี้' : 'No member activity from this group yet'} />
+                      ) : (
+                        (group.members ?? []).map((member) => (
+                          <div key={member.id} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                            {member.pictureUrl ? (
+                              <img src={member.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                            ) : (
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-slate-500">
+                                <Users className="h-4 w-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-900">{member.displayName || member.linkedUser?.name || (isThai ? 'สมาชิก LINE' : 'LINE member')}</p>
+                              <p className="text-xs text-slate-500">
+                                {lineRoleLabel(member.role, isThai)} · {member.documentCount} {isThai ? 'ไฟล์' : 'files'} · {formatDate(member.lastSeenAt)}
+                              </p>
+                            </div>
+                            <select
+                              value={member.role}
+                              disabled={lineRoleUpdatingId === member.id}
+                              onChange={(event) => void updateLineMemberRole(member, event.target.value)}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+                            >
+                              {LINE_PROJECT_ROLES.map((role) => (
+                                <option key={role.value} value={role.value}>{isThai ? role.labelTh : role.labelEn}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </WorkspacePanel>
       )}
 

@@ -13,6 +13,7 @@ import { exportProjectToSheets, isSheetsConfigured } from '../services/googleShe
 import { downloadFromStorage } from '../services/storageService';
 import { createZip, ZipEntryInput } from '../services/zipService';
 import { sendLineText } from '../services/lineService';
+import { getLineGroupMemberCount, getLineGroupSummary, getLineRoomMemberCount } from '../services/lineService';
 import {
   ensureProjectDriveFolderForUser,
   syncDocumentIntakeToProjectDrive,
@@ -22,6 +23,7 @@ export const projectsRouter = Router();
 
 const statusSchema = z.enum(['active', 'on_hold', 'completed', 'archived']);
 const memberRoleSchema = z.enum(['owner', 'approver', 'member', 'viewer']);
+const lineProjectMemberRoleSchema = z.enum(['project_owner', 'accountant', 'approver', 'staff', 'viewer', 'line_guest', 'linked_user']);
 
 const projectPayloadSchema = z.object({
   code: z.string().trim().min(1).max(32).optional(),
@@ -57,6 +59,10 @@ const documentCommentPayloadSchema = z.object({
   kind: z.enum(['comment', 'request']).default('comment'),
 });
 
+const lineMemberRolePayloadSchema = z.object({
+  role: lineProjectMemberRoleSchema,
+});
+
 const PROJECT_PORTAL_TTL = process.env.PROJECT_PORTAL_TTL ?? '7d';
 
 function getFrontendBaseUrl() {
@@ -80,6 +86,29 @@ function buildProjectPortalUrl(input: { companyId: string; projectId: string; gr
     { expiresIn: PROJECT_PORTAL_TTL as any },
   );
   return `${getFrontendBaseUrl()}/project-portal/${token}`;
+}
+
+async function createProjectLineGroupOtp(input: { companyId: string; projectId: string; issuedBy: string }) {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  await prisma.lineOtp.deleteMany({
+    where: {
+      companyId: input.companyId,
+      projectId: input.projectId,
+      type: 'group',
+      expiresAt: { lt: new Date() },
+    },
+  });
+  await prisma.lineOtp.create({
+    data: {
+      otp,
+      type: 'group',
+      companyId: input.companyId,
+      projectId: input.projectId,
+      issuedBy: input.issuedBy,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+  });
+  return otp;
 }
 
 function normalizeCode(input?: string | null) {
@@ -1007,7 +1036,31 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         tx.lineGroupLink.findMany({
           where: { companyId, projectId: row.id, isActive: true },
           orderBy: { linkedAt: 'desc' },
-          select: { id: true, groupName: true, linkedAt: true },
+          select: {
+            id: true,
+            sourceType: true,
+            groupName: true,
+            pictureUrl: true,
+            memberCount: true,
+            lastMessageAt: true,
+            lastSenderDisplayName: true,
+            lastSyncedAt: true,
+            linkedAt: true,
+            members: {
+              orderBy: [{ lastSeenAt: 'desc' }],
+              take: 50,
+              select: {
+                id: true,
+                lineUserId: true,
+                displayName: true,
+                pictureUrl: true,
+                role: true,
+                documentCount: true,
+                lastSeenAt: true,
+                linkedUser: { select: { id: true, name: true, email: true, role: true } },
+              },
+            },
+          },
         }),
       ]);
 
@@ -1161,6 +1214,116 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         ? { details: err instanceof Error ? err.message : String(err) }
         : {}),
     });
+  }
+});
+
+projectsRouter.post('/:id/line/link-start', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const project = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+      tx.project.findFirst({
+        where: { id: req.params.id, companyId },
+        select: { id: true, code: true, name: true },
+      }),
+    );
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const otp = await createProjectLineGroupOtp({
+      companyId,
+      projectId: project.id,
+      issuedBy: req.user!.userId,
+    });
+
+    res.json({
+      data: {
+        otp,
+        expiresInSeconds: 600,
+        command: `ผูกโปรเจค ${otp}`,
+        project,
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to create project LINE group link OTP', { error: err, projectId: req.params.id });
+    res.status(500).json({ error: 'Failed to generate LINE group link code' });
+  }
+});
+
+projectsRouter.post('/:id/line/groups/:groupLinkId/refresh', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const group = await tx.lineGroupLink.findFirst({
+        where: { id: req.params.groupLinkId, companyId, projectId: req.params.id, isActive: true },
+        select: { id: true, lineGroupId: true, sourceType: true },
+      });
+      if (!group) return null;
+
+      const [summary, memberCount] = await Promise.all([
+        group.sourceType === 'room' ? Promise.resolve(null) : getLineGroupSummary(group.lineGroupId),
+        group.sourceType === 'room' ? getLineRoomMemberCount(group.lineGroupId) : getLineGroupMemberCount(group.lineGroupId),
+      ]);
+
+      return tx.lineGroupLink.update({
+        where: { id: group.id },
+        data: {
+          groupName: summary?.groupName ?? undefined,
+          pictureUrl: summary?.pictureUrl ?? undefined,
+          memberCount: memberCount ?? undefined,
+          lastSyncedAt: new Date(),
+        },
+        select: {
+          id: true,
+          sourceType: true,
+          groupName: true,
+          pictureUrl: true,
+          memberCount: true,
+          lastMessageAt: true,
+          lastSenderDisplayName: true,
+          lastSyncedAt: true,
+          linkedAt: true,
+        },
+      });
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'LINE group not found for this project' });
+      return;
+    }
+    res.json({ data: updated });
+  } catch (err) {
+    logger.error('Failed to refresh project LINE group', { error: err, projectId: req.params.id, groupLinkId: req.params.groupLinkId });
+    res.status(500).json({ error: 'Failed to refresh LINE group info' });
+  }
+});
+
+projectsRouter.patch('/:id/line/members/:memberId', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const body = lineMemberRolePayloadSchema.parse(req.body);
+    const companyId = req.user!.companyId;
+    const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+      tx.lineProjectMember.updateMany({
+        where: {
+          id: req.params.memberId,
+          companyId,
+          projectId: req.params.id,
+        },
+        data: { role: body.role },
+      }),
+    );
+    if (updated.count === 0) {
+      res.status(404).json({ error: 'LINE project member not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to update project LINE member role', { error: err, projectId: req.params.id, memberId: req.params.memberId });
+    res.status(500).json({ error: 'Failed to update LINE member role' });
   }
 });
 

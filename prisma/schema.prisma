@@ -195,6 +195,7 @@ model User {
   createdProjects  Project[]         @relation("ProjectCreatedBy")
   projectMembers   ProjectMember[]
   lineUserLink     LineUserLink?
+  lineProjectMembers LineProjectMember[]
   linkedLineGroups LineGroupLink[]   @relation("LineGroupLinkedBy")
   driveOAuthStates DriveOAuthState[]
 
@@ -593,6 +594,7 @@ model Project {
   documentComments DocumentComment[]
   expenseVouchers  ExpenseVoucher[]
   lineGroupLinks   LineGroupLink[]
+  lineProjectMembers LineProjectMember[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -790,10 +792,12 @@ model LineOtp {
   type      String   @default("user")
   userId    String?
   companyId String
+  projectId String?
   issuedBy  String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  @@index([companyId, projectId])
   @@map("line_otps")
 }
 
@@ -817,7 +821,14 @@ model LineGroupLink {
   companyId   String
   projectId   String?
   lineGroupId String   @unique
+  sourceType  String   @default("group")
   groupName   String?
+  pictureUrl  String?
+  memberCount Int?
+  lastMessageAt DateTime?
+  lastSenderLineUserId String?
+  lastSenderDisplayName String?
+  lastSyncedAt DateTime?
   isActive    Boolean  @default(true)
   linkedById  String?
   linkedAt    DateTime @default(now())
@@ -827,12 +838,40 @@ model LineGroupLink {
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   linkedBy User?    @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+  members  LineProjectMember[]
 
   @@index([companyId])
   @@index([companyId, projectId])
   @@index([companyId, isActive])
   @@index([lineGroupId])
   @@map("line_group_links")
+}
+
+model LineProjectMember {
+  id              String   @id @default(cuid())
+  companyId       String
+  projectId       String
+  lineGroupLinkId String
+  lineUserId      String
+  displayName     String?
+  pictureUrl      String?
+  linkedUserId    String?
+  role            String   @default("line_guest")
+  documentCount   Int      @default(0)
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lineGroupLink LineGroupLink @relation(fields: [lineGroupLinkId], references: [id], onDelete: Cascade)
+  linkedUser    User?         @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([lineGroupLinkId, lineUserId])
+  @@index([companyId, projectId])
+  @@index([companyId, lineUserId])
+  @@index([projectId, role])
+  @@map("line_project_members")
 }
 
 model ExpenseVoucher {

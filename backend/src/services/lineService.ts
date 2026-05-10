@@ -132,6 +132,53 @@ export async function sendLineTextWithQuickReply(
   return linePush(lineUserId, [{ type: 'text', text, quickReply: { items } }]);
 }
 
+async function lineGetJson<T>(url: string): Promise<T | null> {
+  if (!channelAccessToken) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${channelAccessToken}` },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      logger.warn('[Line] API GET failed', { url, status: res.status, body: body.slice(0, 500) });
+      return null;
+    }
+    return await res.json() as T;
+  } catch (err) {
+    logger.warn('[Line] API GET error', { url, error: String(err) });
+    return null;
+  }
+}
+
+export async function getLineGroupSummary(lineGroupId: string): Promise<{ groupName?: string; pictureUrl?: string } | null> {
+  return lineGetJson<{ groupName?: string; pictureUrl?: string }>(
+    `https://api.line.me/v2/bot/group/${encodeURIComponent(lineGroupId)}/summary`,
+  );
+}
+
+export async function getLineGroupMemberCount(lineGroupId: string): Promise<number | null> {
+  const json = await lineGetJson<{ count?: number }>(
+    `https://api.line.me/v2/bot/group/${encodeURIComponent(lineGroupId)}/members/count`,
+  );
+  return typeof json?.count === 'number' ? json.count : null;
+}
+
+export async function getLineRoomMemberCount(lineRoomId: string): Promise<number | null> {
+  const json = await lineGetJson<{ count?: number }>(
+    `https://api.line.me/v2/bot/room/${encodeURIComponent(lineRoomId)}/members/count`,
+  );
+  return typeof json?.count === 'number' ? json.count : null;
+}
+
+export async function getLineGroupMemberProfile(
+  lineGroupId: string,
+  lineUserId: string,
+): Promise<{ displayName?: string; pictureUrl?: string; userId?: string } | null> {
+  return lineGetJson<{ displayName?: string; pictureUrl?: string; userId?: string }>(
+    `https://api.line.me/v2/bot/group/${encodeURIComponent(lineGroupId)}/member/${encodeURIComponent(lineUserId)}`,
+  );
+}
+
 export function buildOverdueFlexCard(invoices: OverdueInvoice[]): object {
   const displayInvoices = invoices.slice(0, 5);
 

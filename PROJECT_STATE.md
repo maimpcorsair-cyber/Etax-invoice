@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 23:33 Asia/Bangkok
+Last updated: 2026-05-10 23:55 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -98,6 +98,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Service Account Drive folder re-share deploy run: `25633410156` succeeded.
 - Latest verified Service Account Drive folder re-share typecheck run: `25633410142` succeeded.
 - Production backend `/api/health` after deploy returned `status: ok`, `version: 2026-05-09d`.
+- Project LINE Team v1 is implemented locally and pending deploy:
+  - New migration `20260510_project_line_team` adds project-scoped LINE group metadata and `line_project_members`.
+  - Project Workspace has a `LINE team` tab with project-specific group link code generation, connected group cards, member activity, and per-member project role controls.
+  - LINE group OTP can be project-specific; sending `ผูกโปรเจค 123456` or the bare 6-digit code in the group links that group directly to the project.
+  - LINE webhook now syncs group name/member count when linking, updates last activity on group messages, records LINE guest members, and increments document counts when group members send files.
+  - Backend and frontend typecheck/build passed locally after syncing root and backend Prisma schemas.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.
