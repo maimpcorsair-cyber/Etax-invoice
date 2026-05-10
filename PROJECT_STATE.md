@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 21:55 Asia/Bangkok
+Last updated: 2026-05-10 11:33 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -119,6 +119,19 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Document OCR Hardening v1:
+  - new shared backend `documentOcrService` now drives LINE, web upload, and Project Guest Portal upload through the same pipeline
+  - PDF path now tries text extraction, PDF OCR, rasterized page fallback, and bank-slip specialist fallback
+  - image path now runs QR decode, general OCR, and bank-slip specialist fallback when needed
+  - Project Guest Portal uploads now run OCR immediately instead of staying as review-only files with no extracted data
+  - Project Workspace file rows now show OCR summary: type, amount, date, supplier, payment from/to, reference, tax treatment, and confidence
+  - non-VAT/expense-only documents can be converted from Project Workspace into a draft Expense Voucher linked back to the original document intake
+- Verified locally after Document OCR Hardening v1:
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Added Overage Billing Automation v1:
   - `GET /api/billing/usage-overage` now returns billing period, auto-charge guard state, and existing overage charge state
   - new guarded `POST /api/billing/usage-overage/charge` creates a Stripe invoice item + auto-charge invoice for OCR overage

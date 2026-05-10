@@ -20,12 +20,18 @@ import {
   getLineMessagingDiagnostics,
   OverdueInvoice,
 } from '../services/lineService';
-import { askBillboy, buildCompanyContext, getOcrProductionReadiness, looksLikeBankSlipCandidate, ocrBankTransferSlip, ocrSupplierInvoice, testOcrProvider, OcrResult } from '../services/aiService';
+import { askBillboy, buildCompanyContext, getOcrProductionReadiness, testOcrProvider, OcrResult } from '../services/aiService';
+import {
+  analyzeAccountingDocumentBuffer,
+  documentIntakeWarningsForOcr,
+  hasUsefulDocumentData,
+  PURCHASE_RECORD_DOCUMENT_TYPES,
+  REVIEW_ONLY_DOCUMENT_TYPES,
+  supportedDocumentMimeType,
+} from '../services/documentOcrService';
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
-import { decodeQrFromImage } from '../services/qrDecodeService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
-import { rasterizePdfToPngPages } from '../services/pdfRasterService';
 
 export const lineRouter = Router();
 
@@ -81,16 +87,6 @@ const BANK_TRANSFER_TEMPLATE_FIELDS: DocumentTemplateField[] = [
   { key: 'payment.reference', label: 'เลขอ้างอิงสลิป', hint: 'เช่น เลข reference/transaction id บนสลิป', type: 'text' },
 ];
 
-const PURCHASE_RECORD_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
-  'tax_invoice',
-  'receipt',
-  'invoice',
-  'billing_note',
-  'expense_receipt',
-  'credit_note',
-  'debit_note',
-]);
-
 function lineWebhookRlsContext(companyId: string, userId?: string | null) {
   return {
     companyId,
@@ -99,16 +95,6 @@ function lineWebhookRlsContext(companyId: string, userId?: string | null) {
     systemMode: false,
   };
 }
-
-const REVIEW_ONLY_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
-  'quotation',
-  'purchase_order',
-  'delivery_note',
-  'withholding_tax',
-  'bank_statement',
-  'contract',
-  'other',
-]);
 
 type LineOtpPayload = {
   type?: 'user' | 'group';
@@ -2222,7 +2208,6 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     stage = 'detect_file_type';
     const contentType = detectLineFileMimeType(buffer, contentResponse.headers.get('content-type') ?? '', messageType);
     const isPdf = contentType === 'application/pdf';
-    const qrResult = !isPdf ? decodeQrFromImage(buffer, contentType) : { ok: false };
     const companyId = resolved.companyId;
     const intake = await createDocumentIntake({
       companyId,
@@ -2237,7 +2222,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
 
-    if (!['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(contentType)) {
+    if (!supportedDocumentMimeType(contentType)) {
       await sendLineText(lineUserId, 'ไฟล์ชนิดนี้ยังไม่รองรับครับ กรุณาส่งเป็นรูป JPG/PNG/WebP หรือ PDF');
       await updateDocumentIntake(intake?.id, {
         status: 'failed',
@@ -2248,49 +2233,10 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     await updateDocumentIntake(intake?.id, { status: 'processing' });
 
-    if (isPdf) {
-      // Step 1: extract text (fast, cheap — works for digital/typed PDFs)
-      let pdfText = '';
-      let pageCount = 1;
-      try {
-        stage = 'pdf_parse';
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { PDFParse } = require('pdf-parse');
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
-        pageCount = textResult.total ?? 1;
-        pdfText = (textResult.text ?? '').trim().slice(0, 8000);
-        logger.info('[Line] PDF text extracted', { chars: pdfText.length, pages: pageCount });
-      } catch (pdfErr) {
-        logger.warn('[Line] pdf-parse failed', { error: String(pdfErr) });
-      }
-
-      if (pdfText.length > 30) {
-        // Step 2a: got text — send to chat model (cheap, no vision needed)
-        stage = 'ocr_text_pdf';
-        result = await ocrSupplierInvoice(Buffer.from(pdfText, 'utf-8').toString('base64'), 'text/plain', {
-          pageCount,
-          source: 'text_pdf',
-          companyId,
-        });
-      } else {
-        // Step 2b: no text (scanned PDF) — send PDF binary to Gemini via OpenRouter
-        logger.info('[Line] No text found, sending PDF through OCR pipeline', { bytes: buffer.length });
-        stage = 'ocr_scan_pdf';
-        result = await ocrSupplierInvoice(buffer.toString('base64'), 'application/pdf', {
-          pageCount,
-          source: 'scan_pdf',
-          companyId,
-        });
-      }
-    } else {
-      stage = 'ocr_image';
-      result = await ocrSupplierInvoice(buffer.toString('base64'), contentType, {
-        source: 'image',
-        qrText: qrResult.ok ? qrResult.text : undefined,
-        companyId,
-      });
-    }
+    stage = 'document_ocr_pipeline';
+    const analysis = await analyzeAccountingDocumentBuffer(buffer, contentType, companyId);
+    result = analysis.result;
+    const qrText = analysis.qrText;
 
     if (!result) {
       await updateDocumentIntake(intake?.id, {
@@ -2301,72 +2247,20 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       return;
     }
 
-    if (isPdf && !hasUsefulLineOcrData(result)) {
-      stage = 'pdf_raster_fallback';
-      logger.info('[Line] PDF OCR returned no useful fields; rasterizing pages for vision fallback', {
-        bytes: buffer.length,
-        provider: result.extractionProvider,
-      });
-      const rasterPages = await rasterizePdfToPngPages(buffer);
-      for (const [index, png] of rasterPages.entries()) {
-        stage = `pdf_raster_ocr_page_${index + 1}`;
-        const pageResult = await ocrSupplierInvoice(png.toString('base64'), 'image/png', {
-          source: 'image',
-          companyId,
-          pageCount: rasterPages.length,
-        });
-
-        let candidate = pageResult;
-        if (candidate.documentType !== 'bank_transfer'
-          && candidate.documentType !== 'payment_advice'
-          && (!paymentAmount(candidate) || looksLikeBankSlipCandidate(candidate))) {
-          const slipCandidate = await ocrBankTransferSlip(png.toString('base64'), 'image/png');
-          if (paymentAmount(slipCandidate) || slipCandidate.invoiceNumber || slipCandidate.payment?.reference) {
-            candidate = slipCandidate;
-          }
-        }
-
-        if (hasUsefulLineOcrData(candidate)) {
-          result = {
-            ...candidate,
-            extractionProvider: `${candidate.extractionProvider ?? 'vision'}+pdf-raster-fallback`,
-            validationWarnings: [
-              ...(candidate.validationWarnings ?? []),
-              `อ่านจากภาพหน้า PDF หน้า ${index + 1}`,
-            ],
-          };
-          break;
-        }
-      }
-    }
-
-    if (result.documentType !== 'bank_transfer'
-      && result.documentType !== 'payment_advice'
-      && (!paymentAmount(result) || looksLikeBankSlipCandidate(result))) {
-      stage = 'ocr_bank_slip_specialist';
-      const slipResult = await ocrBankTransferSlip(
-        buffer.toString('base64'),
-        contentType,
-        qrResult.ok ? qrResult.text : undefined,
-      );
-      if (paymentAmount(slipResult) || slipResult.invoiceNumber || slipResult.payment?.reference) {
-        result = slipResult;
-      }
-    }
-
     logger.info('[Line] OCR result', {
       confidence: result.confidence,
       supplierName: result.supplierName,
       total: result.total,
-      qrDecoded: qrResult.ok,
+      qrDecoded: !!qrText,
+      stages: analysis.stages,
     });
 
-    const hasAnyData = hasUsefulLineOcrData(result);
+    const hasAnyData = hasUsefulDocumentData(result) || hasUsefulLineOcrData(result);
     if (!hasAnyData) {
       await updateDocumentIntake(intake?.id, {
         status: 'failed',
         ocrResult: result,
-        warnings: result.validationWarnings,
+        warnings: documentIntakeWarningsForOcr(result, analysis.stages),
         error: 'OCR returned no useful fields',
       });
       await sendLineText(lineUserId, `❌ ยังอ่านข้อมูลจากเอกสารนี้ไม่ได้${intake?.id ? '\n\nไฟล์ถูกเก็บไว้ในหน้า Input VAT แล้ว เพื่อให้กดเปิดดู/ตรวจเองได้' : ''}\n\nกรุณาลองถ่ายให้ชัดขึ้น เห็นทั้งใบ ไม่เอียง แสงพอ และเห็นเลขผู้เสียภาษี/วันที่/ยอดรวม หรือส่งเป็น PDF ต้นฉบับ`);
@@ -2377,7 +2271,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       stage = 'match_bank_transfer';
       const enrichedResult = {
         ...result,
-        qrText: qrResult.ok ? qrResult.text : undefined,
+        qrText,
       } as OcrResult;
       const [field] = missingTemplateFields(enrichedResult);
       if (field && intake?.id) {
@@ -2398,12 +2292,9 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         status: 'needs_review',
         ocrResult: {
           ...result,
-          qrText: qrResult.ok ? qrResult.text : undefined,
+          qrText,
         } as OcrResult,
-        warnings: [
-          ...(result.validationWarnings ?? []),
-          `review_only:${result.documentType}`,
-        ],
+        warnings: documentIntakeWarningsForOcr(result, analysis.stages),
       });
       await sendLineText(lineUserId, buildReviewOnlySummary(result));
       return;
@@ -2417,7 +2308,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       void restFields;
       const enrichedResult = {
         ...result,
-        qrText: qrResult.ok ? qrResult.text : undefined,
+        qrText,
       } as OcrResult;
       if (intake?.id) {
         await askForMissingField(lineUserId, intake.id, enrichedResult, firstField);
@@ -2436,7 +2327,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     void tempId;
     const enrichedResult = {
       ...result,
-      qrText: qrResult.ok ? qrResult.text : undefined,
+      qrText,
     } as OcrResult;
     if (intake?.id) {
       stage = 'await_confirmation';

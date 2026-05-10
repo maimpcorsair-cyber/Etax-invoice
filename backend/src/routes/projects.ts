@@ -276,6 +276,44 @@ function dateField(data: Record<string, unknown> | null, key: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function ocrSummaryForIntake(item: { ocrResult: unknown }) {
+  const data = item.ocrResult as Record<string, unknown> | null;
+  if (!data) return null;
+  const meta = data.documentMetadata as Record<string, unknown> | undefined;
+  const payment = data.payment as Record<string, unknown> | undefined;
+  const amount = numberField(payment ?? null, 'amount') || numberField(data, 'total');
+  const reference = textField(payment ?? null, 'reference')
+    || textField(meta ?? null, 'purchaseOrderNumber')
+    || textField(meta ?? null, 'quotationNumber')
+    || textField(meta ?? null, 'deliveryNoteNumber')
+    || textField(data, 'invoiceNumber');
+
+  return {
+    documentType: textField(data, 'documentType'),
+    documentTypeLabel: textField(data, 'documentTypeLabel'),
+    supplierName: textField(data, 'supplierName') || textField(meta ?? null, 'sellerName'),
+    supplierTaxId: textField(data, 'supplierTaxId') || textField(meta ?? null, 'sellerTaxId'),
+    invoiceNumber: textField(data, 'invoiceNumber'),
+    invoiceDate: textField(data, 'invoiceDate') || textField(payment ?? null, 'paidAt'),
+    total: amount || null,
+    vatAmount: numberField(data, 'vatAmount') || null,
+    confidence: textField(data, 'confidence'),
+    taxTreatment: textField(data, 'taxTreatment'),
+    postingSuggestion: textField(data, 'postingSuggestion') || textField(data, 'expenseSubcategory') || textField(data, 'expenseCategory'),
+    reference,
+    payment: payment
+      ? {
+          bankName: textField(payment, 'bankName'),
+          fromName: textField(payment, 'fromName'),
+          fromAccount: textField(payment, 'fromAccount'),
+          toName: textField(payment, 'toName'),
+          toAccount: textField(payment, 'toAccount'),
+          direction: textField(payment, 'direction'),
+        }
+      : null,
+  };
+}
+
 function normalizedReference(value: string | null | undefined) {
   return (value ?? '').toLowerCase().replace(/[^a-z0-9ก-๙]/gi, '');
 }
@@ -424,6 +462,7 @@ function taxSafetyForIntake(item: {
   const data = item.ocrResult as Record<string, unknown> | null;
   const documentType = textField(data, 'documentType').toLowerCase();
   const documentGroup = textField(data, 'documentGroup').toLowerCase();
+  const taxTreatment = textField(data, 'taxTreatment').toLowerCase();
   const hasLinkedRecord = Boolean(item.purchaseInvoiceId || (item.targetType && item.targetId));
   const isPayment = ['bank_transfer', 'payment_slip', 'payment_advice', 'slip'].some((token) =>
     documentType.includes(token) || documentGroup.includes(token),
@@ -460,6 +499,21 @@ function taxSafetyForIntake(item: {
   const missing = missingTaxFields(item.ocrResult);
   const vatAmount = numberField(data, 'vatAmount');
   const total = numberField(data, 'total');
+  const isExpenseOnlyCandidate = total > 0 && (
+    documentType.includes('expense_receipt')
+    || taxTreatment === 'vat_exempt'
+    || taxTreatment === 'non_deductible'
+    || taxTreatment === 'needs_review'
+  ) && vatAmount <= 0;
+  if (isExpenseOnlyCandidate) {
+    return {
+      status: 'expense_only_no_vat',
+      severity: 'info',
+      label: 'Expense only',
+      message: 'Record this as an expense voucher/project cost. Do not claim input VAT unless a valid tax invoice is attached.',
+      missingFields: missing.filter((field) => !['supplier_tax_id', 'document_number'].includes(field)),
+    };
+  }
   if (missing.length > 0) {
     return {
       status: total > 0 ? 'missing_required_fields' : 'needs_review',
@@ -980,6 +1034,7 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         commentCount: item._count.comments,
         comments: item.comments.reverse(),
         kind: documentKind(item),
+        ocrSummary: ocrSummaryForIntake(item),
         taxSafety: taxSafetyForIntake(item),
       }));
       const purchaseInvoiceRows = purchaseInvoices.map((item) => {

@@ -104,6 +104,28 @@ interface DocumentIntake {
   targetId?: string | null;
   purchaseInvoiceId?: string | null;
   taxSafety?: TaxSafety;
+  ocrSummary?: {
+    documentType?: string;
+    documentTypeLabel?: string;
+    supplierName?: string;
+    supplierTaxId?: string;
+    invoiceNumber?: string;
+    invoiceDate?: string;
+    total?: number | null;
+    vatAmount?: number | null;
+    confidence?: string;
+    taxTreatment?: string;
+    postingSuggestion?: string;
+    reference?: string;
+    payment?: {
+      bankName?: string;
+      fromName?: string;
+      fromAccount?: string;
+      toName?: string;
+      toAccount?: string;
+      direction?: string;
+    } | null;
+  } | null;
   commentCount?: number;
   comments?: DocumentComment[];
   processedAt?: string | null;
@@ -307,6 +329,7 @@ export default function ProjectDetail() {
   const [zipDownloading, setZipDownloading] = useState(false);
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
+  const [voucherCreatingId, setVoucherCreatingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -540,6 +563,26 @@ export default function ProjectDetail() {
     }
   }
 
+  async function createExpenseVoucherFromDoc(doc: DocumentIntake) {
+    if (!token) return;
+    setVoucherCreatingId(doc.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/purchase-invoices/document-intakes/${doc.id}/create-expense-voucher`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Failed to create expense voucher');
+      await fetchWorkspace();
+      setActiveTab('expenses');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create expense voucher');
+    } finally {
+      setVoucherCreatingId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -758,7 +801,7 @@ export default function ProjectDetail() {
             />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
-            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} onComment={requestDocumentComment} commentingId={commentingId} />
+            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} commentingId={commentingId} voucherCreatingId={voucherCreatingId} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'LINE / ทีม' : 'LINE / team'} icon={Users}>
             <div className="space-y-3">
@@ -809,7 +852,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'files' && (
         <WorkspacePanel title={isThai ? 'ไฟล์ทั้งหมดของโปรเจค' : 'Project file library'} icon={FolderOpen}>
-          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} onOpen={openDocument} onComment={requestDocumentComment} commentingId={commentingId} />
+          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} commentingId={commentingId} voucherCreatingId={voucherCreatingId} />
         </WorkspacePanel>
       )}
 
@@ -1136,22 +1179,78 @@ function ThreeWayChip({ label, ok, count }: { label: string; ok: boolean; count?
   );
 }
 
+function DocumentOcrSummaryLine({
+  doc,
+  isThai,
+  formatCurrency,
+  formatDate,
+}: {
+  doc: DocumentIntake;
+  isThai: boolean;
+  formatCurrency: (value: number) => string;
+  formatDate: (value: string) => string;
+}) {
+  const summary = doc.ocrSummary;
+  if (!summary) {
+    return (
+      <p className="mt-1 text-xs text-slate-400">
+        {doc.status === 'processing'
+          ? (isThai ? 'กำลังอ่านเอกสาร' : 'Reading document')
+          : (isThai ? 'ยังไม่มีผล OCR' : 'No OCR result yet')}
+      </p>
+    );
+  }
+
+  const partyLine = summary.payment?.fromName || summary.payment?.toName
+    ? `${isThai ? 'จาก' : 'From'}: ${summary.payment?.fromName || '-'} · ${isThai ? 'ถึง' : 'To'}: ${summary.payment?.toName || '-'}`
+    : summary.supplierName
+      ? `${isThai ? 'คู่ค้า' : 'Party'}: ${summary.supplierName}`
+      : '';
+  const moneyLine = summary.total ? formatCurrency(summary.total) : '';
+  const dateLine = summary.invoiceDate ? formatDate(summary.invoiceDate) : '';
+  const refLine = summary.reference || summary.invoiceNumber || '';
+  const typeLine = summary.documentTypeLabel || summary.documentType || doc.kind;
+
+  return (
+    <div className="mt-1 space-y-1 text-xs text-slate-500">
+      <p className="truncate">
+        <span className="font-semibold text-slate-700">{typeLine}</span>
+        {moneyLine ? ` · ${moneyLine}` : ''}
+        {dateLine ? ` · ${dateLine}` : ''}
+        {summary.confidence ? ` · ${summary.confidence}` : ''}
+      </p>
+      {partyLine ? <p className="truncate">{partyLine}</p> : null}
+      <div className="flex flex-wrap gap-1">
+        {refLine ? <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">ref: {refLine}</span> : null}
+        {summary.postingSuggestion ? <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-700">{summary.postingSuggestion}</span> : null}
+        {summary.taxTreatment ? <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">{summary.taxTreatment}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function DocumentList({
   docs,
   isThai,
   token,
   formatDate,
+  formatCurrency,
   onOpen,
   onComment,
+  onCreateVoucher,
   commentingId,
+  voucherCreatingId,
 }: {
   docs: DocumentIntake[];
   isThai: boolean;
   token: string;
   formatDate: (value: string) => string;
+  formatCurrency: (value: number) => string;
   onOpen: (doc: DocumentIntake) => void | Promise<void>;
   onComment: (doc: DocumentIntake) => void | Promise<void>;
+  onCreateVoucher: (doc: DocumentIntake) => void | Promise<void>;
   commentingId?: string | null;
+  voucherCreatingId?: string | null;
 }) {
   if (docs.length === 0) {
     return <EmptyBlock text={isThai ? 'ยังไม่มีไฟล์ในโปรเจคนี้' : 'No files in this project yet'} />;
@@ -1159,6 +1258,14 @@ function DocumentList({
   return (
     <div className="divide-y divide-slate-100">
       {docs.map((doc) => {
+        const canCreateVoucher = !doc.targetId
+          && doc.status !== 'failed'
+          && (
+            doc.taxSafety?.status === 'expense_only_no_vat'
+            || doc.ocrSummary?.documentType === 'expense_receipt'
+            || doc.ocrSummary?.taxTreatment === 'vat_exempt'
+            || doc.ocrSummary?.taxTreatment === 'non_deductible'
+          );
         return (
           <div key={doc.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
             <FilePreview doc={doc} token={token} />
@@ -1167,6 +1274,7 @@ function DocumentList({
               <p className="mt-0.5 text-xs text-slate-500">
                 {doc.kind} · {doc.status} · {formatBytes(doc.fileSize)} · {formatDate(doc.createdAt)}
               </p>
+              <DocumentOcrSummaryLine doc={doc} isThai={isThai} formatCurrency={formatCurrency} formatDate={formatDate} />
               <div className="mt-1">
                 <TaxSafetyBadge taxSafety={doc.taxSafety} />
               </div>
@@ -1184,6 +1292,18 @@ function DocumentList({
                 </div>
               )}
             </div>
+            {canCreateVoucher && (
+              <button
+                type="button"
+                onClick={() => void onCreateVoucher(doc)}
+                disabled={!token || voucherCreatingId === doc.id}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                aria-label={isThai ? 'สร้างใบเบิกจากไฟล์นี้' : 'Create expense voucher'}
+                title={isThai ? 'สร้างใบเบิก/Payment Voucher' : 'Create expense voucher'}
+              >
+                {voucherCreatingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void onComment(doc)}

@@ -1,6 +1,6 @@
 # Billboy Project Workspace + Profit Plan
 
-Last updated: 2026-05-10 00:55 Asia/Bangkok
+Last updated: 2026-05-10 11:33 Asia/Bangkok
 
 This document is the working plan for turning Billboy from an OCR/e-Tax tool into a project-aware operating system for SME accounting, field teams, and project owners.
 
@@ -88,7 +88,15 @@ Current approval/billing foundation:
 - Budget guard is active on project expense approval.
 - Project document requests now push LINE notifications to linked project groups with a fresh Project Portal link.
 - `GET /api/billing/usage-overage` estimates document overage from current plan policy.
-- Full automatic billing collection for overage is still pending Stripe/PromptPay automation.
+- OCR overage billing has a guarded Stripe auto-charge path; real charging stays disabled unless `OVERAGE_BILLING_AUTO_CHARGE_ENABLED=true`.
+
+Current document OCR hardening:
+
+- LINE uploads, web uploads, and Project Guest Portal uploads now use the same document OCR pipeline.
+- PDF handling tries text extraction first, then PDF OCR, then rasterized page OCR fallback for scanned/low-quality PDFs.
+- Image handling decodes QR/barcode evidence and escalates likely slips to the bank-transfer specialist extractor.
+- Project Workspace file rows show extracted OCR summary so accountants can see what the system read without opening each file.
+- Non-VAT expense evidence can be turned into a linked Expense Voucher from the Project Workspace.
 
 ## Target Workflow
 

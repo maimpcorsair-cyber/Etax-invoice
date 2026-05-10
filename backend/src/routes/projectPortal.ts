@@ -7,6 +7,12 @@ import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { checkStorageQuota, incrementStorageUsed } from '../services/storageQuotaService';
+import {
+  analyzeAccountingDocumentBuffer,
+  documentIntakeStatusForOcr,
+  documentIntakeWarningsForOcr,
+  hasUsefulDocumentData,
+} from '../services/documentOcrService';
 
 export const projectPortalRouter = Router();
 
@@ -345,7 +351,7 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
       fileUrl = await uploadToStorage(storageKey, buffer, body.mimeType);
     }
 
-    const created = await withSystemRlsContext(prisma, async (tx) => {
+    let created = await withSystemRlsContext(prisma, async (tx) => {
       return tx.documentIntake.create({
         data: {
           companyId: payload.companyId,
@@ -359,9 +365,9 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
           fileBase64: storageReady ? undefined : buffer.toString('base64'),
           fileUrl,
           storageKey,
-          status: 'needs_review',
+          status: 'processing',
           warnings: ['uploaded_by_project_guest'] as Prisma.InputJsonValue,
-          error: 'Uploaded from project guest portal; accountant review required',
+          error: null,
         },
         select: {
           id: true,
@@ -376,9 +382,56 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
     });
     await incrementStorageUsed(payload.companyId, buffer.length);
 
+    try {
+      const analysis = await analyzeAccountingDocumentBuffer(buffer, body.mimeType, payload.companyId);
+      const result = analysis.result;
+      const hasUsefulData = hasUsefulDocumentData(result);
+      created = await withSystemRlsContext(prisma, async (tx) => tx.documentIntake.update({
+        where: { id: created.id },
+        data: {
+          status: documentIntakeStatusForOcr(result),
+          ocrResult: result as unknown as Prisma.InputJsonValue,
+          warnings: [
+            'uploaded_by_project_guest',
+            ...documentIntakeWarningsForOcr(result, analysis.stages),
+          ] as Prisma.InputJsonValue,
+          error: hasUsefulData ? null : 'OCR returned no useful fields',
+          processedAt: new Date(),
+        },
+        select: {
+          id: true,
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          status: true,
+          source: true,
+          createdAt: true,
+        },
+      }));
+    } catch (ocrErr) {
+      logger.warn('Project guest upload OCR failed', { error: ocrErr, intakeId: created.id });
+      created = await withSystemRlsContext(prisma, async (tx) => tx.documentIntake.update({
+        where: { id: created.id },
+        data: {
+          status: 'failed',
+          error: ocrErr instanceof Error ? ocrErr.message : 'OCR failed',
+          processedAt: new Date(),
+        },
+        select: {
+          id: true,
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          status: true,
+          source: true,
+          createdAt: true,
+        },
+      }));
+    }
+
     res.status(201).json({
       data: created,
-      message: 'Uploaded to project. Accountant review required.',
+      message: 'Uploaded to project and queued for accountant review.',
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
