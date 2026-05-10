@@ -118,6 +118,25 @@ type LineMessageContext = {
   lineRoomId?: string;
 };
 
+function isLineGroupConversation(context?: LineMessageContext): boolean {
+  return !!(context?.lineGroupId || context?.lineRoomId || context?.sourceType === 'group' || context?.sourceType === 'room');
+}
+
+function lineGroupSilentModeEnabled(): boolean {
+  return process.env.LINE_GROUP_SILENT_MODE !== 'false';
+}
+
+function isGroupTextCommand(text: string): boolean {
+  const lower = text.trim().toLowerCase();
+  if (!lower) return false;
+  if (/^(?:\/link-group\s+|\/link\s+|ผูกโปรเจค\s+|ผูกกลุ่ม\s+)?\d{6}$/i.test(lower)) return true;
+  if (['เข้าทีม', 'สมัครทีม', 'join', 'join project', 'ผูกบัญชี', 'สมัคร', 'เข้าโปรเจค', 'เข้าโปรเจกต์'].includes(lower)) return true;
+  if (['help', 'ช่วยเหลือ', 'ลิงก์', 'link', 'เข้าเว็บ', 'เข้าระบบ', 'login', 'เปิดระบบ', 'ดูเอกสาร'].includes(lower)) return true;
+  if (['สถานะ', 'สรุปโปรเจค', 'สรุปโปรเจกต์', 'สรุปภาษี', 'ยอดภาษี', 'ใบล่าสุด', 'เอกสารล่าสุด', 'ล่าสุด', 'ใบเดือนนี้', 'เอกสารเดือนนี้'].includes(lower)) return true;
+  if (/^(?:ส่งใบ|ขอใบ|ดูใบ|หาใบ|pdf|ค้นหา)\s+.+/i.test(lower)) return true;
+  return false;
+}
+
 interface LineSession {
   state: 'awaiting_field';
   currentField: string;
@@ -1361,7 +1380,10 @@ lineRouter.get('/admin/ocr-health', authenticate, requireRole('admin', 'super_ad
         ...result,
         productionReadiness: getOcrProductionReadiness(),
         redisFailureFallback: 'direct_db_save_then_ocr_text_summary',
-        webhookReplyMode: 'reply_token_ack_with_push_fallback',
+        webhookReplyMode: lineGroupSilentModeEnabled()
+          ? 'group_reply_only_silent_mode_private_push_fallback'
+          : 'reply_token_ack_with_push_fallback',
+        groupSilentMode: lineGroupSilentModeEnabled(),
         redis: redisResult.status === 'fulfilled'
           ? { ok: true, response: redisResult.value }
           : { ok: false, error: redisResult.reason instanceof Error ? redisResult.reason.message : String(redisResult.reason) },
@@ -1994,6 +2016,15 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
   const trimmed = text.trim();
 
   if (await handleGroupLinkOtp(messageContext, trimmed)) return;
+
+  if (lineGroupSilentModeEnabled() && isLineGroupConversation(messageContext) && !isGroupTextCommand(trimmed)) {
+    logger.info('[Line] group text ignored by silent mode', {
+      sourceType: messageContext.sourceType,
+      lineGroupId: messageContext.lineGroupId,
+      lineRoomId: messageContext.lineRoomId,
+    });
+    return;
+  }
 
   // Check if user is in a field-input session
   if (await handleSessionReply(lineUserId, trimmed)) return;
@@ -2985,6 +3016,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       lineGroupId: event.source.groupId,
       lineRoomId: event.source.roomId,
     };
+    const replyOnly = lineGroupSilentModeEnabled() && isLineGroupConversation(context);
 
     // Idempotency: skip if this event was already processed (LINE retries on timeout)
     const eventId = (event as { webhookEventId?: string }).webhookEventId
@@ -3004,22 +3036,26 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
 
     try {
       if (event.type === 'follow') {
-        await sendLineText(
-          replyTargetId,
-          'สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\n' +
-          'ส่ง OTP 6 หลักจากระบบ e-Tax Invoice เพื่อเชื่อมบัญชีก่อนเริ่มใช้งานนะครับ\n\n' +
-          '📋 สิ่งที่ทำได้หลังเชื่อมบัญชี:\n' +
-          '• ส่งรูป/PDF ใบกำกับภาษี → บันทึกภาษีซื้ออัตโนมัติ\n' +
-          '• พิมพ์ "สรุปภาษี" → ดูยอด VAT เดือนนี้\n' +
-          '• พิมพ์ "ใบเกินกำหนด" → ใบแจ้งหนี้ค้างชำระ\n' +
-          '• พิมพ์ "ส่งใบ [เลขที่]" → รับ PDF ใบกำกับภาษี\n' +
-          '• พิมพ์ "ช่วยเหลือ" → ดูคำสั่งทั้งหมด\n\n' +
-          '💡 หรือใช้เมนูด้านล่างได้เลยครับ',
+        await withLineReplyToken(event.replyToken, () => sendLineText(
+            replyTargetId,
+            'สวัสดีครับ! ผม Billboy ผู้ช่วยบัญชีอัจฉริยะ 🤖\n\n' +
+            'ส่ง OTP 6 หลักจากระบบ e-Tax Invoice เพื่อเชื่อมบัญชีก่อนเริ่มใช้งานนะครับ\n\n' +
+            '📋 สิ่งที่ทำได้หลังเชื่อมบัญชี:\n' +
+            '• ส่งรูป/PDF ใบกำกับภาษี → บันทึกภาษีซื้ออัตโนมัติ\n' +
+            '• พิมพ์ "สรุปภาษี" → ดูยอด VAT เดือนนี้\n' +
+            '• พิมพ์ "ใบเกินกำหนด" → ใบแจ้งหนี้ค้างชำระ\n' +
+            '• พิมพ์ "ส่งใบ [เลขที่]" → รับ PDF ใบกำกับภาษี\n' +
+            '• พิมพ์ "ช่วยเหลือ" → ดูคำสั่งทั้งหมด\n\n' +
+            '💡 หรือใช้เมนูด้านล่างได้เลยครับ',
+          ),
+          { replyOnly },
         );
       } else if (event.type === 'join') {
-        await sendLineText(
-          replyTargetId,
-          'Billboy เข้ากลุ่มแล้วครับ\n\nให้แอดมินเข้าเว็บ Billboy → Admin → LINE → สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนี้เพื่อเริ่มใช้งาน',
+        await withLineReplyToken(event.replyToken, () => sendLineText(
+            replyTargetId,
+            'Billboy เข้ากลุ่มแล้วครับ\n\nให้แอดมินเข้าเว็บ Billboy → Admin → LINE → สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนี้เพื่อเริ่มใช้งาน',
+          ),
+          { replyOnly },
         );
       } else if (event.type === 'memberJoined') {
         const groupLink = await withSystemRlsContext(prisma, (tx) => tx.lineGroupLink.findUnique({
@@ -3035,21 +3071,23 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
               senderLineUserId: member.userId,
             }).catch((err) => logger.warn('[Line] memberJoined activity update failed', { err, lineGroupId: groupLink.lineGroupId }));
           }
-          await sendLineText(
-            replyTargetId,
-            `ยินดีต้อนรับสมาชิกใหม่ครับ 👋\n\nกลุ่มนี้ผูกกับโปรเจค ${groupLink.project?.name ?? ''} แล้ว สมาชิกส่งเอกสารได้ทันทีแบบ LINE guest\nถ้าต้องการดูสถานะหรือเข้าทีมในระบบ ให้พิมพ์ "เข้าทีม"`,
+          await withLineReplyToken(event.replyToken, () => sendLineText(
+              replyTargetId,
+              `ยินดีต้อนรับสมาชิกใหม่ครับ 👋\n\nกลุ่มนี้ผูกกับโปรเจค ${groupLink.project?.name ?? ''} แล้ว สมาชิกส่งเอกสารได้ทันทีแบบ LINE guest\nถ้าต้องการดูสถานะหรือเข้าทีมในระบบ ให้พิมพ์ "เข้าทีม"`,
+            ),
+            { replyOnly },
           );
         }
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;
         if (msg.type === 'text') {
-          await withLineReplyToken(event.replyToken, () => handleTextMessage(replyTargetId, (msg as LineTextMessage).text, context));
+          await withLineReplyToken(event.replyToken, () => handleTextMessage(replyTargetId, (msg as LineTextMessage).text, context), { replyOnly });
         } else if (msg.type === 'image' || msg.type === 'file') {
-          await withLineReplyToken(event.replyToken, () => handleImageMessage(replyTargetId, msg.id, msg.type, context));
+          await withLineReplyToken(event.replyToken, () => handleImageMessage(replyTargetId, msg.id, msg.type, context), { replyOnly });
         }
       } else if (event.type === 'postback' && event.postback) {
         const postbackData = event.postback.data;
-        await withLineReplyToken(event.replyToken, () => handlePostback(replyTargetId, postbackData));
+        await withLineReplyToken(event.replyToken, () => handlePostback(replyTargetId, postbackData), { replyOnly });
       }
     } catch (err) {
       lineWebhookDiagnostics.lastUnhandledError = {
@@ -3059,7 +3097,9 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       };
       logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, replyTargetId, senderLineUserId: event.source.userId });
       try {
-        await sendLineText(replyTargetId, 'ขอโทษครับ ระบบสะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง 🙏');
+        if (!replyOnly) {
+          await sendLineText(replyTargetId, 'ขอโทษครับ ระบบสะดุดชั่วคราว กรุณาลองส่งใหม่อีกครั้ง 🙏');
+        }
       } catch { /* ignore send failure */ }
     }
   }

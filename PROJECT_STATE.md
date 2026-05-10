@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 01:00 Asia/Bangkok
+Last updated: 2026-05-11 01:32 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -120,6 +120,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Accepting an invite links `line_user_links`, updates `line_project_members.linkedUserId`, and upserts `project_members`.
   - LINE group members can type `เข้าทีม`/`join` to get their invite link; unlinked members who send a project document get one throttled invite nudge per 24h.
   - Backend/frontend typecheck and production builds passed locally.
+- LINE Group Cost Guard is implemented locally and pending deploy:
+  - Group/room webhook handling now runs in reply-only mode by default, so failed/expired reply tokens do not fall back to push messages.
+  - LINE group text silent mode is enabled by default with `LINE_GROUP_SILENT_MODE !== 'false'`; regular group chat is ignored unless it is a link code or supported Billboy command.
+  - Private 1:1 LINE chat still keeps the existing reply-token with push fallback behavior.
+  - `/api/line/admin/ocr-health` now reports `groupSilentMode` and the current webhook reply mode.
+  - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.

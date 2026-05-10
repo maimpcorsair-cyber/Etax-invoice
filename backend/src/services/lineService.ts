@@ -5,7 +5,7 @@ import { OcrResult } from './aiService';
 
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
 const channelSecret = process.env.LINE_CHANNEL_SECRET ?? '';
-const replyContext = new AsyncLocalStorage<{ replyToken: string; used: boolean }>();
+const replyContext = new AsyncLocalStorage<{ replyToken: string; used: boolean; replyOnly?: boolean }>();
 const lineDiagnostics: {
   lastPushOkAt?: string;
   lastReplyOkAt?: string;
@@ -31,7 +31,15 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
     ctx.used = true;
     const replied = await lineReply(ctx.replyToken, messages);
     if (replied) return true;
+    if (ctx.replyOnly) {
+      logger.warn('[Line] replyToken send failed; reply-only mode skipped push fallback', { lineUserId });
+      return false;
+    }
     logger.warn('[Line] replyToken send failed; falling back to push', { lineUserId });
+  }
+  if (ctx?.replyOnly) {
+    logger.warn('[Line] reply-only mode skipped push fallback', { lineUserId });
+    return false;
   }
   try {
     const body = JSON.stringify({ to: lineUserId, messages });
@@ -58,9 +66,16 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
   }
 }
 
-export async function withLineReplyToken<T>(replyToken: string | undefined, fn: () => Promise<T>): Promise<T> {
-  if (!replyToken) return fn();
-  return replyContext.run({ replyToken, used: false }, fn);
+export async function withLineReplyToken<T>(
+  replyToken: string | undefined,
+  fn: () => Promise<T>,
+  options?: { replyOnly?: boolean },
+): Promise<T> {
+  if (!replyToken) {
+    if (options?.replyOnly) return replyContext.run({ replyToken: '', used: true, replyOnly: true }, fn);
+    return fn();
+  }
+  return replyContext.run({ replyToken, used: false, replyOnly: options?.replyOnly }, fn);
 }
 
 async function lineReply(replyToken: string, messages: object[]): Promise<boolean> {
