@@ -57,6 +57,67 @@ function getFrontendBaseUrl() {
   return (firstConfigured ?? 'https://etax-invoice.vercel.app').replace(/\/+$/, '');
 }
 
+function recordFromJson(value: Prisma.JsonValue | null | undefined): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringFromUnknown(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function numberFromUnknown(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function warningTextFromJson(value: Prisma.JsonValue | null | undefined): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const record = item as Record<string, unknown>;
+        return stringFromUnknown(record.message) ?? stringFromUnknown(record.code);
+      }
+      return null;
+    })
+    .filter((item): item is string => !!item);
+}
+
+function summarizeDocumentIntakeOcr(ocrResult: Prisma.JsonValue | null | undefined, warnings: Prisma.JsonValue | null | undefined) {
+  const ocr = recordFromJson(ocrResult);
+  const payment = recordFromJson(ocr?.payment as Prisma.JsonValue | null | undefined);
+  const metadata = recordFromJson(ocr?.documentMetadata as Prisma.JsonValue | null | undefined);
+  const warningTexts = warningTextFromJson(warnings);
+  const stages = warningTexts
+    .filter((item) => item.startsWith('analysis:'))
+    .map((item) => item.replace(/^analysis:/, ''));
+  const validationWarnings = warningTexts.filter((item) => !item.startsWith('analysis:'));
+
+  return {
+    documentType: stringFromUnknown(ocr?.documentType),
+    documentTypeLabel: stringFromUnknown(ocr?.documentTypeLabel),
+    counterparty:
+      stringFromUnknown(ocr?.supplierName)
+      ?? stringFromUnknown(payment?.toName)
+      ?? stringFromUnknown(payment?.fromName),
+    invoiceNumber:
+      stringFromUnknown(ocr?.invoiceNumber)
+      ?? stringFromUnknown(payment?.reference)
+      ?? stringFromUnknown(metadata?.purchaseOrderNumber)
+      ?? stringFromUnknown(metadata?.quotationNumber),
+    total:
+      numberFromUnknown(ocr?.total)
+      ?? numberFromUnknown(payment?.amount),
+    vatAmount: numberFromUnknown(ocr?.vatAmount),
+    confidence: stringFromUnknown(ocr?.confidence),
+    stages,
+    warningCount: validationWarnings.length,
+    firstWarning: validationWarnings[0] ?? null,
+  };
+}
+
 const REQUIRED_OCR_FIELDS: Array<{ key: keyof OcrResult; label: string; hint: string }> = [
   { key: 'supplierName',  label: 'ชื่อผู้ขาย',                      hint: 'เช่น บริษัท ABC จำกัด' },
   { key: 'supplierTaxId', label: 'เลขผู้เสียภาษีผู้ขาย (13 หลัก)', hint: 'เช่น 0105567890123' },
@@ -1414,15 +1475,23 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       select: {
         id: true,
         source: true,
+        sourceMessageId: true,
         fileName: true,
         mimeType: true,
+        fileSize: true,
         status: true,
         projectId: true,
         project: { select: { id: true, code: true, name: true } },
         targetType: true,
         targetId: true,
         purchaseInvoiceId: true,
+        ocrResult: true,
+        warnings: true,
         error: true,
+        driveSyncStatus: true,
+        driveUrl: true,
+        driveSyncError: true,
+        processedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -1487,7 +1556,15 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
           : undefined,
       },
       recentDocumentIntakes: recentIntakesResult.status === 'fulfilled'
-        ? { ok: true, items: recentIntakesResult.value }
+        ? {
+            ok: true,
+            items: recentIntakesResult.value.map((item) => ({
+              ...item,
+              ocrSummary: summarizeDocumentIntakeOcr(item.ocrResult, item.warnings),
+              ocrResult: undefined,
+              warnings: undefined,
+            })),
+          }
         : { ok: false, items: [], error: recentIntakesResult.reason instanceof Error ? recentIntakesResult.reason.message : String(recentIntakesResult.reason) },
       linkedUsers: linkedUsersResult.status === 'fulfilled'
         ? { ok: true, count: linkedUsersResult.value }

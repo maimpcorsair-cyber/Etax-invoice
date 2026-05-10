@@ -1788,7 +1788,42 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     };
     redis?: { ok: boolean; error?: string };
     documentIntakesSchema?: { ok: boolean; missingColumns: string[]; error?: string };
-    recentDocumentIntakes?: { ok: boolean; items: Array<{ id: string; source: string; fileName?: string | null; status: string; mimeType: string; projectId?: string | null; project?: { id: string; code: string; name: string } | null; targetType?: string | null; targetId?: string | null; purchaseInvoiceId?: string | null; error?: string | null; createdAt: string; updatedAt: string }> };
+    recentDocumentIntakes?: {
+      ok: boolean;
+      items: Array<{
+        id: string;
+        source: string;
+        sourceMessageId?: string | null;
+        fileName?: string | null;
+        status: string;
+        mimeType: string;
+        fileSize?: number;
+        projectId?: string | null;
+        project?: { id: string; code: string; name: string } | null;
+        targetType?: string | null;
+        targetId?: string | null;
+        purchaseInvoiceId?: string | null;
+        error?: string | null;
+        driveSyncStatus?: string | null;
+        driveUrl?: string | null;
+        driveSyncError?: string | null;
+        processedAt?: string | null;
+        createdAt: string;
+        updatedAt: string;
+        ocrSummary?: {
+          documentType?: string | null;
+          documentTypeLabel?: string | null;
+          counterparty?: string | null;
+          invoiceNumber?: string | null;
+          total?: number | null;
+          vatAmount?: number | null;
+          confidence?: string | null;
+          stages?: string[];
+          warningCount?: number;
+          firstWarning?: string | null;
+        };
+      }>;
+    };
     linkedUsers?: { ok: boolean; count: number };
     linkedGroups?: { ok: boolean; count: number };
     documentOps?: {
@@ -2050,6 +2085,33 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
         {label ?? (ok ? 'OK' : 'Issue')}
       </span>
     );
+  }
+
+  function statusPill(status: string) {
+    const tone =
+      status === 'saved' ? 'bg-green-50 text-green-700 border-green-100'
+      : status === 'failed' || status === 'rejected' ? 'bg-red-50 text-red-700 border-red-100'
+      : status === 'needs_review' || status === 'awaiting_input' || status === 'awaiting_confirmation' ? 'bg-amber-50 text-amber-700 border-amber-100'
+      : 'bg-gray-50 text-gray-700 border-gray-100';
+    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tone}`}>{status}</span>;
+  }
+
+  function drivePill(status?: string | null) {
+    const ok = status === 'synced';
+    const warn = status === 'failed';
+    const tone = ok ? 'bg-blue-50 text-blue-700 border-blue-100' : warn ? 'bg-red-50 text-red-700 border-red-100' : 'bg-gray-50 text-gray-600 border-gray-100';
+    return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tone}`}>Drive: {status || 'not_synced'}</span>;
+  }
+
+  function formatMoney(value?: number | null) {
+    if (typeof value !== 'number') return '-';
+    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value);
+  }
+
+  function formatFileSize(value?: number) {
+    if (!value) return '-';
+    if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+    return `${Math.round((value / (1024 * 1024)) * 10) / 10} MB`;
   }
 
   if (!policy?.canUseLineOa) {
@@ -2501,20 +2563,88 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
             )}
 
             {!!liveStatus?.recentDocumentIntakes?.items?.length && (
-              <div className="rounded-lg border border-gray-100 overflow-hidden">
-                <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
-                  {isThai ? 'เอกสาร LINE ล่าสุด' : 'Recent LINE documents'}
+              <div className="rounded-lg border border-gray-100 bg-white overflow-hidden">
+                <div className="flex flex-col gap-1 bg-gray-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {isThai ? 'เอกสาร LINE/OCR ล่าสุด' : 'Recent LINE/OCR documents'}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      {isThai ? 'ใช้เช็คว่าไฟล์เข้า DB, OCR, Drive และโปรเจคครบไหม' : 'Shows DB, OCR, Drive, and project linkage state.'}
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-gray-400">
+                    {isThai ? 'ล่าสุด 10 รายการ' : 'Latest 10'}
+                  </span>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {liveStatus.recentDocumentIntakes.items.slice(0, 5).map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-gray-700">{item.fileName || item.mimeType}</p>
-                        <p className="truncate text-gray-400">{item.source} · {item.mimeType}</p>
+                  {liveStatus.recentDocumentIntakes.items.map((item) => (
+                    <div key={item.id} className="grid gap-3 px-3 py-3 text-xs lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {statusPill(item.status)}
+                          {drivePill(item.driveSyncStatus)}
+                          {item.ocrSummary?.confidence && (
+                            <span className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                              OCR: {item.ocrSummary.confidence}
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate font-semibold text-gray-800">{item.fileName || item.mimeType}</p>
+                        <p className="truncate text-gray-400">
+                          {item.source} · {item.mimeType} · {formatFileSize(item.fileSize)} · {new Date(item.createdAt).toLocaleString()}
+                        </p>
+                        {item.sourceMessageId && (
+                          <p className="truncate font-mono text-[11px] text-gray-400">LINE msg: {item.sourceMessageId}</p>
+                        )}
                       </div>
-                      <span className="font-medium text-gray-900">{item.status}</span>
-                      <span className="text-gray-500">{item.project ? `${item.project.code}` : (isThai ? 'ไม่มีโปรเจค' : 'No project')}</span>
-                      <span className="text-gray-400">{new Date(item.createdAt).toLocaleTimeString()}</span>
+
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate font-medium text-gray-700">
+                          {item.ocrSummary?.documentTypeLabel || item.ocrSummary?.documentType || (isThai ? 'ยังไม่แยกประเภท' : 'No type yet')}
+                        </p>
+                        <p className="truncate text-gray-500">
+                          {item.ocrSummary?.counterparty || (isThai ? 'ยังไม่พบคู่ค้า' : 'No counterparty')}
+                        </p>
+                        <p className="text-gray-700">
+                          {formatMoney(item.ocrSummary?.total)}
+                          {item.ocrSummary?.invoiceNumber ? <span className="text-gray-400"> · {item.ocrSummary.invoiceNumber}</span> : null}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate text-gray-600">
+                          {item.project ? `${item.project.code} · ${item.project.name}` : (isThai ? 'ไม่ผูกโปรเจค' : 'No project')}
+                        </p>
+                        {!!item.ocrSummary?.stages?.length && (
+                          <p className="line-clamp-2 text-[11px] text-gray-400">
+                            OCR stages: {item.ocrSummary.stages.slice(-4).join(' → ')}
+                          </p>
+                        )}
+                        {(item.error || item.driveSyncError || item.ocrSummary?.firstWarning) && (
+                          <p className="line-clamp-2 text-[11px] text-red-600">
+                            {item.error || item.driveSyncError || item.ocrSummary?.firstWarning}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        {item.projectId && (
+                          <Link to={`/app/projects/${item.projectId}`} className="rounded-md border border-gray-200 px-2 py-1 font-semibold text-gray-600 hover:bg-gray-50">
+                            {isThai ? 'โปรเจค' : 'Project'}
+                          </Link>
+                        )}
+                        {(item.purchaseInvoiceId || item.targetType === 'purchase_invoice') && (
+                          <Link to="/app/purchase-invoices" className="rounded-md border border-gray-200 px-2 py-1 font-semibold text-gray-600 hover:bg-gray-50">
+                            Input VAT
+                          </Link>
+                        )}
+                        {item.driveUrl && (
+                          <a href={item.driveUrl} target="_blank" rel="noreferrer" className="rounded-md border border-blue-100 bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100">
+                            Drive
+                          </a>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

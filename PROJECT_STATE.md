@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 02:29 Asia/Bangkok
+Last updated: 2026-05-11 02:49 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -144,6 +144,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Login page now fetches `/api/auth/google/config` first so the Google button uses the backend `GOOGLE_CLIENT_ID` instead of a potentially stale `VITE_GOOGLE_CLIENT_ID`.
   - If backend config is unavailable, the login page can still fall back to `VITE_GOOGLE_CLIENT_ID`.
   - Backend no longer exposes raw Google `Wrong recipient, payload audience != requiredAudience` errors to users; it returns a clearer configuration mismatch message and logs the raw detail server-side.
+  - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
+- LINE/OCR admin debug view is implemented locally:
+  - `/api/line/admin/live-status` now returns compact OCR summaries for recent document intakes: document type, counterparty, invoice/reference, total, confidence, OCR stages, warning count, Drive sync state, and project linkage.
+  - Admin LINE status panel now shows the latest 10 LINE/OCR documents as an operational timeline with status, Drive state, project link, Input VAT shortcut, Drive link, error/warning snippet, and LINE message id.
   - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
