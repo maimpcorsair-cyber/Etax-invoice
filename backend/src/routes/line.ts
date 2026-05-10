@@ -37,6 +37,7 @@ import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
+import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
 
 export const lineRouter = Router();
 
@@ -344,7 +345,7 @@ async function recordLineProjectMemberActivity(input: {
   const linkedUserId = linkedUser?.isActive && linkedUser.user.companyId === input.groupLink.companyId ? linkedUser.userId : null;
   displayName = displayName ?? linkedUser?.user.name ?? null;
 
-  await withSystemRlsContext(prisma, async (tx) => {
+  return withSystemRlsContext(prisma, async (tx) => {
     await tx.lineGroupLink.update({
       where: { id: input.groupLink.id },
       data: {
@@ -355,9 +356,9 @@ async function recordLineProjectMemberActivity(input: {
       },
     });
 
-    if (!input.groupLink.projectId || !input.senderLineUserId) return;
+    if (!input.groupLink.projectId || !input.senderLineUserId) return null;
 
-    await tx.lineProjectMember.upsert({
+    const member = await tx.lineProjectMember.upsert({
       where: {
         lineGroupLinkId_lineUserId: {
           lineGroupLinkId: input.groupLink.id,
@@ -385,8 +386,47 @@ async function recordLineProjectMemberActivity(input: {
         documentCount: input.incrementDocumentCount ? { increment: 1 } : undefined,
         lastSeenAt: now,
       },
+      select: {
+        id: true,
+        companyId: true,
+        projectId: true,
+        lineGroupLinkId: true,
+        lineUserId: true,
+        displayName: true,
+        linkedUserId: true,
+      },
     });
+    return {
+      ...member,
+      joinUrl: member.linkedUserId
+        ? null
+        : buildProjectLineMemberInviteUrl({
+            companyId: member.companyId,
+            projectId: member.projectId,
+            lineGroupLinkId: member.lineGroupLinkId,
+            lineProjectMemberId: member.id,
+            lineUserId: member.lineUserId,
+          }),
+    };
   });
+}
+
+function buildProjectJoinInviteText(input: { joinUrl: string; companyName: string; projectName?: string | null }) {
+  return `รับไฟล์เข้าโปรเจคแล้วครับ ✅\n\n` +
+    `ตอนนี้บันทึกในนาม LINE guest ของ ${input.companyName}${input.projectName ? ` / ${input.projectName}` : ''}\n` +
+    `ถ้าต้องการดูสถานะเอกสาร, dashboard โปรเจค, หรือรับสิทธิ์ในทีม ให้กดลิงก์นี้แล้วเข้าสู่ระบบด้วย Google:\n${input.joinUrl}`;
+}
+
+async function sendProjectJoinInviteOnce(targetId: string, member: { id: string; joinUrl: string | null } | null, input: { companyName: string; projectName?: string | null }) {
+  if (!member?.joinUrl) return;
+  const key = `line:project-join-invite:${member.id}`;
+  try {
+    const sent = await redis.set(key, '1', 'EX', 24 * 60 * 60, 'NX');
+    if (!sent) return;
+  } catch (err) {
+    logger.warn('[Line] Project join invite rate-limit failed; sending once without cache', { err, memberId: member.id });
+  }
+  await sendLineText(targetId, buildProjectJoinInviteText({ joinUrl: member.joinUrl, ...input }));
 }
 
 function buildOcrTextSummary(result: OcrResult, note?: string) {
@@ -1495,6 +1535,7 @@ interface LineEvent {
   replyToken?: string;
   message?: LineMessage;
   postback?: { data: string };
+  joined?: { members?: Array<{ type?: string; userId?: string }> };
 }
 
 interface LineWebhookBody {
@@ -1586,6 +1627,7 @@ async function resolveLineConversationContext(context: LineMessageContext) {
             where: { lineGroupId: context.lineGroupId ?? context.lineRoomId },
             include: {
               company: true,
+              project: { select: { id: true, code: true, name: true } },
               linkedBy: { select: { id: true, isActive: true } },
             },
           })
@@ -1624,6 +1666,7 @@ async function resolveLineConversationContext(context: LineMessageContext) {
       userCompany: senderBelongsToGroupCompany ? senderLink.user.company : groupLink.company,
       senderLink: senderBelongsToGroupCompany ? senderLink : null,
       groupLink,
+      project: groupLink.project,
     };
   }
 
@@ -2082,6 +2125,30 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
   const companyId = resolved.companyId;
   const lower = trimmed.toLowerCase();
 
+  if (
+    resolved.groupLink?.projectId
+    && ['เข้าทีม', 'สมัครทีม', 'join', 'join project', 'ผูกบัญชี', 'สมัคร', 'เข้าโปรเจค', 'เข้าโปรเจกต์'].includes(lower)
+  ) {
+    const member = await recordLineProjectMemberActivity({
+      groupLink: resolved.groupLink,
+      sourceType: messageContext.lineGroupId ? 'group' : 'room',
+      senderLineUserId,
+      senderDisplayName: resolved.senderLink?.user.name ?? null,
+      senderPictureUrl: resolved.senderLink?.pictureUrl ?? null,
+    });
+
+    if (member?.joinUrl) {
+      await sendLineText(
+        lineUserId,
+        `ลิงก์เข้าร่วมทีมโปรเจค ${resolved.project?.name ?? ''}\n\n` +
+        `กดลิงก์นี้แล้วเข้าสู่ระบบด้วย Google เพื่อผูก LINE นี้กับบัญชี Billboy:\n${member.joinUrl}`,
+      );
+    } else {
+      await sendLineText(lineUserId, 'บัญชี LINE นี้ผูกกับผู้ใช้ในระบบแล้วครับ เข้าเว็บ Billboy เพื่อดูโปรเจคได้เลย\nhttps://etax-invoice.vercel.app/app/projects');
+    }
+    return;
+  }
+
   // Help / greeting
   if (['สวัสดี', 'help', 'ช่วยเหลือ'].includes(lower)) {
     await sendLineText(
@@ -2377,14 +2444,21 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       buffer,
     });
     if (resolved.groupLink && messageContext.senderLineUserId) {
-      void recordLineProjectMemberActivity({
+      const member = await recordLineProjectMemberActivity({
         groupLink: resolved.groupLink,
         sourceType: messageContext.lineGroupId ? 'group' : 'room',
         senderLineUserId: messageContext.senderLineUserId,
         senderDisplayName: resolved.senderLink?.user.name ?? null,
         senderPictureUrl: resolved.senderLink?.pictureUrl ?? null,
         incrementDocumentCount: true,
-      }).catch((err) => logger.warn('[Line] group document sender update failed', { err, lineGroupId: resolved.groupLink?.lineGroupId }));
+      }).catch((err) => {
+        logger.warn('[Line] group document sender update failed', { err, lineGroupId: resolved.groupLink?.lineGroupId });
+        return null;
+      });
+      await sendProjectJoinInviteOnce(lineUserId, member, {
+        companyName: resolved.companyName,
+        projectName: resolved.project?.name,
+      });
     }
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
@@ -2947,6 +3021,25 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
           replyTargetId,
           'Billboy เข้ากลุ่มแล้วครับ\n\nให้แอดมินเข้าเว็บ Billboy → Admin → LINE → สร้างรหัสเชื่อมกลุ่ม แล้วส่งรหัส 6 หลักในกลุ่มนี้เพื่อเริ่มใช้งาน',
         );
+      } else if (event.type === 'memberJoined') {
+        const groupLink = await withSystemRlsContext(prisma, (tx) => tx.lineGroupLink.findUnique({
+          where: { lineGroupId: event.source.groupId ?? event.source.roomId ?? '' },
+          include: { company: true, project: { select: { id: true, name: true } } },
+        }));
+        if (groupLink?.isActive && groupLink.projectId) {
+          for (const member of event.joined?.members ?? []) {
+            if (!member.userId) continue;
+            await recordLineProjectMemberActivity({
+              groupLink,
+              sourceType: event.source.groupId ? 'group' : 'room',
+              senderLineUserId: member.userId,
+            }).catch((err) => logger.warn('[Line] memberJoined activity update failed', { err, lineGroupId: groupLink.lineGroupId }));
+          }
+          await sendLineText(
+            replyTargetId,
+            `ยินดีต้อนรับสมาชิกใหม่ครับ 👋\n\nกลุ่มนี้ผูกกับโปรเจค ${groupLink.project?.name ?? ''} แล้ว สมาชิกส่งเอกสารได้ทันทีแบบ LINE guest\nถ้าต้องการดูสถานะหรือเข้าทีมในระบบ ให้พิมพ์ "เข้าทีม"`,
+          );
+        }
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;
         if (msg.type === 'text') {

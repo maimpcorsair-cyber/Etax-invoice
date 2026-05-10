@@ -14,6 +14,12 @@ import {
   hasUsefulDocumentData,
 } from '../services/documentOcrService';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
+import { authenticate } from '../middleware/auth';
+import {
+  acceptProjectLineMemberInvite,
+  getProjectLineMemberInvitePreview,
+  ProjectLineInviteError,
+} from '../services/projectLineInviteService';
 
 export const projectPortalRouter = Router();
 
@@ -97,6 +103,41 @@ async function assertPortalAccess(payload: ProjectPortalToken) {
     });
   });
 }
+
+projectPortalRouter.get('/join/:token', async (req, res) => {
+  try {
+    const data = await getProjectLineMemberInvitePreview(req.params.token);
+    res.json({ data });
+  } catch (err) {
+    const status = err instanceof ProjectLineInviteError ? err.statusCode : 401;
+    logger.warn('Failed to open project LINE member invite', { error: err });
+    res.status(status).json({ error: err instanceof Error ? err.message : 'Invalid or expired project invite' });
+  }
+});
+
+projectPortalRouter.post('/join/:token/accept', authenticate, async (req, res) => {
+  try {
+    const joined = await acceptProjectLineMemberInvite({
+      inviteToken: req.params.token,
+      existingUserId: req.user!.userId,
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: req.headers['accept-language']?.startsWith('th') ? 'th' : 'en',
+    });
+    res.json({
+      data: {
+        projectId: joined.project.id,
+        projectCode: joined.project.code,
+        projectName: joined.project.name,
+        lineGroupName: joined.lineGroup.groupName,
+      },
+    });
+  } catch (err) {
+    const status = err instanceof ProjectLineInviteError ? err.statusCode : 401;
+    logger.warn('Failed to accept project LINE member invite', { error: err });
+    res.status(status).json({ error: err instanceof Error ? err.message : 'Failed to join project team' });
+  }
+});
 
 projectPortalRouter.get('/:token', async (req, res) => {
   try {

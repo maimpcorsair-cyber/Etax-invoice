@@ -6,6 +6,10 @@ import { z } from 'zod';
 import prisma from '../config/database';
 import { withSystemRlsContext } from '../config/rls';
 import { auditLog } from '../services/auditService';
+import {
+  acceptProjectLineMemberInvite,
+  ProjectLineInviteError,
+} from '../services/projectLineInviteService';
 
 export const authRouter = Router();
 
@@ -19,6 +23,7 @@ const loginSchema = z.object({
 
 const googleLoginSchema = z.object({
   credential: z.string().min(1),
+  projectInviteToken: z.string().min(1).optional(),
 });
 
 function issueToken(user: { id: string; companyId: string; role: string; email: string }) {
@@ -134,7 +139,7 @@ authRouter.post('/google', async (req, res) => {
       return;
     }
 
-    const { credential } = googleLoginSchema.parse(req.body);
+    const { credential, projectInviteToken } = googleLoginSchema.parse(req.body);
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: googleClientId,
@@ -147,6 +152,34 @@ authRouter.post('/google', async (req, res) => {
     }
 
     const email = payload.email.toLowerCase();
+
+    if (projectInviteToken) {
+      const joined = await acceptProjectLineMemberInvite({
+        inviteToken: projectInviteToken,
+        googleProfile: {
+          email,
+          googleSub: payload.sub,
+          name: payload.name,
+        },
+        ipAddress: req.ip ?? '',
+        userAgent: req.get('user-agent') ?? '',
+        language: req.headers['accept-language']?.startsWith('th') ? 'th' : 'en',
+      });
+
+      const token = issueToken(joined.user);
+      res.json({
+        token,
+        user: serializeUser(joined.user),
+        projectInvite: {
+          projectId: joined.project.id,
+          projectCode: joined.project.code,
+          projectName: joined.project.name,
+          lineGroupName: joined.lineGroup.groupName,
+        },
+      });
+      return;
+    }
+
     const user = await withSystemRlsContext(prisma, (tx) => tx.user.findUnique({
       where: { email },
       include: { company: true },
@@ -204,6 +237,11 @@ authRouter.post('/google', async (req, res) => {
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+
+    if (err instanceof ProjectLineInviteError) {
+      res.status(err.statusCode).json({ error: err.message });
       return;
     }
 

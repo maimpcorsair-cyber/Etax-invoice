@@ -29,6 +29,7 @@ export default function Login() {
   const [googleConfig, setGoogleConfig] = useState<GoogleConfigResponse | null>(null);
   const surface = detectSurface();
   const ownerMode = location.pathname.startsWith('/ops/') || surface === 'ops';
+  const projectInviteToken = new URLSearchParams(location.search).get('projectInvite') || '';
   const isLocalSubdomain = window.location.hostname === 'app.localhost' || window.location.hostname === 'ops.localhost';
   const localGoogleSafeUrl = `${window.location.protocol}//localhost${window.location.port ? `:${window.location.port}` : ''}${ownerMode ? '/ops/login' : '/app/login'}`;
 
@@ -102,7 +103,10 @@ export default function Login() {
             const res = await fetch('/api/auth/google', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ credential: response.credential }),
+              body: JSON.stringify({
+                credential: response.credential,
+                ...(projectInviteToken ? { projectInviteToken } : {}),
+              }),
             });
 
             const data = await res.json();
@@ -112,6 +116,10 @@ export default function Login() {
             }
 
             setAuth(data.token, data.user);
+            if (data.projectInvite?.projectId) {
+              window.location.replace(buildPlaneUrl(`/app/projects/${data.projectInvite.projectId}`, 'app', { token: data.token, user: data.user }));
+              return;
+            }
             if (data.user?.role === 'super_admin') {
               window.location.replace(buildPlaneUrl('/ops/overview', 'ops', { token: data.token, user: data.user }));
               return;
@@ -152,7 +160,7 @@ export default function Login() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [googleConfig, isThai, navigate, ownerMode, setAuth]);
+  }, [googleConfig, isThai, navigate, ownerMode, projectInviteToken, setAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,8 +318,8 @@ export default function Login() {
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {isThai
-                    ? 'บัญชี Google ต้องถูกเพิ่มอีเมลไว้ในระบบก่อนโดยผู้ดูแล'
-                    : 'Your Google email must already be added by an administrator.'}
+                    ? (projectInviteToken ? 'ใช้ Google เพื่อยืนยันตัวตนและเข้าทีมโปรเจคนี้' : 'บัญชี Google ต้องถูกเพิ่มอีเมลไว้ในระบบก่อนโดยผู้ดูแล')
+                    : (projectInviteToken ? 'Use Google to verify yourself and join this project team.' : 'Your Google email must already be added by an administrator.')}
                 </p>
               </div>
 

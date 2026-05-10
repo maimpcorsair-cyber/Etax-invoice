@@ -298,6 +298,7 @@ interface LineProjectMember {
   displayName?: string | null;
   pictureUrl?: string | null;
   role: string;
+  joinUrl?: string | null;
   documentCount: number;
   lastSeenAt: string;
   linkedUser?: ProjectUser | null;
@@ -1164,6 +1165,19 @@ export default function ProjectDetail() {
                               <p className="text-xs text-slate-500">
                                 {lineRoleLabel(member.role, isThai)} · {member.documentCount} {isThai ? 'ไฟล์' : 'files'} · {formatDate(member.lastSeenAt)}
                               </p>
+                              {member.linkedUser ? (
+                                <p className="mt-0.5 truncate text-xs text-emerald-700">
+                                  {isThai ? 'ผูกกับ' : 'Linked to'} {member.linkedUser.email}
+                                </p>
+                              ) : member.joinUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void navigator.clipboard?.writeText(member.joinUrl ?? '')}
+                                  className="mt-1 text-xs font-semibold text-primary-700 hover:text-primary-800"
+                                >
+                                  {isThai ? 'คัดลอกลิงก์สมัคร/เข้าทีม' : 'Copy signup invite'}
+                                </button>
+                              ) : null}
                             </div>
                             <select
                               value={member.role}

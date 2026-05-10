@@ -14,6 +14,7 @@ import { downloadFromStorage } from '../services/storageService';
 import { createZip, ZipEntryInput } from '../services/zipService';
 import { sendLineText } from '../services/lineService';
 import { getLineGroupMemberCount, getLineGroupSummary, getLineRoomMemberCount } from '../services/lineService';
+import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
 import {
   ensureProjectDriveFolderForUser,
   syncDocumentIntakeToProjectDrive,
@@ -1166,6 +1167,21 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           documentIntakeId: item.id,
         }));
       const allActionNeeded = [...actionNeeded, ...taxSafetyActions];
+      const lineGroupsWithMemberInvites = lineGroups.map((group) => ({
+        ...group,
+        members: group.members.map((member) => ({
+          ...member,
+          joinUrl: member.linkedUser
+            ? null
+            : buildProjectLineMemberInviteUrl({
+                companyId,
+                projectId: row.id,
+                lineGroupLinkId: group.id,
+                lineProjectMemberId: member.id,
+                lineUserId: member.lineUserId,
+              }),
+        })),
+      }));
 
       return {
         project,
@@ -1195,7 +1211,7 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           total: asNumber(item.total),
         })),
         expenseVouchers: expenseVouchers.map((item) => ({ ...item, totalAmount: asNumber(item.totalAmount) })),
-        lineGroups,
+        lineGroups: lineGroupsWithMemberInvites,
         driveFolder: row.driveFolderId && row.driveFolderUrl
           ? { id: row.driveFolderId, url: row.driveFolderUrl }
           : null,
