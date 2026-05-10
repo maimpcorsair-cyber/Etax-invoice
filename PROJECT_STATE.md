@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 02:09 Asia/Bangkok
+Last updated: 2026-05-11 02:25 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -118,6 +118,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Production backend/frontend `/api/health` after Google Sign-In audience mismatch fix returned `status: ok`, `version: 2026-05-09d`.
 - Production `/api/auth/google/config` returned `enabled:true` and backend client id `420889491125-i138802hjg1v8dul3spnaf6l58ieo5rb.apps.googleusercontent.com`.
 - Production login chunk `Login-DdWwkQLi.js` confirms the login page fetches `/api/auth/google/config` before falling back to bundled `VITE_GOOGLE_CLIENT_ID`.
+- Render backend deploy duration diagnosis on run `25636985010`:
+  - Runtime health was not slow: production `/api/health` returned HTTP 200 in about 1.0s during live checks.
+  - Slow part was deploy pipeline: Render stayed `queued` for about 4 minutes, `build_in_progress` for about 5 minutes, and `update_in_progress` for about 1 minute before `live`.
+  - Backend Dockerfile deploy-speed optimization is implemented locally and pending deploy: removed the unused second `npm ci --omit=dev` stage and prunes dev dependencies after build before copying runtime `node_modules`.
+  - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. Docker image build could not be run locally because Docker Desktop/daemon was not running.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.

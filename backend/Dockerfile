@@ -8,16 +8,13 @@ RUN apk add --no-cache font-noto font-noto-cjk
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
-FROM base AS deps
-COPY package*.json ./
-RUN npm ci --omit=dev
-
 FROM base AS builder
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npx prisma generate
 RUN npm run build
+RUN npm prune --omit=dev
 
 FROM base AS runner
 WORKDIR /app
