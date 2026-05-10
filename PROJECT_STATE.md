@@ -115,6 +115,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Production backend `/api/health` after LINE Group Cost Guard deploy returned `status: ok`, `version: 2026-05-09d`.
 - Latest verified Google Sign-In audience mismatch fix deploy run: `25636985010` succeeded.
 - Latest verified Google Sign-In audience mismatch fix typecheck run: `25636985005` succeeded.
+- Latest verified LINE/OCR admin debug view deploy run: `25638141801` succeeded.
+- Latest verified LINE/OCR admin debug view typecheck run: `25638141808` succeeded.
+- Vercel production frontend contains `AdminPanel-0Uf7GTe4.js` with the new LINE/OCR debug timeline copy.
 - Production backend/frontend `/api/health` after Google Sign-In audience mismatch fix returned `status: ok`, `version: 2026-05-09d`.
 - Production `/api/auth/google/config` returned `enabled:true` and backend client id `420889491125-i138802hjg1v8dul3spnaf6l58ieo5rb.apps.googleusercontent.com`.
 - Production login chunk `Login-DdWwkQLi.js` confirms the login page fetches `/api/auth/google/config` before falling back to bundled `VITE_GOOGLE_CLIENT_ID`.
@@ -145,10 +148,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - If backend config is unavailable, the login page can still fall back to `VITE_GOOGLE_CLIENT_ID`.
   - Backend no longer exposes raw Google `Wrong recipient, payload audience != requiredAudience` errors to users; it returns a clearer configuration mismatch message and logs the raw detail server-side.
   - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
-- LINE/OCR admin debug view is implemented locally:
+- LINE/OCR admin debug view is deployed:
   - `/api/line/admin/live-status` now returns compact OCR summaries for recent document intakes: document type, counterparty, invoice/reference, total, confidence, OCR stages, warning count, Drive sync state, and project linkage.
   - Admin LINE status panel now shows the latest 10 LINE/OCR documents as an operational timeline with status, Drive state, project link, Input VAT shortcut, Drive link, error/warning snippet, and LINE message id.
   - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
+  - Verified production: GitHub deploy run `25638141801` passed, backend `/api/health` returned HTTP 200 in about 1.38s, and Vercel AdminPanel chunk includes the new debug timeline UI.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.
