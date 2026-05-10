@@ -1,6 +1,13 @@
 import { google } from 'googleapis';
+import ExcelJS from 'exceljs';
+import { Readable } from 'stream';
 import { logger } from '../config/logger';
-import { buildGoogleServiceAccountAuth, isDriveServiceAccountConfigured } from './googleDriveService';
+import {
+  buildGoogleServiceAccountAuth,
+  buildOAuth2Client,
+  isDriveServiceAccountConfigured,
+  isUserDriveOAuthConfigured,
+} from './googleDriveService';
 
 interface InvoiceSheetRow {
   invoiceNumber: string;
@@ -181,7 +188,12 @@ export interface ExpenseSheetRow {
   netAmount?: number | null;
 }
 
-function getAuthWithDrive() {
+function getAuthWithDrive(userRefreshToken?: string | null) {
+  if (userRefreshToken && isUserDriveOAuthConfigured()) {
+    const oauthClient = buildOAuth2Client();
+    oauthClient.setCredentials({ refresh_token: userRefreshToken });
+    return oauthClient;
+  }
   return buildGoogleServiceAccountAuth([
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive',
@@ -316,7 +328,7 @@ export async function exportExpensesToSheets(
   return url;
 }
 
-export async function exportProjectToSheets(input: {
+export interface ProjectSheetsInput {
   project: {
     code: string;
     name: string;
@@ -337,14 +349,139 @@ export async function exportProjectToSheets(input: {
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
   expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number; attachmentUrl?: string | null }>;
   lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
-}): Promise<{ spreadsheetId: string; url: string; created: boolean }> {
-  const auth = getAuthWithDrive();
+  userRefreshToken?: string | null;
+}
+
+function asProjectSheetDate(value: Date | string) {
+  return value instanceof Date ? formatDate(value) : value;
+}
+
+function projectSheetLinkFormula(url?: string | null, label = 'Open') {
+  return url ? `=HYPERLINK("${String(url).replace(/"/g, '""')}","${label}")` : '';
+}
+
+function projectWorkbookValues(input: ProjectSheetsInput) {
+  const overviewRows = [
+    ['Project code', input.project.code],
+    ['Project name', input.project.name],
+    ['Customer / site', input.project.customerName ?? ''],
+    ['Status', input.project.status],
+    ['Owner', input.project.ownerName ?? ''],
+    ['Approver', input.project.approverName ?? ''],
+    ['Budget', input.project.budgetAmount],
+    ...Object.entries(input.summary).map(([key, value]) => [key, value]),
+  ];
+
+  return {
+    Workflow: [
+      ['Step', 'What to record', 'Required evidence', 'Where it appears'],
+      ['1. Collect', 'Upload PDF/JPG, LINE files, PO, slips, and receipts into this project', 'Original file link in Google Drive', 'Files'],
+      ['2. Classify', 'Mark each document as tax invoice, receipt, payment proof, PO, delivery note, or supporting document', 'Reviewer note and Drive link', 'Action Needed / Files'],
+      ['3. Input VAT', 'Confirm valid purchase tax invoices and receipts', 'Tax invoice PDF/JPG link', 'Purchases'],
+      ['4. PO 3-way', 'Match PO, supplier invoice, and payment slip', 'PO link, invoice link, payment proof link', 'PO 3-way'],
+      ['5. Sales VAT', 'Issue project-related sales invoices', 'Invoice PDF/XML from Billboy', 'Sales'],
+      ['6. Expense claim', 'Record small expenses or no-tax documents as Payment Voucher', 'Receipt/photo/chat/map evidence link', 'Expenses'],
+      ['7. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
+    ],
+    Overview: [['Metric', 'Value'], ...overviewRows],
+    'Action Needed': [['Severity', 'Type', 'Title', 'Message', 'Next action'], ...input.actionNeeded.map((item) => [item.severity, item.type, item.title, item.message, 'Review in Billboy project workspace'])],
+    Files: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'Drive sync', 'Open file', 'Open folder', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.driveSyncStatus ?? '', projectSheetLinkFormula(item.driveUrl), projectSheetLinkFormula(item.driveFolderUrl, 'Folder'), item.mimeType, item.fileSize, asProjectSheetDate(item.createdAt)])],
+    Purchases: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid', 'Attachment'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asProjectSheetDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No', projectSheetLinkFormula(item.attachmentUrl)])],
+    'PO 3-way': [['PO no.', 'Document type', 'Vendor', 'Vendor tax ID', 'Issue date', 'Total', 'Status', 'Matched purchases', 'Matched payments', 'Missing'], ...input.purchaseOrders.map((item) => [item.poNumber, item.documentType, item.vendorName ?? '', item.vendorTaxId ?? '', item.issueDate ? asProjectSheetDate(item.issueDate) : '', item.total ?? '', item.status, item.matchedPurchaseCount, item.matchedPaymentCount, item.missing.join(', ')])],
+    Sales: [['Invoice no.', 'Buyer', 'Type', 'Status', 'Invoice date', 'Subtotal', 'VAT', 'Total', 'Paid'], ...input.sales.map((item) => [item.invoiceNumber, item.buyerName, item.type, item.status, asProjectSheetDate(item.invoiceDate), item.subtotal, item.vatAmount, item.total, item.isPaid ? 'Yes' : 'No'])],
+    Expenses: [['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total', 'Attachment'], ...input.expenses.map((item) => [item.voucherNumber, item.status, asProjectSheetDate(item.voucherDate), item.description, item.totalAmount, projectSheetLinkFormula(item.attachmentUrl)])],
+    'LINE Groups': [['Group name', 'Linked at'], ...input.lineGroups.map((item) => [item.groupName, asProjectSheetDate(item.linkedAt)])],
+  };
+}
+
+function hyperlinkCellValue(value: string) {
+  const match = value.match(/^=HYPERLINK\("((?:[^"]|"")*)","((?:[^"]|"")*)"\)$/);
+  if (!match) return value;
+  return {
+    text: match[2].replace(/""/g, '"'),
+    hyperlink: match[1].replace(/""/g, '"'),
+  };
+}
+
+async function uploadProjectWorkbookViaDrive(input: ProjectSheetsInput, title: string) {
+  const auth = getAuthWithDrive(input.userRefreshToken);
+  const drive = google.drive({ version: 'v3', auth });
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Billboy';
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  const valuesBySheet = projectWorkbookValues(input);
+  Object.entries(valuesBySheet).forEach(([sheetName, rows]) => {
+    const sheet = workbook.addWorksheet(sheetName);
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    rows.forEach((row) => {
+      sheet.addRow(row.map((value) => (typeof value === 'string' ? hyperlinkCellValue(value) : value)));
+    });
+    const header = sheet.getRow(1);
+    header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+    sheet.columns.forEach((column) => {
+      let maxLength = 12;
+      column.eachCell?.({ includeEmpty: true }, (cell) => {
+        const raw = typeof cell.value === 'object' && cell.value && 'text' in cell.value
+          ? String(cell.value.text)
+          : String(cell.value ?? '');
+        maxLength = Math.max(maxLength, Math.min(raw.length + 2, 48));
+      });
+      column.width = maxLength;
+    });
+  });
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const created = await drive.files.create({
+    requestBody: {
+      name: title,
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      ...(input.project.driveFolderId ? { parents: [input.project.driveFolderId] } : {}),
+    },
+    media: {
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      body: Readable.from(buffer),
+    },
+    fields: 'id,webViewLink',
+  });
+
+  const id = created.data.id!;
+  const shareTargets = Array.from(new Set(
+    (input.sharedWithEmails ?? [])
+      .map((email) => email?.trim().toLowerCase())
+      .filter((email): email is string => !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+  ));
+  await Promise.all(shareTargets.map(async (email) => {
+    try {
+      await drive.permissions.create({
+        fileId: id,
+        requestBody: { role: 'writer', type: 'user', emailAddress: email },
+        sendNotificationEmail: false,
+      });
+    } catch (err) {
+      logger.warn('Could not share project sheet fallback workbook with user', { error: err, email });
+    }
+  }));
+
+  const url = created.data.webViewLink ?? `https://docs.google.com/spreadsheets/d/${id}`;
+  logger.info(`Project Sheets workbook uploaded via Drive conversion: ${url} (${input.project.code})`);
+  return { spreadsheetId: id, url, created: true };
+}
+
+export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<{ spreadsheetId: string; url: string; created: boolean }> {
+  const auth = getAuthWithDrive(input.userRefreshToken);
   const sheets = google.sheets({ version: 'v4', auth });
   const drive = google.drive({ version: 'v3', auth });
   const title = `${input.project.code} ${input.project.name} - Billboy Project Workbook`;
   const sheetTitles = ['Workflow', 'Overview', 'Action Needed', 'Files', 'PO 3-way', 'Purchases', 'Sales', 'Expenses', 'LINE Groups'];
   let id = input.project.googleSheetId ?? '';
   let created = false;
+
+  if (process.env.PROJECT_SHEETS_USE_DRIVE_UPLOAD !== 'false') {
+    return uploadProjectWorkbookViaDrive(input, title);
+  }
 
   if (id) {
     try {

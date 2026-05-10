@@ -2007,7 +2007,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       });
       if (!row) return null;
 
-      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups, projectMembers, company] = await Promise.all([
+      const [summary, documentIntakes, purchaseInvoices, invoices, expenseVouchers, lineGroups, projectMembers, company, currentUser] = await Promise.all([
         projectBudgetSummary(companyId, row.id, tx),
         tx.documentIntake.findMany({
           where: { companyId, projectId: row.id },
@@ -2099,9 +2099,26 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
           where: { id: companyId },
           select: {
             email: true,
+            googleDriveOwnerUserId: true,
           },
         }),
+        tx.user.findFirst({
+          where: { id: req.user!.userId, companyId },
+          select: { googleRefreshToken: true },
+        }),
       ]);
+      const companyOwner = company?.googleDriveOwnerUserId
+        ? await tx.user.findFirst({
+          where: { id: company.googleDriveOwnerUserId, companyId },
+          select: { googleRefreshToken: true },
+        })
+        : null;
+      const projectOwner = row.ownerId
+        ? await tx.user.findFirst({
+          where: { id: row.ownerId, companyId },
+          select: { googleRefreshToken: true },
+        })
+        : null;
 
       const purchaseRows = purchaseInvoices.map((item) => ({
         ...item,
@@ -2177,6 +2194,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
           row.approver?.email,
           ...projectMembers.map((member) => member.user.email),
         ],
+        googleRefreshToken: companyOwner?.googleRefreshToken ?? projectOwner?.googleRefreshToken ?? currentUser?.googleRefreshToken ?? null,
       };
     });
 
@@ -2277,6 +2295,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         groupName: item.groupName ?? 'LINE Group',
         linkedAt: item.linkedAt,
       })),
+      userRefreshToken: exportData.googleRefreshToken,
     });
 
     await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.project.update({

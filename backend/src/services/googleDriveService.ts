@@ -38,7 +38,10 @@ export function getDriveAuthUrl(stateToken: string): string {
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: ['https://www.googleapis.com/auth/drive.file'],
+    scope: [
+      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/spreadsheets',
+    ],
     state: stateToken,
   });
 }
