@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 03:13 Asia/Bangkok
+Last updated: 2026-05-11 03:33 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -134,6 +134,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: backend `npm run build` and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25638457544` succeeded in `58s`; Render deploy run `25638457561` succeeded in `8m59s`.
   - Production `/api/health` after deploy returned HTTP 200 in about `1.03s`.
+- Project document review workflow is implemented locally:
+  - Project Action Needed rows now have an explicit `ตรวจ/จัดประเภท` action.
+  - Project file cards now have a visible `ตรวจ/จัดประเภทเอกสาร` button instead of relying only on small icon buttons.
+  - New project document review modal lets accountants classify a file as purchase tax invoice, receipt, expense-only receipt, payment proof, PO, quotation, delivery note, supporting document, or ignored.
+  - New `POST /api/projects/:id/documents/:documentIntakeId/review` stores the manual document role in OCR metadata, clears stale errors, writes a resolved comment/audit log, and re-syncs the file into the matching Google Drive project subfolder.
+  - Google Sheets project export now includes an `Attachment` column on the Purchases sheet so Input VAT rows link back to source evidence.
+  - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.

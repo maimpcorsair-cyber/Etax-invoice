@@ -60,6 +60,23 @@ const documentCommentPayloadSchema = z.object({
   kind: z.enum(['comment', 'request']).default('comment'),
 });
 
+const documentReviewRoleSchema = z.enum([
+  'tax_invoice',
+  'receipt',
+  'expense_receipt',
+  'purchase_order',
+  'quotation',
+  'delivery_note',
+  'payment_proof',
+  'supporting_document',
+  'ignore',
+]);
+
+const documentReviewPayloadSchema = z.object({
+  documentRole: documentReviewRoleSchema,
+  note: z.string().trim().max(500).optional(),
+});
+
 const lineMemberRolePayloadSchema = z.object({
   role: lineProjectMemberRoleSchema,
 });
@@ -227,6 +244,93 @@ function documentKind(item: { mimeType: string; ocrResult: unknown; status: stri
   if (item.mimeType === 'application/pdf') return 'pdf';
   if (item.mimeType.includes('image')) return 'image';
   return item.status === 'failed' ? 'unreadable' : 'unknown';
+}
+
+const DOCUMENT_REVIEW_ROLE_META: Record<z.infer<typeof documentReviewRoleSchema>, {
+  documentType: string;
+  documentTypeLabel: string;
+  documentGroup: string;
+  status: string;
+  targetType?: string;
+}> = {
+  tax_invoice: {
+    documentType: 'tax_invoice',
+    documentTypeLabel: 'ใบกำกับภาษีซื้อ',
+    documentGroup: 'purchase_tax_document',
+    status: 'awaiting_confirmation',
+  },
+  receipt: {
+    documentType: 'receipt',
+    documentTypeLabel: 'ใบเสร็จ/ใบกำกับภาษีอย่างย่อ',
+    documentGroup: 'purchase_tax_document',
+    status: 'awaiting_confirmation',
+  },
+  expense_receipt: {
+    documentType: 'expense_receipt',
+    documentTypeLabel: 'ใบเสร็จค่าใช้จ่าย/ไม่มี VAT',
+    documentGroup: 'expense_document',
+    status: 'needs_review',
+  },
+  purchase_order: {
+    documentType: 'purchase_order',
+    documentTypeLabel: 'Purchase Order (PO)',
+    documentGroup: 'supporting_document',
+    status: 'saved',
+    targetType: 'project_supporting_document',
+  },
+  quotation: {
+    documentType: 'quotation',
+    documentTypeLabel: 'ใบเสนอราคา',
+    documentGroup: 'supporting_document',
+    status: 'saved',
+    targetType: 'project_supporting_document',
+  },
+  delivery_note: {
+    documentType: 'delivery_note',
+    documentTypeLabel: 'ใบส่งของ',
+    documentGroup: 'supporting_document',
+    status: 'saved',
+    targetType: 'project_supporting_document',
+  },
+  payment_proof: {
+    documentType: 'bank_transfer',
+    documentTypeLabel: 'สลิป/หลักฐานการจ่าย',
+    documentGroup: 'payment_proof',
+    status: 'saved',
+    targetType: 'project_payment_proof',
+  },
+  supporting_document: {
+    documentType: 'other',
+    documentTypeLabel: 'เอกสารแนบประกอบโปรเจค',
+    documentGroup: 'supporting_document',
+    status: 'saved',
+    targetType: 'project_supporting_document',
+  },
+  ignore: {
+    documentType: 'other',
+    documentTypeLabel: 'ไม่ใช้ในโปรเจค/ไม่เกี่ยวภาษี',
+    documentGroup: 'ignored_document',
+    status: 'rejected',
+    targetType: 'project_ignored_document',
+  },
+};
+
+function mergeManualReviewOcrResult(current: unknown, role: z.infer<typeof documentReviewRoleSchema>, note?: string) {
+  const base = current && typeof current === 'object' && !Array.isArray(current)
+    ? current as Record<string, unknown>
+    : {};
+  const meta = DOCUMENT_REVIEW_ROLE_META[role];
+  return {
+    ...base,
+    documentType: meta.documentType,
+    documentTypeLabel: meta.documentTypeLabel,
+    documentGroup: meta.documentGroup,
+    manualReview: {
+      documentRole: role,
+      reviewedAt: new Date().toISOString(),
+      note: note || null,
+    },
+  };
 }
 
 function missingTaxFields(result: unknown) {
@@ -1387,6 +1491,122 @@ projectsRouter.post('/:id/documents/:documentIntakeId/drive/retry', requireRole(
   }
 });
 
+projectsRouter.post('/:id/documents/:documentIntakeId/review', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const body = documentReviewPayloadSchema.parse(req.body);
+    const companyId = req.user!.companyId;
+    const meta = DOCUMENT_REVIEW_ROLE_META[body.documentRole];
+
+    const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const document = await tx.documentIntake.findFirst({
+        where: {
+          id: req.params.documentIntakeId,
+          companyId,
+          projectId: req.params.id,
+        },
+        select: {
+          id: true,
+          projectId: true,
+          fileName: true,
+          ocrResult: true,
+          warnings: true,
+        },
+      });
+      if (!document?.projectId) return null;
+
+      const warningValues = Array.isArray(document.warnings)
+        ? document.warnings.filter((item): item is string => typeof item === 'string')
+        : [];
+      const warnings = [
+        ...warningValues.filter((item) => !item.startsWith('manual_review:')),
+        `manual_review:${body.documentRole}`,
+      ];
+      if (body.note) warnings.push(`manual_note:${body.note}`);
+
+      const targetType = meta.targetType ?? null;
+      const targetId = meta.targetType ? document.projectId : null;
+      const updatedDocument = await tx.documentIntake.update({
+        where: { id: document.id },
+        data: {
+          status: meta.status,
+          ocrResult: mergeManualReviewOcrResult(document.ocrResult, body.documentRole, body.note) as Prisma.InputJsonValue,
+          warnings: warnings as Prisma.InputJsonValue,
+          error: null,
+          targetType,
+          targetId,
+          processedAt: ['saved', 'rejected'].includes(meta.status) ? new Date() : undefined,
+        },
+        select: {
+          id: true,
+          status: true,
+          targetType: true,
+          targetId: true,
+          projectId: true,
+          fileName: true,
+          ocrResult: true,
+          driveSyncStatus: true,
+        },
+      });
+
+      await tx.documentComment.create({
+        data: {
+          companyId,
+          projectId: document.projectId,
+          documentIntakeId: document.id,
+          authorType: 'user',
+          authorUserId: req.user!.userId,
+          authorName: req.user!.email,
+          kind: 'comment',
+          status: 'resolved',
+          message: [
+            `Reviewed as: ${meta.documentTypeLabel}`,
+            body.note ? `Note: ${body.note}` : null,
+          ].filter(Boolean).join('\n'),
+        },
+      });
+
+      return updatedDocument;
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: 'Project document not found' });
+      return;
+    }
+
+    void syncDocumentIntakeToProjectDrive(updated.id, {
+      companyId,
+      preferredUserId: req.user!.userId,
+      force: true,
+    }).catch((err) => logger.warn('Reviewed project document Drive re-sync failed', {
+      error: err instanceof Error ? err.message : String(err),
+      documentIntakeId: updated.id,
+      projectId: req.params.id,
+    }));
+
+    await auditLog({
+      companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'project.document.review',
+      resourceType: 'document_intake',
+      resourceId: updated.id,
+      details: { projectId: req.params.id, documentRole: body.documentRole, status: updated.status },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.json({ data: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to review project document', { error: err, projectId: req.params.id, documentIntakeId: req.params.documentIntakeId });
+    res.status(500).json({ error: 'Failed to review project document' });
+  }
+});
+
 projectsRouter.post('/:id/documents/:documentIntakeId/comments', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
   try {
     const body = documentCommentPayloadSchema.parse(req.body);
@@ -1560,6 +1780,7 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
             vatAmount: true,
             total: true,
             isPaid: true,
+            pdfUrl: true,
           },
         }),
         tx.invoice.findMany({
@@ -1723,6 +1944,7 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
         taxSafetyStatus: item.taxSafety.status,
         taxSafetyMessage: item.taxSafety.message,
         isPaid: item.isPaid,
+        attachmentUrl: item.pdfUrl,
       })),
       sales: exportData.invoices.map((item) => ({
         invoiceNumber: item.invoiceNumber,

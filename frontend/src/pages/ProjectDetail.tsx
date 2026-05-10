@@ -35,6 +35,7 @@ import { useDriveStatus } from '../hooks/useDriveStatus';
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
 type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'po' | 'files' | 'line' | 'purchases' | 'sales' | 'expenses';
 type TaxSafetyStatus = 'vat_claimable' | 'expense_only_no_vat' | 'needs_tax_invoice' | 'missing_required_fields' | 'unmatched_payment' | 'supporting_only' | 'needs_review';
+type ReviewDocumentRole = 'tax_invoice' | 'receipt' | 'expense_receipt' | 'purchase_order' | 'quotation' | 'delivery_note' | 'payment_proof' | 'supporting_document' | 'ignore';
 
 interface ProjectUser {
   id: string;
@@ -351,6 +352,18 @@ const LINE_PROJECT_ROLES = [
   { value: 'linked_user', labelTh: 'ผู้ใช้ระบบ', labelEn: 'Linked user' },
 ];
 
+const REVIEW_DOCUMENT_ROLES: Array<{ value: ReviewDocumentRole; th: string; en: string; hintTh: string; hintEn: string }> = [
+  { value: 'tax_invoice', th: 'ใบกำกับภาษีซื้อ', en: 'Purchase tax invoice', hintTh: 'ใช้เป็นเอกสารหลักสำหรับ Input VAT', hintEn: 'Primary Input VAT document' },
+  { value: 'receipt', th: 'ใบเสร็จ/ใบกำกับอย่างย่อ', en: 'Receipt', hintTh: 'ตรวจว่าเคลม VAT ได้หรือเป็นแค่ใบแนบ', hintEn: 'Check VAT claimability before filing' },
+  { value: 'expense_receipt', th: 'ค่าใช้จ่ายไม่มีใบกำกับ', en: 'Expense only', hintTh: 'ใช้สร้าง Payment Voucher/ค่าใช้จ่ายโครงการ', hintEn: 'Use for project expense voucher' },
+  { value: 'payment_proof', th: 'สลิป/Payment Advice', en: 'Payment proof', hintTh: 'เป็นหลักฐานจ่าย ต้องจับคู่กับใบซื้อ', hintEn: 'Match against purchase/tax invoice' },
+  { value: 'purchase_order', th: 'PO', en: 'PO', hintTh: 'เอกสารตั้งงบ/ขอซื้อของโปรเจค', hintEn: 'Project purchasing support' },
+  { value: 'quotation', th: 'ใบเสนอราคา', en: 'Quotation', hintTh: 'เอกสารแนบก่อนซื้อ', hintEn: 'Pre-purchase support document' },
+  { value: 'delivery_note', th: 'ใบส่งของ', en: 'Delivery note', hintTh: 'เอกสารแนบตรวจรับงาน/สินค้า', hintEn: 'Delivery support document' },
+  { value: 'supporting_document', th: 'เอกสารแนบอื่น', en: 'Other attachment', hintTh: 'เก็บเป็นหลักฐาน audit ของโปรเจค', hintEn: 'Keep in project audit pack' },
+  { value: 'ignore', th: 'ไม่ใช้/ไม่เกี่ยว', en: 'Ignore', hintTh: 'ตัดออกจากงานค้างของโปรเจค', hintEn: 'Remove from project action queue' },
+];
+
 function lineRoleLabel(role: string, isThai: boolean) {
   const found = LINE_PROJECT_ROLES.find((item) => item.value === role);
   return found ? (isThai ? found.labelTh : found.labelEn) : role;
@@ -379,6 +392,10 @@ export default function ProjectDetail() {
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [voucherCreatingId, setVoucherCreatingId] = useState<string | null>(null);
+  const [reviewingDoc, setReviewingDoc] = useState<DocumentIntake | null>(null);
+  const [reviewRole, setReviewRole] = useState<ReviewDocumentRole>('tax_invoice');
+  const [reviewNote, setReviewNote] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
   const [lineLinking, setLineLinking] = useState(false);
   const [lineRefreshingId, setLineRefreshingId] = useState<string | null>(null);
   const [lineRoleUpdatingId, setLineRoleUpdatingId] = useState<string | null>(null);
@@ -437,6 +454,25 @@ export default function ProjectDetail() {
       archived: isThai ? 'เก็บถาวร' : 'Archived',
     };
     return labels[value];
+  }
+
+  function openReview(doc: DocumentIntake) {
+    const suggestedRole =
+      doc.ocrSummary?.documentType === 'bank_transfer' || doc.ocrSummary?.documentType === 'payment_advice'
+        ? 'payment_proof'
+        : doc.ocrSummary?.documentType === 'purchase_order'
+          ? 'purchase_order'
+          : doc.ocrSummary?.documentType === 'quotation'
+            ? 'quotation'
+            : doc.ocrSummary?.documentType === 'delivery_note'
+              ? 'delivery_note'
+              : doc.taxSafety?.status === 'expense_only_no_vat' || doc.ocrSummary?.documentType === 'expense_receipt'
+                ? 'expense_receipt'
+                : 'tax_invoice';
+    setReviewingDoc(doc);
+    setReviewRole(suggestedRole);
+    setReviewNote('');
+    setActiveTab('action');
   }
 
   async function fileToBase64(file: File) {
@@ -773,6 +809,48 @@ export default function ProjectDetail() {
     }
   }
 
+  async function saveDocumentReview(options?: { confirmPurchase?: boolean; createVoucher?: boolean }) {
+    if (!token || !workspace || !reviewingDoc) return;
+    setReviewSaving(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/documents/${reviewingDoc.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ documentRole: reviewRole, note: reviewNote.trim() || undefined }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Failed to review document');
+
+      if (options?.confirmPurchase) {
+        const confirmRes = await fetch(`/api/purchase-invoices/document-intakes/${reviewingDoc.id}/confirm-purchase`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const confirmJson = await confirmRes.json().catch(() => ({}));
+        if (!confirmRes.ok) throw new Error(confirmJson.error || 'Failed to save Input VAT');
+        setActiveTab('purchases');
+      } else if (options?.createVoucher) {
+        const voucherRes = await fetch(`/api/purchase-invoices/document-intakes/${reviewingDoc.id}/create-expense-voucher`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const voucherJson = await voucherRes.json().catch(() => ({}));
+        if (!voucherRes.ok) throw new Error(voucherJson.error || 'Failed to create expense voucher');
+        setActiveTab('expenses');
+      } else {
+        setActiveTab(reviewRole === 'payment_proof' ? 'matching' : 'files');
+      }
+
+      setReviewingDoc(null);
+      await fetchWorkspace();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to review document');
+    } finally {
+      setReviewSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -985,7 +1063,7 @@ export default function ProjectDetail() {
       {activeTab === 'overview' && (
         <div className="grid gap-4 xl:grid-cols-4">
           <WorkspacePanel title={isThai ? 'งานที่ต้องตรวจ' : 'Needs attention'} icon={AlertTriangle}>
-            <ActionList actions={workspace.actionNeeded.slice(0, 5)} isThai={isThai} />
+            <ActionList actions={workspace.actionNeeded.slice(0, 5)} docs={workspace.documentIntakes} isThai={isThai} onReview={openReview} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'จับคู่เอกสาร' : 'Smart matching'} icon={Link2}>
             <SmartMatchList
@@ -1009,7 +1087,7 @@ export default function ProjectDetail() {
             />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
-            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
+            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onReview={openReview} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'LINE / ทีม' : 'LINE / team'} icon={Users}>
             <div className="space-y-3">
@@ -1038,7 +1116,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'action' && (
         <WorkspacePanel title={isThai ? 'เอกสารที่ต้องจัดการ' : 'Documents needing action'} icon={AlertTriangle}>
-          <ActionList actions={workspace.actionNeeded} isThai={isThai} />
+          <ActionList actions={workspace.actionNeeded} docs={workspace.documentIntakes} isThai={isThai} onReview={openReview} />
         </WorkspacePanel>
       )}
 
@@ -1068,7 +1146,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'files' && (
         <WorkspacePanel title={isThai ? 'ไฟล์ทั้งหมดของโปรเจค' : 'Project file library'} icon={FolderOpen}>
-          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
+          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onReview={openReview} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
         </WorkspacePanel>
       )}
 
@@ -1249,6 +1327,25 @@ export default function ProjectDetail() {
           />
         </WorkspacePanel>
       )}
+
+      {reviewingDoc && (
+        <ReviewDocumentModal
+          doc={reviewingDoc}
+          role={reviewRole}
+          note={reviewNote}
+          isThai={isThai}
+          saving={reviewSaving}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          token={token ?? ''}
+          onRoleChange={setReviewRole}
+          onNoteChange={setReviewNote}
+          onClose={() => setReviewingDoc(null)}
+          onSave={() => void saveDocumentReview()}
+          onConfirmPurchase={() => void saveDocumentReview({ confirmPurchase: true })}
+          onCreateVoucher={() => void saveDocumentReview({ createVoucher: true })}
+        />
+      )}
     </div>
   );
 }
@@ -1281,23 +1378,198 @@ function EmptyBlock({ text }: { text: string }) {
   );
 }
 
-function ActionList({ actions, isThai }: { actions: ActionNeeded[]; isThai: boolean }) {
+function ActionList({
+  actions,
+  docs,
+  isThai,
+  onReview,
+}: {
+  actions: ActionNeeded[];
+  docs: DocumentIntake[];
+  isThai: boolean;
+  onReview: (doc: DocumentIntake) => void;
+}) {
   if (actions.length === 0) {
     return <EmptyBlock text={isThai ? 'ไม่มีงานค้าง เอกสารในโปรเจคนี้เรียบร้อยดี' : 'No pending actions. This project is clean.'} />;
   }
   return (
     <div className="space-y-3">
-      {actions.map((action) => (
-        <div key={action.id} className={clsx('rounded-lg border p-3', ACTION_CLASSES[action.severity])}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold">{action.title}</p>
-              <p className="mt-1 text-xs opacity-80">{action.message}</p>
+      {actions.map((action) => {
+        const doc = docs.find((item) => item.id === action.documentIntakeId);
+        return (
+          <div key={action.id} className={clsx('rounded-lg border p-3', ACTION_CLASSES[action.severity])}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{action.title}</p>
+                <p className="mt-1 text-xs opacity-80">{action.message}</p>
+                {doc?.ocrSummary && (
+                  <p className="mt-1 truncate text-xs opacity-80">
+                    {doc.ocrSummary.documentTypeLabel || doc.ocrSummary.documentType || doc.kind}
+                    {doc.ocrSummary.confidence ? ` · OCR ${doc.ocrSummary.confidence}` : ''}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold">{action.type}</span>
+                {doc && (
+                  <button
+                    type="button"
+                    onClick={() => onReview(doc)}
+                    className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
+                  >
+                    {isThai ? 'ตรวจ/จัดประเภท' : 'Review'}
+                  </button>
+                )}
+              </div>
             </div>
-            <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold">{action.type}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReviewDocumentModal({
+  doc,
+  role,
+  note,
+  isThai,
+  saving,
+  token,
+  formatCurrency,
+  formatDate,
+  onRoleChange,
+  onNoteChange,
+  onClose,
+  onSave,
+  onConfirmPurchase,
+  onCreateVoucher,
+}: {
+  doc: DocumentIntake;
+  role: ReviewDocumentRole;
+  note: string;
+  isThai: boolean;
+  saving: boolean;
+  token: string;
+  formatCurrency: (value: number) => string;
+  formatDate: (value: string) => string;
+  onRoleChange: (role: ReviewDocumentRole) => void;
+  onNoteChange: (note: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+  onConfirmPurchase: () => void;
+  onCreateVoucher: () => void;
+}) {
+  const selected = REVIEW_DOCUMENT_ROLES.find((item) => item.value === role);
+  const canConfirmPurchase = role === 'tax_invoice' || role === 'receipt';
+  const canCreateVoucher = role === 'expense_receipt';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-base font-bold text-slate-950">{isThai ? 'ตรวจและจัดประเภทเอกสาร' : 'Review document'}</p>
+            <p className="mt-1 truncate text-sm text-slate-500">{doc.fileName || (isThai ? 'ไฟล์ไม่มีชื่อ' : 'Untitled file')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            disabled={saving}
+          >
+            {isThai ? 'ปิด' : 'Close'}
+          </button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-h-[420px] overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <FilePreview doc={doc} token={token} variant="card" />
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold text-slate-500">{isThai ? 'ข้อมูลที่ระบบอ่านได้' : 'Detected data'}</p>
+              <div className="mt-2 space-y-1 text-sm text-slate-700">
+                <p><span className="font-semibold">{isThai ? 'ประเภท' : 'Type'}:</span> {doc.ocrSummary?.documentTypeLabel || doc.ocrSummary?.documentType || '-'}</p>
+                <p><span className="font-semibold">{isThai ? 'คู่ค้า' : 'Party'}:</span> {doc.ocrSummary?.supplierName || doc.ocrSummary?.payment?.toName || '-'}</p>
+                <p><span className="font-semibold">{isThai ? 'เลขที่/อ้างอิง' : 'No./ref'}:</span> {doc.ocrSummary?.invoiceNumber || doc.ocrSummary?.reference || '-'}</p>
+                <p><span className="font-semibold">{isThai ? 'วันที่' : 'Date'}:</span> {doc.ocrSummary?.invoiceDate ? formatDate(doc.ocrSummary.invoiceDate) : '-'}</p>
+                <p><span className="font-semibold">{isThai ? 'ยอด' : 'Amount'}:</span> {doc.ocrSummary?.total ? formatCurrency(doc.ocrSummary.total) : '-'}</p>
+                <p><span className="font-semibold">VAT:</span> {doc.ocrSummary?.vatAmount ? formatCurrency(doc.ocrSummary.vatAmount) : '-'}</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{isThai ? 'เลือกบทบาทเอกสาร' : 'Document role'}</label>
+              <div className="mt-2 grid gap-2">
+                {REVIEW_DOCUMENT_ROLES.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => onRoleChange(item.value)}
+                    className={clsx(
+                      'rounded-lg border px-3 py-2 text-left transition',
+                      role === item.value ? 'border-primary-500 bg-primary-50 text-primary-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                    )}
+                  >
+                    <p className="text-sm font-semibold">{isThai ? item.th : item.en}</p>
+                    <p className="mt-0.5 text-xs opacity-75">{isThai ? item.hintTh : item.hintEn}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{isThai ? 'หมายเหตุ' : 'Note'}</label>
+              <textarea
+                value={note}
+                onChange={(event) => onNoteChange(event.target.value)}
+                rows={3}
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                placeholder={isThai ? 'เช่น ใบนี้เป็นใบแนบของ PO ไม่ใช่ใบภาษีซื้อ' : 'Example: supporting document for PO, not input VAT'}
+              />
+            </div>
           </div>
         </div>
-      ))}
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-500">
+            {selected ? (isThai ? selected.hintTh : selected.hintEn) : ''}
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {isThai ? 'บันทึกบทบาท' : 'Save role'}
+            </button>
+            {canCreateVoucher && (
+              <button
+                type="button"
+                onClick={onCreateVoucher}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+                {isThai ? 'สร้าง Payment Voucher' : 'Create voucher'}
+              </button>
+            )}
+            {canConfirmPurchase && (
+              <button
+                type="button"
+                onClick={onConfirmPurchase}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                {isThai ? 'บันทึกเป็นภาษีซื้อ' : 'Save Input VAT'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1582,6 +1854,7 @@ function DocumentList({
   formatCurrency,
   onOpen,
   onComment,
+  onReview,
   onCreateVoucher,
   onDriveRetry,
   commentingId,
@@ -1595,6 +1868,7 @@ function DocumentList({
   formatCurrency: (value: number) => string;
   onOpen: (doc: DocumentIntake) => void | Promise<void>;
   onComment: (doc: DocumentIntake) => void | Promise<void>;
+  onReview: (doc: DocumentIntake) => void | Promise<void>;
   onCreateVoucher: (doc: DocumentIntake) => void | Promise<void>;
   onDriveRetry: (doc: DocumentIntake) => void | Promise<void>;
   commentingId?: string | null;
@@ -1676,7 +1950,16 @@ function DocumentList({
                 <p className="mt-2 line-clamp-2 text-xs text-rose-600" title={doc.driveSyncError}>{doc.driveSyncError}</p>
               )}
               <p className="mt-auto pt-3 text-xs text-slate-400">{formatDate(doc.createdAt)}</p>
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => void onReview(doc)}
+                disabled={!token}
+                className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {isThai ? 'ตรวจ/จัดประเภทเอกสาร' : 'Review document'}
+              </button>
+              <div className="mt-2 grid grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => void onOpen(doc)}

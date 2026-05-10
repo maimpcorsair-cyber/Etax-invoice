@@ -326,7 +326,7 @@ export async function exportProjectToSheets(input: {
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
   files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string; driveSyncStatus?: string | null; driveUrl?: string | null; driveFolderUrl?: string | null }>;
   purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
-  purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean }>;
+  purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean; attachmentUrl?: string | null }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
   expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number }>;
   lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
@@ -387,7 +387,7 @@ export async function exportProjectToSheets(input: {
       spreadsheetId: id,
       range: 'Purchases!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No'])] },
+      requestBody: { values: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid', 'Attachment'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No', item.attachmentUrl ?? ''])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
