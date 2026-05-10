@@ -60,13 +60,15 @@ jobs:
         run: |
           echo "Triggering Render deploy..."
           DEPLOY_MODE="hook"
+          TRIGGERED_AFTER=$(date -u -d "2 minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
           if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
             DEPLOY_MODE="api"
+            REQUEST_BODY=$(jq -nc --arg commitId "$GITHUB_SHA" '{clearCache:"do_not_clear", commitId:$commitId}')
             RESPONSE=$(curl -s -w "\n%{http_code}" \
               -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
               -H "Authorization: Bearer $RENDER_API_KEY" \
               -H "Content-Type: application/json" \
-              -d '{"clearCache":"do_not_clear"}')
+              -d "$REQUEST_BODY")
           else
             RESPONSE=$(curl -s -w "\n%{http_code}" \
               -X POST "$RENDER_DEPLOY_HOOK_URL")
@@ -74,6 +76,26 @@ jobs:
           STATUS=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           DEPLOY_ID=$(echo "$BODY" | jq -r '.id // .deploy.id // .deployId // .data.id // empty' 2>/dev/null || echo "")
+          if [ "$DEPLOY_MODE" = "api" ] && [ -z "$DEPLOY_ID" ] && [ "$STATUS" = "202" ]; then
+            echo "Deploy was queued; locating queued deploy for commit $GITHUB_SHA..."
+            for i in $(seq 1 12); do
+              sleep 5
+              DEPLOYS=$(curl -s -G \
+                -H "Authorization: Bearer $RENDER_API_KEY" \
+                --data-urlencode "createdAfter=$TRIGGERED_AFTER" \
+                --data-urlencode "limit=10" \
+                "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys")
+              DEPLOY_ID=$(echo "$DEPLOYS" | jq -r --arg sha "$GITHUB_SHA" '
+                map(select((.deploy.commit.id // "") == $sha or ((.deploy.commit.id // "") | startswith($sha))))[0].deploy.id
+                // .[0].deploy.id
+                // empty
+              ' 2>/dev/null || echo "")
+              if [ -n "$DEPLOY_ID" ]; then
+                break
+              fi
+              echo "  queued deploy not visible yet (attempt $i)"
+            done
+          fi
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "deploy_id=$DEPLOY_ID" >> $GITHUB_OUTPUT
           if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ] && [ "$STATUS" != "202" ]; then
