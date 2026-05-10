@@ -59,6 +59,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Project Workspace production fix deploy run: `25621254346` succeeded.
 - Latest verified Project Workspace production fix typecheck run: `25621254343` succeeded.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 after the fix.
+- Latest verified Project Google Drive Workspace deploy run: `25622268180` succeeded.
+- Latest verified Project Google Drive Workspace typecheck run: `25622268183` succeeded.
+- Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 with project Drive fields after deploy.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
