@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 19:42 Asia/Bangkok
+Last updated: 2026-05-10 19:56 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -78,7 +78,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Production Google Drive service account is configured:
   - `/api/drive/status` returned `oauthConfigured:true`, `serviceAccountConfigured:true`, `driveUsable:true`, `mode:"service_account"`, `requiredEnv:[]`.
   - `POST /api/projects/cmozbu2ow001l10l2rl5mym9i/drive/folder` returned a Google Drive `folderUrl` with `userDrive:false`.
-- Company Drive Owner is implemented locally and pending commit/deploy:
+- Latest verified Company Drive Owner deploy run: `25629043673` succeeded.
+- Latest verified Company Drive Owner typecheck run: `25629043674` succeeded.
+- Vercel production frontend deploy was Ready 2026-05-10 19:56 Asia/Bangkok.
+- Production `/api/drive/status` after deploy returned the new `companyDriveOwner` field; current demo admin still has `companyDriveOwner:null` because no user has completed Drive OAuth after this feature.
+- Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.
   - Project Drive folder/document sync prefers the company Drive owner's Google token, then the current/preferred user's token, then service account fallback.
