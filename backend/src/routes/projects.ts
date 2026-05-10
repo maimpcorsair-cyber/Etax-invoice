@@ -1142,7 +1142,9 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
     logger.error('Failed to get project workspace', { error: err });
     res.status(500).json({
       error: 'Failed to fetch project workspace',
-      details: err instanceof Error ? err.message : String(err),
+      ...(req.user?.role === 'super_admin' && req.query.debug === '1'
+        ? { details: err instanceof Error ? err.message : String(err) }
+        : {}),
     });
   }
 });
