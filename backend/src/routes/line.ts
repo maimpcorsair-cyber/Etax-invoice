@@ -32,6 +32,7 @@ import {
 import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 
 export const lineRouter = Router();
 
@@ -736,7 +737,7 @@ async function updateDocumentIntake(
 ) {
   if (!id) return;
   try {
-    await withSystemRlsContext(prisma, (tx) =>
+    const updated = await withSystemRlsContext(prisma, (tx) =>
       tx.documentIntake.update({
         where: { id },
         data: {
@@ -749,8 +750,15 @@ async function updateDocumentIntake(
           purchaseInvoiceId: data.purchaseInvoiceId,
           processedAt: ['saved', 'needs_review', 'failed'].includes(data.status) ? new Date() : undefined,
         },
+        select: { companyId: true, projectId: true, userId: true },
       }),
     );
+    if (updated.projectId && ['saved', 'needs_review', 'failed', 'awaiting_input', 'awaiting_confirmation'].includes(data.status)) {
+      void syncDocumentIntakeToProjectDrive(id, {
+        companyId: updated.companyId,
+        preferredUserId: updated.userId,
+      });
+    }
   } catch (err) {
     logger.warn('[Line] Document intake update failed', { err, intakeId: id, status: data.status });
   }
@@ -2218,7 +2226,6 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       mimeType: contentType,
       buffer,
     });
-
     let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
 

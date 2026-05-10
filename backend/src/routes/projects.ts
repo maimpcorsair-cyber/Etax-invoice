@@ -13,6 +13,10 @@ import { exportProjectToSheets, isSheetsConfigured } from '../services/googleShe
 import { downloadFromStorage } from '../services/storageService';
 import { createZip, ZipEntryInput } from '../services/zipService';
 import { sendLineText } from '../services/lineService';
+import {
+  ensureProjectDriveFolderForUser,
+  syncDocumentIntakeToProjectDrive,
+} from '../services/projectDriveSyncService';
 
 export const projectsRouter = Router();
 
@@ -902,6 +906,14 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
             mimeType: true,
             fileSize: true,
             fileUrl: true,
+            driveFileId: true,
+            driveUrl: true,
+            driveFolderId: true,
+            driveFolderUrl: true,
+            driveSyncStatus: true,
+            driveSyncError: true,
+            driveSyncedAt: true,
+            driveUserDrive: true,
             status: true,
             ocrResult: true,
             warnings: true,
@@ -1131,6 +1143,9 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         })),
         expenseVouchers: expenseVouchers.map((item) => ({ ...item, totalAmount: asNumber(item.totalAmount) })),
         lineGroups,
+        driveFolder: row.driveFolderId && row.driveFolderUrl
+          ? { id: row.driveFolderId, url: row.driveFolderUrl }
+          : null,
       };
     });
     if (!data) {
@@ -1146,6 +1161,50 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
         ? { details: err instanceof Error ? err.message : String(err) }
         : {}),
     });
+  }
+});
+
+projectsRouter.post('/:id/drive/folder', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const folder = await ensureProjectDriveFolderForUser({
+      companyId: req.user!.companyId,
+      projectId: req.params.id,
+      userId: req.user!.userId,
+    });
+    if (!folder) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+    res.json({ data: folder });
+  } catch (err) {
+    logger.error('Failed to ensure project Drive folder', { error: err, projectId: req.params.id });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create project Drive folder' });
+  }
+});
+
+projectsRouter.post('/:id/documents/:documentIntakeId/drive/retry', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const document = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => tx.documentIntake.findFirst({
+      where: {
+        id: req.params.documentIntakeId,
+        companyId: req.user!.companyId,
+        projectId: req.params.id,
+      },
+      select: { id: true },
+    }));
+    if (!document) {
+      res.status(404).json({ error: 'Project document not found' });
+      return;
+    }
+    await syncDocumentIntakeToProjectDrive(document.id, {
+      companyId: req.user!.companyId,
+      preferredUserId: req.user!.userId,
+      force: true,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Failed to retry project document Drive sync', { error: err, projectId: req.params.id, documentIntakeId: req.params.documentIntakeId });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to retry Drive sync' });
   }
 });
 
@@ -1302,6 +1361,9 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
             targetId: true,
             purchaseInvoiceId: true,
             createdAt: true,
+            driveUrl: true,
+            driveSyncStatus: true,
+            driveFolderUrl: true,
           },
         }),
         tx.purchaseInvoice.findMany({
@@ -1454,6 +1516,9 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
         mimeType: item.mimeType,
         fileSize: item.fileSize,
         createdAt: item.createdAt,
+        driveSyncStatus: item.driveSyncStatus,
+        driveUrl: item.driveUrl,
+        driveFolderUrl: item.driveFolderUrl,
       })),
       purchaseOrders: exportData.purchaseOrders.map((item) => ({
         poNumber: item.poNumber,
@@ -1558,6 +1623,9 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
             targetId: true,
             purchaseInvoiceId: true,
             createdAt: true,
+            driveUrl: true,
+            driveSyncStatus: true,
+            driveFolderUrl: true,
           },
         }),
         tx.purchaseInvoice.findMany({
@@ -1687,6 +1755,20 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       return;
     }
 
+    let driveFolderId = exportData.project.driveFolderId ?? null;
+    if (!driveFolderId) {
+      try {
+        const folder = await ensureProjectDriveFolderForUser({
+          companyId: req.user!.companyId,
+          projectId: req.params.id,
+          userId: req.user!.userId,
+        });
+        driveFolderId = folder?.folderId ?? null;
+      } catch (driveErr) {
+        logger.warn('Could not ensure Drive folder before project sheet export', { error: driveErr, projectId: req.params.id });
+      }
+    }
+
     const url = await exportProjectToSheets({
       project: {
         code: exportData.project.code,
@@ -1696,7 +1778,9 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         status: exportData.project.status,
         ownerName: exportData.project.owner?.name ?? null,
         approverName: exportData.project.approver?.name ?? null,
+        driveFolderId,
       },
+      sharedWithEmail: req.user!.email,
       summary: exportData.workspaceSummary,
       actionNeeded: exportData.actionNeeded,
       files: exportData.files.map((item) => ({
@@ -1709,6 +1793,9 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         mimeType: item.mimeType,
         fileSize: item.fileSize,
         createdAt: item.createdAt,
+        driveSyncStatus: item.driveSyncStatus,
+        driveUrl: item.driveUrl,
+        driveFolderUrl: item.driveFolderUrl,
       })),
       purchaseOrders: exportData.purchaseOrders.map((item) => ({
         poNumber: item.poNumber,

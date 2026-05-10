@@ -13,6 +13,7 @@ import {
   documentIntakeWarningsForOcr,
   hasUsefulDocumentData,
 } from '../services/documentOcrService';
+import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 
 export const projectPortalRouter = Router();
 
@@ -90,6 +91,7 @@ async function assertPortalAccess(payload: ProjectPortalToken) {
         groupName: true,
         companyId: true,
         projectId: true,
+        linkedById: true,
         project: { select: { id: true, code: true, name: true } },
       },
     });
@@ -428,6 +430,10 @@ projectPortalRouter.post('/:token/upload', async (req, res) => {
         },
       }));
     }
+    void syncDocumentIntakeToProjectDrive(created.id, {
+      companyId: payload.companyId,
+      preferredUserId: group.linkedById,
+    });
 
     res.status(201).json({
       data: created,

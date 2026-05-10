@@ -22,7 +22,7 @@ import {
   PURCHASE_RECORD_DOCUMENT_TYPES,
   supportedDocumentMimeType,
 } from '../services/documentOcrService';
-import { isDriveConfigured, uploadToDrive } from '../services/googleDriveService';
+import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { generateVoucherNumber } from '../services/expenseService';
 
 export const purchaseInvoicesRouter = Router();
@@ -455,37 +455,6 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
 
     await incrementStorageUsed(req.user!.companyId, buffer.length);
 
-    const uploadProjectId = body.projectId ?? null;
-    if (uploadProjectId && isDriveConfigured()) {
-      void (async () => {
-        try {
-          const [company, userRecord, project] = await Promise.all([
-            prisma.company.findUnique({ where: { id: req.user!.companyId }, select: { nameTh: true, nameEn: true } }),
-            prisma.user.findUnique({ where: { id: req.user!.userId }, select: { googleRefreshToken: true } }),
-            prisma.project.findFirst({
-              where: { id: uploadProjectId, companyId: req.user!.companyId },
-              select: { code: true, name: true },
-            }),
-          ]);
-          const driveResult = await uploadToDrive(
-            buffer,
-            body.fileName ?? `document-${created.id}`,
-            body.mimeType,
-            company?.nameEn ?? company?.nameTh ?? req.user!.companyId,
-            userRecord?.googleRefreshToken,
-            {
-              projectCode: project?.code,
-              projectName: project?.name,
-              documentFolder: body.mimeType === 'application/pdf' ? '02_Tax_Invoices' : '04_Photos',
-            },
-          );
-          logger.info('Project document mirrored to Drive', { intakeId: created.id, fileId: driveResult.fileId, folderId: driveResult.folderId });
-        } catch (driveErr) {
-          logger.warn('Project document Drive mirror failed', { error: driveErr, intakeId: created.id });
-        }
-      })();
-    }
-
     try {
       const analysis = await analyzeAccountingDocumentBuffer(buffer, body.mimeType, req.user!.companyId);
       const result = analysis.result;
@@ -514,6 +483,12 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
             processedAt: new Date(),
           },
         });
+      });
+    }
+    if (body.projectId) {
+      void syncDocumentIntakeToProjectDrive(created.id, {
+        companyId: req.user!.companyId,
+        preferredUserId: req.user!.userId,
       });
     }
 

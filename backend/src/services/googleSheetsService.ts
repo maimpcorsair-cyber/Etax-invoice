@@ -343,10 +343,12 @@ export async function exportProjectToSheets(input: {
     status: string;
     ownerName?: string | null;
     approverName?: string | null;
+    driveFolderId?: string | null;
   };
+  sharedWithEmail?: string | null;
   summary: Record<string, string | number>;
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
-  files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string }>;
+  files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string; driveSyncStatus?: string | null; driveUrl?: string | null; driveFolderUrl?: string | null }>;
   purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
   purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
@@ -403,7 +405,7 @@ export async function exportProjectToSheets(input: {
       spreadsheetId: id,
       range: 'Files!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.mimeType, item.fileSize, asDate(item.createdAt)])] },
+      requestBody: { values: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'Drive sync', 'Drive file', 'Drive folder', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.driveSyncStatus ?? '', item.driveUrl ?? '', item.driveFolderUrl ?? '', item.mimeType, item.fileSize, asDate(item.createdAt)])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
@@ -468,13 +470,27 @@ export async function exportProjectToSheets(input: {
     },
   });
 
-  try {
-    await drive.permissions.create({
-      fileId: id,
-      requestBody: { role: 'reader', type: 'anyone' },
-    });
-  } catch {
-    logger.warn('Could not set project sheet permissions to anyone-reader');
+  if (input.project.driveFolderId) {
+    try {
+      await drive.files.update({
+        fileId: id,
+        addParents: input.project.driveFolderId,
+        fields: 'id,parents',
+      });
+    } catch (err) {
+      logger.warn('Could not move project sheet into Drive project folder', { error: err, folderId: input.project.driveFolderId });
+    }
+  }
+  if (input.sharedWithEmail) {
+    try {
+      await drive.permissions.create({
+        fileId: id,
+        requestBody: { role: 'writer', type: 'user', emailAddress: input.sharedWithEmail },
+        sendNotificationEmail: false,
+      });
+    } catch (err) {
+      logger.warn('Could not share project sheet with user', { error: err, email: input.sharedWithEmail });
+    }
   }
 
   const url = `https://docs.google.com/spreadsheets/d/${id}`;

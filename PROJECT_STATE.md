@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 13:05 Asia/Bangkok
+Last updated: 2026-05-10 13:42 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -130,6 +130,20 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 ## Latest Work Completed
 
+- Added Project Google Drive Workspace v1:
+  - new migration `20260510_project_drive_sync` adds Drive metadata/status to `document_intakes` and Drive folder link fields to `projects`
+  - shared project Drive sync service now records `driveFileId`, `driveUrl`, `driveFolderId`, `driveFolderUrl`, `driveSyncStatus`, `driveSyncError`, `driveSyncedAt`, and whether the file landed in user Drive
+  - web project uploads, LINE project uploads, and Project Guest Portal uploads now use the shared project Drive sync path
+  - Project Workspace can create/open the project Drive folder and retry Drive sync per file
+  - Project Workspace Files tab now renders Drive-like file cards with previews, Drive status, file actions, OCR summary, tax badge, comments, and voucher action
+  - project Google Sheet export attempts to place the sheet in the project Drive folder and privately shares it with the requesting user instead of making it public-anyone by default
+- Verified locally after Project Google Drive Workspace v1:
+  - `DATABASE_URL=postgresql://user:pass@localhost:5432/db npx prisma validate --schema=backend/prisma/schema.prisma`
+  - backend `npm run typecheck`
+  - frontend `npm run typecheck`
+  - backend `npm run build`
+  - frontend `npm run build`
+  - `git diff --check`
 - Fixed Project Workspace production 500:
   - reproduced `Failed to fetch project workspace` on production for project `cmozbu2ow001l10l2rl5mym9i`
   - root cause was schema drift: `document_comments` migration existed under root `prisma/migrations` but not under `backend/prisma/migrations`, while Render deploy runs migrations from `backend`

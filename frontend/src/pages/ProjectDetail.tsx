@@ -48,6 +48,8 @@ interface Project {
   name: string;
   description?: string | null;
   customerName?: string | null;
+  driveFolderId?: string | null;
+  driveFolderUrl?: string | null;
   budgetAmount: number;
   status: ProjectStatus;
   owner?: ProjectUser | null;
@@ -98,6 +100,14 @@ interface DocumentIntake {
   mimeType: string;
   fileSize: number;
   fileUrl?: string | null;
+  driveFileId?: string | null;
+  driveUrl?: string | null;
+  driveFolderId?: string | null;
+  driveFolderUrl?: string | null;
+  driveSyncStatus?: 'not_synced' | 'syncing' | 'synced' | 'failed' | 'skipped' | string | null;
+  driveSyncError?: string | null;
+  driveSyncedAt?: string | null;
+  driveUserDrive?: boolean | null;
   status: string;
   kind: string;
   targetType?: string | null;
@@ -285,6 +295,7 @@ interface ProjectWorkspace {
   invoices: SalesInvoice[];
   expenseVouchers: ExpenseVoucher[];
   lineGroups: LineGroup[];
+  driveFolder?: { id: string; url: string } | null;
 }
 
 const STATUS_CLASSES: Record<ProjectStatus, string> = {
@@ -327,6 +338,8 @@ export default function ProjectDetail() {
   const [exporting, setExporting] = useState(false);
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
+  const [driveOpening, setDriveOpening] = useState(false);
+  const [driveRetryingId, setDriveRetryingId] = useState<string | null>(null);
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [voucherCreatingId, setVoucherCreatingId] = useState<string | null>(null);
@@ -489,6 +502,52 @@ export default function ProjectDetail() {
       setError(err instanceof Error ? err.message : 'Google Sheets export failed');
     } finally {
       setSheetSyncing(false);
+    }
+  }
+
+  async function openProjectDriveFolder() {
+    if (!token || !workspace) return;
+    setDriveOpening(true);
+    setError('');
+    try {
+      const currentUrl = workspace.driveFolder?.url || workspace.project.driveFolderUrl;
+      if (currentUrl) {
+        window.open(currentUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const res = await fetch(`/api/projects/${workspace.project.id}/drive/folder`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Google Drive folder failed');
+      const url = json.data?.folderUrl;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      await fetchWorkspace();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google Drive folder failed');
+    } finally {
+      setDriveOpening(false);
+    }
+  }
+
+  async function retryDriveSync(doc: DocumentIntake) {
+    if (!token || !workspace) return;
+    setDriveRetryingId(doc.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/projects/${workspace.project.id}/documents/${doc.id}/drive/retry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Drive sync failed');
+      await fetchWorkspace();
+      setActiveTab('files');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Drive sync failed');
+    } finally {
+      setDriveRetryingId(null);
     }
   }
 
@@ -671,6 +730,15 @@ export default function ProjectDetail() {
           </button>
           <button
             type="button"
+            onClick={() => void openProjectDriveFolder()}
+            disabled={driveOpening}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {driveOpening ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+            {isThai ? 'Drive' : 'Drive'}
+          </button>
+          <button
+            type="button"
             onClick={() => void downloadAttachmentZip()}
             disabled={zipDownloading}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -801,7 +869,7 @@ export default function ProjectDetail() {
             />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
-            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} commentingId={commentingId} voucherCreatingId={voucherCreatingId} />
+            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'LINE / ทีม' : 'LINE / team'} icon={Users}>
             <div className="space-y-3">
@@ -852,7 +920,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'files' && (
         <WorkspacePanel title={isThai ? 'ไฟล์ทั้งหมดของโปรเจค' : 'Project file library'} icon={FolderOpen}>
-          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} commentingId={commentingId} voucherCreatingId={voucherCreatingId} />
+          <DocumentList docs={workspace.documentIntakes} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
         </WorkspacePanel>
       )}
 
@@ -1238,8 +1306,10 @@ function DocumentList({
   onOpen,
   onComment,
   onCreateVoucher,
+  onDriveRetry,
   commentingId,
   voucherCreatingId,
+  driveRetryingId,
 }: {
   docs: DocumentIntake[];
   isThai: boolean;
@@ -1249,14 +1319,16 @@ function DocumentList({
   onOpen: (doc: DocumentIntake) => void | Promise<void>;
   onComment: (doc: DocumentIntake) => void | Promise<void>;
   onCreateVoucher: (doc: DocumentIntake) => void | Promise<void>;
+  onDriveRetry: (doc: DocumentIntake) => void | Promise<void>;
   commentingId?: string | null;
   voucherCreatingId?: string | null;
+  driveRetryingId?: string | null;
 }) {
   if (docs.length === 0) {
     return <EmptyBlock text={isThai ? 'ยังไม่มีไฟล์ในโปรเจคนี้' : 'No files in this project yet'} />;
   }
   return (
-    <div className="divide-y divide-slate-100">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {docs.map((doc) => {
         const canCreateVoucher = !doc.targetId
           && doc.status !== 'failed'
@@ -1266,17 +1338,49 @@ function DocumentList({
             || doc.ocrSummary?.taxTreatment === 'vat_exempt'
             || doc.ocrSummary?.taxTreatment === 'non_deductible'
           );
+        const driveStatus = doc.driveSyncStatus ?? 'not_synced';
+        const driveOk = driveStatus === 'synced' && !!doc.driveUrl;
+        const driveBusy = driveStatus === 'syncing' || driveRetryingId === doc.id;
         return (
-          <div key={doc.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <FilePreview doc={doc} token={token} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-950">{doc.fileName || (isThai ? 'ไฟล์ไม่มีชื่อ' : 'Untitled file')}</p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {doc.kind} · {doc.status} · {formatBytes(doc.fileSize)} · {formatDate(doc.createdAt)}
-              </p>
-              <DocumentOcrSummaryLine doc={doc} isThai={isThai} formatCurrency={formatCurrency} formatDate={formatDate} />
-              <div className="mt-1">
+          <div key={doc.id} className="group flex min-h-[360px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-primary-200 hover:shadow-md">
+            <button
+              type="button"
+              onClick={() => void onOpen(doc)}
+              disabled={!token}
+              className="relative flex h-40 items-center justify-center border-b border-slate-100 bg-slate-50"
+              aria-label={isThai ? 'เปิดไฟล์' : 'Open file'}
+            >
+              <FilePreview doc={doc} token={token} variant="card" />
+              <span className="absolute right-2 top-2 rounded-md bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm">
+                {doc.mimeType.includes('pdf') ? 'PDF' : doc.mimeType.includes('image') ? 'IMG' : 'FILE'}
+              </span>
+            </button>
+            <div className="flex flex-1 flex-col p-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-950" title={doc.fileName || undefined}>{doc.fileName || (isThai ? 'ไฟล์ไม่มีชื่อ' : 'Untitled file')}</p>
+                <p className="mt-1 truncate text-xs text-slate-500">
+                  {doc.kind} · {doc.status} · {formatBytes(doc.fileSize)}
+                </p>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className={clsx(
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                  driveOk ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : driveStatus === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-700'
+                      : driveStatus === 'skipped' ? 'border-slate-200 bg-slate-50 text-slate-500'
+                        : 'border-amber-200 bg-amber-50 text-amber-700',
+                )}>
+                  {driveBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderOpen className="h-3 w-3" />}
+                  {driveOk ? (isThai ? 'อยู่ใน Drive' : 'In Drive')
+                    : driveStatus === 'failed' ? (isThai ? 'Drive ล้มเหลว' : 'Drive failed')
+                      : driveStatus === 'skipped' ? (isThai ? 'ยังไม่ตั้ง Drive' : 'Drive skipped')
+                        : driveStatus === 'syncing' ? (isThai ? 'กำลัง sync' : 'Syncing')
+                          : (isThai ? 'รอ Drive' : 'Drive pending')}
+                </span>
                 <TaxSafetyBadge taxSafety={doc.taxSafety} />
+              </div>
+              <div className="mt-2 min-h-[48px]">
+                <DocumentOcrSummaryLine doc={doc} isThai={isThai} formatCurrency={formatCurrency} formatDate={formatDate} />
               </div>
               {doc.comments && doc.comments.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -1291,38 +1395,53 @@ function DocumentList({
                   ))}
                 </div>
               )}
+              {doc.driveSyncError && (
+                <p className="mt-2 line-clamp-2 text-xs text-rose-600" title={doc.driveSyncError}>{doc.driveSyncError}</p>
+              )}
+              <p className="mt-auto pt-3 text-xs text-slate-400">{formatDate(doc.createdAt)}</p>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onOpen(doc)}
+                  disabled={!token}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  aria-label={isThai ? 'เปิดไฟล์' : 'Open file'}
+                  title={isThai ? 'เปิดไฟล์' : 'Open file'}
+                >
+                  {doc.fileUrl?.startsWith('http') ? <ExternalLink className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => driveOk ? window.open(doc.driveUrl!, '_blank', 'noopener,noreferrer') : void onDriveRetry(doc)}
+                  disabled={!token || driveBusy}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  aria-label={driveOk ? (isThai ? 'เปิดใน Google Drive' : 'Open in Google Drive') : (isThai ? 'Sync Drive ใหม่' : 'Retry Drive sync')}
+                  title={driveOk ? (isThai ? 'เปิดใน Google Drive' : 'Open in Google Drive') : (isThai ? 'Sync Drive ใหม่' : 'Retry Drive sync')}
+                >
+                  {driveBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onComment(doc)}
+                  disabled={!token || commentingId === doc.id}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+                  aria-label={isThai ? 'ขอเอกสารเพิ่ม' : 'Request more info'}
+                  title={isThai ? 'ขอเอกสาร/คอมเมนต์' : 'Request/comment'}
+                >
+                  {commentingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onCreateVoucher(doc)}
+                  disabled={!canCreateVoucher || !token || voucherCreatingId === doc.id}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30"
+                  aria-label={isThai ? 'สร้างใบเบิกจากไฟล์นี้' : 'Create expense voucher'}
+                  title={isThai ? 'สร้างใบเบิก/Payment Voucher' : 'Create expense voucher'}
+                >
+                  {voucherCreatingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            {canCreateVoucher && (
-              <button
-                type="button"
-                onClick={() => void onCreateVoucher(doc)}
-                disabled={!token || voucherCreatingId === doc.id}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                aria-label={isThai ? 'สร้างใบเบิกจากไฟล์นี้' : 'Create expense voucher'}
-                title={isThai ? 'สร้างใบเบิก/Payment Voucher' : 'Create expense voucher'}
-              >
-                {voucherCreatingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void onComment(doc)}
-              disabled={!token || commentingId === doc.id}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-50"
-              aria-label={isThai ? 'ขอเอกสารเพิ่ม' : 'Request more info'}
-              title={isThai ? 'ขอเอกสาร/คอมเมนต์' : 'Request/comment'}
-            >
-              {commentingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => void onOpen(doc)}
-              disabled={!token}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
-              aria-label={isThai ? 'เปิดไฟล์' : 'Open file'}
-            >
-              {doc.fileUrl?.startsWith('http') ? <ExternalLink className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-            </button>
           </div>
         );
       })}
@@ -1330,7 +1449,7 @@ function DocumentList({
   );
 }
 
-function FilePreview({ doc, token }: { doc: DocumentIntake; token: string }) {
+function FilePreview({ doc, token, variant = 'thumb' }: { doc: DocumentIntake; token: string; variant?: 'thumb' | 'card' }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const Icon = doc.mimeType.includes('image') ? FileImage : FileText;
@@ -1369,8 +1488,8 @@ function FilePreview({ doc, token }: { doc: DocumentIntake; token: string }) {
 
   if (failed || !blobUrl) {
     return (
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-        <Icon className="h-5 w-5" />
+      <div className={clsx('flex shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600', variant === 'card' ? 'h-full w-full' : 'h-14 w-14')}>
+        <Icon className={variant === 'card' ? 'h-12 w-12' : 'h-5 w-5'} />
       </div>
     );
   }
@@ -1380,7 +1499,7 @@ function FilePreview({ doc, token }: { doc: DocumentIntake; token: string }) {
       <img
         src={blobUrl}
         alt=""
-        className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 bg-slate-50 object-contain"
+        className={clsx('shrink-0 bg-slate-50 object-contain', variant === 'card' ? 'h-full w-full' : 'h-14 w-14 rounded-lg border border-slate-200')}
       />
     );
   }
@@ -1390,7 +1509,7 @@ function FilePreview({ doc, token }: { doc: DocumentIntake; token: string }) {
       src={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=0&page=1`}
       title={doc.fileName || doc.id}
       scrolling="no"
-      className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 bg-slate-50"
+      className={clsx('shrink-0 bg-slate-50', variant === 'card' ? 'h-full w-full' : 'h-14 w-14 rounded-lg border border-slate-200')}
     />
   );
 }

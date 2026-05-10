@@ -429,6 +429,14 @@ model DocumentIntake {
   fileBase64        String?
   fileUrl           String?
   storageKey        String?
+  driveFileId       String?
+  driveUrl          String?
+  driveFolderId     String?
+  driveFolderUrl    String?
+  driveSyncStatus   String    @default("not_synced") // not_synced | syncing | synced | failed | skipped
+  driveSyncError    String?
+  driveSyncedAt     DateTime?
+  driveUserDrive    Boolean   @default(false)
   status            String    @default("received") // received | processing | awaiting_input | awaiting_confirmation | saved | needs_review | failed | rejected
   ocrResult         Json?
   warnings          Json?
@@ -446,6 +454,7 @@ model DocumentIntake {
 
   @@index([companyId, status, createdAt])
   @@index([companyId, projectId, createdAt])
+  @@index([companyId, driveSyncStatus])
   @@index([companyId, purchaseInvoiceId])
   @@index([sourceMessageId])
   @@map("document_intakes")
@@ -546,6 +555,8 @@ model Project {
   startDate    DateTime?
   endDate      DateTime?
   metadata     Json?
+  driveFolderId  String?
+  driveFolderUrl String?
   createdBy    String
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

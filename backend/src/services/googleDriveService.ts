@@ -106,24 +106,37 @@ export interface DriveUploadOptions {
   projectCode?: string | null;
   projectName?: string | null;
   documentFolder?: DriveDocumentFolder | null;
+  shareAnyone?: boolean;
 }
 
-async function ensureFolder(
+function driveFolderUrl(folderId: string) {
+  return `https://drive.google.com/drive/folders/${folderId}`;
+}
+
+async function ensureProjectFolder(
   driveClient: ReturnType<typeof google.drive>,
   companyName: string,
   options: DriveUploadOptions = {},
-): Promise<string> {
+): Promise<{ projectFolderId?: string; projectFolderUrl?: string; targetFolderId: string; targetFolderUrl: string }> {
   const rootId = await ensureChildFolder(driveClient, FOLDER_NAME);
   const companyId = await ensureChildFolder(driveClient, companyName, rootId);
 
-  if (!options.projectCode && !options.projectName) return companyId;
+  if (!options.projectCode && !options.projectName) {
+    return { targetFolderId: companyId, targetFolderUrl: driveFolderUrl(companyId) };
+  }
 
   const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId);
   const projectFolderName = sanitizeDriveName(
     [options.projectCode, options.projectName].filter(Boolean).join(' '),
   );
   const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId);
-  return ensureChildFolder(driveClient, options.documentFolder ?? '99_Other', projectId);
+  const targetId = await ensureChildFolder(driveClient, options.documentFolder ?? '99_Other', projectId);
+  return {
+    projectFolderId: projectId,
+    projectFolderUrl: driveFolderUrl(projectId),
+    targetFolderId: targetId,
+    targetFolderUrl: driveFolderUrl(targetId),
+  };
 }
 
 export interface DriveUploadResult {
@@ -131,8 +144,39 @@ export interface DriveUploadResult {
   url: string;
   fileName: string;
   folderId: string;
+  folderUrl: string;
+  projectFolderId?: string;
+  projectFolderUrl?: string;
   /** Whether the file landed in the user's personal Drive (true) or service account Drive (false) */
   userDrive: boolean;
+}
+
+function buildDriveAuth(userRefreshToken?: string | null): { auth: Auth.OAuth2Client | Auth.GoogleAuth; userDrive: boolean } {
+  if (userRefreshToken && isUserDriveOAuthConfigured()) {
+    const oauthClient = buildOAuth2Client();
+    oauthClient.setCredentials({ refresh_token: userRefreshToken });
+    return { auth: oauthClient, userDrive: true };
+  }
+  return { auth: getServiceAccountAuth(), userDrive: false };
+}
+
+export async function ensureProjectDriveFolder(input: {
+  companyName: string;
+  projectCode: string;
+  projectName: string;
+  userRefreshToken?: string | null;
+}): Promise<{ folderId: string; folderUrl: string; userDrive: boolean }> {
+  const { auth, userDrive } = buildDriveAuth(input.userRefreshToken);
+  const driveClient = google.drive({ version: 'v3', auth: auth as never });
+  const folder = await ensureProjectFolder(driveClient, input.companyName, {
+    projectCode: input.projectCode,
+    projectName: input.projectName,
+  });
+  return {
+    folderId: folder.projectFolderId ?? folder.targetFolderId,
+    folderUrl: folder.projectFolderUrl ?? folder.targetFolderUrl,
+    userDrive,
+  };
 }
 
 /**
@@ -150,23 +194,15 @@ export async function uploadToDrive(
   let auth: Auth.OAuth2Client | Auth.GoogleAuth;
   let userDrive = false;
 
-  if (userRefreshToken && isUserDriveOAuthConfigured()) {
-    const oauthClient = buildOAuth2Client();
-    oauthClient.setCredentials({ refresh_token: userRefreshToken });
-    auth = oauthClient;
-    userDrive = true;
-    logger.info('Drive upload: using user OAuth token', { companyName });
-  } else {
-    auth = getServiceAccountAuth();
-    logger.info('Drive upload: using service account', { companyName });
-  }
+  ({ auth, userDrive } = buildDriveAuth(userRefreshToken));
+  logger.info(userDrive ? 'Drive upload: using user OAuth token' : 'Drive upload: using service account', { companyName });
 
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
 
-  const folderId = await ensureFolder(driveClient, companyName, options);
+  const folder = await ensureProjectFolder(driveClient, companyName, options);
 
   const res = await driveClient.files.create({
-    requestBody: { name: originalName, parents: [folderId] },
+    requestBody: { name: originalName, parents: [folder.targetFolderId] },
     media: { mimeType, body: Readable.from(fileBuffer) },
     fields: 'id,name,webViewLink',
   });
@@ -174,15 +210,26 @@ export async function uploadToDrive(
   const fileId = res.data.id!;
   const fileName = res.data.name ?? originalName;
 
-  try {
-    await driveClient.permissions.create({
-      fileId,
-      requestBody: { role: 'reader', type: 'anyone' },
-    });
-  } catch {
-    logger.warn('Could not set Drive file to public', { fileId });
+  if (options.shareAnyone === true) {
+    try {
+      await driveClient.permissions.create({
+        fileId,
+        requestBody: { role: 'reader', type: 'anyone' },
+      });
+    } catch {
+      logger.warn('Could not set Drive file to public', { fileId });
+    }
   }
 
   const url = res.data.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`;
-  return { fileId, url, fileName, folderId, userDrive };
+  return {
+    fileId,
+    url,
+    fileName,
+    folderId: folder.targetFolderId,
+    folderUrl: folder.targetFolderUrl,
+    projectFolderId: folder.projectFolderId,
+    projectFolderUrl: folder.projectFolderUrl,
+    userDrive,
+  };
 }
