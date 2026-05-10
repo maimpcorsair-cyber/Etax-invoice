@@ -54,6 +54,8 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Project PO / 3-way Matching typecheck run: `25612515560` succeeded.
 - Latest verified Overage Billing Automation deploy run: `25612930783` succeeded.
 - Latest verified Overage Billing Automation typecheck run: `25612930778` succeeded.
+- Latest verified Document OCR Hardening deploy run: `25619891540` succeeded.
+- Latest verified Document OCR Hardening typecheck run: `25619891538` succeeded.
 - Production checks after `c7a2410`:
   - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
@@ -116,6 +118,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
   - frontend `/app/admin` returned HTTP 200 from Vercel
   - Vercel production deployment `https://etax-invoice-5l70721cf-maimpcorsair-1177s-projects.vercel.app` was `Ready`
+- Production checks after `fa93d81`:
+  - backend `/api/health` returned `status: ok`, `version: 2026-05-09d`
+  - frontend `/api/health` rewrite returned backend `status: ok`, `version: 2026-05-09d`
+  - frontend `/app/projects` returned HTTP 200 from Vercel
+  - frontend `/api/auth/login` returned a JWT and demo admin/company payload
+  - Vercel production deployment `https://etax-invoice-k5ynn7vrf-maimpcorsair-1177s-projects.vercel.app` was `Ready`
 
 ## Latest Work Completed
 
