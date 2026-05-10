@@ -137,6 +137,8 @@ model Company {
   // Storage quota
   storageUsedBytes  BigInt @default(0)
   storageQuotaBytes BigInt @default(524288000) // 500MB
+  googleDriveOwnerUserId String?
+  googleDriveOwnerLinkedAt DateTime?
 
   // Line OA settings
   lineNotifyEnabled   Boolean @default(false)

@@ -79,7 +79,14 @@ interface DriveStatus {
   driveUsable?: boolean;
   connected: boolean;
   linkedAt?: string | null;
-  mode?: 'user_oauth' | 'service_account' | 'not_configured';
+  companyDriveOwner?: {
+    id: string;
+    name: string;
+    email: string;
+    connected: boolean;
+    linkedAt: string | null;
+  } | null;
+  mode?: 'user_oauth' | 'company_owner' | 'service_account' | 'not_configured';
   requiredEnv?: string[];
   redirectUri?: string;
 }
@@ -855,9 +862,11 @@ export default function Settings() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 font-semibold text-slate-900"><Cloud className="h-4 w-4 text-blue-600" /> Google Drive</div>
                   <StatusPill
-                    ok={driveStatus?.connected || driveStatus?.serviceAccountConfigured}
+                    ok={driveStatus?.connected || driveStatus?.companyDriveOwner?.connected || driveStatus?.serviceAccountConfigured}
                     label={driveStatus?.connected
                       ? (isThai ? 'เชื่อมแล้ว' : 'Connected')
+                      : driveStatus?.companyDriveOwner?.connected
+                        ? (isThai ? 'ใช้ Drive เจ้าของ' : 'Owner Drive')
                       : driveStatus?.serviceAccountConfigured
                         ? (isThai ? 'พร้อม sync' : 'Sync ready')
                         : (isThai ? 'ยังไม่พร้อม' : 'Not ready')}
@@ -866,6 +875,10 @@ export default function Settings() {
                 <p className="mt-2 text-xs leading-5 text-slate-500">
                   {driveStatus?.connected
                     ? (isThai ? 'ไฟล์จะเก็บใน Google Drive ของบัญชีผู้ใช้นี้' : 'Files will be stored in this user Google Drive.')
+                    : driveStatus?.companyDriveOwner?.connected
+                      ? (isThai
+                        ? `ไฟล์โปรเจคจะเก็บใน Google Drive ของ ${driveStatus.companyDriveOwner.name || driveStatus.companyDriveOwner.email}`
+                        : `Project files will use ${driveStatus.companyDriveOwner.name || driveStatus.companyDriveOwner.email}'s Google Drive.`)
                     : driveStatus?.oauthConfigured
                       ? (isThai ? 'ระบบพร้อมให้ผู้ใช้เชื่อมบัญชี Google Drive ส่วนตัว' : 'User Drive OAuth is ready to connect.')
                       : driveStatus?.serviceAccountConfigured

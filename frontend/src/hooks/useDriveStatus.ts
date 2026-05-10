@@ -8,7 +8,14 @@ export interface DriveStatus {
   driveUsable?: boolean;
   connected: boolean;
   linkedAt: string | null;
-  mode?: 'user_oauth' | 'service_account' | 'not_configured';
+  companyDriveOwner?: {
+    id: string;
+    name: string;
+    email: string;
+    connected: boolean;
+    linkedAt: string | null;
+  } | null;
+  mode?: 'user_oauth' | 'company_owner' | 'service_account' | 'not_configured';
   requiredEnv?: string[];
   redirectUri?: string;
 }

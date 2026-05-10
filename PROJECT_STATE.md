@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 19:02 Asia/Bangkok
+Last updated: 2026-05-10 19:42 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -78,6 +78,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Production Google Drive service account is configured:
   - `/api/drive/status` returned `oauthConfigured:true`, `serviceAccountConfigured:true`, `driveUsable:true`, `mode:"service_account"`, `requiredEnv:[]`.
   - `POST /api/projects/cmozbu2ow001l10l2rl5mym9i/drive/folder` returned a Google Drive `folderUrl` with `userDrive:false`.
+- Company Drive Owner is implemented locally and pending commit/deploy:
+  - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
+  - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.
+  - Project Drive folder/document sync prefers the company Drive owner's Google token, then the current/preferred user's token, then service account fallback.
+  - `/api/drive/status` reports `companyDriveOwner` and `mode:"company_owner"` when applicable.
 - Project Drive connect flow guard is deployed:
   - Production status showed `oauthConfigured:true`, `serviceAccountConfigured:false`, `driveUsable:true`, but `connected:false` for the demo admin user.
   - Project detail now redirects to the Google Drive OAuth flow before attempting folder creation when no service account exists and the user has not completed Drive linking.

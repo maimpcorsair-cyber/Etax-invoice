@@ -55,6 +55,13 @@ function usableDriveUserId(userId: string, preferredUserId?: string | null) {
   return userId;
 }
 
+function selectDriveRefreshToken(input: {
+  companyOwnerToken?: string | null;
+  preferredUserToken?: string | null;
+}) {
+  return input.companyOwnerToken ?? input.preferredUserToken ?? null;
+}
+
 export async function syncDocumentIntakeToProjectDrive(
   intakeId: string,
   options: { companyId: string; preferredUserId?: string | null; force?: boolean },
@@ -94,19 +101,31 @@ export async function syncDocumentIntakeToProjectDrive(
   }));
 
   try {
-    const [company, project, user] = await withSystemRlsContext(prisma, (tx) => Promise.all([
-      tx.company.findUnique({ where: { id: intake.companyId }, select: { nameTh: true, nameEn: true } }),
-      tx.project.findFirst({
-        where: { id: intake.projectId!, companyId: intake.companyId },
-        select: { id: true, code: true, name: true },
-      }),
-      (() => {
-        const userId = usableDriveUserId(intake.userId, options.preferredUserId);
-        return userId
-          ? tx.user.findFirst({ where: { id: userId, companyId: intake.companyId }, select: { googleRefreshToken: true } })
-          : Promise.resolve(null);
-      })(),
-    ]));
+    const { company, project, user, companyOwner } = await withSystemRlsContext(prisma, async (tx) => {
+      const [companyRecord, projectRecord, preferredUser] = await Promise.all([
+        tx.company.findUnique({
+          where: { id: intake.companyId },
+          select: { nameTh: true, nameEn: true, googleDriveOwnerUserId: true },
+        }),
+        tx.project.findFirst({
+          where: { id: intake.projectId!, companyId: intake.companyId },
+          select: { id: true, code: true, name: true },
+        }),
+        (() => {
+          const userId = usableDriveUserId(intake.userId, options.preferredUserId);
+          return userId
+            ? tx.user.findFirst({ where: { id: userId, companyId: intake.companyId }, select: { googleRefreshToken: true } })
+            : Promise.resolve(null);
+        })(),
+      ]);
+      const owner = companyRecord?.googleDriveOwnerUserId
+        ? await tx.user.findFirst({
+          where: { id: companyRecord.googleDriveOwnerUserId, companyId: intake.companyId },
+          select: { googleRefreshToken: true },
+        })
+        : null;
+      return { company: companyRecord, project: projectRecord, user: preferredUser, companyOwner: owner };
+    });
 
     if (!project) throw new Error('Project not found for Drive sync');
     const buffer = await readIntakeBuffer(intake);
@@ -118,7 +137,10 @@ export async function syncDocumentIntakeToProjectDrive(
       intake.fileName ?? `document-${intake.id}`,
       intake.mimeType,
       companyName,
-      user?.googleRefreshToken,
+      selectDriveRefreshToken({
+        companyOwnerToken: companyOwner?.googleRefreshToken,
+        preferredUserToken: user?.googleRefreshToken,
+      }),
       {
         projectCode: project.code,
         projectName: project.name,
@@ -178,25 +200,46 @@ export async function ensureProjectDriveFolderForUser(input: {
 }) {
   if (!isDriveConfigured()) throw new Error('Google Drive is not configured on this server');
 
-  const data = await withSystemRlsContext(prisma, (tx) => Promise.all([
-    tx.company.findUnique({ where: { id: input.companyId }, select: { nameTh: true, nameEn: true } }),
-    tx.project.findFirst({
-      where: { id: input.projectId, companyId: input.companyId },
-      select: { id: true, code: true, name: true, driveFolderId: true, driveFolderUrl: true },
-    }),
-    tx.user.findFirst({ where: { id: input.userId, companyId: input.companyId }, select: { googleRefreshToken: true } }),
-  ]));
-  const [company, project, user] = data;
+  const { company, project, user, companyOwner } = await withSystemRlsContext(prisma, async (tx) => {
+    const [companyRecord, projectRecord, preferredUser] = await Promise.all([
+      tx.company.findUnique({
+        where: { id: input.companyId },
+        select: { nameTh: true, nameEn: true, googleDriveOwnerUserId: true },
+      }),
+      tx.project.findFirst({
+        where: { id: input.projectId, companyId: input.companyId },
+        select: { id: true, code: true, name: true, driveFolderId: true, driveFolderUrl: true },
+      }),
+      tx.user.findFirst({ where: { id: input.userId, companyId: input.companyId }, select: { googleRefreshToken: true } }),
+    ]);
+    const owner = companyRecord?.googleDriveOwnerUserId
+      ? await tx.user.findFirst({
+        where: { id: companyRecord.googleDriveOwnerUserId, companyId: input.companyId },
+        select: { googleRefreshToken: true },
+      })
+      : null;
+    return { company: companyRecord, project: projectRecord, user: preferredUser, companyOwner: owner };
+  });
   if (!project) return null;
   if (project.driveFolderId && project.driveFolderUrl) {
-    return { folderId: project.driveFolderId, folderUrl: project.driveFolderUrl, userDrive: !!user?.googleRefreshToken };
+    return {
+      folderId: project.driveFolderId,
+      folderUrl: project.driveFolderUrl,
+      userDrive: !!selectDriveRefreshToken({
+        companyOwnerToken: companyOwner?.googleRefreshToken,
+        preferredUserToken: user?.googleRefreshToken,
+      }),
+    };
   }
 
   const folder = await ensureProjectDriveFolder({
     companyName: company?.nameEn ?? company?.nameTh ?? input.companyId,
     projectCode: project.code,
     projectName: project.name,
-    userRefreshToken: user?.googleRefreshToken,
+    userRefreshToken: selectDriveRefreshToken({
+      companyOwnerToken: companyOwner?.googleRefreshToken,
+      preferredUserToken: user?.googleRefreshToken,
+    }),
   });
 
   await withSystemRlsContext(prisma, (tx) => tx.project.updateMany({

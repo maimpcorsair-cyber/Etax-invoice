@@ -47,15 +47,38 @@ function requiredOAuthEnv(): string[] {
 /* ─── Status ─── */
 driveRouter.get('/status', authenticate, async (req, res) => {
   try {
-    const user = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
-      tx.user.findUnique({
+    const { user, companyOwner } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const currentUser = await tx.user.findUnique({
         where: { id: req.user!.userId },
         select: { googleDriveLinkedAt: true, googleRefreshToken: true },
-      }),
-    );
+      });
+      const company = await tx.company.findUnique({
+        where: { id: req.user!.companyId },
+        select: { googleDriveOwnerUserId: true, googleDriveOwnerLinkedAt: true },
+      });
+      const owner = company?.googleDriveOwnerUserId
+        ? await tx.user.findFirst({
+          where: { id: company.googleDriveOwnerUserId, companyId: req.user!.companyId },
+          select: { id: true, name: true, email: true, googleRefreshToken: true },
+        })
+        : null;
+      return {
+        user: currentUser,
+        companyOwner: owner
+          ? {
+            id: owner.id,
+            name: owner.name,
+            email: owner.email,
+            connected: !!owner.googleRefreshToken,
+            linkedAt: company?.googleDriveOwnerLinkedAt ?? null,
+          }
+          : null,
+      };
+    });
     const oauthConfigured = isUserDriveOAuthConfigured();
     const serviceAccountConfigured = isDriveServiceAccountConfigured();
     const connected = !!user?.googleRefreshToken;
+    const companyOwnerConnected = !!companyOwner?.connected;
     res.json({
       data: {
         configured: oauthConfigured,
@@ -64,7 +87,8 @@ driveRouter.get('/status', authenticate, async (req, res) => {
         driveUsable: isDriveConfigured(),
         connected,
         linkedAt: user?.googleDriveLinkedAt ?? null,
-        mode: connected ? 'user_oauth' : serviceAccountConfigured ? 'service_account' : 'not_configured',
+        companyDriveOwner: companyOwner,
+        mode: connected ? 'user_oauth' : companyOwnerConnected ? 'company_owner' : serviceAccountConfigured ? 'service_account' : 'not_configured',
         requiredEnv: requiredOAuthEnv(),
         redirectUri: getDriveRedirectUri(),
       },
@@ -152,9 +176,14 @@ driveRouter.get('/callback', async (req, res) => {
     const { refreshToken } = await exchangeCodeForTokens(code);
 
     const user = await withSystemRlsContext(prisma, async (tx) => {
+      const now = new Date();
       await tx.user.update({
         where: { id: pending.userId },
-        data: { googleRefreshToken: refreshToken, googleDriveLinkedAt: new Date() },
+        data: { googleRefreshToken: refreshToken, googleDriveLinkedAt: now },
+      });
+      await tx.company.updateMany({
+        where: { id: pending.companyId, googleDriveOwnerUserId: null },
+        data: { googleDriveOwnerUserId: pending.userId, googleDriveOwnerLinkedAt: now },
       });
       return tx.user.findUnique({ where: { id: pending.userId }, select: { companyId: true, role: true } });
     });
@@ -187,6 +216,10 @@ driveRouter.post('/disconnect', authenticate, async (req, res) => {
       await tx.user.update({
         where: { id: req.user!.userId },
         data: { googleRefreshToken: null, googleDriveLinkedAt: null },
+      });
+      await tx.company.updateMany({
+        where: { id: req.user!.companyId, googleDriveOwnerUserId: req.user!.userId },
+        data: { googleDriveOwnerUserId: null, googleDriveOwnerLinkedAt: null },
       });
       return tx.user.findUnique({ where: { id: req.user!.userId }, select: { companyId: true, role: true } });
     });
