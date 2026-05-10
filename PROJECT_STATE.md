@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 04:05 Asia/Bangkok
+Last updated: 2026-05-11 04:18 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -152,6 +152,15 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified GitHub: Typecheck run `25639491233` succeeded in `54s`; Render deploy run `25639491244` succeeded in `9m42s`.
   - Production `/api/health` after deploy returned HTTP 200 in about `1.01s`.
   - Vercel production frontend contains `ProjectDetail-BcelSyjh.js` and `PurchaseInvoices-BFHMr-GJ.js` with the duplicate upload prompt copy.
+- Persistent Project Google Sheet workbook is deployed:
+  - Migration `20260511_project_google_sheet_workbook` adds `projects.googleSheetId`, `googleSheetUrl`, and `googleSheetSyncedAt`.
+  - `POST /api/projects/:id/export/sheets` now creates or updates one reusable project workbook instead of always creating a throwaway export.
+  - The workbook is usable before any project files exist and includes template tabs: `Workflow`, `Overview`, `Action Needed`, `Files`, `PO 3-way`, `Purchases`, `Sales`, `Expenses`, and `LINE Groups`.
+  - Evidence columns use Google Sheets `HYPERLINK()` formulas to open the original Drive/source document from Files, Purchases, and Expenses.
+  - Workbook sharing now targets current user, company email, owner, approver, and project member emails; Drive scope for service-account Sheets export was broadened to allow file move/share operations.
+  - Verified locally: backend/frontend `npm run build` and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25639839494` succeeded in `51s`; Render deploy run `25639839498` succeeded in `8m58s`.
+  - Production `/api/health` after deploy returned HTTP 200 in about `0.99s`.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.
