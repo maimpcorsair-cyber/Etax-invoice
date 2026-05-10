@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 23:28 Asia/Bangkok
+Last updated: 2026-05-10 23:33 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -25,6 +25,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - `serena init` and `serena setup codex` completed successfully.
   - Codex user config `~/.codex/config.toml` has `[mcp_servers.serena]` using `/Users/domdom/.local/bin/serena start-mcp-server --context=codex --project-from-cwd`.
   - Shell PATH was made persistent in `~/.zshrc`.
+  - Serena dashboard auto-open is disabled in `~/.serena/serena_config.yml` with `web_dashboard_open_on_launch: false`.
   - Project config `.serena/project.yml` exists with `typescript` language support.
   - `serena project health-check /Users/domdom/Documents/GitHub/Etax-invoice` passed; TypeScript language server was installed under `~/.serena`.
 - GitHub Actions `Deploy to Render` and `Typecheck` are working on `main`.
