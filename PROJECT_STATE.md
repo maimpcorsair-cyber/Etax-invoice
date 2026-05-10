@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-10 19:56 Asia/Bangkok
+Last updated: 2026-05-10 22:54 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -82,6 +82,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 - Latest verified Company Drive Owner typecheck run: `25629043674` succeeded.
 - Vercel production frontend deploy was Ready 2026-05-10 19:56 Asia/Bangkok.
 - Production `/api/drive/status` after deploy returned the new `companyDriveOwner` field; current demo admin still has `companyDriveOwner:null` because no user has completed Drive OAuth after this feature.
+- Service Account Drive folder sharing fix is implemented locally and pending deploy:
+  - Service Account-created project folders are no longer private only to the service account.
+  - The backend now shares the project folder with company email, company Drive owner email, and the current/preferred user email as `writer`.
+  - This fixes Google Drive links opening with "The caller does not have permission" while still avoiding public `anyone with link` sharing.
 - Company Drive Owner is deployed:
   - Company records now have `googleDriveOwnerUserId` and `googleDriveOwnerLinkedAt`.
   - First user in a company to complete Google Drive OAuth becomes the company Drive owner automatically.

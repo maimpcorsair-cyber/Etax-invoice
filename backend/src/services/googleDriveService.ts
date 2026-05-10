@@ -127,6 +127,7 @@ export interface DriveUploadOptions {
   projectName?: string | null;
   documentFolder?: DriveDocumentFolder | null;
   shareAnyone?: boolean;
+  shareWithEmails?: string[];
 }
 
 function driveFolderUrl(folderId: string) {
@@ -171,6 +172,36 @@ export interface DriveUploadResult {
   userDrive: boolean;
 }
 
+function uniqueEmails(emails?: string[]) {
+  return Array.from(new Set(
+    (emails ?? [])
+      .map((email) => email.trim().toLowerCase())
+      .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+  ));
+}
+
+async function shareDriveFileWithEmails(
+  driveClient: ReturnType<typeof google.drive>,
+  fileId: string,
+  emails?: string[],
+  role: 'reader' | 'writer' = 'writer',
+) {
+  const targets = uniqueEmails(emails);
+  if (!targets.length) return;
+
+  await Promise.all(targets.map(async (emailAddress) => {
+    try {
+      await driveClient.permissions.create({
+        fileId,
+        sendNotificationEmail: false,
+        requestBody: { role, type: 'user', emailAddress },
+      });
+    } catch (err) {
+      logger.warn('Could not share Drive file with user', { fileId, emailAddress, error: err });
+    }
+  }));
+}
+
 function buildDriveAuth(userRefreshToken?: string | null): { auth: Auth.OAuth2Client | Auth.GoogleAuth; userDrive: boolean } {
   if (userRefreshToken && isUserDriveOAuthConfigured()) {
     const oauthClient = buildOAuth2Client();
@@ -188,6 +219,7 @@ export async function ensureProjectDriveFolder(input: {
   projectCode: string;
   projectName: string;
   userRefreshToken?: string | null;
+  shareWithEmails?: string[];
 }): Promise<{ folderId: string; folderUrl: string; userDrive: boolean }> {
   const { auth, userDrive } = buildDriveAuth(input.userRefreshToken);
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
@@ -195,6 +227,14 @@ export async function ensureProjectDriveFolder(input: {
     projectCode: input.projectCode,
     projectName: input.projectName,
   });
+  if (!userDrive) {
+    await shareDriveFileWithEmails(
+      driveClient,
+      folder.projectFolderId ?? folder.targetFolderId,
+      input.shareWithEmails,
+      'writer',
+    );
+  }
   return {
     folderId: folder.projectFolderId ?? folder.targetFolderId,
     folderUrl: folder.projectFolderUrl ?? folder.targetFolderUrl,
@@ -223,6 +263,9 @@ export async function uploadToDrive(
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
 
   const folder = await ensureProjectFolder(driveClient, companyName, options);
+  if (!userDrive && folder.projectFolderId) {
+    await shareDriveFileWithEmails(driveClient, folder.projectFolderId, options.shareWithEmails, 'writer');
+  }
 
   const res = await driveClient.files.create({
     requestBody: { name: originalName, parents: [folder.targetFolderId] },

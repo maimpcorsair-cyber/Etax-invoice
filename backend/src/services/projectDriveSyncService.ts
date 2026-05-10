@@ -105,7 +105,7 @@ export async function syncDocumentIntakeToProjectDrive(
       const [companyRecord, projectRecord, preferredUser] = await Promise.all([
         tx.company.findUnique({
           where: { id: intake.companyId },
-          select: { nameTh: true, nameEn: true, googleDriveOwnerUserId: true },
+          select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
         }),
         tx.project.findFirst({
           where: { id: intake.projectId!, companyId: intake.companyId },
@@ -114,14 +114,14 @@ export async function syncDocumentIntakeToProjectDrive(
         (() => {
           const userId = usableDriveUserId(intake.userId, options.preferredUserId);
           return userId
-            ? tx.user.findFirst({ where: { id: userId, companyId: intake.companyId }, select: { googleRefreshToken: true } })
+            ? tx.user.findFirst({ where: { id: userId, companyId: intake.companyId }, select: { email: true, googleRefreshToken: true } })
             : Promise.resolve(null);
         })(),
       ]);
       const owner = companyRecord?.googleDriveOwnerUserId
         ? await tx.user.findFirst({
           where: { id: companyRecord.googleDriveOwnerUserId, companyId: intake.companyId },
-          select: { googleRefreshToken: true },
+          select: { email: true, googleRefreshToken: true },
         })
         : null;
       return { company: companyRecord, project: projectRecord, user: preferredUser, companyOwner: owner };
@@ -145,6 +145,7 @@ export async function syncDocumentIntakeToProjectDrive(
         projectCode: project.code,
         projectName: project.name,
         documentFolder: driveFolderForIntake(intake),
+        shareWithEmails: [company?.email, companyOwner?.email, user?.email].filter(Boolean) as string[],
       },
     );
 
@@ -204,18 +205,18 @@ export async function ensureProjectDriveFolderForUser(input: {
     const [companyRecord, projectRecord, preferredUser] = await Promise.all([
       tx.company.findUnique({
         where: { id: input.companyId },
-        select: { nameTh: true, nameEn: true, googleDriveOwnerUserId: true },
+        select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
       }),
       tx.project.findFirst({
         where: { id: input.projectId, companyId: input.companyId },
         select: { id: true, code: true, name: true, driveFolderId: true, driveFolderUrl: true },
       }),
-      tx.user.findFirst({ where: { id: input.userId, companyId: input.companyId }, select: { googleRefreshToken: true } }),
+      tx.user.findFirst({ where: { id: input.userId, companyId: input.companyId }, select: { email: true, googleRefreshToken: true } }),
     ]);
     const owner = companyRecord?.googleDriveOwnerUserId
       ? await tx.user.findFirst({
         where: { id: companyRecord.googleDriveOwnerUserId, companyId: input.companyId },
-        select: { googleRefreshToken: true },
+        select: { email: true, googleRefreshToken: true },
       })
       : null;
     return { company: companyRecord, project: projectRecord, user: preferredUser, companyOwner: owner };
@@ -240,6 +241,7 @@ export async function ensureProjectDriveFolderForUser(input: {
       companyOwnerToken: companyOwner?.googleRefreshToken,
       preferredUserToken: user?.googleRefreshToken,
     }),
+    shareWithEmails: [company?.email, companyOwner?.email, user?.email].filter(Boolean) as string[],
   });
 
   await withSystemRlsContext(prisma, (tx) => tx.project.updateMany({
