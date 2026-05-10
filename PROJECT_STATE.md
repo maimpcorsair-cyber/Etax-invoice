@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 04:18 Asia/Bangkok
+Last updated: 2026-05-11 05:25 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -161,6 +161,15 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: backend/frontend `npm run build` and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25639839494` succeeded in `51s`; Render deploy run `25639839498` succeeded in `8m58s`.
   - Production `/api/health` after deploy returned HTTP 200 in about `0.99s`.
+- Project Google Sheet sync permission/quota status:
+  - Commit `f8c7851` added recovery when an existing stored project `googleSheetId` is not writable.
+  - Commit `13c24df` changed project sheet sync to generate a full workbook via ExcelJS and upload it through Google Drive conversion into a Google Sheet, avoiding direct Sheets API permission failures.
+  - Commit `2f6c64c` retries through the Billboy service account root when the user's Drive upload fails from quota/permission.
+  - Verified locally: backend `npm run build` and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25641216253` succeeded in `57s`; Render deploy run `25641216255` succeeded in `9m25s`.
+  - Production `/api/drive/status` returned `oauthConfigured:true`, `serviceAccountConfigured:true`, `driveUsable:true`, `connected:false`, `companyDriveOwner:null`, and `mode:"service_account"`.
+  - Production `POST /api/projects/cmozbu2ow001l10l2rl5mym9i/export/sheets` no longer returns the original `The caller does not have permission` error; it now fails with Google `The user's Drive storage quota has been exceeded`.
+  - Next action: connect a Google Drive owner account with available storage, free storage on the current Google account, or configure a real Workspace/shared-drive owner for Billboy fallback. A service account alone can be configured but may not provide usable Drive storage for creating Google-native Sheet files.
 - Production backend `/api/health` after Project LINE Guest-to-User invite deploy returned `status: ok`, `version: 2026-05-09d`.
 - Production frontend `/join/project/test-token` returned HTTP 200 from Vercel SPA routing.
 - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` after deploy returned HTTP 200 with `lineGroupCount:0`.
