@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 14:26 Asia/Bangkok
+Last updated: 2026-05-11 14:37 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,12 +16,17 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Company/project spreadsheet workspace foundation is implemented locally and pending deploy:
+- Company/project spreadsheet workspace foundation is deployed:
   - New `GET /api/dashboard/month-end-workspace` returns company-month input VAT, output VAT, expense voucher, missing document, and project summary rows for Dashboard spreadsheet preview.
   - Dashboard now shows a Company Month-End Workspace preview with sheet-like tabs and attachment links, so single-user/non-project and multi-project companies can see one company-level month-end view.
   - Project Detail now has a `Sheet` tab with Files, Budget/Cost Codes, Input VAT, Expenses/PV, PO 3-way, and Action Needed previews.
   - Project workspace API now returns `costCodeSummary` from project metadata cost codes plus purchase/expense categories, with budget, actual, committed, and balance.
   - Verified locally: backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25656374214` succeeded in `57s`; Render deploy run `25656374167` succeeded in `9m15s`.
+  - Production `/api/health` returned HTTP 200 in about `0.99s`; Vercel `/api/health` rewrite returned HTTP 200 in about `1.35s`.
+  - Production authenticated `GET /api/dashboard/month-end-workspace` returned HTTP 200 for period `2026-05` with output VAT row count `1`, missing document row count `5`, and project summary row count `1`.
+  - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 with `costCodeSummary` fields present; current demo project has no cost-code rows yet because no category/cost-code data exists.
+  - Vercel production chunks contain the new `Company Month-End Workspace`, `month-end-workspace`, `Project Sheet Preview`, and `costCodeSummary` UI strings.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
