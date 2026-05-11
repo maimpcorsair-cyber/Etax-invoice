@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 15:44 Asia/Bangkok
+Last updated: 2026-05-11 15:55 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -39,10 +39,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: frontend `npm run build` and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25659645275` succeeded in `58s`.
   - Verified Vercel production chunk `ProjectDetail-CJ0C_NhC.js` contains `สร้างไฟล์ Google Sheet`, `ยังไม่มีไฟล์ Google Sheet จริง`, and `Create Google Sheet`.
-- Project Google Sheet workbook Cost Code tab is implemented locally and pending deploy:
+- Project Google Sheet workbook Cost Code tab is deployed:
   - Project Google Sheet export now includes a `Budget / Cost Codes` worksheet matching the in-app project Sheet preview.
   - The export route calculates cost-code rows from project metadata, purchase invoice categories, and expense voucher item categories with budget, actual, committed, and balance.
   - Verified locally: backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25659827100` succeeded in `55s`; Render deploy run `25659827141` succeeded in `9m45s`.
+  - Production `/api/health` returned HTTP 200 in about `1.07s`; production project workspace endpoint returned HTTP 200 for `PRJ-2026-001`.
+  - Did not trigger production Google Sheet creation during verification to avoid creating extra Drive files / hitting current Google Drive quota; next manual check is pressing `สร้างไฟล์ Google Sheet` in the project `Sheet` tab.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
