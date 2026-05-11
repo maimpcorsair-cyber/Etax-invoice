@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 14:37 Asia/Bangkok
+Last updated: 2026-05-11 15:25 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -27,6 +27,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Production authenticated `GET /api/dashboard/month-end-workspace` returned HTTP 200 for period `2026-05` with output VAT row count `1`, missing document row count `5`, and project summary row count `1`.
   - Production `GET /api/projects/cmozbu2ow001l10l2rl5mym9i/workspace?debug=1` returned HTTP 200 with `costCodeSummary` fields present; current demo project has no cost-code rows yet because no category/cost-code data exists.
   - Vercel production chunks contain the new `Company Month-End Workspace`, `month-end-workspace`, `Project Sheet Preview`, and `costCodeSummary` UI strings.
+- Dashboard month-end table discoverability fix is implemented locally and pending deploy:
+  - The company month-end spreadsheet preview was easy to miss because it sat below the automation/stat sections and had an English title.
+  - It now appears near the top of Dashboard after the command cards, uses Thai title `ตารางสรุปรายเดือนของบริษัท`, and shows a visible warning panel if the month-end endpoint does not load instead of disappearing silently.
+  - Verified locally: frontend `npm run build` and `git diff --check` passed.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.

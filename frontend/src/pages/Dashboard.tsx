@@ -598,6 +598,48 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Company month-end sheet preview */}
+      {monthEnd ? (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: isThai ? 'ภาษีขายเดือนนี้' : 'Output VAT', value: formatCurrency(monthEnd.summary.outputVat), tone: 'primary' as const },
+              { label: isThai ? 'ภาษีซื้อเดือนนี้' : 'Input VAT', value: formatCurrency(monthEnd.summary.inputVat), tone: 'success' as const },
+              { label: isThai ? 'ภาษีสุทธิ' : 'Net VAT', value: formatCurrency(monthEnd.summary.vatPayable), tone: monthEnd.summary.vatPayable > 0 ? 'warning' as const : 'success' as const },
+              { label: isThai ? 'เอกสารต้องตรวจ' : 'Needs review', value: monthEnd.summary.missingDocuments.toLocaleString(), tone: monthEnd.summary.missingDocuments > 0 ? 'warning' as const : 'success' as const },
+            ].map((item) => (
+              <MetricCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                detail={isThai ? `รอบ ${monthEnd.period}` : `Period ${monthEnd.period}`}
+                tone={item.tone}
+              />
+            ))}
+          </div>
+          <SheetPreviewCard
+            title={isThai ? 'ตารางสรุปรายเดือนของบริษัท' : 'Company Month-End Workspace'}
+            description={isThai
+              ? 'ตารางรวมภาษีซื้อ ภาษีขาย ค่าใช้จ่าย เอกสารที่ต้องตรวจ และสรุปทุกโปรเจค เหมือน preview ของ Google Sheet ก่อน export'
+              : 'Spreadsheet preview for company-wide input VAT, output VAT, expenses, missing documents, and project summary before export.'}
+            tabs={monthEndTabs}
+            activeTab={monthEndTab}
+            onTabChange={setMonthEndTab}
+            formatCurrency={formatCurrency}
+            isThai={isThai}
+          />
+        </div>
+      ) : !loading && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+          <p className="font-bold">{isThai ? 'ตารางสรุปรายเดือนยังไม่แสดง' : 'Month-end workspace is not showing yet'}</p>
+          <p className="mt-1">
+            {isThai
+              ? 'ระบบโหลดข้อมูล Dashboard หลักได้แล้ว แต่โหลดตารางรวมบริษัทไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง หากยังไม่ขึ้นให้เช็คสิทธิ์หรือ backend endpoint /api/dashboard/month-end-workspace'
+              : 'The main dashboard loaded, but the company spreadsheet preview did not. Refresh this page, then check permissions or /api/dashboard/month-end-workspace if it still does not appear.'}
+          </p>
+        </section>
+      )}
+
       {/* RD Compliance Alert (if there are issues) */}
       {!complianceLoading && hasComplianceIssue && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 shadow-sm">
@@ -666,38 +708,6 @@ export default function Dashboard() {
               />
             ))}
       </div>
-
-      {monthEnd && (
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: isThai ? 'ภาษีขายเดือนนี้' : 'Output VAT', value: formatCurrency(monthEnd.summary.outputVat), tone: 'primary' as const },
-              { label: isThai ? 'ภาษีซื้อเดือนนี้' : 'Input VAT', value: formatCurrency(monthEnd.summary.inputVat), tone: 'success' as const },
-              { label: isThai ? 'ภาษีสุทธิ' : 'Net VAT', value: formatCurrency(monthEnd.summary.vatPayable), tone: monthEnd.summary.vatPayable > 0 ? 'warning' as const : 'success' as const },
-              { label: isThai ? 'เอกสารต้องตรวจ' : 'Needs review', value: monthEnd.summary.missingDocuments.toLocaleString(), tone: monthEnd.summary.missingDocuments > 0 ? 'warning' as const : 'success' as const },
-            ].map((item) => (
-              <MetricCard
-                key={item.label}
-                label={item.label}
-                value={item.value}
-                detail={isThai ? `รอบ ${monthEnd.period}` : `Period ${monthEnd.period}`}
-                tone={item.tone}
-              />
-            ))}
-          </div>
-          <SheetPreviewCard
-            title={isThai ? 'Company Month-End Workspace' : 'Company Month-End Workspace'}
-            description={isThai
-              ? 'ตาราง preview รวมภาษีซื้อ ภาษีขาย ค่าใช้จ่าย เอกสารที่ต้องตรวจ และสรุปโปรเจคจากทั้งบริษัท'
-              : 'Spreadsheet preview for company-wide input VAT, output VAT, expenses, missing documents, and project summary.'}
-            tabs={monthEndTabs}
-            activeTab={monthEndTab}
-            onTabChange={setMonthEndTab}
-            formatCurrency={formatCurrency}
-            isThai={isThai}
-          />
-        </div>
-      )}
 
       {integrations && (
         <div className="card">
