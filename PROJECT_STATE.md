@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 19:15 Asia/Bangkok
+Last updated: 2026-05-11 20:40 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -39,12 +39,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: frontend `npm run build` and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25659645275` succeeded in `58s`.
   - Verified Vercel production chunk `ProjectDetail-CJ0C_NhC.js` contains `สร้างไฟล์ Google Sheet`, `ยังไม่มีไฟล์ Google Sheet จริง`, and `Create Google Sheet`.
-- Project Google Sheet workbook Cost Code tab is deployed; a follow-up worksheet-name fix is implemented locally, not deployed yet:
+- Project Google Sheet workbook Cost Code tab is deployed:
   - Project Google Sheet export now includes a cost-code worksheet matching the in-app project Sheet preview.
   - The worksheet name was changed from invalid `Budget / Cost Codes` to `Budget Cost Codes` because Excel/Google workbook conversion rejects `/` in worksheet names (`* ? : \ / [ ]` are invalid).
   - The export route calculates cost-code rows from project metadata, purchase invoice categories, and expense voucher item categories with budget, actual, committed, and balance.
   - Verified locally: backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
-  - Verified GitHub: Typecheck run `25659827100` succeeded in `55s`; Render deploy run `25659827141` succeeded in `9m45s`.
+  - Verified GitHub: Typecheck run `25673232366` succeeded; Render deploy run `25673232491` succeeded in `9m13s`.
   - Production `/api/health` returned HTTP 200 in about `1.07s`; production project workspace endpoint returned HTTP 200 for `PRJ-2026-001`.
   - Did not trigger production Google Sheet creation during verification to avoid creating extra Drive files / hitting current Google Drive quota; next manual check is pressing `สร้างไฟล์ Google Sheet` in the project `Sheet` tab.
 - Project cash-advance workflow is deployed:
