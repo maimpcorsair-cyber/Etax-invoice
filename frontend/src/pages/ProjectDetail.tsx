@@ -1177,6 +1177,8 @@ export default function ProjectDetail() {
           formatCurrency={formatCurrency}
           formatDate={formatDate}
           onOpenDocument={openDocument}
+          onSyncSheet={syncProjectSheet}
+          sheetSyncing={sheetSyncing}
         />
       )}
 
@@ -1444,12 +1446,16 @@ function ProjectSheetPreview({
   formatCurrency,
   formatDate,
   onOpenDocument,
+  onSyncSheet,
+  sheetSyncing,
 }: {
   workspace: ProjectWorkspace;
   isThai: boolean;
   formatCurrency: (value: number) => string;
   formatDate: (value: string | Date) => string;
   onOpenDocument: (doc: DocumentIntake) => void;
+  onSyncSheet: () => void | Promise<void>;
+  sheetSyncing: boolean;
 }) {
   const [activeSheet, setActiveSheet] = useState('files');
   const sheets = [
@@ -1545,13 +1551,34 @@ function ProjectSheetPreview({
             {isThai ? 'ดูข้อมูลโปรเจคเป็นตารางเหมือน Google Sheet ก่อนกด Sync จริง ไฟล์แนบเปิดจากข้อมูล Billboy/Drive ได้' : 'Spreadsheet-like preview before syncing to Google Sheets. Attachments open from Billboy/Drive data.'}
           </p>
         </div>
-        {workspace.googleSheet?.url && (
-          <a href={workspace.googleSheet.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">
-            <ExternalLink className="h-4 w-4" />
-            {isThai ? 'เปิด Google Sheet' : 'Open Google Sheet'}
-          </a>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {workspace.googleSheet?.url && (
+            <a href={workspace.googleSheet.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">
+              <ExternalLink className="h-4 w-4" />
+              {isThai ? 'เปิด Google Sheet' : 'Open Google Sheet'}
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => void onSyncSheet()}
+            disabled={sheetSyncing}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-60"
+          >
+            {sheetSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            {workspace.googleSheet?.url
+              ? (isThai ? 'Sync Google Sheet' : 'Sync Google Sheet')
+              : (isThai ? 'สร้างไฟล์ Google Sheet' : 'Create Google Sheet')}
+          </button>
+        </div>
       </div>
+      {!workspace.googleSheet?.url && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span className="font-semibold">{isThai ? 'ยังไม่มีไฟล์ Google Sheet จริง' : 'No Google Sheet file yet'}:</span>{' '}
+          {isThai
+            ? 'ตารางด้านล่างเป็น preview ใน Billboy กด “สร้างไฟล์ Google Sheet” เพื่อสร้างไฟล์จริงใน Drive แล้วเปิดดู/แชร์กับทีมได้'
+            : 'The table below is a Billboy preview. Create the Google Sheet file to open it in Drive and share it with the team.'}
+        </div>
+      )}
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-3 py-2">
         {sheets.map((sheet) => (
           <button

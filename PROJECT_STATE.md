@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 15:28 Asia/Bangkok
+Last updated: 2026-05-11 15:40 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -33,6 +33,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: frontend `npm run build` and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25658949378` succeeded in `57s`.
   - Verified Vercel production chunk `Dashboard-DsdhOCH_.js` contains `ตารางสรุปรายเดือนของบริษัท` and the month-end fallback copy.
+- Project Sheet tab Google Sheet action is implemented locally and pending deploy:
+  - Project `Sheet` tab now has its own `สร้างไฟล์ Google Sheet` / `Sync Google Sheet` button instead of relying only on the top project header action.
+  - When a project has no real Google Sheet yet, the tab shows a visible note explaining that the current table is a Billboy preview and the button creates the Drive/Google Sheet file.
+  - Verified locally: frontend `npm run build` and `git diff --check` passed.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
