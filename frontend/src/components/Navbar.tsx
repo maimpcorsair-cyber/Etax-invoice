@@ -56,6 +56,7 @@ export default function Navbar() {
   const visibleAdminItems = adminNavItems.filter(
     (item) => !item.roles || item.roles.includes(user?.role ?? ''),
   );
+  const linePictureUrl = user?.line?.linked ? user.line.pictureUrl : null;
 
   const handleLogout = () => {
     window.google?.accounts.id.disableAutoSelect();
@@ -137,14 +138,6 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             <LanguageSwitcher variant="toggle" />
 
-            <Link
-              to="/app/invoices/new"
-              className={`btn-primary hidden lg:inline-flex ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}
-            >
-              <FileText className="w-4 h-4" />
-              {t('invoice.create')}
-            </Link>
-
             {/* User Menu */}
             <div className="relative">
               <button
@@ -154,9 +147,18 @@ export default function Navbar() {
                 aria-expanded={userMenuOpen}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-100 transition-colors"
               >
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#1e3a8a,#14b8a6)'}}>
-                  {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
-                </div>
+                {linePictureUrl ? (
+                  <img
+                    src={linePictureUrl}
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover shadow-sm ring-2 ring-white"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#1e3a8a,#14b8a6)'}}>
+                    {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
+                  </div>
+                )}
                 <span className="text-sm font-medium text-slate-700 hidden sm:block max-w-24 truncate">
                   {user?.name}
                 </span>

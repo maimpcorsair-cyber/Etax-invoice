@@ -72,6 +72,11 @@ export function useAuthBootstrap() {
             nameEn?: string | null;
             taxId: string;
           };
+          line?: {
+            linked: boolean;
+            displayName?: string | null;
+            pictureUrl?: string | null;
+          };
         };
 
         if (!cancelled) {

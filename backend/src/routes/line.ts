@@ -22,6 +22,7 @@ import {
   getLineGroupMemberProfile,
   getLineGroupSummary,
   getLineRoomMemberCount,
+  getLineUserProfile,
   OverdueInvoice,
 } from '../services/lineService';
 import { askBillboy, buildCompanyContext, getOcrProductionReadiness, testOcrProvider, OcrResult } from '../services/aiService';
@@ -2162,17 +2163,23 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
           return { ok: false as const, reason: 'line_already_linked' as const };
         }
 
+        const lineProfile = await getLineUserProfile(senderLineUserId);
+        const lineDisplayName = lineProfile?.displayName ?? targetUser.name;
+        const linePictureUrl = lineProfile?.pictureUrl ?? null;
+
         await tx.lineUserLink.upsert({
           where: { userId: targetUser.id },
           create: {
             userId: targetUser.id,
             lineUserId: senderLineUserId,
-            displayName: targetUser.name,
+            displayName: lineDisplayName,
+            pictureUrl: linePictureUrl,
             isActive: true,
           },
           update: {
             lineUserId: senderLineUserId,
-            displayName: targetUser.name,
+            displayName: lineDisplayName,
+            pictureUrl: linePictureUrl,
             isActive: true,
             linkedAt: new Date(),
           },

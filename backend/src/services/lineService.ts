@@ -171,6 +171,12 @@ export async function getLineGroupSummary(lineGroupId: string): Promise<{ groupN
   );
 }
 
+export async function getLineUserProfile(lineUserId: string): Promise<{ displayName?: string; pictureUrl?: string; userId?: string } | null> {
+  return lineGetJson<{ displayName?: string; pictureUrl?: string; userId?: string }>(
+    `https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUserId)}`,
+  );
+}
+
 export async function getLineGroupMemberCount(lineGroupId: string): Promise<number | null> {
   const json = await lineGetJson<{ count?: number }>(
     `https://api.line.me/v2/bot/group/${encodeURIComponent(lineGroupId)}/members/count`,

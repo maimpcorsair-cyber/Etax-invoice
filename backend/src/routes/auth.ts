@@ -10,6 +10,7 @@ import {
   acceptProjectLineMemberInvite,
   ProjectLineInviteError,
 } from '../services/projectLineInviteService';
+import { getLineUserProfile } from '../services/lineService';
 import { logger } from '../config/logger';
 
 export const authRouter = Router();
@@ -49,6 +50,12 @@ function serializeUser(user: {
     nameEn: string | null;
     taxId: string;
   };
+  lineUserLink?: {
+    lineUserId?: string;
+    isActive: boolean;
+    displayName: string | null;
+    pictureUrl: string | null;
+  } | null;
 }) {
   return {
     id: user.id,
@@ -65,7 +72,65 @@ function serializeUser(user: {
       nameEn: user.company.nameEn,
       taxId: user.company.taxId,
     },
+    line: user.lineUserLink
+      ? {
+          linked: user.lineUserLink.isActive,
+          displayName: user.lineUserLink.displayName,
+          pictureUrl: user.lineUserLink.pictureUrl,
+        }
+      : {
+          linked: false,
+          displayName: null,
+          pictureUrl: null,
+        },
   };
+}
+
+async function refreshMissingLineProfile<T extends {
+  id: string;
+  companyId: string;
+  role: string;
+  lineUserLink?: {
+    lineUserId: string;
+    isActive: boolean;
+    displayName: string | null;
+    pictureUrl: string | null;
+  } | null;
+}>(user: T): Promise<T> {
+  const link = user.lineUserLink;
+  if (!link?.isActive || link.pictureUrl) {
+    return user;
+  }
+
+  try {
+    const profile = await getLineUserProfile(link.lineUserId);
+    if (!profile?.displayName && !profile?.pictureUrl) {
+      return user;
+    }
+
+    const updatedLink = await withSystemRlsContext(prisma, (tx) => tx.lineUserLink.update({
+      where: { userId: user.id },
+      data: {
+        displayName: profile.displayName ?? link.displayName,
+        pictureUrl: profile.pictureUrl ?? link.pictureUrl,
+      },
+    }), {
+      companyId: user.companyId,
+      userId: user.id,
+      role: user.role,
+    });
+
+    return {
+      ...user,
+      lineUserLink: updatedLink,
+    };
+  } catch (err) {
+    logger.warn('[Auth] Unable to refresh LINE profile picture', {
+      userId: user.id,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return user;
+  }
 }
 
 authRouter.get('/google/config', (_req, res) => {
@@ -81,7 +146,7 @@ authRouter.post('/login', async (req, res) => {
 
     const user = await withSystemRlsContext(prisma, (tx) => tx.user.findUnique({
       where: { email: email.toLowerCase() },
-      include: { company: true },
+      include: { company: true, lineUserLink: true },
     }), { role: 'auth' });
 
     if (!user || !user.passwordHash || !await bcrypt.compare(password, user.passwordHash)) {
@@ -97,13 +162,14 @@ authRouter.post('/login', async (req, res) => {
     const updatedUser = await withSystemRlsContext(prisma, (tx) => tx.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
-      include: { company: true },
+      include: { company: true, lineUserLink: true },
     }), {
       companyId: user.companyId,
       userId: user.id,
       role: user.role,
     });
 
+    const userWithLineProfile = await refreshMissingLineProfile(updatedUser);
     const token = issueToken(updatedUser);
 
     await auditLog({
@@ -122,7 +188,7 @@ authRouter.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: serializeUser(updatedUser),
+      user: serializeUser(userWithLineProfile),
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -183,7 +249,7 @@ authRouter.post('/google', async (req, res) => {
 
     const user = await withSystemRlsContext(prisma, (tx) => tx.user.findUnique({
       where: { email },
-      include: { company: true },
+      include: { company: true, lineUserLink: true },
     }), { role: 'auth' });
 
     if (!user) {
@@ -208,13 +274,14 @@ authRouter.post('/google', async (req, res) => {
         name: payload.name?.trim() || user.name,
         lastLoginAt: new Date(),
       },
-      include: { company: true },
+      include: { company: true, lineUserLink: true },
     }), {
       companyId: user.companyId,
       userId: user.id,
       role: user.role,
     });
 
+    const userWithLineProfile = await refreshMissingLineProfile(updatedUser);
     const token = issueToken(updatedUser);
 
     await auditLog({
@@ -233,7 +300,7 @@ authRouter.post('/google', async (req, res) => {
 
     res.json({
       token,
-      user: serializeUser(updatedUser),
+      user: serializeUser(userWithLineProfile),
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -279,7 +346,7 @@ authRouter.get('/me', async (req, res) => {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
     const user = await withSystemRlsContext(prisma, (tx) => tx.user.findUnique({
       where: { id: payload.userId },
-      include: { company: true },
+      include: { company: true, lineUserLink: true },
     }), { userId: payload.userId, role: 'auth' });
 
     if (!user) {
@@ -292,7 +359,9 @@ authRouter.get('/me', async (req, res) => {
       return;
     }
 
-    res.json(serializeUser(user));
+    const userWithLineProfile = await refreshMissingLineProfile(user);
+
+    res.json(serializeUser(userWithLineProfile));
   } catch {
     res.status(401).json({ error: 'Invalid token' });
   }

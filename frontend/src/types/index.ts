@@ -17,6 +17,11 @@ export interface User {
     nameEn?: string | null;
     taxId: string;
   };
+  line?: {
+    linked: boolean;
+    displayName?: string | null;
+    pictureUrl?: string | null;
+  };
 }
 
 export interface BankAccountProfile {

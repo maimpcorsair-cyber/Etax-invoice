@@ -1,7 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import MobileBottomNav from './MobileBottomNav';
-import MobileFab from './MobileFab';
 import AiChatWidget from './AiChatWidget';
 import { ProductDoodleField } from './ui/AppChrome';
 
@@ -15,7 +14,6 @@ export default function Layout() {
       </main>
       <AiChatWidget />
       <MobileBottomNav />
-      <MobileFab />
     </div>
   );
 }
