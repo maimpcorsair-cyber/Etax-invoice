@@ -53,6 +53,32 @@ function asNumber(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function emptyWhtSummary(period: string) {
+  const rateLabels: Record<string, string> = {
+    '1': 'หัก ณ ที่จ่าย 1%',
+    '3': 'หัก ณ ที่จ่าย 3%',
+    '5': 'หัก ณ ที่จ่าย 5%',
+  };
+  const byRate = ['1', '3', '5'].map((rate) => ({
+    rate,
+    label: rateLabels[rate] ?? rate,
+    count: 0,
+    totalWithheld: 0,
+    totalAmount: 0,
+  }));
+  return {
+    period,
+    data: {
+      period,
+      totalCertificates: 0,
+      totalWithheld: 0,
+      totalAmount: 0,
+      byRate,
+      certificates: [],
+    },
+  };
+}
+
 async function buildPp30(req: Express.Request extends never ? never : { user: NonNullable<Express.Request['user']> }, from: Date, to: Date) {
   const companyId = req.user.companyId;
 
@@ -195,7 +221,25 @@ pp30Router.get('/wht', async (req, res) => {
         paymentDate: { gte: range.from, lte: range.to },
       },
       orderBy: { paymentDate: 'asc' },
+      select: {
+        id: true,
+        certificateNumber: true,
+        whtRate: true,
+        whtAmount: true,
+        totalAmount: true,
+        recipientName: true,
+        recipientTaxId: true,
+        paymentDate: true,
+      },
+    }).catch((err) => {
+      logger.error('pp30/wht certificates query failed; returning empty summary', err);
+      return null;
     });
+
+    if (!certs) {
+      res.json(emptyWhtSummary(range.period));
+      return;
+    }
 
     // Group by rate
     const byRate: Record<string, { count: number; totalWithheld: number; totalAmount: number }> = {
@@ -216,11 +260,10 @@ pp30Router.get('/wht', async (req, res) => {
     const totalWithheld = certs.reduce<number>((s, c) => s + asNumber(c.whtAmount), 0);
     const totalAmount = certs.reduce<number>((s, c) => s + asNumber(c.totalAmount), 0);
 
-    // Income type labels (มาตรา 40)
-    const incomeTypeLabels: Record<string, string> = {
-      '1': 'มาตรา 40(1) — เงินได้จากการจ้าง',
-      '2': 'มาตรา 40(2) — เงินได้จากทรัพย์สิน',
-      '4': 'มาตรา 40(4) — เงินได้จากการรับจ้าง/นายหน้า',
+    const rateLabels: Record<string, string> = {
+      '1': 'หัก ณ ที่จ่าย 1%',
+      '3': 'หัก ณ ที่จ่าย 3%',
+      '5': 'หัก ณ ที่จ่าย 5%',
     };
 
     res.json({
@@ -232,7 +275,7 @@ pp30Router.get('/wht', async (req, res) => {
         totalAmount,
         byRate: Object.entries(byRate).map(([rate, data]) => ({
           rate,
-          label: incomeTypeLabels[rate] ?? rate,
+          label: rateLabels[rate] ?? rate,
           count: data.count,
           totalWithheld: Math.round(data.totalWithheld * 100) / 100,
           totalAmount: Math.round(data.totalAmount * 100) / 100,
