@@ -1845,6 +1845,7 @@ projectsRouter.get('/:id/export/excel', async (req, res) => {
             invoiceNumber: true,
             invoiceDate: true,
             vatType: true,
+            category: true,
             subtotal: true,
             vatAmount: true,
             total: true,
@@ -2109,6 +2110,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
             invoiceNumber: true,
             invoiceDate: true,
             vatType: true,
+            category: true,
             subtotal: true,
             vatAmount: true,
             total: true,
@@ -2144,6 +2146,8 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
             totalAmount: true,
             items: {
               select: {
+                category: true,
+                amount: true,
                 attachments: {
                   take: 1,
                   select: { url: true },
@@ -2219,6 +2223,38 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       const purchaseVat = purchaseRows.reduce((sum, item) => sum + item.vatAmount, 0);
       const revenueTotal = invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
       const expenseTotal = expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
+      const costCodeMap = new Map<string, { code: string; name: string; budget: number; actual: number; committed: number }>();
+      const ensureCostCode = (label: string) => {
+        if (!costCodeMap.has(label)) {
+          costCodeMap.set(label, { code: label, name: label, budget: 0, actual: 0, committed: 0 });
+        }
+        return costCodeMap.get(label)!;
+      };
+      projectMetadataCostCodes(row.metadata).forEach((item) => {
+        const current = ensureCostCode(item.code);
+        current.name = item.name;
+        current.budget = item.budget;
+      });
+      purchaseRows.forEach((item) => {
+        const costCode = ensureCostCode(costCodeLabel(item.category));
+        costCode.actual += item.total;
+        if (!item.isPaid) costCode.committed += item.total;
+      });
+      expenseVouchers.forEach((voucher) => {
+        if (voucher.items.length === 0) {
+          ensureCostCode('Uncategorized').actual += asNumber(voucher.totalAmount);
+          return;
+        }
+        voucher.items.forEach((item) => {
+          ensureCostCode(costCodeLabel(item.category)).actual += asNumber(item.amount);
+        });
+      });
+      const costCodes = Array.from(costCodeMap.values())
+        .map((item) => ({
+          ...item,
+          balance: item.budget - item.actual - item.committed,
+        }))
+        .sort((a, b) => Math.abs(b.actual + b.committed) - Math.abs(a.actual + a.committed));
       const actionNeeded = fileRows
         .map(actionNeededForIntake)
         .filter((item): item is NonNullable<ReturnType<typeof actionNeededForIntake>> => item !== null);
@@ -2247,6 +2283,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
           ClaimableVAT: taxSafetySummary.claimableVat,
         },
         actionNeeded,
+        costCodes,
         files: fileRows,
         purchaseOrders: purchaseOrderHealthRows,
         purchases: purchaseRows,
@@ -2297,6 +2334,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
       },
       sharedWithEmails: exportData.shareEmails,
       summary: exportData.workspaceSummary,
+      costCodes: exportData.costCodes,
       actionNeeded: exportData.actionNeeded,
       files: exportData.files.map((item) => ({
         fileName: item.fileName ?? item.id,

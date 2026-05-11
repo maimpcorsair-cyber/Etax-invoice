@@ -347,6 +347,7 @@ export interface ProjectSheetsInput {
   };
   sharedWithEmails?: Array<string | null | undefined>;
   summary: Record<string, string | number>;
+  costCodes?: Array<{ code: string; name: string; budget: number; actual: number; committed: number; balance: number }>;
   actionNeeded: Array<{ severity: string; type: string; title: string; message: string }>;
   files: Array<{ fileName: string; source: string; kind: string; status: string; taxSafetyStatus?: string; taxSafetyMessage?: string; mimeType: string; fileSize: number; createdAt: Date | string; driveSyncStatus?: string | null; driveUrl?: string | null; driveFolderUrl?: string | null }>;
   purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
@@ -389,6 +390,10 @@ function projectWorkbookValues(input: ProjectSheetsInput) {
       ['7. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
     ],
     Overview: [['Metric', 'Value'], ...overviewRows],
+    'Budget / Cost Codes': [
+      ['Code', 'Name', 'Budget', 'Actual', 'Committed', 'Balance'],
+      ...(input.costCodes ?? []).map((item) => [item.code, item.name, item.budget, item.actual, item.committed, item.balance]),
+    ],
     'Action Needed': [['Severity', 'Type', 'Title', 'Message', 'Next action'], ...input.actionNeeded.map((item) => [item.severity, item.type, item.title, item.message, 'Review in Billboy project workspace'])],
     Files: [['File name', 'Source', 'Kind', 'Status', 'Tax safety', 'Tax note', 'Drive sync', 'Open file', 'Open folder', 'MIME type', 'Size bytes', 'Created at'], ...input.files.map((item) => [item.fileName, item.source, item.kind, item.status, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.driveSyncStatus ?? '', projectSheetLinkFormula(item.driveUrl), projectSheetLinkFormula(item.driveFolderUrl, 'Folder'), item.mimeType, item.fileSize, asProjectSheetDate(item.createdAt)])],
     Purchases: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid', 'Attachment'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asProjectSheetDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No', projectSheetLinkFormula(item.attachmentUrl)])],
@@ -480,7 +485,7 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
   const sheets = google.sheets({ version: 'v4', auth });
   const drive = google.drive({ version: 'v3', auth });
   const title = `${input.project.code} ${input.project.name} - Billboy Project Workbook`;
-  const sheetTitles = ['Workflow', 'Overview', 'Action Needed', 'Files', 'PO 3-way', 'Purchases', 'Sales', 'Expenses', 'LINE Groups'];
+  const sheetTitles = ['Workflow', 'Overview', 'Budget / Cost Codes', 'Action Needed', 'Files', 'PO 3-way', 'Purchases', 'Sales', 'Expenses', 'LINE Groups'];
   let id = input.project.googleSheetId ?? '';
   let created = false;
 
@@ -597,6 +602,12 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
       range: 'Overview!A1',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [['Metric', 'Value'], ...overviewRows] },
+    }),
+    sheets.spreadsheets.values.update({
+      spreadsheetId: id,
+      range: 'Budget / Cost Codes!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['Code', 'Name', 'Budget', 'Actual', 'Committed', 'Balance'], ...(input.costCodes ?? []).map((item) => [item.code, item.name, item.budget, item.actual, item.committed, item.balance])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
