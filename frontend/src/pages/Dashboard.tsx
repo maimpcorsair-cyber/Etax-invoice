@@ -292,10 +292,11 @@ export default function Dashboard() {
         ]);
 
         if (!statsRes.ok) throw new Error(isThai ? 'โหลดสถิติไม่สำเร็จ' : 'Failed to load stats');
-        if (!invRes.ok) throw new Error(isThai ? 'โหลดใบกำกับล่าสุดไม่สำเร็จ' : 'Failed to load recent invoices');
 
         const statsJson = await statsRes.json() as { data: DashboardStats };
-        const invJson = await invRes.json() as { data: Invoice[] };
+        const invJson = invRes.ok
+          ? await invRes.json() as { data: Invoice[] }
+          : { data: [] };
         const integrationJson = integrationRes.ok
           ? await integrationRes.json() as { data: IntegrationStatus }
           : { data: null };

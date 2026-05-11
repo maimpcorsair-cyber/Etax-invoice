@@ -77,6 +77,60 @@ const previewInvoiceSchema = z.object({
   signerTitle: z.string().optional(),
 })
 
+const invoiceListSelect = {
+  id: true,
+  companyId: true,
+  projectId: true,
+  invoiceNumber: true,
+  type: true,
+  status: true,
+  language: true,
+  invoiceDate: true,
+  dueDate: true,
+  seller: true,
+  buyerId: true,
+  subtotal: true,
+  vatAmount: true,
+  discountAmount: true,
+  total: true,
+  notes: true,
+  paymentMethod: true,
+  rdSubmissionStatus: true,
+  rdDocId: true,
+  rdSubmittedAt: true,
+  pdfUrl: true,
+  xmlUrl: true,
+  referenceDocNumber: true,
+  referenceInvoiceId: true,
+  isPaid: true,
+  paidAt: true,
+  paidAmount: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  buyer: { select: { nameTh: true, nameEn: true, taxId: true } },
+  project: { select: { id: true, code: true, name: true } },
+  items: {
+    select: {
+      id: true,
+      invoiceId: true,
+      productId: true,
+      nameTh: true,
+      nameEn: true,
+      descriptionTh: true,
+      descriptionEn: true,
+      quantity: true,
+      unit: true,
+      unitPrice: true,
+      discountAmount: true,
+      vatType: true,
+      amount: true,
+      vatAmount: true,
+      totalAmount: true,
+    },
+  },
+} as const;
+
 function calculateTotals(items: z.infer<typeof itemSchema>[]) {
   const VAT_RATE = 0.07;
   let subtotal = 0;
@@ -288,11 +342,7 @@ invoicesRouter.get('/', async (req, res) => {
           skip,
           take: limitNumber,
           orderBy: { createdAt: 'desc' },
-          include: {
-            buyer: { select: { nameTh: true, nameEn: true, taxId: true } },
-            project: { select: { id: true, code: true, name: true } },
-            items: true,
-          },
+          select: invoiceListSelect,
         }),
         tx.invoice.count({ where }),
       ]);

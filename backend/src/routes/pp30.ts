@@ -45,6 +45,14 @@ function csvEscape(value: unknown): string {
   return str;
 }
 
+function asNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const numeric = typeof value === 'object' && value !== null && 'toString' in value
+    ? Number((value as { toString(): string }).toString())
+    : Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 async function buildPp30(req: Express.Request extends never ? never : { user: NonNullable<Express.Request['user']> }, from: Date, to: Date) {
   const companyId = req.user.companyId;
 
@@ -60,7 +68,16 @@ async function buildPp30(req: Express.Request extends never ? never : { user: No
           invoiceDate: { gte: from, lte: to },
           status: { in: ['approved', 'submitted'] },
         },
-        include: { items: true },
+        select: {
+          id: true,
+          items: {
+            select: {
+              vatType: true,
+              amount: true,
+              vatAmount: true,
+            },
+          },
+        },
       });
       const purchases = await tx.purchaseInvoice.findMany({
         where: {
@@ -82,8 +99,8 @@ async function buildPp30(req: Express.Request extends never ? never : { user: No
       const key: VatTypeKey = VAT_TYPES.includes(item.vatType as VatTypeKey)
         ? (item.vatType as VatTypeKey)
         : 'vat7';
-      salesByVat[key].totalExclVat += item.amount;
-      salesByVat[key].vat += item.vatAmount;
+      salesByVat[key].totalExclVat += asNumber(item.amount);
+      salesByVat[key].vat += asNumber(item.vatAmount);
     }
   }
 
@@ -96,8 +113,8 @@ async function buildPp30(req: Express.Request extends never ? never : { user: No
     const key: VatTypeKey = VAT_TYPES.includes(p.vatType as VatTypeKey)
       ? (p.vatType as VatTypeKey)
       : 'vat7';
-    purchasesByVat[key].totalExclVat += p.subtotal;
-    purchasesByVat[key].vat += p.vatAmount;
+    purchasesByVat[key].totalExclVat += asNumber(p.subtotal);
+    purchasesByVat[key].vat += asNumber(p.vatAmount);
   }
 
   const totalSalesExclVat =
@@ -190,14 +207,14 @@ pp30Router.get('/wht', async (req, res) => {
       const r = cert.whtRate;
       if (byRate[r]) {
         byRate[r].count += 1;
-        byRate[r].totalWithheld += cert.whtAmount;
-        byRate[r].totalAmount += cert.totalAmount;
+        byRate[r].totalWithheld += asNumber(cert.whtAmount);
+        byRate[r].totalAmount += asNumber(cert.totalAmount);
       }
     }
 
     const totalCertificates = certs.length;
-    const totalWithheld = certs.reduce<number>((s, c) => s + c.whtAmount, 0);
-    const totalAmount = certs.reduce<number>((s, c) => s + c.totalAmount, 0);
+    const totalWithheld = certs.reduce<number>((s, c) => s + asNumber(c.whtAmount), 0);
+    const totalAmount = certs.reduce<number>((s, c) => s + asNumber(c.totalAmount), 0);
 
     // Income type labels (มาตรา 40)
     const incomeTypeLabels: Record<string, string> = {
@@ -224,8 +241,8 @@ pp30Router.get('/wht', async (req, res) => {
           id: c.id,
           certificateNumber: c.certificateNumber,
           whtRate: c.whtRate,
-          whtAmount: c.whtAmount,
-          totalAmount: c.totalAmount,
+          whtAmount: asNumber(c.whtAmount),
+          totalAmount: asNumber(c.totalAmount),
           recipientName: c.recipientName,
           recipientTaxId: c.recipientTaxId,
           paymentDate: c.paymentDate.toISOString(),

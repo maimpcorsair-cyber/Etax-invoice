@@ -63,6 +63,14 @@ function toCsv(headers: string[], rows: (string | number | null | undefined)[][]
   return '﻿' + [headerLine, ...bodyLines].join('\n');
 }
 
+function asNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const numeric = typeof value === 'object' && value !== null && 'toString' in value
+    ? Number((value as { toString(): string }).toString())
+    : Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 /* ─── VAT Summary (sales + purchases) ─── */
 vatSummaryRouter.get('/', async (req, res) => {
   try {
@@ -81,7 +89,20 @@ vatSummaryRouter.get('/', async (req, res) => {
           invoiceDate: { gte: from, lte: to },
           status: { in: ['approved', 'submitted'] },
         },
-        include: { items: true },
+        select: {
+          id: true,
+          subtotal: true,
+          vatAmount: true,
+          total: true,
+          items: {
+            select: {
+              vatType: true,
+              amount: true,
+              vatAmount: true,
+              totalAmount: true,
+            },
+          },
+        },
       });
 
       const purchaseInvoices = await tx.purchaseInvoice.findMany({
@@ -101,17 +122,17 @@ vatSummaryRouter.get('/', async (req, res) => {
     let salesTotalInclVat = 0;
 
     for (const inv of sales) {
-      salesTotalExclVat += inv.subtotal;
-      salesOutputVat += inv.vatAmount;
-      salesTotalInclVat += inv.total;
+      salesTotalExclVat += asNumber(inv.subtotal);
+      salesOutputVat += asNumber(inv.vatAmount);
+      salesTotalInclVat += asNumber(inv.total);
 
       // Group by vatType using items (each line carries its own vatType)
       for (const item of inv.items) {
         const key = (VAT_TYPES.includes(item.vatType as VatTypeKey) ? item.vatType : 'vat7') as VatTypeKey;
         const bucket = salesByVatType[key];
-        bucket.totalExclVat += item.amount;
-        bucket.vat += item.vatAmount;
-        bucket.totalInclVat += item.totalAmount;
+        bucket.totalExclVat += asNumber(item.amount);
+        bucket.vat += asNumber(item.vatAmount);
+        bucket.totalInclVat += asNumber(item.totalAmount);
       }
     }
     // Count = number of invoices that contain at least one item of that vatType
@@ -133,16 +154,16 @@ vatSummaryRouter.get('/', async (req, res) => {
     let purchasesTotalInclVat = 0;
 
     for (const p of purchases) {
-      purchasesTotalExclVat += p.subtotal;
-      purchasesInputVat += p.vatAmount;
-      purchasesTotalInclVat += p.total;
+      purchasesTotalExclVat += asNumber(p.subtotal);
+      purchasesInputVat += asNumber(p.vatAmount);
+      purchasesTotalInclVat += asNumber(p.total);
 
       const key = (VAT_TYPES.includes(p.vatType as VatTypeKey) ? p.vatType : 'vat7') as VatTypeKey;
       const bucket = purchasesByVatType[key];
       bucket.count += 1;
-      bucket.totalExclVat += p.subtotal;
-      bucket.vat += p.vatAmount;
-      bucket.totalInclVat += p.total;
+      bucket.totalExclVat += asNumber(p.subtotal);
+      bucket.vat += asNumber(p.vatAmount);
+      bucket.totalInclVat += asNumber(p.total);
     }
 
     const vatPayable = salesOutputVat - purchasesInputVat;
@@ -235,12 +256,12 @@ vatSummaryRouter.get('/sales-detail', async (req, res) => {
       return {
         invoiceNumber: inv.invoiceNumber,
         invoiceDate: inv.invoiceDate.toISOString().slice(0, 10),
-        customerName: inv.buyer.nameTh ?? inv.buyer.nameEn ?? '',
-        customerTaxId: inv.buyer.taxId ?? '',
+        customerName: inv.buyer?.nameTh ?? inv.buyer?.nameEn ?? '',
+        customerTaxId: inv.buyer?.taxId ?? '',
         description,
-        subtotal: inv.subtotal,
-        vatAmount: inv.vatAmount,
-        total: inv.total,
+        subtotal: asNumber(inv.subtotal),
+        vatAmount: asNumber(inv.vatAmount),
+        total: asNumber(inv.total),
         vatType,
       };
     });
