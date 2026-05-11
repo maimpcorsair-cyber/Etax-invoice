@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
+  Table2,
   Upload,
   Users,
   WalletCards,
@@ -33,7 +34,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useDriveStatus } from '../hooks/useDriveStatus';
 
 type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
-type ProjectWorkspaceTab = 'overview' | 'action' | 'matching' | 'po' | 'files' | 'line' | 'purchases' | 'sales' | 'expenses';
+type ProjectWorkspaceTab = 'overview' | 'sheet' | 'action' | 'matching' | 'po' | 'files' | 'line' | 'purchases' | 'sales' | 'expenses';
 type TaxSafetyStatus = 'vat_claimable' | 'expense_only_no_vat' | 'needs_tax_invoice' | 'missing_required_fields' | 'unmatched_payment' | 'supporting_only' | 'needs_review';
 type ReviewDocumentRole = 'tax_invoice' | 'receipt' | 'expense_receipt' | 'purchase_order' | 'quotation' | 'delivery_note' | 'payment_proof' | 'supporting_document' | 'ignore';
 
@@ -84,6 +85,7 @@ interface WorkspaceSummary {
   purchaseOrderCount?: number;
   purchaseOrderGapCount?: number;
   smartMatchCount?: number;
+  costCodeCount?: number;
   taxSafetyRiskCount?: number;
   claimableVat?: number;
   taxSafetyByStatus?: Record<string, number>;
@@ -283,6 +285,15 @@ interface ExpenseVoucher {
   createdAt: string;
 }
 
+interface CostCodeSummary {
+  code: string;
+  name: string;
+  budget: number;
+  actual: number;
+  committed: number;
+  balance: number;
+}
+
 interface LineGroup {
   id: string;
   sourceType?: string | null;
@@ -311,6 +322,7 @@ interface LineProjectMember {
 interface ProjectWorkspace {
   project: Project;
   workspaceSummary: WorkspaceSummary;
+  costCodeSummary?: CostCodeSummary[];
   actionNeeded: ActionNeeded[];
   smartMatches?: SmartMatch[];
   purchaseOrders?: ProjectPurchaseOrder[];
@@ -439,6 +451,7 @@ export default function ProjectDetail() {
     const summary = workspace?.workspaceSummary;
     return [
       { id: 'overview' as const, label: isThai ? 'ภาพรวม' : 'Overview', count: null },
+      { id: 'sheet' as const, label: isThai ? 'ตาราง' : 'Sheet', count: null },
       { id: 'action' as const, label: isThai ? 'ต้องตรวจ' : 'Action', count: summary?.actionNeededCount ?? 0 },
       { id: 'matching' as const, label: isThai ? 'จับคู่' : 'Matching', count: summary?.smartMatchCount ?? workspace?.smartMatches?.length ?? 0 },
       { id: 'po' as const, label: isThai ? 'PO' : 'PO', count: summary?.purchaseOrderCount ?? workspace?.purchaseOrders?.length ?? 0 },
@@ -1157,6 +1170,16 @@ export default function ProjectDetail() {
         </WorkspacePanel>
       )}
 
+      {activeTab === 'sheet' && (
+        <ProjectSheetPreview
+          workspace={workspace}
+          isThai={isThai}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          onOpenDocument={openDocument}
+        />
+      )}
+
       {activeTab === 'matching' && (
         <WorkspacePanel title={isThai ? 'Smart Matching / จับคู่สลิปกับเอกสารซื้อ' : 'Smart matching / match slips to purchases'} icon={Link2}>
           <SmartMatchList
@@ -1412,6 +1435,182 @@ function EmptyBlock({ text }: { text: string }) {
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
       {text}
     </div>
+  );
+}
+
+function ProjectSheetPreview({
+  workspace,
+  isThai,
+  formatCurrency,
+  formatDate,
+  onOpenDocument,
+}: {
+  workspace: ProjectWorkspace;
+  isThai: boolean;
+  formatCurrency: (value: number) => string;
+  formatDate: (value: string | Date) => string;
+  onOpenDocument: (doc: DocumentIntake) => void;
+}) {
+  const [activeSheet, setActiveSheet] = useState('files');
+  const sheets = [
+    {
+      id: 'files',
+      label: isThai ? 'Files' : 'Files',
+      columns: [isThai ? 'วันที่' : 'Date', isThai ? 'ไฟล์' : 'File', isThai ? 'ประเภท' : 'Type', isThai ? 'ที่มา' : 'Source', isThai ? 'สถานะ' : 'Status', 'Tax', 'Drive', isThai ? 'เปิด' : 'Open'],
+      rows: workspace.documentIntakes.map((doc) => ({
+        id: doc.id,
+        cells: [
+          formatDate(doc.createdAt),
+          doc.fileName ?? doc.id,
+          doc.kind,
+          doc.source,
+          doc.status,
+          doc.taxSafety?.label ?? '—',
+          doc.driveSyncStatus ?? '—',
+        ],
+        doc,
+      })),
+    },
+    {
+      id: 'costCodes',
+      label: isThai ? 'งบหมวดงาน' : 'Cost codes',
+      columns: [
+        isThai ? 'รหัส/หมวด' : 'Code',
+        isThai ? 'ชื่อหมวด' : 'Name',
+        isThai ? 'งบตั้งไว้' : 'Budget',
+        isThai ? 'ใช้จริง' : 'Actual',
+        isThai ? 'ผูกพันแล้ว' : 'Committed',
+        isThai ? 'คงเหลือ' : 'Balance',
+      ],
+      rows: (workspace.costCodeSummary ?? []).map((item) => ({
+        id: item.code,
+        cells: [
+          item.code,
+          item.name,
+          formatCurrency(item.budget),
+          formatCurrency(item.actual),
+          formatCurrency(item.committed),
+          formatCurrency(item.balance),
+        ],
+      })),
+    },
+    {
+      id: 'purchases',
+      label: isThai ? 'Input VAT' : 'Input VAT',
+      columns: [isThai ? 'วันที่' : 'Date', isThai ? 'ผู้ขาย' : 'Supplier', isThai ? 'เลขเอกสาร' : 'Doc no.', isThai ? 'หมวด' : 'Category', isThai ? 'ก่อน VAT' : 'Subtotal', 'VAT', isThai ? 'รวม' : 'Total', isThai ? 'สถานะ' : 'Status'],
+      rows: workspace.purchaseInvoices.map((item) => ({
+        id: item.id,
+        cells: [formatDate(item.invoiceDate), item.supplierName, item.invoiceNumber, item.category ?? '—', formatCurrency(item.subtotal), formatCurrency(item.vatAmount), formatCurrency(item.total), item.taxSafety?.label ?? (item.isPaid ? 'Paid' : 'Unpaid')],
+      })),
+    },
+    {
+      id: 'expenses',
+      label: isThai ? 'Expenses/PV' : 'Expenses/PV',
+      columns: [isThai ? 'วันที่' : 'Date', isThai ? 'เลข PV' : 'Voucher', isThai ? 'รายละเอียด' : 'Description', isThai ? 'ยอด' : 'Amount', isThai ? 'สถานะ' : 'Status'],
+      rows: workspace.expenseVouchers.map((item) => ({
+        id: item.id,
+        cells: [formatDate(item.voucherDate), item.voucherNumber, item.description ?? '—', formatCurrency(item.totalAmount), item.status],
+      })),
+    },
+    {
+      id: 'po',
+      label: isThai ? 'PO 3-way' : 'PO 3-way',
+      columns: ['PO', isThai ? 'ผู้ขาย' : 'Vendor', isThai ? 'วันที่' : 'Date', isThai ? 'ยอด' : 'Total', isThai ? 'สถานะ' : 'Status', isThai ? 'จับคู่ใบซื้อ' : 'Purchases', isThai ? 'จับคู่จ่าย' : 'Payments', isThai ? 'ขาด' : 'Missing'],
+      rows: (workspace.purchaseOrders ?? []).map((item) => ({
+        id: item.id,
+        cells: [item.poNumber, item.vendorName ?? '—', item.issueDate ? formatDate(item.issueDate) : '—', formatCurrency(item.total ?? 0), item.status, item.matchedPurchaseCount, item.matchedPaymentCount, item.missing.join(', ') || '—'],
+      })),
+    },
+    {
+      id: 'action',
+      label: isThai ? 'Action Needed' : 'Action Needed',
+      columns: [isThai ? 'ระดับ' : 'Severity', isThai ? 'ประเภท' : 'Type', isThai ? 'หัวข้อ' : 'Title', isThai ? 'ข้อความ' : 'Message'],
+      rows: workspace.actionNeeded.map((item) => ({
+        id: item.id,
+        cells: [item.severity, item.type, item.title, item.message],
+      })),
+    },
+  ];
+  const current = sheets.find((sheet) => sheet.id === activeSheet) ?? sheets[0];
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Table2 className="h-4 w-4 text-emerald-700" />
+            <h2 className="text-sm font-bold text-slate-950">{isThai ? 'Project Sheet Preview' : 'Project Sheet Preview'}</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            {isThai ? 'ดูข้อมูลโปรเจคเป็นตารางเหมือน Google Sheet ก่อนกด Sync จริง ไฟล์แนบเปิดจากข้อมูล Billboy/Drive ได้' : 'Spreadsheet-like preview before syncing to Google Sheets. Attachments open from Billboy/Drive data.'}
+          </p>
+        </div>
+        {workspace.googleSheet?.url && (
+          <a href={workspace.googleSheet.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">
+            <ExternalLink className="h-4 w-4" />
+            {isThai ? 'เปิด Google Sheet' : 'Open Google Sheet'}
+          </a>
+        )}
+      </div>
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-3 py-2">
+        {sheets.map((sheet) => (
+          <button
+            key={sheet.id}
+            type="button"
+            onClick={() => setActiveSheet(sheet.id)}
+            className={clsx(
+              'shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold',
+              current.id === sheet.id ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-100' : 'text-slate-500 hover:bg-white hover:text-slate-800',
+            )}
+          >
+            {sheet.label}
+            <span className="ml-1 text-[11px] text-slate-400">{sheet.rows.length}</span>
+          </button>
+        ))}
+      </div>
+      <div className="max-h-[480px] overflow-auto">
+        <table className="min-w-[960px] w-full border-separate border-spacing-0 text-sm">
+          <thead className="sticky top-0 z-10 bg-slate-100">
+            <tr>
+              {current.columns.map((column) => (
+                <th key={column} className="border-b border-r border-slate-200 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {current.rows.length === 0 ? (
+              <tr>
+                <td colSpan={current.columns.length} className="px-4 py-8 text-center text-sm text-slate-500">
+                  {isThai ? 'ยังไม่มีข้อมูลในตารางนี้' : 'No rows in this sheet yet'}
+                </td>
+              </tr>
+            ) : current.rows.map((row) => (
+              <tr key={row.id} className="odd:bg-white even:bg-slate-50/60">
+                {row.cells.map((cell, cellIndex) => (
+                  <td key={`${row.id}-${cellIndex}`} className="max-w-[280px] truncate border-b border-r border-slate-100 px-3 py-2 text-slate-700">
+                    {cell}
+                  </td>
+                ))}
+                {current.id === 'files' && 'doc' in row && (
+                  <td className="border-b border-r border-slate-100 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDocument(row.doc as DocumentIntake)}
+                      className="inline-flex items-center gap-1 font-semibold text-primary-700 hover:text-primary-800"
+                    >
+                      {isThai ? 'เปิดไฟล์' : 'Open'}
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

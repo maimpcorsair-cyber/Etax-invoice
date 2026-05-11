@@ -57,6 +57,25 @@ function normalizeBankAccounts(input: z.infer<typeof bankAccountSchema>[]) {
   }));
 }
 
+function asNumber(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value) || 0;
+  if (typeof value === 'object' && 'toString' in value) return Number(value.toString()) || 0;
+  return 0;
+}
+
+function monthRange(inputYear?: unknown, inputMonth?: unknown) {
+  const now = new Date();
+  const year = Number(inputYear) || now.getFullYear();
+  const month = Number(inputMonth) || (now.getMonth() + 1);
+  const normalizedMonth = Math.min(Math.max(month, 1), 12);
+  const start = new Date(year, normalizedMonth - 1, 1);
+  const end = new Date(year, normalizedMonth, 0, 23, 59, 59, 999);
+  const label = `${year}-${String(normalizedMonth).padStart(2, '0')}`;
+  return { year, month: normalizedMonth, start, end, label };
+}
+
 dashboardRouter.get('/integration-status', async (req, res) => {
   try {
     const [lineLink, company, user] = await Promise.all([
@@ -109,6 +128,240 @@ dashboardRouter.get('/integration-status', async (req, res) => {
   } catch (err) {
     logger.error('Failed to load integration status', { error: err });
     res.status(500).json({ error: 'Failed to load integration status' });
+  }
+});
+
+dashboardRouter.get('/month-end-workspace', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const period = monthRange(req.query.year, req.query.month);
+
+    const [
+      purchases,
+      sales,
+      expenses,
+      actionDocs,
+      projects,
+    ] = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return Promise.all([
+        tx.purchaseInvoice.findMany({
+          where: {
+            companyId,
+            invoiceDate: { gte: period.start, lte: period.end },
+          },
+          orderBy: { invoiceDate: 'desc' },
+          take: 200,
+          select: {
+            id: true,
+            supplierName: true,
+            supplierTaxId: true,
+            invoiceNumber: true,
+            invoiceDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            vatType: true,
+            category: true,
+            pdfUrl: true,
+            isPaid: true,
+            project: { select: { id: true, code: true, name: true } },
+          },
+        }),
+        tx.invoice.findMany({
+          where: {
+            companyId,
+            invoiceDate: { gte: period.start, lte: period.end },
+            status: { not: 'cancelled' },
+          },
+          orderBy: { invoiceDate: 'desc' },
+          take: 200,
+          select: {
+            id: true,
+            invoiceNumber: true,
+            type: true,
+            status: true,
+            invoiceDate: true,
+            subtotal: true,
+            vatAmount: true,
+            total: true,
+            pdfUrl: true,
+            buyer: { select: { nameTh: true, nameEn: true, taxId: true } },
+            project: { select: { id: true, code: true, name: true } },
+          },
+        }),
+        tx.expenseVoucher.findMany({
+          where: {
+            companyId,
+            voucherDate: { gte: period.start, lte: period.end },
+          },
+          orderBy: { voucherDate: 'desc' },
+          take: 200,
+          select: {
+            id: true,
+            voucherNumber: true,
+            status: true,
+            voucherDate: true,
+            description: true,
+            totalAmount: true,
+            project: { select: { id: true, code: true, name: true } },
+            items: {
+              take: 3,
+              select: {
+                category: true,
+                attachments: {
+                  take: 1,
+                  select: { url: true },
+                },
+              },
+            },
+          },
+        }),
+        tx.documentIntake.findMany({
+          where: {
+            companyId,
+            createdAt: { gte: period.start, lte: period.end },
+            OR: [
+              { status: { in: ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed'] } },
+              { driveSyncStatus: { in: ['not_synced', 'failed'] } },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+          select: {
+            id: true,
+            fileName: true,
+            source: true,
+            status: true,
+            error: true,
+            driveUrl: true,
+            fileUrl: true,
+            driveSyncStatus: true,
+            createdAt: true,
+            project: { select: { id: true, code: true, name: true } },
+          },
+        }),
+        tx.project.findMany({
+          where: { companyId, status: { not: 'archived' } },
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            budgetAmount: true,
+            status: true,
+            purchaseInvoices: {
+              select: { total: true, vatAmount: true },
+            },
+            expenseVouchers: {
+              select: { totalAmount: true },
+            },
+            invoices: {
+              where: { status: { not: 'cancelled' } },
+              select: { total: true },
+            },
+            documentIntakes: {
+              select: { id: true },
+            },
+          },
+        }),
+      ]);
+    });
+
+    const inputVatRows = purchases.map((item) => ({
+      id: item.id,
+      date: item.invoiceDate,
+      supplier: item.supplierName,
+      taxId: item.supplierTaxId,
+      documentNo: item.invoiceNumber,
+      project: item.project ? `${item.project.code} ${item.project.name}` : 'Company',
+      category: item.category ?? '',
+      subtotal: item.subtotal,
+      vat: item.vatAmount,
+      total: item.total,
+      taxStatus: item.vatType === 'vat7' && item.vatAmount > 0 ? 'Input VAT' : 'No VAT',
+      attachmentUrl: item.pdfUrl,
+    }));
+    const outputVatRows = sales.map((item) => ({
+      id: item.id,
+      date: item.invoiceDate,
+      buyer: item.buyer.nameTh || item.buyer.nameEn || '',
+      taxId: item.buyer.taxId,
+      documentNo: item.invoiceNumber,
+      project: item.project ? `${item.project.code} ${item.project.name}` : 'Company',
+      type: item.type,
+      status: item.status,
+      subtotal: item.subtotal,
+      vat: item.vatAmount,
+      total: item.total,
+      attachmentUrl: item.pdfUrl,
+    }));
+    const expenseRows = expenses.map((item) => ({
+      id: item.id,
+      date: item.voucherDate,
+      voucherNo: item.voucherNumber,
+      project: item.project ? `${item.project.code} ${item.project.name}` : 'Company',
+      category: item.items.map((expenseItem) => expenseItem.category).filter(Boolean)[0] ?? '',
+      description: item.description ?? '',
+      amount: asNumber(item.totalAmount),
+      status: item.status,
+      attachmentUrl: item.items.flatMap((expenseItem) => expenseItem.attachments.map((attachment) => attachment.url))[0] ?? null,
+    }));
+    const missingRows = actionDocs.map((item) => ({
+      id: item.id,
+      date: item.createdAt,
+      fileName: item.fileName ?? item.id,
+      project: item.project ? `${item.project.code} ${item.project.name}` : 'Company',
+      source: item.source,
+      status: item.status,
+      drive: item.driveSyncStatus,
+      issue: item.error ?? (item.driveSyncStatus === 'failed' ? 'Drive sync failed' : 'Needs review'),
+      attachmentUrl: item.driveUrl ?? item.fileUrl,
+    }));
+    const projectRows = projects.map((project) => {
+      const purchaseTotal = project.purchaseInvoices.reduce((sum, item) => sum + item.total, 0);
+      const expenseTotal = project.expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
+      const revenueTotal = project.invoices.reduce((sum, item) => sum + item.total, 0);
+      const actual = purchaseTotal + expenseTotal;
+      const budget = asNumber(project.budgetAmount);
+      return {
+        id: project.id,
+        project: `${project.code} ${project.name}`,
+        status: project.status,
+        budget,
+        revenue: revenueTotal,
+        actual,
+        balance: budget - actual,
+        forecastProfit: revenueTotal - actual,
+        files: project.documentIntakes.length,
+      };
+    });
+
+    const summary = {
+      inputVat: inputVatRows.reduce((sum, item) => sum + item.vat, 0),
+      outputVat: outputVatRows.reduce((sum, item) => sum + item.vat, 0),
+      expenses: expenseRows.reduce((sum, item) => sum + item.amount, 0),
+      missingDocuments: missingRows.length,
+      projectCount: projectRows.length,
+      vatPayable: outputVatRows.reduce((sum, item) => sum + item.vat, 0) - inputVatRows.reduce((sum, item) => sum + item.vat, 0),
+    };
+
+    res.json({
+      data: {
+        period: period.label,
+        summary,
+        tabs: {
+          inputVat: inputVatRows,
+          outputVat: outputVatRows,
+          expenses: expenseRows,
+          missingDocs: missingRows,
+          projectSummary: projectRows,
+        },
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to load month-end workspace', { error: err });
+    res.status(500).json({ error: 'Failed to load month-end workspace' });
   }
 });
 

@@ -172,6 +172,32 @@ function asNumber(value: unknown) {
   return Number(value);
 }
 
+function costCodeLabel(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed || 'Uncategorized';
+}
+
+function projectMetadataCostCodes(metadata: Prisma.JsonValue | null | undefined) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+  const raw = (metadata as { costCodes?: unknown }).costCodes;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as { code?: unknown; name?: unknown; budget?: unknown; budgetAmount?: unknown };
+      const code = typeof row.code === 'string' ? row.code.trim() : '';
+      const name = typeof row.name === 'string' ? row.name.trim() : '';
+      const budget = asNumber(row.budget ?? row.budgetAmount);
+      if (!code && !name && budget <= 0) return null;
+      return {
+        code: code || name || 'Uncategorized',
+        name: name || code || 'Uncategorized',
+        budget,
+      };
+    })
+    .filter((item): item is { code: string; name: string; budget: number } => item !== null);
+}
+
 async function projectBudgetSummary(companyId: string, projectId: string, tx: Prisma.TransactionClient) {
   const [purchaseAll, purchasePaid, expenseCommitted, expenseApproved, intakes] = await Promise.all([
     tx.purchaseInvoice.aggregate({
@@ -1136,6 +1162,12 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
             approvedAt: true,
             rejectedAt: true,
             createdAt: true,
+            items: {
+              select: {
+                category: true,
+                amount: true,
+              },
+            },
           },
         }),
         tx.lineGroupLink.findMany({
@@ -1243,6 +1275,38 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           taxSafety,
         };
       });
+      const costCodeMap = new Map<string, { code: string; name: string; budget: number; actual: number; committed: number }>();
+      const ensureCostCode = (label: string) => {
+        if (!costCodeMap.has(label)) {
+          costCodeMap.set(label, { code: label, name: label, budget: 0, actual: 0, committed: 0 });
+        }
+        return costCodeMap.get(label)!;
+      };
+      projectMetadataCostCodes(row.metadata).forEach((item) => {
+        const current = ensureCostCode(item.code);
+        current.name = item.name;
+        current.budget = item.budget;
+      });
+      purchaseInvoiceRows.forEach((item) => {
+        const row = ensureCostCode(costCodeLabel(item.category));
+        row.actual += item.total;
+        if (!item.isPaid) row.committed += item.total;
+      });
+      expenseVouchers.forEach((voucher) => {
+        if (voucher.items.length === 0) {
+          ensureCostCode('Uncategorized').actual += asNumber(voucher.totalAmount);
+          return;
+        }
+        voucher.items.forEach((item) => {
+          ensureCostCode(costCodeLabel(item.category)).actual += asNumber(item.amount);
+        });
+      });
+      const costCodeSummary = Array.from(costCodeMap.values())
+        .map((item) => ({
+          ...item,
+          balance: item.budget - item.actual - item.committed,
+        }))
+        .sort((a, b) => Math.abs(b.actual + b.committed) - Math.abs(a.actual + a.committed));
       const purchaseOrderRows = purchaseOrders.map((item) => ({
         ...item,
         subtotal: item.subtotal ?? null,
@@ -1301,8 +1365,10 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           purchaseOrderCount: purchaseOrderRows.length,
           purchaseOrderGapCount: purchaseOrderHealthRows.filter((item) => item.threeWayStatus !== 'complete').length,
           smartMatchCount: smartMatches.length,
+          costCodeCount: costCodeSummary.length,
           ...taxSafetySummary,
         },
+        costCodeSummary,
         actionNeeded: allActionNeeded,
         smartMatches,
         purchaseOrders: purchaseOrderHealthRows,
