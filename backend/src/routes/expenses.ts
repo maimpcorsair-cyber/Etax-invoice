@@ -40,9 +40,13 @@ const expenseItemSchema = z.object({
 
 const createVoucherSchema = z.object({
   projectId: z.string().min(1).nullable().optional(),
+  workflowType: z.enum(['expense_claim', 'cash_advance']).optional().default('expense_claim'),
   voucherDate: z.string().min(1),
   description: z.string().optional(),
   notes: z.string().optional(),
+  requestedByName: z.string().optional(),
+  paidToName: z.string().optional(),
+  clearingDueDate: z.string().optional(),
   items: z.array(expenseItemSchema).min(1),
 });
 
@@ -344,6 +348,18 @@ function buildItemCreate(items: z.infer<typeof expenseItemSchema>[]) {
   });
 }
 
+function buildVoucherMetadata(body: z.infer<typeof createVoucherSchema>): Prisma.InputJsonObject {
+  return {
+    workflowType: body.workflowType,
+    ...(body.requestedByName?.trim() ? { requestedByName: body.requestedByName.trim() } : {}),
+    ...(body.paidToName?.trim() ? { paidToName: body.paidToName.trim() } : {}),
+    ...(body.clearingDueDate ? { clearingDueDate: body.clearingDueDate } : {}),
+    ...(body.workflowType === 'cash_advance'
+      ? { clearingStatus: 'pending_receipts', workflowLabel: 'Cash Advance' }
+      : {}),
+  };
+}
+
 /* ─── Create ─── */
 expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
   try {
@@ -378,6 +394,7 @@ expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), asyn
           voucherDate: new Date(body.voucherDate),
           description: body.description,
           notes: body.notes,
+          metadata: buildVoucherMetadata(body),
           totalAmount,
           createdBy: req.user!.userId,
           items: { create: buildItemCreate(body.items) },
@@ -403,7 +420,7 @@ expensesRouter.post('/', requireRole('admin', 'super_admin', 'accountant'), asyn
       data: {
         ...created,
         totalAmount: Number(created.totalAmount),
-        items: created.items.map((i) => ({ ...i, amount: Number(i.amount) })),
+        items: (created as typeof created & { items: Array<{ amount: Prisma.Decimal }> }).items.map((i) => ({ ...i, amount: Number(i.amount) })),
       },
     });
   } catch (err) {
@@ -454,6 +471,7 @@ expensesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accountant'), 
           projectId: body.projectId ?? null,
           description: body.description,
           notes: body.notes,
+          metadata: buildVoucherMetadata(body),
           totalAmount,
           items: { create: buildItemCreate(body.items) },
         },
@@ -478,7 +496,7 @@ expensesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accountant'), 
       data: {
         ...updated,
         totalAmount: Number(updated.totalAmount),
-        items: updated.items.map((i) => ({ ...i, amount: Number(i.amount) })),
+        items: (updated as typeof updated & { items: Array<{ amount: Prisma.Decimal }> }).items.map((i) => ({ ...i, amount: Number(i.amount) })),
       },
     });
   } catch (err) {

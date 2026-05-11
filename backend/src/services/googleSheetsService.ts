@@ -353,7 +353,7 @@ export interface ProjectSheetsInput {
   purchaseOrders: Array<{ poNumber: string; documentType: string; vendorName?: string | null; vendorTaxId?: string | null; issueDate?: Date | string | null; total?: number | null; status: string; matchedPurchaseCount: number; matchedPaymentCount: number; missing: string[] }>;
   purchases: Array<{ supplierName: string; supplierTaxId: string; invoiceNumber: string; invoiceDate: Date | string; vatType: string; subtotal: number; vatAmount: number; total: number; taxSafetyStatus?: string; taxSafetyMessage?: string; isPaid: boolean; attachmentUrl?: string | null }>;
   sales: Array<{ invoiceNumber: string; buyerName: string; type: string; status: string; invoiceDate: Date | string; subtotal: number; vatAmount: number; total: number; isPaid: boolean }>;
-  expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; totalAmount: number; attachmentUrl?: string | null }>;
+  expenses: Array<{ voucherNumber: string; status: string; voucherDate: Date | string; description: string; workflowType?: string; clearingStatus?: string; paidToName?: string; totalAmount: number; attachmentUrl?: string | null }>;
   lineGroups: Array<{ groupName: string; linkedAt: Date | string }>;
   userRefreshToken?: string | null;
 }
@@ -386,8 +386,9 @@ function projectWorkbookValues(input: ProjectSheetsInput) {
       ['3. Input VAT', 'Confirm valid purchase tax invoices and receipts', 'Tax invoice PDF/JPG link', 'Purchases'],
       ['4. PO 3-way', 'Match PO, supplier invoice, and payment slip', 'PO link, invoice link, payment proof link', 'PO 3-way'],
       ['5. Sales VAT', 'Issue project-related sales invoices', 'Invoice PDF/XML from Billboy', 'Sales'],
-      ['6. Expense claim', 'Record small expenses or no-tax documents as Payment Voucher', 'Receipt/photo/chat/map evidence link', 'Expenses'],
-      ['7. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
+      ['6. Cash advance', 'Request field cash, approve, pay, then clear against receipts/payment proof', 'Approval, transfer slip, receipts, refund/overuse note', 'Expenses / Action Needed'],
+      ['7. Expense claim', 'Record small expenses or no-tax documents as Payment Voucher', 'Receipt/photo/chat/map evidence link', 'Expenses'],
+      ['8. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
     ],
     Overview: [['Metric', 'Value'], ...overviewRows],
     'Budget / Cost Codes': [
@@ -399,7 +400,7 @@ function projectWorkbookValues(input: ProjectSheetsInput) {
     Purchases: [['Supplier', 'Supplier tax ID', 'Invoice no.', 'Invoice date', 'VAT type', 'Subtotal', 'VAT', 'Total', 'Tax safety', 'Tax note', 'Paid', 'Attachment'], ...input.purchases.map((item) => [item.supplierName, item.supplierTaxId, item.invoiceNumber, asProjectSheetDate(item.invoiceDate), item.vatType, item.subtotal, item.vatAmount, item.total, item.taxSafetyStatus ?? '', item.taxSafetyMessage ?? '', item.isPaid ? 'Yes' : 'No', projectSheetLinkFormula(item.attachmentUrl)])],
     'PO 3-way': [['PO no.', 'Document type', 'Vendor', 'Vendor tax ID', 'Issue date', 'Total', 'Status', 'Matched purchases', 'Matched payments', 'Missing'], ...input.purchaseOrders.map((item) => [item.poNumber, item.documentType, item.vendorName ?? '', item.vendorTaxId ?? '', item.issueDate ? asProjectSheetDate(item.issueDate) : '', item.total ?? '', item.status, item.matchedPurchaseCount, item.matchedPaymentCount, item.missing.join(', ')])],
     Sales: [['Invoice no.', 'Buyer', 'Type', 'Status', 'Invoice date', 'Subtotal', 'VAT', 'Total', 'Paid'], ...input.sales.map((item) => [item.invoiceNumber, item.buyerName, item.type, item.status, asProjectSheetDate(item.invoiceDate), item.subtotal, item.vatAmount, item.total, item.isPaid ? 'Yes' : 'No'])],
-    Expenses: [['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total', 'Attachment'], ...input.expenses.map((item) => [item.voucherNumber, item.status, asProjectSheetDate(item.voucherDate), item.description, item.totalAmount, projectSheetLinkFormula(item.attachmentUrl)])],
+    Expenses: [['Voucher no.', 'Type', 'Status', 'Clearing status', 'Voucher date', 'Pay to', 'Description', 'Total', 'Attachment'], ...input.expenses.map((item) => [item.voucherNumber, item.workflowType === 'cash_advance' ? 'Cash advance' : 'Expense claim', item.status, item.clearingStatus ?? '', asProjectSheetDate(item.voucherDate), item.paidToName ?? '', item.description, item.totalAmount, projectSheetLinkFormula(item.attachmentUrl)])],
     'LINE Groups': [['Group name', 'Linked at'], ...input.lineGroups.map((item) => [item.groupName, asProjectSheetDate(item.linkedAt)])],
   };
 }
@@ -586,8 +587,9 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
     ['3. Input VAT', 'Confirm valid purchase tax invoices and receipts', 'Tax invoice PDF/JPG link', 'Purchases'],
     ['4. PO 3-way', 'Match PO, supplier invoice, and payment slip', 'PO link, invoice link, payment proof link', 'PO 3-way'],
     ['5. Sales VAT', 'Issue project-related sales invoices', 'Invoice PDF/XML from Billboy', 'Sales'],
-    ['6. Expense claim', 'Record small expenses or no-tax documents as Payment Voucher', 'Receipt/photo/chat/map evidence link', 'Expenses'],
-    ['7. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
+    ['6. Cash advance', 'Request field cash, approve, pay, then clear against receipts/payment proof', 'Approval, transfer slip, receipts, refund/overuse note', 'Expenses / Action Needed'],
+    ['7. Expense claim', 'Record small expenses or no-tax documents as Payment Voucher', 'Receipt/photo/chat/map evidence link', 'Expenses'],
+    ['8. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
   ];
 
   await Promise.all([
@@ -643,7 +645,7 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
       spreadsheetId: id,
       range: 'Expenses!A1',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [['Voucher no.', 'Status', 'Voucher date', 'Description', 'Total', 'Attachment'], ...input.expenses.map((item) => [item.voucherNumber, item.status, asDate(item.voucherDate), item.description, item.totalAmount, linkFormula(item.attachmentUrl)])] },
+      requestBody: { values: [['Voucher no.', 'Type', 'Status', 'Clearing status', 'Voucher date', 'Pay to', 'Description', 'Total', 'Attachment'], ...input.expenses.map((item) => [item.voucherNumber, item.workflowType === 'cash_advance' ? 'Cash advance' : 'Expense claim', item.status, item.clearingStatus ?? '', asDate(item.voucherDate), item.paidToName ?? '', item.description, item.totalAmount, linkFormula(item.attachmentUrl)])] },
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,

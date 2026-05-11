@@ -1157,6 +1157,7 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
             status: true,
             voucherDate: true,
             description: true,
+            metadata: true,
             totalAmount: true,
             submittedAt: true,
             approvedAt: true,
@@ -1334,7 +1335,18 @@ projectsRouter.get('/:id/workspace', async (req, res) => {
           message: item.taxSafety.message,
           documentIntakeId: item.id,
         }));
-      const allActionNeeded = [...actionNeeded, ...taxSafetyActions];
+      const cashAdvanceActions = expenseVouchers
+        .filter((item) => typeof item.metadata === 'object' && item.metadata !== null && !Array.isArray(item.metadata) && item.metadata.workflowType === 'cash_advance' && ['draft', 'submitted'].includes(item.status))
+        .map((item) => ({
+          id: `expense:${item.id}:cash-advance`,
+          severity: item.status === 'submitted' ? 'medium' as const : 'low' as const,
+          type: 'cash_advance',
+          title: `${item.voucherNumber} ${item.description ?? 'Cash advance needs follow-up'}`,
+          message: item.status === 'submitted'
+            ? 'Cash advance is waiting for project approval before payment and clearing.'
+            : 'Cash advance is still draft; submit it so the approver can act.',
+        }));
+      const allActionNeeded = [...actionNeeded, ...taxSafetyActions, ...cashAdvanceActions];
       const lineGroupsWithMemberInvites = lineGroups.map((group) => ({
         ...group,
         members: group.members.map((member) => ({
@@ -2143,6 +2155,7 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
             status: true,
             voucherDate: true,
             description: true,
+            metadata: true,
             totalAmount: true,
             items: {
               select: {
@@ -2392,6 +2405,9 @@ projectsRouter.post('/:id/export/sheets', requireRole('admin', 'super_admin', 'a
         status: item.status,
         voucherDate: item.voucherDate,
         description: item.description ?? '',
+        workflowType: typeof item.metadata === 'object' && item.metadata !== null && !Array.isArray(item.metadata) && 'workflowType' in item.metadata ? String(item.metadata.workflowType ?? '') : '',
+        clearingStatus: typeof item.metadata === 'object' && item.metadata !== null && !Array.isArray(item.metadata) && 'clearingStatus' in item.metadata ? String(item.metadata.clearingStatus ?? '') : '',
+        paidToName: typeof item.metadata === 'object' && item.metadata !== null && !Array.isArray(item.metadata) && 'paidToName' in item.metadata ? String(item.metadata.paidToName ?? '') : '',
         totalAmount: asNumber(item.totalAmount),
         attachmentUrl: item.items.flatMap((expenseItem) => expenseItem.attachments.map((attachment) => attachment.url))[0] ?? null,
       })),

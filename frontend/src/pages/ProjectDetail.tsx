@@ -279,6 +279,14 @@ interface ExpenseVoucher {
   voucherDate: string;
   description?: string | null;
   totalAmount: number;
+  metadata?: {
+    workflowType?: string;
+    workflowLabel?: string;
+    clearingStatus?: string;
+    clearingDueDate?: string;
+    requestedByName?: string;
+    paidToName?: string;
+  } | null;
   submittedAt?: string | null;
   approvedAt?: string | null;
   rejectedAt?: string | null;
@@ -408,6 +416,7 @@ export default function ProjectDetail() {
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [commentingId, setCommentingId] = useState<string | null>(null);
   const [voucherCreatingId, setVoucherCreatingId] = useState<string | null>(null);
+  const [advanceCreating, setAdvanceCreating] = useState(false);
   const [reviewingDoc, setReviewingDoc] = useState<DocumentIntake | null>(null);
   const [reviewRole, setReviewRole] = useState<ReviewDocumentRole>('tax_invoice');
   const [reviewNote, setReviewNote] = useState('');
@@ -859,6 +868,62 @@ export default function ProjectDetail() {
     }
   }
 
+  async function createCashAdvanceRequest() {
+    if (!token || !workspace) return;
+    const amountText = window.prompt(isThai ? 'ยอดขอเบิกเงินหน้างาน (บาท)' : 'Cash advance amount (THB)');
+    const amount = Number(amountText?.replace(/,/g, '').trim());
+    if (!amountText || !Number.isFinite(amount) || amount <= 0) return;
+    const reason = window.prompt(isThai ? 'ใช้ทำอะไร/ซื้ออะไร' : 'Purpose / what will this pay for');
+    if (!reason?.trim()) return;
+    const category = window.prompt(isThai ? 'หมวดงบ เช่น Material, Labor, Travel' : 'Cost code/category, e.g. Material, Labor, Travel')?.trim() || 'Cash Advance';
+    const paidToName = window.prompt(isThai ? 'โอนให้ใคร/ผู้รับเงิน' : 'Pay to / recipient name')?.trim() || undefined;
+    const today = new Date().toISOString().slice(0, 10);
+
+    setAdvanceCreating(true);
+    setError('');
+    try {
+      const createRes = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          projectId: workspace.project.id,
+          workflowType: 'cash_advance',
+          voucherDate: today,
+          description: `${isThai ? 'ขอเบิกเงินหน้างาน' : 'Cash advance'}: ${reason.trim()}`,
+          notes: isThai
+            ? 'สร้างจากหน้าโปรเจคเพื่อรออนุมัติและเคลียร์ด้วยใบเสร็จ/สลิปภายหลัง'
+            : 'Created from project workspace; clear later with receipts/payment proof.',
+          requestedByName: paidToName,
+          paidToName,
+          items: [{
+            description: reason.trim(),
+            category,
+            amount,
+            date: today,
+            notes: isThai ? 'เงินทดรองรอเคลียร์' : 'Advance pending clearing',
+          }],
+        }),
+      });
+      const createdJson = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) throw new Error(createdJson.error || 'Failed to create cash advance');
+      const voucherId = createdJson.data?.id;
+      if (voucherId) {
+        const submitRes = await fetch(`/api/expenses/${voucherId}/submit`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const submitJson = await submitRes.json().catch(() => ({}));
+        if (!submitRes.ok) throw new Error(submitJson.error || 'Failed to submit cash advance');
+      }
+      await fetchWorkspace();
+      setActiveTab('expenses');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create cash advance');
+    } finally {
+      setAdvanceCreating(false);
+    }
+  }
+
   async function saveDocumentReview(options?: { confirmPurchase?: boolean; createVoucher?: boolean }) {
     if (!token || !workspace || !reviewingDoc) return;
     setReviewSaving(true);
@@ -928,6 +993,13 @@ export default function ProjectDetail() {
   const teamNames = [project.owner?.name, project.approver?.name, ...project.members.map((m) => m.user.name)]
     .filter(Boolean)
     .filter((name, index, arr) => arr.indexOf(name) === index);
+  const cashAdvanceVouchers = workspace.expenseVouchers.filter((item) => item.metadata?.workflowType === 'cash_advance');
+  const pendingAdvanceTotal = cashAdvanceVouchers
+    .filter((item) => !['approved', 'rejected'].includes(item.status))
+    .reduce((sum, item) => sum + item.totalAmount, 0);
+  const approvedAdvanceTotal = cashAdvanceVouchers
+    .filter((item) => item.status === 'approved')
+    .reduce((sum, item) => sum + item.totalAmount, 0);
 
   const statCards = [
     { label: isThai ? 'งบตั้งต้น' : 'Budget', value: formatCurrency(project.budgetAmount), icon: WalletCards },
@@ -1028,6 +1100,15 @@ export default function ProjectDetail() {
             <Inbox className="h-4 w-4" />
             {isThai ? 'ทำใบเบิก' : 'New voucher'}
           </Link>
+          <button
+            type="button"
+            onClick={() => void createCashAdvanceRequest()}
+            disabled={advanceCreating}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+          >
+            {advanceCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+            {isThai ? 'ขอเบิกหน้างาน' : 'Cash advance'}
+          </button>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {isThai ? 'อัปโหลดเข้าโปรเจค' : 'Upload to project'}
@@ -1376,14 +1457,35 @@ export default function ProjectDetail() {
 
       {activeTab === 'expenses' && (
         <WorkspacePanel title={isThai ? 'Payment Voucher / ค่าใช้จ่ายไม่มีใบกำกับ' : 'Payment vouchers / non-tax expenses'} icon={Inbox}>
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-700">{isThai ? 'เงินทดรองรออนุมัติ/เคลียร์' : 'Pending advances'}</p>
+              <p className="mt-1 text-lg font-bold text-amber-900">{formatCurrency(pendingAdvanceTotal)}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-xs font-semibold text-emerald-700">{isThai ? 'เงินทดรองอนุมัติแล้ว' : 'Approved advances'}</p>
+              <p className="mt-1 text-lg font-bold text-emerald-900">{formatCurrency(approvedAdvanceTotal)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void createCashAdvanceRequest()}
+              disabled={advanceCreating}
+              className="inline-flex min-h-[76px] items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
+            >
+              {advanceCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+              {isThai ? 'สร้างคำขอเบิกเงินหน้างาน' : 'Create cash advance request'}
+            </button>
+          </div>
           <DataTable
             emptyText={isThai ? 'ยังไม่มี payment voucher ในโปรเจคนี้' : 'No payment vouchers in this project yet'}
             rows={workspace.expenseVouchers.map((item) => ({
               id: item.id,
-              title: item.voucherNumber,
-              subtitle: `${item.description || (isThai ? 'ไม่มีรายละเอียด' : 'No description')} · ${formatDate(item.voucherDate)}`,
+              title: item.metadata?.workflowType === 'cash_advance'
+                ? `${item.voucherNumber} · ${isThai ? 'เงินทดรอง' : 'Advance'}`
+                : item.voucherNumber,
+              subtitle: `${item.description || (isThai ? 'ไม่มีรายละเอียด' : 'No description')} · ${formatDate(item.voucherDate)}${item.metadata?.paidToName ? ` · ${isThai ? 'ผู้รับ' : 'Pay to'} ${item.metadata.paidToName}` : ''}`,
               amount: formatCurrency(item.totalAmount),
-              meta: item.status,
+              meta: item.metadata?.clearingStatus ? `${item.status} · ${item.metadata.clearingStatus}` : item.status,
               href: `/app/expenses?projectId=${project.id}`,
             }))}
           />
@@ -1512,10 +1614,18 @@ function ProjectSheetPreview({
     {
       id: 'expenses',
       label: isThai ? 'Expenses/PV' : 'Expenses/PV',
-      columns: [isThai ? 'วันที่' : 'Date', isThai ? 'เลข PV' : 'Voucher', isThai ? 'รายละเอียด' : 'Description', isThai ? 'ยอด' : 'Amount', isThai ? 'สถานะ' : 'Status'],
+      columns: [isThai ? 'วันที่' : 'Date', isThai ? 'เลข PV' : 'Voucher', isThai ? 'ประเภท' : 'Type', isThai ? 'รายละเอียด' : 'Description', isThai ? 'ยอด' : 'Amount', isThai ? 'สถานะ' : 'Status', isThai ? 'ผู้รับเงิน' : 'Pay to'],
       rows: workspace.expenseVouchers.map((item) => ({
         id: item.id,
-        cells: [formatDate(item.voucherDate), item.voucherNumber, item.description ?? '—', formatCurrency(item.totalAmount), item.status],
+        cells: [
+          formatDate(item.voucherDate),
+          item.voucherNumber,
+          item.metadata?.workflowType === 'cash_advance' ? (isThai ? 'เงินทดรอง' : 'Cash advance') : (isThai ? 'ค่าใช้จ่าย' : 'Expense'),
+          item.description ?? '—',
+          formatCurrency(item.totalAmount),
+          item.metadata?.clearingStatus ? `${item.status} · ${item.metadata.clearingStatus}` : item.status,
+          item.metadata?.paidToName ?? '—',
+        ],
       })),
     },
     {

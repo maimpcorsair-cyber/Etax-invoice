@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 15:55 Asia/Bangkok
+Last updated: 2026-05-11 16:25 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -46,6 +46,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified GitHub: Typecheck run `25659827100` succeeded in `55s`; Render deploy run `25659827141` succeeded in `9m45s`.
   - Production `/api/health` returned HTTP 200 in about `1.07s`; production project workspace endpoint returned HTTP 200 for `PRJ-2026-001`.
   - Did not trigger production Google Sheet creation during verification to avoid creating extra Drive files / hitting current Google Drive quota; next manual check is pressing `สร้างไฟล์ Google Sheet` in the project `Sheet` tab.
+- Project cash-advance workflow is implemented locally, not deployed yet:
+  - Expense Voucher create/update now accepts `workflowType: "cash_advance"` plus `paidToName`, `requestedByName`, and `clearingDueDate`, stored in `expense_vouchers.metadata`.
+  - Project Detail has a `ขอเบิกหน้างาน` / `Cash advance` action that creates a project-linked cash advance voucher and submits it for approval.
+  - Project workspace Action Needed now surfaces draft/submitted cash advances; the Expenses/PV preview and Google Sheet export show voucher type, clearing status, and pay-to fields.
+  - Verified locally: backend `npm run typecheck` and frontend `npm run typecheck` passed.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
