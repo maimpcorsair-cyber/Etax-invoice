@@ -391,7 +391,7 @@ function projectWorkbookValues(input: ProjectSheetsInput) {
       ['8. Audit / filing', 'Review totals, missing documents, and links before filing VAT or closing project', 'Every row should have an attachment/evidence link where possible', 'Overview / Action Needed'],
     ],
     Overview: [['Metric', 'Value'], ...overviewRows],
-    'Budget / Cost Codes': [
+    'Budget Cost Codes': [
       ['Code', 'Name', 'Budget', 'Actual', 'Committed', 'Balance'],
       ...(input.costCodes ?? []).map((item) => [item.code, item.name, item.budget, item.actual, item.committed, item.balance]),
     ],
@@ -486,7 +486,7 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
   const sheets = google.sheets({ version: 'v4', auth });
   const drive = google.drive({ version: 'v3', auth });
   const title = `${input.project.code} ${input.project.name} - Billboy Project Workbook`;
-  const sheetTitles = ['Workflow', 'Overview', 'Budget / Cost Codes', 'Action Needed', 'Files', 'PO 3-way', 'Purchases', 'Sales', 'Expenses', 'LINE Groups'];
+  const sheetTitles = ['Workflow', 'Overview', 'Budget Cost Codes', 'Action Needed', 'Files', 'PO 3-way', 'Purchases', 'Sales', 'Expenses', 'LINE Groups'];
   let id = input.project.googleSheetId ?? '';
   let created = false;
 
@@ -607,7 +607,7 @@ export async function exportProjectToSheets(input: ProjectSheetsInput): Promise<
     }),
     sheets.spreadsheets.values.update({
       spreadsheetId: id,
-      range: 'Budget / Cost Codes!A1',
+      range: 'Budget Cost Codes!A1',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [['Code', 'Name', 'Budget', 'Actual', 'Committed', 'Balance'], ...(input.costCodes ?? []).map((item) => [item.code, item.name, item.budget, item.actual, item.committed, item.balance])] },
     }),
