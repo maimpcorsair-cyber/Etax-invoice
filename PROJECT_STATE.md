@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 20:40 Asia/Bangkok
+Last updated: 2026-05-11 21:38 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -59,6 +59,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Dashboard now keeps the month-end endpoint error text separately and shows it in the warning panel instead of only the generic fallback copy.
   - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25662880401` succeeded in `56s`; Render deploy run `25662880406` succeeded in `9m4s`.
+- Dashboard tax endpoint 500 fix is deployed:
+  - Production Dashboard had multiple 500s from `/api/invoices`, `/api/vat-summary`, `/api/pp30`, and `/api/pp30/wht`, which made the month-end spreadsheet warning remain visible even after the month-end endpoint itself was fixed.
+  - Invoice list, VAT summary, and PP.30 now select only the fields they need and normalize numeric values before aggregation; Dashboard no longer treats recent-invoice failure as a fatal page error.
+  - PP.30 WHT summary now returns an empty nonblocking summary if the WHT certificate query fails, so the Dashboard does not show a red console error while the WHT module/table is unavailable.
+  - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25675118037` succeeded in `2m9s`; Render deploy run `25675118147` succeeded in `10m11s`; WHT follow-up Typecheck run `25676150909` succeeded in `4m39s`; WHT follow-up Render deploy run `25676150900` succeeded in `12m2s`.
+  - Production authenticated checks returned HTTP 200 for `/api/invoices?limit=5`, `/api/vat-summary?from=2026-05-01&to=2026-05-31`, `/api/pp30?year=2026&month=5`, `/api/pp30/wht?year=2026&month=5`, and `/api/dashboard/month-end-workspace`.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
