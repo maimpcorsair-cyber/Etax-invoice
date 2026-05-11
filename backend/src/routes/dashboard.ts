@@ -276,24 +276,24 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
       documentNo: item.invoiceNumber,
       project: item.project ? `${item.project.code} ${item.project.name}` : 'Company',
       category: item.category ?? '',
-      subtotal: item.subtotal,
-      vat: item.vatAmount,
-      total: item.total,
-      taxStatus: item.vatType === 'vat7' && item.vatAmount > 0 ? 'Input VAT' : 'No VAT',
+      subtotal: asNumber(item.subtotal),
+      vat: asNumber(item.vatAmount),
+      total: asNumber(item.total),
+      taxStatus: item.vatType === 'vat7' && asNumber(item.vatAmount) > 0 ? 'Input VAT' : 'No VAT',
       attachmentUrl: item.pdfUrl,
     }));
     const outputVatRows = sales.map((item) => ({
       id: item.id,
       date: item.invoiceDate,
-      buyer: item.buyer.nameTh || item.buyer.nameEn || '',
-      taxId: item.buyer.taxId,
+      buyer: item.buyer?.nameTh || item.buyer?.nameEn || '',
+      taxId: item.buyer?.taxId ?? '',
       documentNo: item.invoiceNumber,
       project: item.project ? `${item.project.code} ${item.project.name}` : 'Company',
       type: item.type,
       status: item.status,
-      subtotal: item.subtotal,
-      vat: item.vatAmount,
-      total: item.total,
+      subtotal: asNumber(item.subtotal),
+      vat: asNumber(item.vatAmount),
+      total: asNumber(item.total),
       attachmentUrl: item.pdfUrl,
     }));
     const expenseRows = expenses.map((item) => ({
@@ -319,9 +319,9 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
       attachmentUrl: item.driveUrl ?? item.fileUrl,
     }));
     const projectRows = projects.map((project) => {
-      const purchaseTotal = project.purchaseInvoices.reduce((sum, item) => sum + item.total, 0);
+      const purchaseTotal = project.purchaseInvoices.reduce((sum, item) => sum + asNumber(item.total), 0);
       const expenseTotal = project.expenseVouchers.reduce((sum, item) => sum + asNumber(item.totalAmount), 0);
-      const revenueTotal = project.invoices.reduce((sum, item) => sum + item.total, 0);
+      const revenueTotal = project.invoices.reduce((sum, item) => sum + asNumber(item.total), 0);
       const actual = purchaseTotal + expenseTotal;
       const budget = asNumber(project.budgetAmount);
       return {

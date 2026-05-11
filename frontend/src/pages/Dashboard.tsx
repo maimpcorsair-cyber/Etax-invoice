@@ -268,6 +268,7 @@ export default function Dashboard() {
   const [integrations, setIntegrations] = useState<IntegrationStatus | null>(null);
   const [documentStats, setDocumentStats] = useState<DocumentIntakeStats | null>(null);
   const [monthEnd, setMonthEnd] = useState<MonthEndWorkspace | null>(null);
+  const [monthEndError, setMonthEndError] = useState<string | null>(null);
   const [monthEndTab, setMonthEndTab] = useState('inputVat');
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
@@ -301,9 +302,14 @@ export default function Dashboard() {
         const docStatsJson = docStatsRes.ok
           ? await docStatsRes.json() as { data: DocumentIntakeStats }
           : { data: null };
-        const monthEndJson = monthEndRes.ok
-          ? await monthEndRes.json() as { data: MonthEndWorkspace }
-          : { data: null };
+        let monthEndJson: { data: MonthEndWorkspace | null } = { data: null };
+        if (monthEndRes.ok) {
+          monthEndJson = await monthEndRes.json() as { data: MonthEndWorkspace };
+          setMonthEndError(null);
+        } else {
+          const json = await monthEndRes.json().catch(() => ({})) as { error?: string; message?: string };
+          setMonthEndError(json.error || json.message || `HTTP ${monthEndRes.status}`);
+        }
 
         setStats(statsJson.data);
         setRecentInvoices(invJson.data ?? []);
@@ -637,6 +643,11 @@ export default function Dashboard() {
               ? 'ระบบโหลดข้อมูล Dashboard หลักได้แล้ว แต่โหลดตารางรวมบริษัทไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง หากยังไม่ขึ้นให้เช็คสิทธิ์หรือ backend endpoint /api/dashboard/month-end-workspace'
               : 'The main dashboard loaded, but the company spreadsheet preview did not. Refresh this page, then check permissions or /api/dashboard/month-end-workspace if it still does not appear.'}
           </p>
+          {monthEndError && (
+            <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-amber-900">
+              {monthEndError}
+            </p>
+          )}
         </section>
       )}
 

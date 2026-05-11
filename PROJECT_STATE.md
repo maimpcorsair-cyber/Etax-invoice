@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 16:45 Asia/Bangkok
+Last updated: 2026-05-11 16:55 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -53,6 +53,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25662073487` succeeded in `57s`; Render deploy run `25662073508` succeeded in `9m51s`.
   - Production `/api/health` and Vercel `/api/health` both returned HTTP 200; Vercel production chunk `ProjectDetail-DziJqPET.js` contains `ขอเบิกหน้างาน` / `Cash advance`.
+- Dashboard month-end workspace resilience fix is implemented locally, not deployed yet:
+  - `GET /api/dashboard/month-end-workspace` now normalizes Decimal-like totals with `asNumber()` and tolerates missing invoice buyer relation (`buyer?.nameTh/nameEn/taxId`) so one imperfect invoice cannot break the whole company month-end table.
+  - Dashboard now keeps the month-end endpoint error text separately and shows it in the warning panel instead of only the generic fallback copy.
+  - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
 - Backend health currently verified as `version: 2026-05-09d`.
 - Vercel CLI is installed globally and logged in as `maimpcorsair-1177`.
 - Vercel project is linked locally in `.vercel/repo.json`; `.vercel` is ignored and must not be committed.
