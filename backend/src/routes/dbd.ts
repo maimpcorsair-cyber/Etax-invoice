@@ -12,6 +12,7 @@ import {
   searchLocalJuristicProfiles,
   syncAllOpenDataCaches,
 } from '../services/dbdOpenDataService';
+import { dbdOpenDataSyncQueue } from '../queues/dbdOpenDataSyncQueue';
 import { logger } from '../config/logger';
 
 export const dbdRouter = Router();
@@ -98,6 +99,50 @@ dbdRouter.post('/sync', requireRole('super_admin'), async (req, res) => {
     }
     logger.error('Failed to sync local DBD/RD open data', { error: err });
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to sync local DBD/RD open data' });
+  }
+});
+
+dbdRouter.post('/sync/job', requireRole('super_admin'), async (req, res) => {
+  try {
+    const body = z.object({
+      vatStartRow: z.coerce.number().int().min(0).default(0),
+      vatMaxRows: z.coerce.number().int().min(1000).max(50000).default(10000),
+      vatDelayMs: z.coerce.number().int().min(0).max(5000).default(150),
+      continueUntilRow: z.coerce.number().int().min(1).max(1000000).optional(),
+      delayBetweenJobsMs: z.coerce.number().int().min(0).max(3600000).default(30000),
+      autoContinue: z.coerce.boolean().default(true),
+    }).parse(req.body ?? {});
+
+    const job = await dbdOpenDataSyncQueue.add(
+      'manual-open-data-sync',
+      {
+        triggeredBy: `manual:${req.user!.userId}`,
+        vatStartRow: body.vatStartRow,
+        vatMaxRows: body.vatMaxRows,
+        vatDelayMs: body.vatDelayMs,
+        continueUntilRow: body.continueUntilRow,
+        delayBetweenJobsMs: body.delayBetweenJobsMs,
+        autoContinue: body.autoContinue,
+      },
+      {
+        jobId: `manual-rd-vat-open-data-sync-${req.user!.userId}-${Date.now()}`,
+      },
+    );
+
+    res.status(202).json({
+      data: {
+        jobId: job.id,
+        queued: true,
+        options: body,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid sync job options', details: err.errors });
+      return;
+    }
+    logger.error('Failed to enqueue local DBD/RD open data sync job', { error: err });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to enqueue local DBD/RD open data sync job' });
   }
 });
 
