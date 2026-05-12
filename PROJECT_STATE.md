@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-12 15:37 Asia/Bangkok
+Last updated: 2026-05-12 20:42 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- Desktop navigation cleanup is deployed:
+  - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
+  - Removed `ผู้ดูแลระบบ` / Admin from the main desktop navbar and moved it into the right-side user/profile menu for `admin` and `super_admin` users only.
+  - Mobile navigation still keeps Settings/Admin under the existing More sheet, matching mobile navigation expectations.
+  - Verified locally: frontend `npm run typecheck`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25738237964` succeeded in `56s`.
+  - Verified production frontend: Vercel `/app/dashboard` returned HTTP 200; production main bundle contains nav items without `/app/settings` and the user menu contains `/app/settings` plus role-gated `/app/admin`.
 - Dashboard e-Tax readiness copy is deployed:
   - Dashboard primary CTA was changed from `สร้าง e-Tax ใหม่` / `Create e-Tax` to `สร้างเอกสารขาย` / `Create sales document`, so new users can start with normal sales documents without assuming RD/e-Tax registration is already complete.
   - Dashboard hero copy no longer positions e-Tax as the first required job; it now describes document intake, sales documents, VAT, receivables, and company files.
