@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-11 21:38 Asia/Bangkok
+Last updated: 2026-05-12 09:37 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,14 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- Dashboard company Drive workspace is deployed:
+  - Claude had partially added `/api/dashboard/drive-summary` and Dashboard fetch state, but no visible UI was rendered, so users could not open company/project Drive files from Dashboard.
+  - Dashboard now shows `คลัง Google Drive ของบริษัท` with an open/create company Drive button, project Drive folder cards, Google Sheet links, and recent synced files.
+  - New `POST /api/dashboard/drive/folder` ensures the company-level `Billboy/{company}` Drive folder using company Drive owner first, then current user Drive, then service-account fallback.
+  - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25709558296` succeeded in `59s`; Render deploy run `25709558298` succeeded in `9m47s`.
+  - Production authenticated `GET /api/dashboard/drive-summary` returned HTTP 200 with `driveConfigured:true`, `oauthConfigured:true`, `driveMode:"service_account"`, `projectCount:1`, and `recentFileCount:0`.
+  - Vercel production chunk `Dashboard-DzDb_Bav.js` contains `คลัง Google Drive ของบริษัท`, `/api/dashboard/drive-summary`, and `/api/dashboard/drive/folder`.
 - Company/project spreadsheet workspace foundation is deployed:
   - New `GET /api/dashboard/month-end-workspace` returns company-month input VAT, output VAT, expense voucher, missing document, and project summary rows for Dashboard spreadsheet preview.
   - Dashboard now shows a Company Month-End Workspace preview with sheet-like tabs and attachment links, so single-user/non-project and multi-project companies can see one company-level month-end view.
