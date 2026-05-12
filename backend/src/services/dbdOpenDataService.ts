@@ -81,7 +81,7 @@ interface OpenDataSyncOptions {
 const BATCH_SIZE = parseInt(process.env.DBD_OPEN_DATA_BATCH_SIZE ?? '500', 10);
 const SEARCH_LIMIT = 10;
 const MOC_JURISTIC_API_URL = process.env.MOC_JURISTIC_API_URL ?? 'https://dataapi.moc.go.th/juristic';
-const MOC_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.MOC_JURISTIC_LOOKUP_TIMEOUT_MS ?? '2500', 10);
+const MOC_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.MOC_JURISTIC_LOOKUP_TIMEOUT_MS ?? '1500', 10);
 
 function normalizeTaxId(value: unknown) {
   if (typeof value === 'number') return String(value).replace(/\D/g, '').padStart(13, '0');
@@ -556,7 +556,7 @@ async function upsertMocJuristicRecord(record: NormalizedMocJuristicRecord) {
 }
 
 async function fetchMocJuristicRecord(taxId: string): Promise<NormalizedMocJuristicRecord | null> {
-  if (process.env.MOC_JURISTIC_LOOKUP_ENABLED === 'false') return null;
+  if (process.env.MOC_JURISTIC_LOOKUP_ENABLED !== 'true') return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(500, MOC_JURISTIC_LOOKUP_TIMEOUT_MS));
