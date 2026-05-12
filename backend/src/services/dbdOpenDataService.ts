@@ -53,6 +53,16 @@ interface NormalizedVatRecord {
   raw: RawRow;
 }
 
+interface NormalizedMocJuristicRecord {
+  taxId: string;
+  nameTh: string | null;
+  nameEn: string | null;
+  addressTh: string | null;
+  status: string | null;
+  juristicType: string | null;
+  raw: RawRow;
+}
+
 interface SyncResult {
   kind: 'dbd_juristic' | 'rd_vat';
   status: 'success' | 'skipped' | 'failed';
@@ -70,6 +80,8 @@ interface OpenDataSyncOptions {
 
 const BATCH_SIZE = parseInt(process.env.DBD_OPEN_DATA_BATCH_SIZE ?? '500', 10);
 const SEARCH_LIMIT = 10;
+const MOC_JURISTIC_API_URL = process.env.MOC_JURISTIC_API_URL ?? 'https://dataapi.moc.go.th/juristic';
+const MOC_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.MOC_JURISTIC_LOOKUP_TIMEOUT_MS ?? '2500', 10);
 
 function normalizeTaxId(value: unknown) {
   if (typeof value === 'number') return String(value).replace(/\D/g, '').padStart(13, '0');
@@ -129,6 +141,28 @@ function composeThaiAddress(row: RawRow) {
   ]);
 }
 
+function composeMocThaiAddress(row: RawRow) {
+  const addressDetail = row.addressDetail && typeof row.addressDetail === 'object'
+    ? row.addressDetail as RawRow
+    : row;
+
+  return compactJoin([
+    compactJoin([
+      pick(addressDetail, ['buildingName']),
+      pick(addressDetail, ['roomNo']),
+      pick(addressDetail, ['floor']),
+      pick(addressDetail, ['villageName']),
+      pick(addressDetail, ['houseNumber']),
+      pick(addressDetail, ['moo']),
+      pick(addressDetail, ['soi']),
+      pick(addressDetail, ['street']),
+    ]),
+    pick(addressDetail, ['subDistrict']),
+    pick(addressDetail, ['district']),
+    pick(addressDetail, ['province']),
+  ]);
+}
+
 function compactRawRow(row: RawRow): RawRow {
   return Object.fromEntries(
     Object.entries(row)
@@ -177,6 +211,21 @@ function normalizeVatRecord(row: RawRow): NormalizedVatRecord | null {
     taxId,
     vatName: pick(row, ['Name', 'OperatorName', 'VatName', 'ชื่อผู้ประกอบการ', 'ชื่อ']),
     vatAddress: composeThaiAddress(row),
+    raw: compactRawRow(row),
+  };
+}
+
+function normalizeMocJuristicRecord(row: RawRow): NormalizedMocJuristicRecord | null {
+  const taxId = normalizeTaxId(pick(row, ['juristicID', 'juristicId', 'juristic_id']));
+  if (taxId.length !== 13) return null;
+
+  return {
+    taxId,
+    nameTh: pick(row, ['juristicNameTH', 'juristicNameTh']),
+    nameEn: pick(row, ['juristicNameEN', 'juristicNameEn']),
+    addressTh: composeMocThaiAddress(row),
+    status: pick(row, ['juristicStatus']),
+    juristicType: pick(row, ['juristicType']),
     raw: compactRawRow(row),
   };
 }
@@ -465,6 +514,90 @@ async function upsertVatRecords(records: NormalizedVatRecord[]) {
   return upserted;
 }
 
+async function upsertMocJuristicRecord(record: NormalizedMocJuristicRecord) {
+  const now = new Date();
+  const raw = { moc: record.raw };
+
+  await prisma.$executeRaw`
+    INSERT INTO "juristic_open_data_cache"
+      ("id", "taxId", "nameTh", "nameEn", "addressTh", "status", "juristicType", "source", "raw", "lastSyncedAt", "updatedAt")
+    VALUES (
+      ${randomUUID()},
+      ${record.taxId},
+      ${record.nameTh},
+      ${record.nameEn},
+      ${record.addressTh},
+      ${record.status},
+      ${record.juristicType},
+      'open-dbd',
+      CAST(${JSON.stringify(raw)} AS jsonb),
+      ${now},
+      ${now}
+    )
+    ON CONFLICT ("taxId") DO UPDATE SET
+      "nameTh" = COALESCE("juristic_open_data_cache"."nameTh", EXCLUDED."nameTh"),
+      "nameEn" = COALESCE(EXCLUDED."nameEn", "juristic_open_data_cache"."nameEn"),
+      "addressTh" = CASE
+        WHEN "juristic_open_data_cache"."source" = 'rd-vat' AND "juristic_open_data_cache"."addressTh" IS NOT NULL
+        THEN "juristic_open_data_cache"."addressTh"
+        ELSE COALESCE(EXCLUDED."addressTh", "juristic_open_data_cache"."addressTh")
+      END,
+      "status" = COALESCE(EXCLUDED."status", "juristic_open_data_cache"."status"),
+      "juristicType" = COALESCE(EXCLUDED."juristicType", "juristic_open_data_cache"."juristicType"),
+      "source" = CASE
+        WHEN "juristic_open_data_cache"."source" = 'rd-vat'
+        THEN "juristic_open_data_cache"."source"
+        ELSE 'open-dbd'
+      END,
+      "raw" = COALESCE("juristic_open_data_cache"."raw", '{}'::jsonb) || EXCLUDED."raw",
+      "lastSyncedAt" = GREATEST("juristic_open_data_cache"."lastSyncedAt", EXCLUDED."lastSyncedAt"),
+      "updatedAt" = EXCLUDED."updatedAt"
+  `;
+}
+
+async function fetchMocJuristicRecord(taxId: string): Promise<NormalizedMocJuristicRecord | null> {
+  if (process.env.MOC_JURISTIC_LOOKUP_ENABLED === 'false') return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(500, MOC_JURISTIC_LOOKUP_TIMEOUT_MS));
+
+  try {
+    const url = new URL(MOC_JURISTIC_API_URL);
+    url.searchParams.set('juristic_id', taxId);
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Billboy/1.0',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      logger.warn('[MOC Open Data] Juristic lookup returned non-OK status', { status: response.status, taxId });
+      return null;
+    }
+
+    const text = await response.text();
+    if (!text.trim()) return null;
+
+    const parsed = JSON.parse(text) as unknown;
+    const candidates = findFirstArray(parsed) ?? (parsed && typeof parsed === 'object' ? [parsed] : []);
+
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const record = normalizeMocJuristicRecord(candidate as RawRow);
+      if (record?.taxId === taxId) return record;
+    }
+    return null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn('[MOC Open Data] Juristic lookup failed', { taxId, error: message });
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function syncDbdOpenData(triggeredBy = 'manual'): Promise<SyncResult> {
   const startedAt = new Date();
   try {
@@ -642,13 +775,23 @@ export async function lookupLocalJuristicProfile(user: AuthPayload, taxIdInput: 
   const taxId = normalizeTaxId(taxIdInput);
   if (taxId.length !== 13) throw new Error('Tax ID must be 13 digits');
 
-  const [verified, openData] = await Promise.all([
+  const [verified, initialOpenData] = await Promise.all([
     withRlsContext(prisma, tenantRlsContext(user), (tx) => tx.customer.findFirst({
       where: { companyId: user.companyId, isActive: true, taxId },
       orderBy: { updatedAt: 'desc' },
     })),
     prisma.juristicOpenDataCache.findUnique({ where: { taxId } }),
   ]);
+
+  let openData = initialOpenData;
+  const shouldTryMocLookup = !openData?.nameEn || !openData?.status || !openData?.juristicType;
+  if (shouldTryMocLookup) {
+    const mocRecord = await fetchMocJuristicRecord(taxId);
+    if (mocRecord) {
+      await upsertMocJuristicRecord(mocRecord);
+      openData = await prisma.juristicOpenDataCache.findUnique({ where: { taxId } });
+    }
+  }
 
   const openDataProfile = openData ? fromOpenData(openData) : null;
   const verifiedProfile = verified ? fromCustomer(verified, openDataProfile) : null;
