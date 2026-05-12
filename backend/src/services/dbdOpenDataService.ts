@@ -445,8 +445,17 @@ async function upsertVatRecords(records: NormalizedVatRecord[]) {
         "vatAddress" = EXCLUDED."vatAddress",
         "vatSource" = 'rd-vat',
         "vatLastSyncedAt" = EXCLUDED."vatLastSyncedAt",
-        "nameTh" = COALESCE("juristic_open_data_cache"."nameTh", EXCLUDED."nameTh"),
-        "addressTh" = COALESCE("juristic_open_data_cache"."addressTh", EXCLUDED."addressTh"),
+        "nameTh" = CASE
+          WHEN "juristic_open_data_cache"."source" = 'rd-vat' OR "juristic_open_data_cache"."nameTh" IS NULL
+          THEN EXCLUDED."nameTh"
+          ELSE "juristic_open_data_cache"."nameTh"
+        END,
+        "addressTh" = CASE
+          WHEN "juristic_open_data_cache"."source" = 'rd-vat' OR "juristic_open_data_cache"."addressTh" IS NULL
+          THEN EXCLUDED."addressTh"
+          ELSE "juristic_open_data_cache"."addressTh"
+        END,
+        "raw" = EXCLUDED."raw",
         "lastSyncedAt" = GREATEST("juristic_open_data_cache"."lastSyncedAt", EXCLUDED."lastSyncedAt"),
         "updatedAt" = EXCLUDED."updatedAt"
     `;
