@@ -4,6 +4,7 @@ import {
   Calculator, TrendingUp, TrendingDown, FileSpreadsheet, Loader2,
   ArrowRight, Calendar,
 } from 'lucide-react';
+import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
@@ -34,6 +35,9 @@ export default function VatSummary() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState<VatSummaryData | null>(null);
+  const [monthEnd, setMonthEnd] = useState<MonthEndWorkspace | null>(null);
+  const [monthEndError, setMonthEndError] = useState<string | null>(null);
+  const [monthEndTab, setMonthEndTab] = useState('inputVat');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<'sales' | 'purchases' | null>(null);
 
@@ -41,13 +45,29 @@ export default function VatSummary() {
     setLoading(true);
     try {
       const { from, to } = monthRange(year, month);
-      const res = await fetch(`/api/vat-summary?from=${from}&to=${to}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      setData(json.data ?? null);
-    } catch {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [vatRes, monthEndRes] = await Promise.all([
+        fetch(`/api/vat-summary?from=${from}&to=${to}`, { headers }),
+        fetch(`/api/dashboard/month-end-workspace?year=${year}&month=${month}`, { headers }),
+      ]);
+
+      if (!vatRes.ok) throw new Error(`VAT summary HTTP ${vatRes.status}`);
+      const vatJson = await vatRes.json();
+      setData(vatJson.data ?? null);
+
+      if (monthEndRes.ok) {
+        const monthEndJson = await monthEndRes.json() as { data: MonthEndWorkspace };
+        setMonthEnd(monthEndJson.data ?? null);
+        setMonthEndError(null);
+      } else {
+        const json = await monthEndRes.json().catch(() => ({})) as { error?: string; message?: string };
+        setMonthEnd(null);
+        setMonthEndError(json.error || json.message || `HTTP ${monthEndRes.status}`);
+      }
+    } catch (err) {
       setData(null);
+      setMonthEnd(null);
+      setMonthEndError(err instanceof Error ? err.message : null);
     } finally {
       setLoading(false);
     }
@@ -237,6 +257,32 @@ export default function VatSummary() {
               </div>
             </div>
           </div>
+
+          {monthEnd ? (
+            <MonthEndWorkspacePreview
+              workspace={monthEnd}
+              title={isThai ? 'ตารางปิดภาษีรายเดือน' : 'Monthly Tax Closing Workspace'}
+              description={isThai
+                ? 'มุมมองเดียวกับ Dashboard แต่โฟกัสงานปิดภาษี: ภาษีซื้อ ภาษีขาย ค่าใช้จ่าย เอกสารที่ต้องตรวจ และผลกระทบจากทุกโปรเจค'
+                : 'The same company workspace as Dashboard, focused on tax closing: input VAT, output VAT, expenses, documents to review, and project impact.'}
+              activeTab={monthEndTab}
+              onTabChange={setMonthEndTab}
+              formatCurrency={formatCurrency}
+              isThai={isThai}
+            />
+          ) : monthEndError && (
+            <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+              <p className="font-bold">{isThai ? 'ยังโหลดตารางปิดภาษีรายเดือนไม่สำเร็จ' : 'Monthly tax workspace is not showing yet'}</p>
+              <p className="mt-1">
+                {isThai
+                  ? 'สรุป VAT หลักยังใช้งานได้ แต่ตารางรวมบริษัทโหลดไม่ได้ ลองรีเฟรชหน้านี้หรือเช็ค endpoint /api/dashboard/month-end-workspace'
+                  : 'The main VAT summary is available, but the company sheet preview did not load. Refresh or check /api/dashboard/month-end-workspace.'}
+              </p>
+              <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-amber-900">
+                {monthEndError}
+              </p>
+            </section>
+          )}
 
           {/* Breakdown by VAT type */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
