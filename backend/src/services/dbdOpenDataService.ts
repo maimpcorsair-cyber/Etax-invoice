@@ -81,6 +81,7 @@ interface OpenDataSyncOptions {
 const BATCH_SIZE = parseInt(process.env.DBD_OPEN_DATA_BATCH_SIZE ?? '500', 10);
 const SEARCH_LIMIT = 10;
 const MOC_JURISTIC_API_URL = process.env.MOC_JURISTIC_API_URL ?? 'https://dataapi.moc.go.th/juristic';
+const DBD_OPENAPI_JURISTIC_API_URL = process.env.DBD_OPENAPI_JURISTIC_API_URL ?? 'https://openapi.dbd.go.th/api/v1/juristic_person';
 const MOC_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.MOC_JURISTIC_LOOKUP_TIMEOUT_MS ?? '1500', 10);
 
 function normalizeTaxId(value: unknown) {
@@ -97,6 +98,13 @@ function normalizeKey(value: string) {
   return sanitizeOpenDataText(value).toLowerCase().replace(/[\s_\-./\\()[\]:*?"'“”‘’]+/g, '');
 }
 
+function normalizedKeyCandidates(value: string) {
+  const candidates = [normalizeKey(value)];
+  const namespaceIndex = value.lastIndexOf(':');
+  if (namespaceIndex >= 0) candidates.push(normalizeKey(value.slice(namespaceIndex + 1)));
+  return candidates;
+}
+
 function readString(value: unknown) {
   if (typeof value === 'string') {
     const sanitized = sanitizeOpenDataText(value);
@@ -110,7 +118,16 @@ function readString(value: unknown) {
 function pick(row: RawRow, aliases: string[]) {
   const wanted = new Set(aliases.map(normalizeKey));
   for (const [key, value] of Object.entries(row)) {
-    if (wanted.has(normalizeKey(key))) return readString(value);
+    if (normalizedKeyCandidates(key).some((candidate) => wanted.has(candidate))) return readString(value);
+  }
+  return null;
+}
+
+function pickObject(row: RawRow, aliases: string[]): RawRow | null {
+  const wanted = new Set(aliases.map(normalizeKey));
+  for (const [key, value] of Object.entries(row)) {
+    if (!normalizedKeyCandidates(key).some((candidate) => wanted.has(candidate))) continue;
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value as RawRow;
   }
   return null;
 }
@@ -160,6 +177,36 @@ function composeMocThaiAddress(row: RawRow) {
     pick(addressDetail, ['subDistrict']),
     pick(addressDetail, ['district']),
     pick(addressDetail, ['province']),
+  ]);
+}
+
+function composeDbdOpenApiThaiAddress(row: RawRow) {
+  const address = pickObject(row, ['OrganizationJuristicAddress', 'JuristicAddress', 'addressDetail']);
+  const addressType = address ? pickObject(address, ['AddressType']) ?? address : row;
+
+  return compactJoin([
+    pick(addressType, ['Address', 'FullAddress', 'JuristicAddress']),
+    compactJoin([
+      pick(addressType, ['Building']),
+      pick(addressType, ['RoomNo']),
+      pick(addressType, ['Floor']),
+      pick(addressType, ['Village']),
+      pick(addressType, ['AddressNo', 'HouseNo']),
+      pick(addressType, ['Moo']),
+      pick(addressType, ['Soi']),
+      pick(addressType, ['Yaek']),
+      pick(addressType, ['Road']),
+    ]),
+    pickObject(addressType, ['CitySubDivision'])
+      ? pick(pickObject(addressType, ['CitySubDivision'])!, ['CitySubDivisionTextTH'])
+      : pick(addressType, ['SubDistrict', 'Subdistrict', 'Tambon']),
+    pickObject(addressType, ['City'])
+      ? pick(pickObject(addressType, ['City'])!, ['CityTextTH'])
+      : pick(addressType, ['District', 'Amphur']),
+    pickObject(addressType, ['CountrySubDivision'])
+      ? pick(pickObject(addressType, ['CountrySubDivision'])!, ['CountrySubDivisionTextTH'])
+      : pick(addressType, ['Province']),
+    pick(addressType, ['Postcode', 'ZipCode']),
   ]);
 }
 
@@ -216,18 +263,22 @@ function normalizeVatRecord(row: RawRow): NormalizedVatRecord | null {
 }
 
 function normalizeMocJuristicRecord(row: RawRow): NormalizedMocJuristicRecord | null {
-  const taxId = normalizeTaxId(pick(row, ['juristicID', 'juristicId', 'juristic_id']));
+  const taxId = normalizeTaxId(pick(row, ['juristicID', 'juristicId', 'juristic_id', 'OrganizationJuristicID']));
   if (taxId.length !== 13) return null;
 
   return {
     taxId,
-    nameTh: pick(row, ['juristicNameTH', 'juristicNameTh']),
-    nameEn: pick(row, ['juristicNameEN', 'juristicNameEn']),
-    addressTh: composeMocThaiAddress(row),
-    status: pick(row, ['juristicStatus']),
-    juristicType: pick(row, ['juristicType']),
+    nameTh: pick(row, ['juristicNameTH', 'juristicNameTh', 'OrganizationJuristicNameTH']),
+    nameEn: pick(row, ['juristicNameEN', 'juristicNameEn', 'OrganizationJuristicNameEN']),
+    addressTh: composeMocThaiAddress(row) ?? composeDbdOpenApiThaiAddress(row),
+    status: pick(row, ['juristicStatus', 'OrganizationJuristicStatus']),
+    juristicType: pick(row, ['juristicType', 'OrganizationJuristicType']),
     raw: compactRawRow(row),
   };
+}
+
+function unwrapJuristicCandidate(row: RawRow): RawRow {
+  return pickObject(row, ['OrganizationJuristicPerson', 'JuristicPerson']) ?? row;
 }
 
 function findFirstArray(value: unknown): unknown[] | null {
@@ -558,6 +609,9 @@ async function upsertMocJuristicRecord(record: NormalizedMocJuristicRecord) {
 async function fetchMocJuristicRecord(taxId: string): Promise<NormalizedMocJuristicRecord | null> {
   if (process.env.MOC_JURISTIC_LOOKUP_ENABLED !== 'true') return null;
 
+  const dbdOpenApiRecord = await fetchDbdOpenApiJuristicRecord(taxId);
+  if (dbdOpenApiRecord) return dbdOpenApiRecord;
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(500, MOC_JURISTIC_LOOKUP_TIMEOUT_MS));
 
@@ -585,13 +639,52 @@ async function fetchMocJuristicRecord(taxId: string): Promise<NormalizedMocJuris
 
     for (const candidate of candidates) {
       if (!candidate || typeof candidate !== 'object') continue;
-      const record = normalizeMocJuristicRecord(candidate as RawRow);
+      const record = normalizeMocJuristicRecord(unwrapJuristicCandidate(candidate as RawRow));
       if (record?.taxId === taxId) return record;
     }
     return null;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.warn('[MOC Open Data] Juristic lookup failed', { taxId, error: message });
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchDbdOpenApiJuristicRecord(taxId: string): Promise<NormalizedMocJuristicRecord | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(500, MOC_JURISTIC_LOOKUP_TIMEOUT_MS));
+
+  try {
+    const url = new URL(`${DBD_OPENAPI_JURISTIC_API_URL.replace(/\/$/, '')}/${taxId}`);
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Billboy/1.0',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      logger.warn('[DBD OpenAPI] Juristic lookup returned non-OK status', { status: response.status, taxId });
+      return null;
+    }
+
+    const text = await response.text();
+    if (!text.trim()) return null;
+
+    const parsed = JSON.parse(text) as unknown;
+    const candidates = findFirstArray(parsed) ?? (parsed && typeof parsed === 'object' ? [parsed] : []);
+
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const record = normalizeMocJuristicRecord(unwrapJuristicCandidate(candidate as RawRow));
+      if (record?.taxId === taxId) return record;
+    }
+    return null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn('[DBD OpenAPI] Juristic lookup failed', { taxId, error: message });
     return null;
   } finally {
     clearTimeout(timeout);

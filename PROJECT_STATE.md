@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 04:25 Asia/Bangkok
+Last updated: 2026-05-13 05:04 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -48,9 +48,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - Verified GitHub/Render: Typecheck run `25760281078` succeeded in `58s`; Render deploy run `25760281093` succeeded in `14m6s`.
     - Production resync of row range `vatStartRow:45000, vatMaxRows:1000` fixed `0105532098360` lookup from incomplete `- ณ ระนอง...` to `เอสเอสพี ทาวเวอร์ 2 116/52 15 ณ ระนอง คลองเตย คลองเตย กรุงเทพมหานคร 10110`.
   - MOC/DBD English-name enrichment foundation is implemented:
-    - `GET /api/dbd/local/lookup?taxId=...` can enrich missing `nameEn`, `status`, and `juristicType` from the free MOC Juristic API and merge it into `juristic_open_data_cache` without replacing RD VAT address data.
-    - MOC lookup is opt-in behind `MOC_JURISTIC_LOOKUP_ENABLED=true` because `https://dataapi.moc.go.th/juristic` timed out from the current local/prod test path; default is `false` with `MOC_JURISTIC_LOOKUP_TIMEOUT_MS=1500` to avoid slowing customer autofill.
-    - If MOC becomes reachable or a Thai-region/proxy path is used, enable the env and lookup will cache English names on demand. RD VAT remains the default fast source for Thai VAT name/address/status.
+    - `GET /api/dbd/local/lookup?taxId=...` can enrich missing `nameEn`, `status`, and `juristicType` from free DBD/MOC juristic APIs and merge it into `juristic_open_data_cache` without replacing RD VAT address data.
+    - Lookup is opt-in behind `MOC_JURISTIC_LOOKUP_ENABLED=true`; when enabled it now tries the faster free DBD OpenAPI path `https://openapi.dbd.go.th/api/v1/juristic_person/{taxId}` before the older MOC `https://dataapi.moc.go.th/juristic?juristic_id=...` path.
+    - Local verification on 2026-05-13: MOC `dataapi.moc.go.th` timed out after 8s, but DBD OpenAPI returned English names for `0107537001463` (`KRUNGTHAI FOOD PUBLIC COMPANY LIMITED`) and `0105532098360` (`SEALITE SHIPPING CO., LTD.`).
+    - RD VAT remains the default fast source for Thai VAT name/address/status; DBD/MOC enrichment should be enabled only when the extra lookup latency is acceptable.
   - Database risk: current compact local cache is not expected to fill the DB immediately, but full province-wide imports should stay chunked/throttled and should not store full raw rows. Re-check Render Postgres storage before importing all Thai VAT branches.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
