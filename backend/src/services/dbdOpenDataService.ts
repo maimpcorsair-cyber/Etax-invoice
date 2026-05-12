@@ -62,6 +62,12 @@ interface SyncResult {
   error?: string;
 }
 
+interface OpenDataSyncOptions {
+  startRow?: number;
+  maxRows?: number;
+  delayMs?: number;
+}
+
 const BATCH_SIZE = parseInt(process.env.DBD_OPEN_DATA_BATCH_SIZE ?? '500', 10);
 const SEARCH_LIMIT = 10;
 
@@ -325,18 +331,34 @@ async function readSourceText(kind: 'dbd' | 'vat'): Promise<{ text: string; sour
 }
 
 async function recordSyncRun(input: Omit<SyncResult, 'status'> & { status: SyncResult['status']; triggeredBy?: string; startedAt: Date }) {
-  await prisma.dbdOpenDataSyncRun.create({
-    data: {
-      kind: input.kind,
-      status: input.status,
-      source: input.source,
-      recordsRead: input.recordsRead,
-      recordsUpserted: input.recordsUpserted,
-      error: input.error,
-      triggeredBy: input.triggeredBy,
-      startedAt: input.startedAt,
-      finishedAt: new Date(),
-    },
+  try {
+    await prisma.dbdOpenDataSyncRun.create({
+      data: {
+        kind: input.kind,
+        status: input.status,
+        source: input.source,
+        recordsRead: input.recordsRead,
+        recordsUpserted: input.recordsUpserted,
+        error: input.error,
+        triggeredBy: input.triggeredBy,
+        startedAt: input.startedAt,
+        finishedAt: new Date(),
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to record DBD open data sync run', { error: err, kind: input.kind, status: input.status });
+  }
+}
+
+function clampSyncNumber(value: number | undefined, fallback: number, min: number, max: number) {
+  if (!Number.isFinite(value ?? NaN)) return fallback;
+  return Math.min(Math.max(Math.trunc(value!), min), max);
+}
+
+async function waitForSyncThrottle(delayMs: number) {
+  if (delayMs <= 0) return;
+  await new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
   });
 }
 
@@ -453,8 +475,19 @@ export async function syncDbdOpenData(triggeredBy = 'manual'): Promise<SyncResul
   }
 }
 
-export async function syncRdVatOpenData(triggeredBy = 'manual'): Promise<SyncResult> {
+export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDataSyncOptions = {}): Promise<SyncResult> {
   const startedAt = new Date();
+  const startRow = clampSyncNumber(options.startRow, 0, 0, Number.MAX_SAFE_INTEGER);
+  const maxRows = options.maxRows === undefined
+    ? undefined
+    : clampSyncNumber(options.maxRows, 0, 1, 100000);
+  const delayMs = clampSyncNumber(
+    options.delayMs,
+    parseInt(process.env.RD_VAT_SYNC_BATCH_DELAY_MS ?? '0', 10),
+    0,
+    5000
+  );
+
   try {
     const source = await readSourceText('vat');
     if (!source) {
@@ -467,13 +500,18 @@ export async function syncRdVatOpenData(triggeredBy = 'manual'): Promise<SyncRes
     let recordsUpserted = 0;
 
     if (/^\s*[\[{]/.test(source.text)) {
-      const rows = parseRows(source.text);
+      const rows = parseRows(source.text).slice(startRow, maxRows ? startRow + maxRows : undefined);
       const records = rows.map(normalizeVatRecord).filter((record): record is NormalizedVatRecord => Boolean(record));
       recordsRead = rows.length;
       recordsUpserted = await upsertVatRecords(records);
     } else {
       let batch: NormalizedVatRecord[] = [];
+      let rowIndex = 0;
       for (const row of iterateCsvRows(source.text)) {
+        rowIndex += 1;
+        if (rowIndex <= startRow) continue;
+        if (maxRows && recordsRead >= maxRows) break;
+
         recordsRead += 1;
         const record = normalizeVatRecord(row);
         if (!record) continue;
@@ -482,6 +520,7 @@ export async function syncRdVatOpenData(triggeredBy = 'manual'): Promise<SyncRes
         if (batch.length >= BATCH_SIZE) {
           recordsUpserted += await upsertVatRecords(batch);
           batch = [];
+          await waitForSyncThrottle(delayMs);
         }
       }
 
@@ -502,10 +541,10 @@ export async function syncRdVatOpenData(triggeredBy = 'manual'): Promise<SyncRes
   }
 }
 
-export async function syncAllOpenDataCaches(triggeredBy = 'manual') {
+export async function syncAllOpenDataCaches(triggeredBy = 'manual', options: { vat?: OpenDataSyncOptions } = {}) {
   const [dbd, vat] = await Promise.all([
     syncDbdOpenData(triggeredBy),
-    syncRdVatOpenData(triggeredBy),
+    syncRdVatOpenData(triggeredBy, options.vat),
   ]);
   return { dbd, vat };
 }

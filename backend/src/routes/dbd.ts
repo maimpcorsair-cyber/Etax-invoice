@@ -78,9 +78,24 @@ dbdRouter.get('/local/search', async (req, res) => {
 
 dbdRouter.post('/sync', requireRole('super_admin'), async (req, res) => {
   try {
-    const data = await syncAllOpenDataCaches(`manual:${req.user!.userId}`);
+    const body = z.object({
+      vatStartRow: z.coerce.number().int().min(0).optional(),
+      vatMaxRows: z.coerce.number().int().min(1).max(100000).optional(),
+      vatDelayMs: z.coerce.number().int().min(0).max(5000).optional(),
+    }).parse(req.body ?? {});
+    const data = await syncAllOpenDataCaches(`manual:${req.user!.userId}`, {
+      vat: {
+        startRow: body.vatStartRow,
+        maxRows: body.vatMaxRows,
+        delayMs: body.vatDelayMs,
+      },
+    });
     res.json({ data });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid sync options', details: err.errors });
+      return;
+    }
     logger.error('Failed to sync local DBD/RD open data', { error: err });
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to sync local DBD/RD open data' });
   }
