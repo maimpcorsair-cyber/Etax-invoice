@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 02:02 Asia/Bangkok
+Last updated: 2026-05-13 02:13 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -34,7 +34,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Do not run full 377k-row RD VAT import in one HTTP request on current Render/Postgres size. Continue with smaller chunks or move full weekly sync into a throttled worker/job before importing the rest.
 - RD VAT open-data background sync is deployed:
   - Added BullMQ queue endpoint `POST /api/dbd/sync/job` for super admins. It queues RD VAT sync in 1k-50k row chunks with one worker at a time and optional auto-continue delay, so full imports do not hold one HTTP request open or overload API.
-  - Verified GitHub: Typecheck run `25755157637` succeeded in `1m0s`; Render deploy run `25755157646` succeeded in `9m5s`.
+  - Verified GitHub: Typecheck run `25755918670` succeeded in `1m1s`; Render deploy run `25755918686` succeeded in `9m59s`.
   - Production `POST /api/dbd/sync/job` returned HTTP 202 and enqueued a test job. Worker consumed the job but skipped RD VAT because `RD_VAT_DATA_URL` was not configured on `etax-invoice-worker`; direct API sync of `vatStartRow:140000, vatMaxRows:1` succeeded, proving the API service env is configured.
   - `render.yaml` now declares `RD_VAT_DATA_URL` and `OPEN_DBD_DATA_URL` for both `etax-invoice-api` and `etax-invoice-worker`. Copy the same `RD_VAT_DATA_URL` value into the Render worker env before running large/background sync.
   - Database risk: current compact local cache is not expected to fill the DB immediately, but full province-wide imports should stay chunked/throttled and should not store full raw rows. Re-check Render Postgres storage before importing all Thai VAT branches.
