@@ -1747,3 +1747,68 @@ billingRouter.post('/owner/renewals/:companyId/send-reminder', authenticate, req
     res.status(500).json({ error: (err as Error).message || 'Failed to send renewal reminder' });
   }
 });
+
+billingRouter.post('/owner/tenants/:companyId/subscription-override', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const body = z.object({
+      plan: z.enum(['starter', 'business', 'enterprise']),
+      status: z.enum(['pending', 'active', 'past_due', 'canceled', 'incomplete', 'incomplete_expired', 'trialing', 'unpaid']).default('active'),
+      billingInterval: z.string().trim().min(1).max(20).default('month'),
+      currentPeriodDays: z.number().int().min(1).max(3660).default(365),
+      cancelAtPeriodEnd: z.boolean().default(false),
+      docLimit: z.number().int().positive().nullable().optional(),
+    }).parse(req.body);
+
+    const company = await withSystemRlsContext(prisma, (tx) => tx.company.findUnique({
+      where: { id: req.params.companyId },
+      select: { id: true, nameTh: true, email: true },
+    }), { role: 'owner-subscription-override' });
+
+    if (!company) {
+      res.status(404).json({ error: 'Company not found' });
+      return;
+    }
+
+    const currentPeriodStart = new Date();
+    const currentPeriodEnd = new Date(currentPeriodStart.getTime() + body.currentPeriodDays * 24 * 60 * 60 * 1000);
+    const activatedAt = body.status === 'active' || body.status === 'trialing' ? currentPeriodStart : null;
+
+    const subscription = await withSystemRlsContext(prisma, (tx) => tx.companySubscription.upsert({
+      where: { companyId: req.params.companyId },
+      create: {
+        companyId: req.params.companyId,
+        plan: body.plan,
+        status: body.status,
+        billingInterval: body.billingInterval,
+        docLimit: body.docLimit ?? null,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: body.cancelAtPeriodEnd,
+        activatedAt,
+      },
+      update: {
+        plan: body.plan,
+        status: body.status,
+        billingInterval: body.billingInterval,
+        docLimit: body.docLimit ?? null,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: body.cancelAtPeriodEnd,
+        activatedAt,
+      },
+    }), { role: 'owner-subscription-override' });
+
+    res.json({
+      data: {
+        company,
+        subscription,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    res.status(500).json({ error: (err as Error).message || 'Failed to override company subscription' });
+  }
+});
