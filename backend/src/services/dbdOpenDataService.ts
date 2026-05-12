@@ -88,6 +88,7 @@ function normalizeKey(value: string) {
 function readString(value: unknown) {
   if (typeof value === 'string') {
     const sanitized = sanitizeOpenDataText(value);
+    if (sanitized === '-' || sanitized === '–' || sanitized === '—') return null;
     return sanitized || null;
   }
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
@@ -111,9 +112,14 @@ function composeThaiAddress(row: RawRow) {
   return compactJoin([
     pick(row, ['address', 'addressTh', 'Address_TH', 'FullAddress', 'JuristicAddress', 'ที่อยู่', 'ที่ตั้งสำนักงานใหญ่']),
     compactJoin([
-      pick(row, ['HouseNo', 'house_no', 'เลขที่']),
+      pick(row, ['Building', 'BuildingName', 'ชื่ออาคาร']),
+      pick(row, ['RoomNo', 'Room', 'เลขที่ห้อง']),
+      pick(row, ['Floor', 'FloorNo', 'ชั้นที่']),
+      pick(row, ['Village', 'VillageName', 'ชื่อหมู่บ้าน']),
+      pick(row, ['HouseNo', 'house_no', 'เลขที่', 'เลขที่ตั้ง']),
       pick(row, ['Moo', 'หมู่']),
       pick(row, ['Soi', 'ซอย']),
+      pick(row, ['Yaek', 'แยก']),
       pick(row, ['Road', 'ถนน']),
     ]),
     pick(row, ['SubDistrict', 'Subdistrict', 'Tambon', 'ตำบล', 'แขวง']),
