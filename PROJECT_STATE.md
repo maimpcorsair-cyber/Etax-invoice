@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-12 23:45 Asia/Bangkok
+Last updated: 2026-05-13 00:02 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,12 +16,14 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Free DBD/RD autofill + private verified cache is implemented locally and pending deploy:
+- Free DBD/RD autofill + private verified cache is deployed:
   - Added Prisma models/migrations for `juristic_open_data_cache` and `dbd_open_data_sync_runs` in both root and backend Prisma trees.
   - Added local open-data APIs: `GET /api/dbd/local/lookup?taxId=...`, `GET /api/dbd/local/search?q=...`, `GET /api/dbd/local/status`, and super-admin `POST /api/dbd/sync`.
   - Added weekly BullMQ worker `dbd-open-data-sync` with default cron `0 3 * * 0`; data source envs are `OPEN_DBD_DATA_URL` or `OPEN_DBD_DATA_FILE`, plus `RD_VAT_DATA_URL` or `RD_VAT_DATA_FILE`.
   - Customer create/edit modal now has a free open-data search panel and Tax ID lookup button; existing tenant `customers` data acts as the private Billboy verified cache before open public data.
   - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25749095286` succeeded in `1m2s`; Render deploy run `25749095291` succeeded in `10m9s`.
+  - Production `GET /api/health` returned HTTP 200; authenticated `GET /api/dbd/local/status` returned HTTP 200 with `dbdCount:0`, `vatCount:0`, and no sync runs yet because open-data source envs have not been configured/synced.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
   - Removed `ผู้ดูแลระบบ` / Admin from the main desktop navbar and moved it into the right-side user/profile menu for `admin` and `super_admin` users only.
