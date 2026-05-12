@@ -7,7 +7,7 @@
   "nav": {
     "dashboard": "แดชบอร์ด",
     "invoices": "ใบกำกับภาษี",
-    "createInvoice": "สร้างใบกำกับภาษี",
+    "createInvoice": "สร้างเอกสารขาย",
     "receipts": "ใบเสร็จรับเงิน",
     "customers": "ลูกค้า",
     "products": "สินค้า/บริการ",
@@ -63,7 +63,7 @@
     "recentInvoices": "ใบกำกับภาษีล่าสุด",
     "viewAll": "ดูทั้งหมด",
     "quickActions": "การดำเนินการด่วน",
-    "createNew": "สร้างใบกำกับภาษีใหม่",
+    "createNew": "สร้างเอกสารขายใหม่",
     "chart": {
       "monthly": "รายรับรายเดือน",
       "status": "สถานะเอกสาร"

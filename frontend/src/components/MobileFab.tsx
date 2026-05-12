@@ -16,7 +16,7 @@ export default function MobileFab() {
       <div
         className="fixed bottom-20 right-5 z-40 lg:hidden w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg opacity-50 cursor-not-allowed"
         aria-disabled="true"
-        aria-label="สร้างใบกำกับภาษี / Create Invoice"
+        aria-label="สร้างเอกสารขาย / Create Sales Document"
       >
         <Plus className="w-6 h-6 text-white" strokeWidth={2.5} />
       </div>
@@ -27,7 +27,7 @@ export default function MobileFab() {
     <Link
       to="/app/invoices/new"
       className="fixed bottom-20 right-5 z-40 lg:hidden w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 flex items-center justify-center shadow-lg active:scale-90 transition-transform"
-      aria-label="สร้างใบกำกับภาษี / Create Invoice"
+      aria-label="สร้างเอกสารขาย / Create Sales Document"
     >
       <Plus className="w-6 h-6 text-white" strokeWidth={2.5} />
     </Link>

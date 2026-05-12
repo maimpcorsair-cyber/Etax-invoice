@@ -380,8 +380,8 @@ export default function Dashboard() {
     {
       key: 'issue',
       icon: FileCheck2,
-      label: isThai ? 'ออก e-Tax' : 'Issue e-Tax',
-      title: isThai ? 'สร้าง PDF/XML พร้อมตรวจ' : 'Generate PDF/XML with preview',
+      label: isThai ? 'ออกเอกสารขาย' : 'Issue documents',
+      title: isThai ? 'สร้างใบขาย PDF พร้อมตรวจ' : 'Generate sales PDFs with preview',
       status: stats ? `${stats.pendingCount}` : '—',
     },
     {
@@ -449,11 +449,11 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Command Center */}
       <PageHeader
-        eyebrow={isThai ? 'AI Tax Command Center' : 'AI Tax Command Center'}
+        eyebrow={isThai ? 'Billboy Command Center' : 'Billboy Command Center'}
         title={isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
         description={isThai
-          ? `สวัสดี ${user?.name ?? ''} ระบบรวมงานเอกสารเข้า, e-Tax, RD, VAT และลูกหนี้ไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
-          : `Hi ${user?.name ?? ''}. This workspace brings document intake, e-Tax, RD, VAT, and receivables into one daily operating view.`}
+          ? `สวัสดี ${user?.name ?? ''} ระบบรวมงานเอกสารเข้า เอกสารขาย VAT ลูกหนี้ และไฟล์บริษัทไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
+          : `Hi ${user?.name ?? ''}. This workspace brings document intake, sales documents, VAT, receivables, and company files into one daily operating view.`}
         icon={<Bot className="h-3.5 w-3.5" />}
         mascot="hero"
         actions={(
@@ -464,7 +464,7 @@ export default function Dashboard() {
             </Link>
             <Link to="/app/invoices/new" className="btn-secondary">
               <Plus className="h-4 w-4" />
-              {isThai ? 'สร้าง e-Tax ใหม่' : 'Create e-Tax'}
+              {isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
             </Link>
           </>
         )}
@@ -505,6 +505,34 @@ export default function Dashboard() {
           {error}
         </div>
       )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-slate-950">
+                {isThai ? 'e-Tax เปิดใช้ได้เมื่อบริษัทพร้อม' : 'e-Tax is available when the company is ready'}
+              </p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                {isThai
+                  ? 'ผู้ใช้สามารถเริ่มจากสร้างเอกสารขายและจัดเก็บภาษีได้ก่อน ส่วนการส่ง e-Tax ไป RD ต้องตั้งค่าบริษัทและลงทะเบียนกับกรมสรรพากรให้เรียบร้อย ระบบจะช่วยพาไปทีละขั้นเมื่อพร้อมใช้งานจริง'
+                  : 'Teams can start by creating sales documents and organizing VAT first. RD e-Tax submission only becomes part of the flow after the company registration and settings are ready.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/app/settings" className="btn-secondary text-sm">
+              {isThai ? 'ตั้งค่าบริษัท' : 'Company settings'}
+            </Link>
+            <Link to="/app/admin" className="btn-primary text-sm">
+              {isThai ? 'ดูขั้นตอน e-Tax' : 'View e-Tax setup'}
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Company month-end sheet preview */}
       {monthEnd ? (
@@ -906,7 +934,7 @@ export default function Dashboard() {
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: isThai ? 'ใบกำกับภาษี' : 'Tax Invoice', href: '/app/invoices/new' },
+            { label: isThai ? 'เอกสารขาย' : 'Sales document', href: '/app/invoices/new' },
             { label: isThai ? 'ใบเสร็จรับเงิน' : 'Receipt', href: '/app/invoices/new?type=receipt' },
             { label: isThai ? 'ใบลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note' },
             { label: isThai ? 'รายการ/ส่งออก' : 'List / Export', href: '/app/invoices' },
@@ -928,10 +956,10 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="font-semibold text-gray-900">
-              {isThai ? 'สถานะการส่ง e-Tax ไปยัง RD' : 'RD e-Tax Submission Status'}
+              {isThai ? 'สถานะส่งเอกสารให้ RD เมื่อเปิดใช้ e-Tax' : 'RD submission status when e-Tax is enabled'}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              {isThai ? 'ครบถ้วนตาม ประมวลรัษฎากร ม. 86/6 · กำหนดส่งทุกวันที่ 15 ของเดือนถัดไป' : 'Per Revenue Code §86/6 · Deadline: 15th of following month'}
+              {isThai ? 'สำหรับบริษัทที่ตั้งค่า e-Tax/RD แล้ว · กำหนดส่งทุกวันที่ 15 ของเดือนถัดไป' : 'For companies with e-Tax/RD settings enabled · Deadline: 15th of following month'}
             </p>
           </div>
         </div>
@@ -1061,9 +1089,9 @@ export default function Dashboard() {
                 <tr>
                   <td colSpan={6} className="table-cell text-center py-10">
                     <EmptyState
-                      title={isThai ? 'ยังไม่มีใบกำกับภาษี' : 'No invoices yet'}
-                      description={isThai ? 'สร้างเอกสารใบแรก แล้ว Billoy จะช่วยติดตามสถานะ RD และการชำระเงินให้' : 'Create the first document and Billoy will help track RD and payment status.'}
-                      actionLabel={isThai ? 'สร้างใบใหม่' : 'Create invoice'}
+                      title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
+                      description={isThai ? 'สร้างเอกสารใบแรกก่อน แล้วค่อยเปิด workflow e-Tax/RD เมื่อบริษัทลงทะเบียนและตั้งค่าพร้อม' : 'Create the first document now, then enable the e-Tax/RD workflow after registration and setup are ready.'}
+                      actionLabel={isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
                       actionHref="/app/invoices/new"
                     />
                   </td>

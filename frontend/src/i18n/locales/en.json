@@ -7,7 +7,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "invoices": "Invoices",
-    "createInvoice": "Create Invoice",
+    "createInvoice": "Create Sales Document",
     "receipts": "Receipts",
     "customers": "Customers",
     "products": "Products / Services",
@@ -63,7 +63,7 @@
     "recentInvoices": "Recent Invoices",
     "viewAll": "View All",
     "quickActions": "Quick Actions",
-    "createNew": "Create New Invoice",
+    "createNew": "Create New Sales Document",
     "chart": {
       "monthly": "Monthly Revenue",
       "status": "Document Status"
