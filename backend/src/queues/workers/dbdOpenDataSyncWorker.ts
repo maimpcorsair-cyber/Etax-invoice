@@ -18,6 +18,10 @@ function clamp(value: number | undefined, fallback: number, min: number, max: nu
   return Math.min(Math.max(Math.trunc(value!), min), max);
 }
 
+function toSafeJobIdPart(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80);
+}
+
 (async () => {
   await dbdOpenDataSyncQueue.add(
     'weekly-open-data-sync',
@@ -74,7 +78,7 @@ export const dbdOpenDataSyncWorker = new Worker<DbdOpenDataSyncJobData>(
         },
         {
           delay: delayBetweenJobsMs,
-          jobId: `rd-vat-open-data-sync-${job.data.triggeredBy}-${nextStartRow}`,
+          jobId: `rd-vat-open-data-sync-${toSafeJobIdPart(job.data.triggeredBy)}-${nextStartRow}`,
         },
       );
       logger.info('[DBD Open Data] Next RD VAT chunk queued', { nextStartRow, vatMaxRows, delayBetweenJobsMs });
