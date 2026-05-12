@@ -142,6 +142,7 @@ function normalizeVatRecord(row: RawRow): NormalizedVatRecord | null {
     'tin',
     'เลขประจำตัวผู้เสียภาษี',
     'เลขผู้เสียภาษี',
+    'เลขผู้เสียภาษีอากร',
   ]));
   if (taxId.length !== 13) return null;
 
@@ -226,6 +227,19 @@ function parseRows(text: string): RawRow[] {
   }
 }
 
+function decodeSourceBuffer(buffer: Buffer, kind: 'dbd' | 'vat') {
+  const preferredEncoding = kind === 'vat'
+    ? (process.env.RD_VAT_DATA_ENCODING ?? process.env.VAT_OPEN_DATA_ENCODING ?? 'windows-874')
+    : (process.env.OPEN_DBD_DATA_ENCODING ?? process.env.DBD_OPEN_DATA_ENCODING ?? 'utf-8');
+  const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+  try {
+    return new TextDecoder(preferredEncoding).decode(bytes);
+  } catch {
+    return buffer.toString('utf8');
+  }
+}
+
 async function readSourceText(kind: 'dbd' | 'vat'): Promise<{ text: string; source: string } | null> {
   const url = kind === 'dbd'
     ? process.env.OPEN_DBD_DATA_URL ?? process.env.DBD_OPEN_DATA_URL
@@ -235,13 +249,13 @@ async function readSourceText(kind: 'dbd' | 'vat'): Promise<{ text: string; sour
     : process.env.RD_VAT_DATA_FILE ?? process.env.VAT_OPEN_DATA_FILE;
 
   if (file?.trim()) {
-    return { text: await readFile(file.trim(), 'utf8'), source: file.trim() };
+    return { text: decodeSourceBuffer(await readFile(file.trim()), kind), source: file.trim() };
   }
 
   if (url?.trim()) {
     const res = await fetch(url.trim());
     if (!res.ok) throw new Error(`${kind.toUpperCase()} open data returned ${res.status}`);
-    return { text: await res.text(), source: url.trim() };
+    return { text: decodeSourceBuffer(Buffer.from(await res.arrayBuffer()), kind), source: url.trim() };
   }
 
   return null;
