@@ -71,12 +71,19 @@ function normalizeTaxId(value: unknown) {
   return value.replace(/\D/g, '');
 }
 
+function sanitizeOpenDataText(value: string) {
+  return value.replace(/\u0000/g, '').trim();
+}
+
 function normalizeKey(value: string) {
-  return value.toLowerCase().replace(/[\s_\-./\\()[\]:*?"'“”‘’]+/g, '');
+  return sanitizeOpenDataText(value).toLowerCase().replace(/[\s_\-./\\()[\]:*?"'“”‘’]+/g, '');
 }
 
 function readString(value: unknown) {
-  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'string') {
+    const sanitized = sanitizeOpenDataText(value);
+    return sanitized || null;
+  }
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   return null;
 }
@@ -182,7 +189,7 @@ function findFirstArray(value: unknown): unknown[] | null {
 function csvRowToObject(headers: string[], values: string[]): RawRow {
   const output: RawRow = {};
   headers.forEach((header, index) => {
-    output[header] = values[index]?.trim() ?? '';
+    output[sanitizeOpenDataText(header)] = sanitizeOpenDataText(values[index] ?? '');
   });
   return output;
 }
@@ -237,7 +244,7 @@ function* iterateCsvRows(text: string): Generator<RawRow> {
     }
 
     if (!headers) {
-      headers = row.map((header) => header.trim().replace(/^\uFEFF/, ''));
+      headers = row.map((header) => sanitizeOpenDataText(header).replace(/^\uFEFF/, ''));
     } else {
       yield csvRowToObject(headers, row);
     }
@@ -290,9 +297,9 @@ function decodeSourceBuffer(buffer: Buffer, kind: 'dbd' | 'vat') {
   const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
   try {
-    return new TextDecoder(preferredEncoding).decode(bytes);
+    return new TextDecoder(preferredEncoding).decode(bytes).replace(/\u0000/g, '');
   } catch {
-    return buffer.toString('utf8');
+    return buffer.toString('utf8').replace(/\u0000/g, '');
   }
 }
 
