@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-12 09:37 Asia/Bangkok
+Last updated: 2026-05-12 14:21 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,19 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- VAT Summary now shares the company month-end spreadsheet preview with Dashboard:
+  - New shared frontend component `frontend/src/components/monthEnd/MonthEndWorkspacePreview.tsx` renders the company-month tabs for Input VAT, Output VAT, Expenses/PV, Missing Docs, and Project Summary.
+  - Dashboard now uses the shared component instead of its local duplicate table logic, keeping the Dashboard and VAT Summary table structure aligned.
+  - `สรุปภาษี / VAT Summary` now fetches `GET /api/dashboard/month-end-workspace?year=&month=` for the selected VAT period and shows `ตารางปิดภาษีรายเดือน` below the VAT KPI cards.
+  - Verified locally: frontend `npm run typecheck`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25719601267` succeeded in `56s`.
+  - Verified production frontend: Vercel `/app/vat-summary` returned HTTP 200; production chunks include `VatSummary-8wl5BoNT.js` with `ตารางปิดภาษีรายเดือน` and `MonthEndWorkspacePreview-BIw2wEI5.js` with the shared Input VAT / Output VAT / Project Summary tabs.
+- Owner subscription override is deployed and used in production:
+  - New super-admin endpoint `POST /api/billing/owner/tenants/:companyId/subscription-override` can upsert a tenant subscription directly for manual testing, internal support, or emergency plan correction without Stripe checkout.
+  - Verified locally before deploy: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25714512039` succeeded in `57s`; Render deploy run `25714512017` succeeded in `10m30s`.
+  - Production tenant `cmogtxytr0017wruwc6ffd2iy` (`jukgrapat@gmail.com`, company `บริษัท พงศ์ธวัช กรุ๊ป 66 จำกัด`) was upgraded manually to `enterprise`, `status:"active"`, `billingInterval:"month"`, `currentPeriodEnd:"2027-05-12T05:14:50.339Z"`.
+  - Production verification after tenant switch: authenticated `GET /api/billing/access-policy` returned HTTP 200 with `plan:"enterprise"`, `isSubscriptionActive:true`, all premium/project/LINE/Google export flags `true`, and unlimited caps (`maxUsers`, `maxDocumentsPerMonth`, `maxProjects`, `maxLineGroups` all `null`).
 - Dashboard company Drive workspace is deployed:
   - Claude had partially added `/api/dashboard/drive-summary` and Dashboard fetch state, but no visible UI was rendered, so users could not open company/project Drive files from Dashboard.
   - Dashboard now shows `คลัง Google Drive ของบริษัท` with an open/create company Drive button, project Drive folder cards, Google Sheet links, and recent synced files.
