@@ -110,6 +110,14 @@ function composeThaiAddress(row: RawRow) {
   ]);
 }
 
+function compactRawRow(row: RawRow): RawRow {
+  return Object.fromEntries(
+    Object.entries(row)
+      .map(([key, value]) => [key.trim(), readString(value)] as const)
+      .filter(([key, value]) => Boolean(key) && Boolean(value))
+  );
+}
+
 function normalizeDbdRecord(row: RawRow): NormalizedDbdRecord | null {
   const taxId = normalizeTaxId(pick(row, [
     'OrganizationJuristicID',
@@ -130,7 +138,7 @@ function normalizeDbdRecord(row: RawRow): NormalizedDbdRecord | null {
     addressTh: composeThaiAddress(row),
     status: pick(row, ['JuristicStatus', 'Status', 'สถานะ', 'สถานะนิติบุคคล']),
     juristicType: pick(row, ['JuristicType', 'JuristicTypeName', 'Type', 'ประเภท', 'ประเภทนิติบุคคล']),
-    raw: row,
+    raw: compactRawRow(row),
   };
 }
 
@@ -150,7 +158,7 @@ function normalizeVatRecord(row: RawRow): NormalizedVatRecord | null {
     taxId,
     vatName: pick(row, ['Name', 'OperatorName', 'VatName', 'ชื่อผู้ประกอบการ', 'ชื่อ']),
     vatAddress: composeThaiAddress(row),
-    raw: row,
+    raw: compactRawRow(row),
   };
 }
 
@@ -169,6 +177,14 @@ function findFirstArray(value: unknown): unknown[] | null {
     if (found) return found;
   }
   return null;
+}
+
+function csvRowToObject(headers: string[], values: string[]): RawRow {
+  const output: RawRow = {};
+  headers.forEach((header, index) => {
+    output[header] = values[index]?.trim() ?? '';
+  });
+  return output;
 }
 
 function parseCsv(text: string): RawRow[] {
@@ -204,13 +220,53 @@ function parseCsv(text: string): RawRow[] {
   if (rows.length < 2) return [];
 
   const headers = rows[0].map((header) => header.trim().replace(/^\uFEFF/, ''));
-  return rows.slice(1).map((values) => {
-    const output: RawRow = {};
-    headers.forEach((header, index) => {
-      output[header] = values[index]?.trim() ?? '';
-    });
-    return output;
-  });
+  return rows.slice(1).map((values) => csvRowToObject(headers, values));
+}
+
+function* iterateCsvRows(text: string): Generator<RawRow> {
+  let cell = '';
+  let row: string[] = [];
+  let quoted = false;
+  let headers: string[] | null = null;
+
+  const flushRow = function* (): Generator<RawRow> {
+    if (!row.some((item) => item.trim())) {
+      row = [];
+      cell = '';
+      return;
+    }
+
+    if (!headers) {
+      headers = row.map((header) => header.trim().replace(/^\uFEFF/, ''));
+    } else {
+      yield csvRowToObject(headers, row);
+    }
+    row = [];
+    cell = '';
+  };
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      row.push(cell);
+      cell = '';
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && next === '\n') index += 1;
+      row.push(cell);
+      yield* flushRow();
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell);
+  yield* flushRow();
 }
 
 function parseRows(text: string): RawRow[] {
@@ -325,7 +381,7 @@ async function upsertVatRecords(records: NormalizedVatRecord[]) {
   const now = new Date();
 
   for (let index = 0; index < records.length; index += BATCH_SIZE) {
-    const batch = records.slice(index, index + BATCH_SIZE);
+    const batch = Array.from(new Map(records.slice(index, index + BATCH_SIZE).map((record) => [record.taxId, record])).values());
     if (batch.length === 0) continue;
 
     const values = batch.map((record) => Prisma.sql`(
@@ -400,10 +456,34 @@ export async function syncRdVatOpenData(triggeredBy = 'manual'): Promise<SyncRes
       return result;
     }
 
-    const rows = parseRows(source.text);
-    const records = rows.map(normalizeVatRecord).filter((record): record is NormalizedVatRecord => Boolean(record));
-    const recordsUpserted = await upsertVatRecords(records);
-    const result: SyncResult = { kind: 'rd_vat', status: 'success', source: source.source, recordsRead: rows.length, recordsUpserted };
+    let recordsRead = 0;
+    let recordsUpserted = 0;
+
+    if (/^\s*[\[{]/.test(source.text)) {
+      const rows = parseRows(source.text);
+      const records = rows.map(normalizeVatRecord).filter((record): record is NormalizedVatRecord => Boolean(record));
+      recordsRead = rows.length;
+      recordsUpserted = await upsertVatRecords(records);
+    } else {
+      let batch: NormalizedVatRecord[] = [];
+      for (const row of iterateCsvRows(source.text)) {
+        recordsRead += 1;
+        const record = normalizeVatRecord(row);
+        if (!record) continue;
+        batch.push(record);
+
+        if (batch.length >= BATCH_SIZE) {
+          recordsUpserted += await upsertVatRecords(batch);
+          batch = [];
+        }
+      }
+
+      if (batch.length > 0) {
+        recordsUpserted += await upsertVatRecords(batch);
+      }
+    }
+
+    const result: SyncResult = { kind: 'rd_vat', status: 'success', source: source.source, recordsRead, recordsUpserted };
     await recordSyncRun({ ...result, triggeredBy, startedAt });
     return result;
   } catch (err) {
