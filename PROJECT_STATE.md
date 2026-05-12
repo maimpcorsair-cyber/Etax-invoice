@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 02:52 Asia/Bangkok
+Last updated: 2026-05-13 03:43 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -42,6 +42,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Fixed BullMQ continuation job IDs by sanitizing `triggeredBy` before using it in delayed chunk `jobId` (`3f93c03`). This matters because `manual:user...` IDs can prevent the next delayed chunk from being queued.
   - Verified GitHub/Render after the continuation fix: Typecheck run `25757604447` succeeded in `1m5s`; Render deploy run `25757604422` succeeded in `12m9s`.
   - Production auto-continue now works: continuation from `vatStartRow:151000` successfully chained multiple 10k chunks. Latest observed cache after chained chunks: `dbdCount:140493`, `vatCount:140493`; recent RD VAT chunks completed with `recordsUpserted:9046`, `8691`, and `9087`.
+  - RD VAT address parsing fix is deployed:
+    - Added support for real RD CSV address columns: `ชื่ออาคาร`, `เลขที่ห้อง`, `ชั้นที่`, `ชื่อหมู่บ้าน`, `เลขที่ตั้ง`, and `แยก`; `-` placeholder values are now ignored.
+    - Fixed RD VAT upsert so `addressTh` is refreshed when the existing cache row source is `rd-vat`, not only `vatAddress`.
+    - Verified GitHub/Render: Typecheck run `25760281078` succeeded in `58s`; Render deploy run `25760281093` succeeded in `14m6s`.
+    - Production resync of row range `vatStartRow:45000, vatMaxRows:1000` fixed `0105532098360` lookup from incomplete `- ณ ระนอง...` to `เอสเอสพี ทาวเวอร์ 2 116/52 15 ณ ระนอง คลองเตย คลองเตย กรุงเทพมหานคร 10110`.
   - Database risk: current compact local cache is not expected to fill the DB immediately, but full province-wide imports should stay chunked/throttled and should not store full raw rows. Re-check Render Postgres storage before importing all Thai VAT branches.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
