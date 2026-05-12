@@ -6,6 +6,7 @@ import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { rdComplianceQueue } from '../queues/rdComplianceQueue';
+import { ensureCompanyDriveFolder, isDriveConfigured, isUserDriveOAuthConfigured } from '../services/googleDriveService';
 
 export const dashboardRouter = Router();
 
@@ -89,7 +90,7 @@ dashboardRouter.get('/integration-status', async (req, res) => {
       }),
       prisma.user.findUnique({
         where: { id: req.user!.userId },
-        select: { email: true, googleSub: true },
+        select: { email: true, googleSub: true, googleRefreshToken: true },
       }),
     ]);
 
@@ -98,10 +99,8 @@ dashboardRouter.get('/integration-status', async (req, res) => {
       || process.env.GOOGLE_APPLICATION_CREDENTIALS
       || process.env.GOOGLE_CLIENT_EMAIL
     );
-    const googleDriveConfigured = !!(
-      process.env.GOOGLE_DRIVE_ENABLED === 'true'
-      || process.env.GOOGLE_DRIVE_FOLDER_ID
-    );
+    const currentUserHasDrive = !!user?.googleRefreshToken;
+    const googleDriveConfigured = isDriveConfigured() || currentUserHasDrive;
 
     res.json({
       data: {
@@ -558,6 +557,165 @@ dashboardRouter.get('/rd-compliance', async (req, res) => {
   } catch (err) {
     logger.error('Failed to fetch RD compliance stats', { err });
     res.status(500).json({ error: 'Failed to fetch RD compliance stats' });
+  }
+});
+
+/* ─── GET /api/dashboard/drive-summary ─── */
+dashboardRouter.get('/drive-summary', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+
+    const [company, currentUser, projects, recentFiles] = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return Promise.all([
+        tx.company.findUnique({
+          where: { id: companyId },
+          select: {
+            nameTh: true,
+            nameEn: true,
+            email: true,
+            googleDriveOwnerUserId: true,
+            googleDriveOwnerLinkedAt: true,
+          },
+        }),
+        tx.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { id: true, email: true, googleRefreshToken: true, googleDriveLinkedAt: true },
+        }),
+        tx.project.findMany({
+          where: { companyId, status: { not: 'archived' } },
+          orderBy: { updatedAt: 'desc' },
+          take: 50,
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            status: true,
+            driveFolderUrl: true,
+            googleSheetUrl: true,
+            _count: {
+              select: {
+                documentIntakes: {
+                  where: { driveUrl: { not: null } },
+                },
+              },
+            },
+          },
+        }),
+        tx.documentIntake.findMany({
+          where: {
+            companyId,
+            driveUrl: { not: null },
+          },
+          orderBy: { driveSyncedAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            fileName: true,
+            driveUrl: true,
+            driveFolderUrl: true,
+            source: true,
+            driveSyncedAt: true,
+            project: { select: { code: true, name: true } },
+          },
+        }),
+      ]);
+    });
+
+    const driveConnected = !!currentUser?.googleRefreshToken;
+    const driveConfigured = isDriveConfigured();
+    const companyDriveOwner = company?.googleDriveOwnerUserId
+      ? await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.user.findFirst({
+        where: { id: company.googleDriveOwnerUserId!, companyId },
+        select: { id: true, email: true, name: true, googleDriveLinkedAt: true },
+      }))
+      : null;
+
+    res.json({
+      data: {
+        companyName: company?.nameEn ?? company?.nameTh ?? null,
+        driveConnected,
+        driveConfigured,
+        oauthConfigured: isUserDriveOAuthConfigured(),
+        linkedAt: currentUser?.googleDriveLinkedAt ?? null,
+        companyDriveOwner: companyDriveOwner
+          ? {
+              id: companyDriveOwner.id,
+              email: companyDriveOwner.email,
+              name: companyDriveOwner.name,
+              linkedAt: companyDriveOwner.googleDriveLinkedAt,
+            }
+          : null,
+        driveMode: companyDriveOwner ? 'company_owner' : (driveConnected ? 'current_user' : (driveConfigured ? 'service_account' : 'not_configured')),
+        projects: projects.map((p) => ({
+          id: p.id,
+          code: p.code,
+          name: p.name,
+          status: p.status,
+          driveFolderUrl: p.driveFolderUrl,
+          googleSheetUrl: p.googleSheetUrl,
+          fileCount: p._count.documentIntakes,
+        })),
+        recentFiles: recentFiles.map((f) => ({
+          id: f.id,
+          fileName: f.fileName ?? f.id,
+          driveUrl: f.driveUrl,
+          driveFolderUrl: f.driveFolderUrl,
+          projectName: f.project?.name ?? null,
+          projectCode: f.project?.code ?? null,
+          source: f.source,
+          driveSyncedAt: f.driveSyncedAt,
+        })),
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to load drive summary', { error: err });
+    res.status(500).json({ error: 'Failed to load drive summary' });
+  }
+});
+
+/* ─── POST /api/dashboard/drive/folder ─── */
+dashboardRouter.post('/drive/folder', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+
+    const { company, currentUser, companyOwner } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const [companyRecord, userRecord] = await Promise.all([
+        tx.company.findUnique({
+          where: { id: companyId },
+          select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
+        }),
+        tx.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { email: true, googleRefreshToken: true },
+        }),
+      ]);
+      const owner = companyRecord?.googleDriveOwnerUserId
+        ? await tx.user.findFirst({
+          where: { id: companyRecord.googleDriveOwnerUserId, companyId },
+          select: { email: true, googleRefreshToken: true },
+        })
+        : null;
+      return { company: companyRecord, currentUser: userRecord, companyOwner: owner };
+    });
+
+    const companyName = company?.nameEn ?? company?.nameTh ?? companyId;
+    const selectedRefreshToken = companyOwner?.googleRefreshToken ?? currentUser?.googleRefreshToken ?? null;
+    const folder = await ensureCompanyDriveFolder({
+      companyName,
+      userRefreshToken: selectedRefreshToken,
+      shareWithEmails: [company?.email, companyOwner?.email, currentUser?.email].filter(Boolean) as string[],
+    });
+
+    res.json({
+      data: {
+        folderId: folder.folderId,
+        folderUrl: folder.folderUrl,
+        userDrive: folder.userDrive,
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to ensure company Drive folder', { error: err });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create company Drive folder' });
   }
 });
 

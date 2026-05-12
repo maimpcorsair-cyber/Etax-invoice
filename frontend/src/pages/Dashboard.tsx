@@ -20,6 +20,9 @@ import {
   Sparkles,
   ShieldCheck,
   ExternalLink,
+  FolderOpen,
+  FileText,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { EmptyState, MetricCard, PageHeader, MascotHelperCard } from '../components/ui/AppChrome';
 import { useLanguage } from '../hooks/useLanguage';
@@ -115,6 +118,44 @@ interface MonthEndWorkspace {
     missingDocs: Array<Record<string, unknown>>;
     projectSummary: Array<Record<string, unknown>>;
   };
+}
+
+interface DriveSummaryProject {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  driveFolderUrl: string | null;
+  googleSheetUrl: string | null;
+  fileCount: number;
+}
+
+interface DriveSummaryFile {
+  id: string;
+  fileName: string;
+  driveUrl: string | null;
+  driveFolderUrl: string | null;
+  projectName: string | null;
+  projectCode: string | null;
+  source: string;
+  driveSyncedAt: string | null;
+}
+
+interface DriveSummary {
+  companyName: string | null;
+  driveConnected: boolean;
+  driveConfigured: boolean;
+  oauthConfigured: boolean;
+  linkedAt: string | null;
+  companyDriveOwner: {
+    id: string;
+    email: string;
+    name: string;
+    linkedAt: string | null;
+  } | null;
+  driveMode: 'company_owner' | 'current_user' | 'service_account' | 'not_configured';
+  projects: DriveSummaryProject[];
+  recentFiles: DriveSummaryFile[];
 }
 
 function SkeletonCard() {
@@ -270,6 +311,10 @@ export default function Dashboard() {
   const [monthEnd, setMonthEnd] = useState<MonthEndWorkspace | null>(null);
   const [monthEndError, setMonthEndError] = useState<string | null>(null);
   const [monthEndTab, setMonthEndTab] = useState('inputVat');
+  const [driveSummary, setDriveSummary] = useState<DriveSummary | null>(null);
+  const [driveSummaryError, setDriveSummaryError] = useState<string | null>(null);
+  const [driveConnecting, setDriveConnecting] = useState(false);
+  const [driveOpening, setDriveOpening] = useState(false);
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -283,12 +328,13 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [statsRes, invRes, integrationRes, docStatsRes, monthEndRes] = await Promise.all([
+        const [statsRes, invRes, integrationRes, docStatsRes, monthEndRes, driveSummaryRes] = await Promise.all([
           fetch('/api/dashboard/stats', { headers }),
           fetch('/api/invoices?limit=5', { headers }),
           fetch('/api/dashboard/integration-status', { headers }),
           fetch('/api/purchase-invoices/document-intakes/stats/summary', { headers }),
           fetch('/api/dashboard/month-end-workspace', { headers }),
+          fetch('/api/dashboard/drive-summary', { headers }),
         ]);
 
         if (!statsRes.ok) throw new Error(isThai ? 'โหลดสถิติไม่สำเร็จ' : 'Failed to load stats');
@@ -312,11 +358,21 @@ export default function Dashboard() {
           setMonthEndError(json.error || json.message || `HTTP ${monthEndRes.status}`);
         }
 
+        let driveSummaryJson: { data: DriveSummary | null } = { data: null };
+        if (driveSummaryRes.ok) {
+          driveSummaryJson = await driveSummaryRes.json() as { data: DriveSummary };
+          setDriveSummaryError(null);
+        } else {
+          const json = await driveSummaryRes.json().catch(() => ({})) as { error?: string; message?: string };
+          setDriveSummaryError(json.error || json.message || `HTTP ${driveSummaryRes.status}`);
+        }
+
         setStats(statsJson.data);
         setRecentInvoices(invJson.data ?? []);
         setIntegrations(integrationJson.data);
         setDocumentStats(docStatsJson.data);
         setMonthEnd(monthEndJson.data);
+        setDriveSummary(driveSummaryJson.data);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -544,6 +600,56 @@ export default function Dashboard() {
     },
   ];
 
+  async function handleConnectDrive() {
+    if (!token) return;
+    setDriveConnecting(true);
+    try {
+      const res = await fetch('/api/drive/connect?returnPath=/app/dashboard', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json() as { data: { url: string } };
+        window.location.href = json.data.url;
+      }
+    } catch {
+      setDriveConnecting(false);
+    }
+  }
+
+  async function handleOpenCompanyDrive() {
+    if (!token) return;
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    setDriveOpening(true);
+    try {
+      const res = await fetch('/api/dashboard/drive/folder', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        throw new Error(json.error || json.message || `HTTP ${res.status}`);
+      }
+      const json = await res.json() as { data: { folderUrl: string } };
+      if (popup) {
+        popup.location.href = json.data.folderUrl;
+      } else {
+        window.location.href = json.data.folderUrl;
+      }
+      setDriveSummary((current) => current
+        ? {
+            ...current,
+            driveConfigured: true,
+          }
+        : current);
+      setDriveSummaryError(null);
+    } catch (err) {
+      popup?.close();
+      setDriveSummaryError((err as Error).message);
+    } finally {
+      setDriveOpening(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Command Center */}
@@ -651,6 +757,186 @@ export default function Dashboard() {
           )}
         </section>
       )}
+
+      {/* Company Drive workspace */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <HardDrive className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-base font-bold text-slate-950">
+                  {isThai ? 'คลัง Google Drive ของบริษัท' : 'Company Google Drive Workspace'}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {isThai
+                    ? 'เปิดโฟลเดอร์ Billboy ของบริษัท ดูไฟล์รวม ภาษีซื้อ ภาษีขาย ค่าใช้จ่าย และโฟลเดอร์โปรเจคย่อยจากหน้า Dashboard'
+                    : 'Open the company Billboy folder with all files, tax evidence, expenses, and nested project folders from the Dashboard.'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {driveSummary?.driveConnected ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {isThai ? 'Drive user พร้อม' : 'User Drive ready'}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnectDrive}
+                disabled={driveConnecting || driveSummary?.oauthConfigured === false}
+                className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <UserCheck className="h-4 w-4" />
+                {driveConnecting ? (isThai ? 'กำลังเชื่อม...' : 'Connecting...') : (isThai ? 'เชื่อม Drive ของเจ้าของ' : 'Connect owner Drive')}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleOpenCompanyDrive}
+              disabled={driveOpening || driveSummary?.driveConfigured === false}
+              className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FolderOpen className="h-4 w-4" />
+              {driveOpening ? (isThai ? 'กำลังเปิด...' : 'Opening...') : (isThai ? 'เปิด/สร้าง Drive บริษัท' : 'Open company Drive')}
+            </button>
+          </div>
+        </div>
+
+        {driveSummaryError && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="font-bold">{isThai ? 'ยังโหลด/เปิด Drive workspace ไม่สำเร็จ' : 'Drive workspace is not ready yet'}</p>
+            <p className="mt-1 font-mono text-xs">{driveSummaryError}</p>
+          </div>
+        )}
+
+        <div className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  {isThai ? 'โฟลเดอร์โปรเจคในบริษัท' : 'Project folders'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {driveSummary?.companyName ?? user?.company?.nameTh ?? user?.company?.nameEn ?? 'Billboy'}
+                  {driveSummary?.driveMode && (
+                    <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      {driveSummary.driveMode === 'company_owner'
+                        ? (isThai ? 'ใช้ Drive เจ้าของบริษัท' : 'Company owner Drive')
+                        : driveSummary.driveMode === 'current_user'
+                          ? (isThai ? 'ใช้ Drive ผู้ใช้นี้' : 'Current user Drive')
+                          : driveSummary.driveMode === 'service_account'
+                            ? (isThai ? 'ใช้ Drive กลางระบบ' : 'Service account Drive')
+                            : (isThai ? 'ยังไม่ตั้งค่า Drive' : 'Drive not configured')}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <Link to="/app/projects" className="inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:text-primary-800">
+                {isThai ? 'ดูโปรเจคทั้งหมด' : 'All projects'}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            {driveSummary?.projects?.length ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {driveSummary.projects.slice(0, 6).map((project) => (
+                  <div key={project.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-950">{project.code} · {project.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {isThai ? `${project.fileCount} ไฟล์ใน Drive` : `${project.fileCount} Drive files`} · {project.status}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                        {project.fileCount}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link to={`/app/projects/${project.id}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                        {isThai ? 'เปิดในระบบ' : 'Open workspace'}
+                      </Link>
+                      {project.driveFolderUrl && (
+                        <a href={project.driveFolderUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
+                          Drive
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                      {project.googleSheetUrl && (
+                        <a href={project.googleSheetUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                          Sheet
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                {isThai ? 'ยังไม่มีโฟลเดอร์โปรเจคที่ sync เข้า Drive' : 'No project Drive folders have been synced yet.'}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  {isThai ? 'ไฟล์ล่าสุดที่ sync แล้ว' : 'Recent synced files'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {isThai ? 'กดเปิดไฟล์จริงใน Drive หรือกลับไปดูโปรเจคต้นทาง' : 'Open the real Drive file or jump back to its project.'}
+                </p>
+              </div>
+            </div>
+
+            {driveSummary?.recentFiles?.length ? (
+              <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+                {driveSummary.recentFiles.map((file) => (
+                  <div key={file.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                        <FileText className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-900">{file.fileName}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {file.projectCode ? `${file.projectCode} · ${file.projectName ?? ''}` : (isThai ? 'ไฟล์ระดับบริษัท' : 'Company file')}
+                          {file.driveSyncedAt ? ` · ${formatDate(file.driveSyncedAt)}` : ''}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {file.driveUrl && (
+                            <a href={file.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-primary-50 px-2 py-1 text-xs font-bold text-primary-700 hover:bg-primary-100">
+                              <LinkIcon className="h-3.5 w-3.5" />
+                              {isThai ? 'เปิดไฟล์' : 'Open file'}
+                            </a>
+                          )}
+                          {file.driveFolderUrl && (
+                            <a href={file.driveFolderUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                              <FolderOpen className="h-3.5 w-3.5" />
+                              {isThai ? 'โฟลเดอร์' : 'Folder'}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                {isThai ? 'ยังไม่มีไฟล์ที่ sync เข้า Drive จาก LINE/เว็บ/โปรเจค' : 'No files have been synced from LINE, web upload, or projects yet.'}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* RD Compliance Alert (if there are issues) */}
       {!complianceLoading && hasComplianceIssue && (

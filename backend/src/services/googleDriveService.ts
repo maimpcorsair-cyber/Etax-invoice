@@ -322,6 +322,24 @@ export async function ensureProjectDriveFolder(input: {
   };
 }
 
+export async function ensureCompanyDriveFolder(input: {
+  companyName: string;
+  userRefreshToken?: string | null;
+  shareWithEmails?: string[];
+}): Promise<{ folderId: string; folderUrl: string; userDrive: boolean }> {
+  const { auth, userDrive } = buildDriveAuth(input.userRefreshToken);
+  const driveClient = google.drive({ version: 'v3', auth: auth as never });
+  const folder = await ensureProjectFolder(driveClient, input.companyName);
+  if (!userDrive) {
+    await shareDriveFileWithEmails(driveClient, folder.targetFolderId, input.shareWithEmails, 'writer');
+  }
+  return {
+    folderId: folder.targetFolderId,
+    folderUrl: folder.targetFolderUrl,
+    userDrive,
+  };
+}
+
 /**
  * Upload a file to Google Drive.
  * Prefers per-user OAuth (refreshToken) when available; falls back to service account.
