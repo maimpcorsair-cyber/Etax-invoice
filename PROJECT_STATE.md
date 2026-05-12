@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 02:28 Asia/Bangkok
+Last updated: 2026-05-13 02:52 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -39,6 +39,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - `render.yaml` now declares `RD_VAT_DATA_URL` and `OPEN_DBD_DATA_URL` for both `etax-invoice-api` and `etax-invoice-worker`. Copy the same `RD_VAT_DATA_URL` value into the Render worker env before running large/background sync.
   - Worker env was configured and verified in production: `POST /api/dbd/sync/job` with `vatStartRow:140000, vatMaxRows:1000, autoContinue:false` completed with RD VAT `status:success`, `recordsRead:1000`, `recordsUpserted:812`.
   - A throttled continuation job was queued from `vatStartRow:141000` with `vatMaxRows:10000`, `delayBetweenJobsMs:30000`, `continueUntilRow:400000`, and `autoContinue:true`. First 10k chunk completed with `recordsRead:10000`, `recordsUpserted:9138`.
+  - Fixed BullMQ continuation job IDs by sanitizing `triggeredBy` before using it in delayed chunk `jobId` (`3f93c03`). This matters because `manual:user...` IDs can prevent the next delayed chunk from being queued.
+  - Verified GitHub/Render after the continuation fix: Typecheck run `25757604447` succeeded in `1m5s`; Render deploy run `25757604422` succeeded in `12m9s`.
+  - Production auto-continue now works: continuation from `vatStartRow:151000` successfully chained multiple 10k chunks. Latest observed cache after chained chunks: `dbdCount:140493`, `vatCount:140493`; recent RD VAT chunks completed with `recordsUpserted:9046`, `8691`, and `9087`.
   - Database risk: current compact local cache is not expected to fill the DB immediately, but full province-wide imports should stay chunked/throttled and should not store full raw rows. Re-check Render Postgres storage before importing all Thai VAT branches.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
