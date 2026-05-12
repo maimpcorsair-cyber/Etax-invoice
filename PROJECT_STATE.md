@@ -50,6 +50,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - MOC/DBD English-name enrichment foundation is implemented:
     - `GET /api/dbd/local/lookup?taxId=...` can enrich missing `nameEn`, `status`, and `juristicType` from free DBD/MOC juristic APIs and merge it into `juristic_open_data_cache` without replacing RD VAT address data.
     - Lookup is opt-in behind `MOC_JURISTIC_LOOKUP_ENABLED=true`; when enabled it now tries the faster free DBD OpenAPI path `https://openapi.dbd.go.th/api/v1/juristic_person/{taxId}` before the older MOC `https://dataapi.moc.go.th/juristic?juristic_id=...` path.
+    - Verified customer profiles now fallback to open-data `nameEn` when the tenant's saved customer has no English name, so old customer records no longer hide newly enriched English names.
     - Local verification on 2026-05-13: MOC `dataapi.moc.go.th` timed out after 8s, but DBD OpenAPI returned English names for `0107537001463` (`KRUNGTHAI FOOD PUBLIC COMPANY LIMITED`) and `0105532098360` (`SEALITE SHIPPING CO., LTD.`).
     - Deployed commit `a635bed`; GitHub Typecheck run `25765207650` succeeded and Render deploy run `25765207572` succeeded in `12m38s`.
     - RD VAT remains the default fast source for Thai VAT name/address/status; DBD/MOC enrichment should be enabled only when the extra lookup latency is acceptable.

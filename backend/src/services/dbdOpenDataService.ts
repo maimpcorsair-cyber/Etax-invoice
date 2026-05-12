@@ -844,11 +844,11 @@ function fromCustomer(customer: {
   return {
     taxId: customer.taxId,
     nameTh: customer.nameTh,
-    nameEn: customer.nameEn,
+    nameEn: customer.nameEn ?? openData?.nameEn ?? null,
     addressTh: customer.addressTh,
     branchCode: customer.branchCode ?? '00000',
     branchNameTh: customer.branchNameTh,
-    branchNameEn: customer.branchNameEn,
+    branchNameEn: customer.branchNameEn ?? openData?.branchNameEn ?? null,
     email: customer.email,
     phone: customer.phone,
     contactPerson: customer.contactPerson,
