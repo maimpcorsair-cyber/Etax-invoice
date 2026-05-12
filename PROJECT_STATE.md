@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 00:02 Asia/Bangkok
+Last updated: 2026-05-13 01:32 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -24,6 +24,14 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Verified locally: backend `npm run typecheck`, frontend `npm run typecheck`, backend `npm run build`, frontend `npm run build`, and `git diff --check` passed.
   - Verified GitHub: Typecheck run `25749095286` succeeded in `1m2s`; Render deploy run `25749095291` succeeded in `10m9s`.
   - Production `GET /api/health` returned HTTP 200; authenticated `GET /api/dbd/local/status` returned HTTP 200 with `dbdCount:0`, `vatCount:0`, and no sync runs yet because open-data source envs have not been configured/synced.
+- RD VAT open-data production sync hotfix is deployed:
+  - Render env `RD_VAT_DATA_URL` is configured with the RD Bangkok VAT CSV source; `OPEN_DBD_DATA_URL` is still not configured, so DBD juristic sync currently skips and only RD VAT local cache is populated.
+  - Added Windows-874/TIS-620 decoding, Thai header alias `เลขผู้เสียภาษีอากร`, null-byte sanitizing, compact raw row storage, streaming CSV parsing, and manual chunk options for `POST /api/dbd/sync` (`vatStartRow`, `vatMaxRows`, `vatDelayMs`).
+  - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub/Render: Typecheck runs `25751103663`, `25751892472`, `25752537219`, and `25753489585` succeeded; Render deploy runs `25751103580`, `25751892367`, `25752537145`, and `25753489632` succeeded.
+  - Production manual sync initially exposed DB pressure with full-file import; chunked sync is now the safe path. Current production cache after chunked imports: `dbdCount:116851`, `vatCount:116851`.
+  - Production verified: `GET /api/dbd/local/lookup?taxId=0100508000326` returns `บริษัท เชฟรอน (ไทย) จำกัด` with VAT registered data, and `GET /api/dbd/local/search?q=เชฟรอน` returns matching dropdown suggestions.
+  - Do not run full 377k-row RD VAT import in one HTTP request on current Render/Postgres size. Continue with smaller chunks or move full weekly sync into a throttled worker/job before importing the rest.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
   - Removed `ผู้ดูแลระบบ` / Admin from the main desktop navbar and moved it into the right-side user/profile menu for `admin` and `super_admin` users only.
