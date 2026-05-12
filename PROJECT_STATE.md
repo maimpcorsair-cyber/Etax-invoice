@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-12 14:21 Asia/Bangkok
+Last updated: 2026-05-12 15:37 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,15 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- Dashboard e-Tax readiness copy is deployed:
+  - Dashboard primary CTA was changed from `สร้าง e-Tax ใหม่` / `Create e-Tax` to `สร้างเอกสารขาย` / `Create sales document`, so new users can start with normal sales documents without assuming RD/e-Tax registration is already complete.
+  - Dashboard hero copy no longer positions e-Tax as the first required job; it now describes document intake, sales documents, VAT, receivables, and company files.
+  - Added a Dashboard readiness card explaining that e-Tax/RD submission is available after company setup and RD registration, with links to company settings and e-Tax setup.
+  - Dashboard automation and RD panels now label e-Tax/RD as an optional enabled workflow (`สถานะส่งเอกสารให้ RD เมื่อเปิดใช้ e-Tax`) instead of implying every tenant is already registered.
+  - Global quick-create labels and mobile FAB aria labels now use `สร้างเอกสารขาย` / `Create Sales Document` instead of `สร้างใบกำกับภาษี` where the label is a generic create action.
+  - Verified locally: frontend `npm run typecheck`, frontend `npm run build`, and `git diff --check` passed.
+  - Verified GitHub: Typecheck run `25723182714` succeeded in `55s`.
+  - Verified production frontend: Vercel `/app/dashboard` returned HTTP 200; production chunk `Dashboard-Szdct9pq.js` contains `Billboy Command Center`, `สร้างเอกสารขาย`, and `e-Tax เปิดใช้ได้เมื่อบริษัทพร้อม`, and no longer contains the old dashboard CTA string `สร้าง e-Tax ใหม่`.
 - VAT Summary now shares the company month-end spreadsheet preview with Dashboard:
   - New shared frontend component `frontend/src/components/monthEnd/MonthEndWorkspacePreview.tsx` renders the company-month tabs for Input VAT, Output VAT, Expenses/PV, Missing Docs, and Project Summary.
   - Dashboard now uses the shared component instead of its local duplicate table logic, keeping the Dashboard and VAT Summary table structure aligned.
