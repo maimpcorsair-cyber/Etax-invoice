@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -23,6 +23,42 @@ const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> 
   personalId: '',
 };
 
+interface DbdLocalSuggestion {
+  taxId: string;
+  nameTh: string | null;
+  nameEn: string | null;
+  addressTh: string | null;
+  branchCode: string;
+  branchNameTh: string | null;
+  branchNameEn: string | null;
+  email: string | null;
+  phone: string | null;
+  contactPerson: string | null;
+  status: string | null;
+  juristicType: string | null;
+  source: 'billboy-verified' | 'open-dbd' | 'rd-vat';
+  lastSyncedAt: string | null;
+  vatRegistered: boolean;
+  vatName: string | null;
+  vatAddress: string | null;
+  vatLastSyncedAt: string | null;
+  verifiedByThisCompany: boolean;
+}
+
+interface DbdLookupResponse {
+  data?: {
+    profile: DbdLocalSuggestion | null;
+    verifiedProfile: DbdLocalSuggestion | null;
+    openDataProfile: DbdLocalSuggestion | null;
+  };
+  error?: string;
+}
+
+interface DbdSearchResponse {
+  data?: DbdLocalSuggestion[];
+  error?: string;
+}
+
 export default function Customers() {
   const { t } = useTranslation();
   const { isThai } = useLanguage();
@@ -37,6 +73,11 @@ export default function Customers() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [dbdQuery, setDbdQuery] = useState('');
+  const [dbdSuggestions, setDbdSuggestions] = useState<DbdLocalSuggestion[]>([]);
+  const [dbdLoading, setDbdLoading] = useState(false);
+  const [dbdNotice, setDbdNotice] = useState('');
+  const [appliedDbdSuggestion, setAppliedDbdSuggestion] = useState<DbdLocalSuggestion | null>(null);
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
@@ -70,6 +111,51 @@ export default function Customers() {
     return () => clearTimeout(t);
   }, [fetchCustomers]);
 
+  useEffect(() => {
+    if (!showModal || !token) return;
+    const trimmed = dbdQuery.trim();
+    const digits = trimmed.replace(/\D/g, '');
+    if (trimmed.length < 3 && digits.length < 3) {
+      setDbdSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setDbdLoading(true);
+      try {
+        const q = digits.length >= 3 ? digits : trimmed;
+        const res = await fetch(`/api/dbd/local/search?q=${encodeURIComponent(q)}&limit=10`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        const json = await res.json() as DbdSearchResponse;
+        if (!res.ok) throw new Error(json.error ?? 'Search failed');
+        setDbdSuggestions(json.data ?? []);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setDbdSuggestions([]);
+          setDbdNotice(err instanceof Error ? err.message : 'Search failed');
+        }
+      } finally {
+        if (!controller.signal.aborted) setDbdLoading(false);
+      }
+    }, 450);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [dbdQuery, showModal, token]);
+
+  function resetDbdAssist() {
+    setDbdQuery('');
+    setDbdSuggestions([]);
+    setDbdLoading(false);
+    setDbdNotice('');
+    setAppliedDbdSuggestion(null);
+  }
+
   function openCreate() {
     if (policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers) {
       setError(isThai ? 'ถึงจำนวนลูกค้าสูงสุดของแพ็กเกจแล้ว' : 'You reached the customer limit for this plan');
@@ -78,6 +164,7 @@ export default function Customers() {
     setEditing(null);
     setForm(EMPTY_FORM);
     setError('');
+    resetDbdAssist();
     setShowModal(true);
   }
 
@@ -98,6 +185,7 @@ export default function Customers() {
       personalId: c.personalId ?? '',
     });
     setError('');
+    resetDbdAssist();
     setShowModal(true);
   }
 
@@ -140,6 +228,67 @@ export default function Customers() {
 
   const field = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  function sourceLabel(suggestion: DbdLocalSuggestion) {
+    if (suggestion.verifiedByThisCompany) return isThai ? 'ข้อมูลที่บริษัทนี้เคยยืนยัน' : 'Company verified';
+    if (suggestion.vatRegistered) return isThai ? 'ข้อมูลเปิด + VAT' : 'Open data + VAT';
+    return isThai ? 'ข้อมูลเปิด DBD' : 'Open DBD';
+  }
+
+  function formatSyncDate(value: string | null) {
+    if (!value) return isThai ? 'ยังไม่ทราบวันอัปเดต' : 'No sync date';
+    return new Date(value).toLocaleDateString(isThai ? 'th-TH' : 'en-US');
+  }
+
+  function applyDbdSuggestion(suggestion: DbdLocalSuggestion) {
+    setForm((prev) => ({
+      ...prev,
+      nameTh: suggestion.nameTh ?? prev.nameTh,
+      nameEn: suggestion.nameEn ?? prev.nameEn ?? '',
+      taxId: suggestion.taxId || prev.taxId,
+      branchCode: suggestion.branchCode ?? prev.branchCode ?? '00000',
+      branchNameTh: suggestion.branchNameTh ?? prev.branchNameTh ?? '',
+      branchNameEn: suggestion.branchNameEn ?? prev.branchNameEn ?? '',
+      addressTh: suggestion.addressTh ?? suggestion.vatAddress ?? prev.addressTh,
+      email: suggestion.email ?? prev.email ?? '',
+      phone: suggestion.phone ?? prev.phone ?? '',
+      contactPerson: suggestion.contactPerson ?? prev.contactPerson ?? '',
+    }));
+    setAppliedDbdSuggestion(suggestion);
+    setDbdNotice(
+      isThai
+        ? `เติมข้อมูลจาก ${sourceLabel(suggestion)} แล้ว กรุณาตรวจอีกครั้งก่อนบันทึก`
+        : `Applied ${sourceLabel(suggestion)}. Please review before saving.`,
+    );
+    setDbdQuery(suggestion.nameTh ?? suggestion.nameEn ?? suggestion.taxId);
+    setDbdSuggestions([]);
+  }
+
+  async function lookupTaxIdFromOpenData() {
+    if (!token || form.taxId.length !== 13) {
+      setDbdNotice(isThai ? 'กรุณากรอกเลขผู้เสียภาษี 13 หลักก่อน' : 'Enter a 13-digit tax ID first');
+      return;
+    }
+
+    setDbdLoading(true);
+    setDbdNotice('');
+    try {
+      const res = await fetch(`/api/dbd/local/lookup?taxId=${encodeURIComponent(form.taxId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json() as DbdLookupResponse;
+      if (!res.ok) throw new Error(json.error ?? 'Lookup failed');
+      if (!json.data?.profile) {
+        setDbdNotice(isThai ? 'ไม่พบข้อมูลใน cache เปิด กรอกเองต่อได้' : 'No open-data match. You can continue manually.');
+        return;
+      }
+      applyDbdSuggestion(json.data.profile);
+    } catch (err) {
+      setDbdNotice(err instanceof Error ? err.message : 'Lookup failed');
+    } finally {
+      setDbdLoading(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -340,6 +489,74 @@ export default function Customers() {
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
               )}
 
+              <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
+                      <Database className="h-4 w-4" />
+                      {isThai ? 'ช่วยเติมข้อมูลบริษัทจากข้อมูลเปิดฟรี' : 'Free open-data company autofill'}
+                    </div>
+                    <p className="mt-1 text-xs text-teal-700">
+                      {isThai
+                        ? 'ค้นจากข้อมูล DBD/RD ที่ sync ไว้ใน Billboy และข้อมูลลูกค้าที่บริษัทนี้เคยยืนยันแล้ว'
+                        : 'Search Billboy local DBD/RD cache plus this company’s verified customer data.'}
+                    </p>
+                  </div>
+                  {appliedDbdSuggestion && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-medium text-teal-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {sourceLabel(appliedDbdSuggestion)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-500" />
+                  <input
+                    value={dbdQuery}
+                    onChange={(e) => setDbdQuery(e.target.value)}
+                    className="input-field pl-9 bg-white"
+                    placeholder={isThai ? 'พิมพ์ชื่อบริษัทหรือเลขผู้เสียภาษีอย่างน้อย 3 ตัว...' : 'Type company name or at least 3 tax ID digits...'}
+                  />
+                  {dbdLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-teal-500" />
+                  )}
+                </div>
+
+                {dbdSuggestions.length > 0 && (
+                  <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-teal-100 bg-white shadow-sm">
+                    {dbdSuggestions.map((suggestion) => (
+                      <button
+                        key={`${suggestion.taxId}-${suggestion.branchCode}-${suggestion.source}`}
+                        type="button"
+                        onClick={() => applyDbdSuggestion(suggestion)}
+                        className="w-full border-b border-slate-50 px-3 py-2 text-left text-sm last:border-0 hover:bg-teal-50"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-semibold text-slate-900">{suggestion.nameTh ?? suggestion.vatName ?? suggestion.taxId}</div>
+                            <div className="mt-0.5 text-xs text-slate-500">
+                              {suggestion.taxId} · {isThai ? 'สาขา' : 'branch'} {suggestion.branchCode}
+                              {suggestion.vatRegistered ? ` · ${isThai ? 'จด VAT' : 'VAT registered'}` : ''}
+                            </div>
+                            {(suggestion.addressTh ?? suggestion.vatAddress) && (
+                              <div className="mt-1 line-clamp-2 text-xs text-slate-500">{suggestion.addressTh ?? suggestion.vatAddress}</div>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700">
+                            {sourceLabel(suggestion)}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {dbdNotice && (
+                  <p className="mt-2 text-xs text-teal-700">{dbdNotice}</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">{t('customer.nameTh')} *</label>
@@ -357,9 +574,21 @@ export default function Customers() {
                 </div>
                 <div>
                   <label className="label">{t('customer.taxId')} * (13 {isThai ? 'หลัก' : 'digits'})</label>
-                  <input value={form.taxId} onChange={(e) => field('taxId', digitsOnly(e.target.value, 13))} className={guardedInputClass(formValidation.taxId, 'font-mono')} placeholder="0000000000000" inputMode="numeric" maxLength={13} />
+                  <div className="flex gap-2">
+                    <input value={form.taxId} onChange={(e) => field('taxId', digitsOnly(e.target.value, 13))} className={guardedInputClass(formValidation.taxId, 'font-mono')} placeholder="0000000000000" inputMode="numeric" maxLength={13} />
+                    <button
+                      type="button"
+                      onClick={lookupTaxIdFromOpenData}
+                      disabled={dbdLoading || form.taxId.length !== 13}
+                      className="inline-flex min-w-fit items-center gap-1 rounded-lg border border-teal-200 bg-white px-3 text-xs font-medium text-teal-700 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {dbdLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
+                      {isThai ? 'ดึงข้อมูล' : 'Lookup'}
+                    </button>
+                  </div>
                   <p className={inputGuide(formValidation.taxId)}>
                     {isThai ? `ตัวเลข ${form.taxId.length}/13 หลัก` : `${form.taxId.length}/13 digits`}
+                    {appliedDbdSuggestion?.taxId === form.taxId ? ` · ${sourceLabel(appliedDbdSuggestion)} · ${formatSyncDate(appliedDbdSuggestion.lastSyncedAt)}` : ''}
                   </p>
                 </div>
                 <div>

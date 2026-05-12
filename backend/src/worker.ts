@@ -14,6 +14,7 @@ async function startWorkers() {
     import('./queues/workers/rdComplianceWorker'),
     import('./queues/workers/billingRenewalWorker'),
     import('./queues/workers/overdueReminderWorker'),
+    import('./queues/workers/dbdOpenDataSyncWorker'),
   ]);
 
   const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');

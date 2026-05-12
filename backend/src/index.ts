@@ -121,6 +121,7 @@ app.listen(PORT, () => {
     import('./queues/workers/rdComplianceWorker'), // cron: runs on 10th of each month
     import('./queues/workers/billingRenewalWorker'), // cron: runs daily for renewal reminders
     import('./queues/workers/overdueReminderWorker'), // cron: runs daily at 08:00 for overdue Line notifications
+    import('./queues/workers/dbdOpenDataSyncWorker'), // cron: syncs free DBD/RD open data weekly
   ]).then((results) => {
     const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     if (rejected.length === 0) {

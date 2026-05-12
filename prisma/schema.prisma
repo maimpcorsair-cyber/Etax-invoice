@@ -135,9 +135,9 @@ model Company {
   expenseLimit Decimal? @db.Decimal(12, 2)
 
   // Storage quota
-  storageUsedBytes  BigInt @default(0)
-  storageQuotaBytes BigInt @default(524288000) // 500MB
-  googleDriveOwnerUserId String?
+  storageUsedBytes         BigInt    @default(0)
+  storageQuotaBytes        BigInt    @default(524288000) // 500MB
+  googleDriveOwnerUserId   String?
   googleDriveOwnerLinkedAt DateTime?
 
   // Line OA settings
@@ -151,19 +151,19 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users               User[]
-  customers           Customer[]
-  products            Product[]
-  invoices            Invoice[]
-  subscription        CompanySubscription?
-  billingTransactions BillingTransaction[]
-  purchaseInvoices    PurchaseInvoice[]
+  users                 User[]
+  customers             Customer[]
+  products              Product[]
+  invoices              Invoice[]
+  subscription          CompanySubscription?
+  billingTransactions   BillingTransaction[]
+  purchaseInvoices      PurchaseInvoice[]
   projectPurchaseOrders ProjectPurchaseOrder[]
-  projects            Project[]
-  expenseVouchers     ExpenseVoucher[]
-  pettyCash           PettyCash?
-  lineGroupLinks      LineGroupLink[]
-  whtCertificates     WhtCertificate[]
+  projects              Project[]
+  expenseVouchers       ExpenseVoucher[]
+  pettyCash             PettyCash?
+  lineGroupLinks        LineGroupLink[]
+  whtCertificates       WhtCertificate[]
 
   @@map("companies")
 }
@@ -184,20 +184,20 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoices         Invoice[]         @relation("CreatedBy")
-  auditLogs        AuditLog[]
-  fcmTokens        FcmToken[]
-  purchaseInvoices PurchaseInvoice[] @relation("PurchaseCreatedBy")
-  expenseVouchers  ExpenseVoucher[]  @relation("ExpenseVoucherCreatedBy")
-  ownedProjects    Project[]         @relation("ProjectOwner")
-  approvedProjects Project[]         @relation("ProjectApprover")
-  createdProjects  Project[]         @relation("ProjectCreatedBy")
-  projectMembers   ProjectMember[]
-  lineUserLink     LineUserLink?
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices           Invoice[]           @relation("CreatedBy")
+  auditLogs          AuditLog[]
+  fcmTokens          FcmToken[]
+  purchaseInvoices   PurchaseInvoice[]   @relation("PurchaseCreatedBy")
+  expenseVouchers    ExpenseVoucher[]    @relation("ExpenseVoucherCreatedBy")
+  ownedProjects      Project[]           @relation("ProjectOwner")
+  approvedProjects   Project[]           @relation("ProjectApprover")
+  createdProjects    Project[]           @relation("ProjectCreatedBy")
+  projectMembers     ProjectMember[]
+  lineUserLink       LineUserLink?
   lineProjectMembers LineProjectMember[]
-  linkedLineGroups LineGroupLink[]   @relation("LineGroupLinkedBy")
-  driveOAuthStates DriveOAuthState[]
+  linkedLineGroups   LineGroupLink[]     @relation("LineGroupLinkedBy")
+  driveOAuthStates   DriveOAuthState[]
 
   @@index([companyId])
   // List active users per company (user management page)
@@ -252,6 +252,49 @@ model Customer {
   // Customer list page always filters by isActive within a company
   @@index([companyId, isActive])
   @@map("customers")
+}
+
+model JuristicOpenDataCache {
+  id           String  @id @default(cuid())
+  taxId        String  @unique
+  nameTh       String?
+  nameEn       String?
+  addressTh    String?
+  status       String?
+  juristicType String?
+  source       String  @default("open-dbd")
+  raw          Json?
+
+  vatRegistered   Boolean   @default(false)
+  vatName         String?
+  vatAddress      String?
+  vatSource       String?
+  vatLastSyncedAt DateTime?
+
+  lastSyncedAt DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([taxId])
+  @@index([status])
+  @@map("juristic_open_data_cache")
+}
+
+model DbdOpenDataSyncRun {
+  id              String    @id @default(cuid())
+  kind            String
+  status          String
+  source          String?
+  recordsRead     Int       @default(0)
+  recordsUpserted Int       @default(0)
+  error           String?
+  triggeredBy     String?
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+
+  @@index([kind, startedAt])
+  @@index([status, startedAt])
+  @@map("dbd_open_data_sync_runs")
 }
 
 model Product {
@@ -563,41 +606,41 @@ model DocumentTemplate {
 }
 
 model Project {
-  id           String        @id @default(cuid())
-  companyId    String
-  code         String
-  name         String
-  description  String?
-  customerName String?
-  budgetAmount Decimal       @default(0) @db.Decimal(14, 2)
-  status       ProjectStatus @default(active)
-  ownerId      String?
-  approverId   String?
-  startDate    DateTime?
-  endDate      DateTime?
-  metadata     Json?
-  driveFolderId  String?
-  driveFolderUrl String?
-  googleSheetId  String?
-  googleSheetUrl String?
+  id                  String        @id @default(cuid())
+  companyId           String
+  code                String
+  name                String
+  description         String?
+  customerName        String?
+  budgetAmount        Decimal       @default(0) @db.Decimal(14, 2)
+  status              ProjectStatus @default(active)
+  ownerId             String?
+  approverId          String?
+  startDate           DateTime?
+  endDate             DateTime?
+  metadata            Json?
+  driveFolderId       String?
+  driveFolderUrl      String?
+  googleSheetId       String?
+  googleSheetUrl      String?
   googleSheetSyncedAt DateTime?
-  createdBy    String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdBy           String
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
-  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  owner            User?             @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  approver         User?             @relation("ProjectApprover", fields: [approverId], references: [id], onDelete: SetNull)
-  creator          User              @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
-  members          ProjectMember[]
-  invoices         Invoice[]
-  purchaseInvoices PurchaseInvoice[]
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner                 User?                  @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  approver              User?                  @relation("ProjectApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  creator               User                   @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
+  members               ProjectMember[]
+  invoices              Invoice[]
+  purchaseInvoices      PurchaseInvoice[]
   projectPurchaseOrders ProjectPurchaseOrder[]
-  documentIntakes  DocumentIntake[]
-  documentComments DocumentComment[]
-  expenseVouchers  ExpenseVoucher[]
-  lineGroupLinks   LineGroupLink[]
-  lineProjectMembers LineProjectMember[]
+  documentIntakes       DocumentIntake[]
+  documentComments      DocumentComment[]
+  expenseVouchers       ExpenseVoucher[]
+  lineGroupLinks        LineGroupLink[]
+  lineProjectMembers    LineProjectMember[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -624,12 +667,12 @@ model ProjectMember {
 }
 
 model ProjectPurchaseOrder {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   companyId        String
   projectId        String
   documentIntakeId String?
   poNumber         String
-  documentType     String   @default("purchase_order")
+  documentType     String    @default("purchase_order")
   vendorName       String?
   vendorTaxId      String?
   issueDate        DateTime?
@@ -637,12 +680,12 @@ model ProjectPurchaseOrder {
   subtotal         Float?
   vatAmount        Float?
   total            Float?
-  currency         String   @default("THB")
-  status           String   @default("open")
-  source           String   @default("document_intake")
+  currency         String    @default("THB")
+  status           String    @default("open")
+  source           String    @default("document_intake")
   metadata         Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -820,27 +863,27 @@ model LineUserLink {
 }
 
 model LineGroupLink {
-  id          String   @id @default(cuid())
-  companyId   String
-  projectId   String?
-  lineGroupId String   @unique
-  sourceType  String   @default("group")
-  groupName   String?
-  pictureUrl  String?
-  memberCount Int?
-  lastMessageAt DateTime?
-  lastSenderLineUserId String?
+  id                    String    @id @default(cuid())
+  companyId             String
+  projectId             String?
+  lineGroupId           String    @unique
+  sourceType            String    @default("group")
+  groupName             String?
+  pictureUrl            String?
+  memberCount           Int?
+  lastMessageAt         DateTime?
+  lastSenderLineUserId  String?
   lastSenderDisplayName String?
-  lastSyncedAt DateTime?
-  isActive    Boolean  @default(true)
-  linkedById  String?
-  linkedAt    DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  lastSyncedAt          DateTime?
+  isActive              Boolean   @default(true)
+  linkedById            String?
+  linkedAt              DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  linkedBy User?    @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+  company  Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project  Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  linkedBy User?               @relation("LineGroupLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
   members  LineProjectMember[]
 
   @@index([companyId])
