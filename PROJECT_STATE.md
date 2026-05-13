@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 23:05 Asia/Bangkok
+Last updated: 2026-05-13 23:18 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -88,8 +88,8 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - Production nationwide RD VAT import completed on 2026-05-13 by continuing the province source (`vatSourceIndex:1`) in safe 10k-row chunks through EOF. Verified final probe `vatStartRow:300000, vatMaxRows:10000` returned `recordsRead:0`, so the province CSV had no more rows after the `260000-300000` closing sweep. Production `GET /api/dbd/local/status` returned `dbdCount:387219`, `vatCount:387218`.
     - Production queue after nationwide import: `GET /api/dbd/sync/job/status` returned `waiting:0`, `active:0`, `delayed:1` (weekly cron only), `failed:2` (old pre-fix jobs), `completed:50`, `paused:0`; no manual import job is currently running or waiting.
     - Production lookup smoke checks after import: `0105535169497` returns full Thai address `26/30-31 อาคารอรกานต์ ชั้น 9 ซอยชิดลม ถนนเพลินจิต ลุมพินี เขตปทุมวัน กรุงเทพมหานคร 10330` plus English name/address; `0105532098360` returns full SSP Tower address; province searches for `เชียงใหม่`, `ภูเก็ต`, `ขอนแก่น`, and `หาดใหญ่` return 10 suggestions each from `rd-vat`.
-    - Operational note: worker auto-continue succeeded for many chunks but stopped twice while the latest completed chunk still had `recordsRead:10000`; final nationwide completion used direct `POST /api/dbd/sync` one chunk at a time from row `260000` onward. Before relying on weekly fully automated imports, harden/observe auto-continue or add an orchestrator that re-queues when the last run reads a full chunk and no manual job remains.
-    - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. GitHub Typecheck runs `25798845925`, `25799616155`, `25800036784`, and `25800744932` succeeded. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
+    - Follow-up fix: continuation chunk job IDs now include the parent job id before `sourceIndex/startRow`. This avoids cross-run BullMQ jobId collisions where a completed delayed chunk could prevent a later weekly/manual import from queuing the same `nextStartRow`.
+    - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. GitHub Typecheck runs `25798845925`, `25799616155`, `25800036784`, `25800744932`, and `25811020393` succeeded. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
   - Removed `ผู้ดูแลระบบ` / Admin from the main desktop navbar and moved it into the right-side user/profile menu for `admin` and `super_admin` users only.
