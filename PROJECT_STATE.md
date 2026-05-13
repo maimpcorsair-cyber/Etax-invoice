@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 13:01 Asia/Bangkok
+Last updated: 2026-05-13 13:08 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -55,7 +55,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - DBD OpenAPI Thai address enrichment now avoids duplicate address components and can replace a shorter RD VAT `addressTh` with a longer DBD address while preserving the RD postcode when DBD does not provide one. RD VAT status and `vatAddress` stay separate.
     - Lookup now treats Thai addresses without an address number or location marker as incomplete and re-runs DBD enrichment even when `nameEn/status/juristicType` are already cached. This fixes rows such as `0105535169497` where an earlier lookup cached English name but left a short RD address like `ชิดลม เพลินจิต ลุมพินี...`.
     - Pending local change: incomplete-address detection now strips trailing postcode before checking for premise numbers, so `ชิดลม เพลินจิต ลุมพินี ปทุมวัน กรุงเทพมหานคร 10330` is still treated as incomplete, while `26/30-31 อาคารอรกานต์ ชั้น 9 ซอยชิดลม ถนนเพลินจิต...10330` is treated as complete. Verified customer profiles now use complete open-data `addressTh` when the saved customer address is incomplete.
-    - Pending local change: Render deploy workflow now requests `clearCache:"clear"` and prints the Render deploy failure object on `build_failed` because deploys `25782571599` and `25782852178` failed at Render `build_failed` while local backend/frontend builds and GitHub typecheck passed.
+    - Pending local change: Render deploy workflow now requests `clearCache:"clear"`, prints the Render deploy failure object on `build_failed`, and no longer pins `commitId` in the Render API deploy request. Deploys `25782571599`, `25782852178`, and `25782959201` failed at Render `build_failed` while local backend/frontend builds and GitHub typecheck passed; the Render failure object had `failureReason:null`.
     - Local verification on 2026-05-13: MOC `dataapi.moc.go.th` timed out after 8s, but DBD OpenAPI returned English names for `0107537001463` (`KRUNGTHAI FOOD PUBLIC COMPANY LIMITED`) and `0105532098360` (`SEALITE SHIPPING CO., LTD.`).
     - Deployed commits `a635bed`, `914d802`, `9ce79fb`, `2f0e183`, and `ce0746f`; latest GitHub Typecheck run `25780205735` succeeded in `54s` and Render deploy run `25780205723` succeeded in `13m59s`.
     - RD VAT remains the default fast source for Thai VAT name/address/status; DBD/MOC enrichment should be enabled only when the extra lookup latency is acceptable.
