@@ -703,12 +703,12 @@ export default function Customers() {
                     <div>
                       <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
                         <Database className="h-4 w-4" />
-                        {isThai ? 'ช่วยเติมข้อมูลบริษัทจากข้อมูลเปิดฟรี' : 'Free open-data company autofill'}
+                        {isThai ? 'ค้นข้อมูลบริษัท' : 'Company lookup'}
                       </div>
                       <p className="mt-1 text-xs text-teal-700">
                         {isThai
-                          ? 'ค้นจากข้อมูล DBD/RD ที่ sync ไว้ใน Billboy และข้อมูลลูกค้าที่บริษัทนี้เคยยืนยันแล้ว'
-                          : 'Search Billboy local DBD/RD cache plus this company’s verified customer data.'}
+                          ? 'เติมชื่อ เลขผู้เสียภาษี และที่อยู่จากข้อมูลเปิดหรือข้อมูลที่เคยบันทึกไว้'
+                          : 'Fill name, tax ID, and address from open data or saved company records.'}
                       </p>
                     </div>
                     {appliedDbdSuggestion && (
