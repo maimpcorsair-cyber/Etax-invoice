@@ -69,7 +69,10 @@ jobs:
           echo "Triggering Render deploy..."
           DEPLOY_MODE="hook"
           TRIGGERED_AFTER=$(date -u -d "2 minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
-          if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X POST "$RENDER_DEPLOY_HOOK_URL")
+          elif [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
             DEPLOY_MODE="api"
             REQUEST_BODY=$(jq -nc '{clearCache:"clear"}')
             RESPONSE=$(curl -s -w "\n%{http_code}" \
@@ -78,13 +81,13 @@ jobs:
               -H "Content-Type: application/json" \
               -d "$REQUEST_BODY")
           else
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -X POST "$RENDER_DEPLOY_HOOK_URL")
+            echo "Neither RENDER_DEPLOY_HOOK_URL nor Render API credentials are configured"
+            exit 1
           fi
           STATUS=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           DEPLOY_ID=$(echo "$BODY" | jq -r '.id // .deploy.id // .deployId // .data.id // empty' 2>/dev/null || echo "")
-          if [ "$DEPLOY_MODE" = "api" ] && [ -z "$DEPLOY_ID" ] && [ "$STATUS" = "202" ]; then
+          if [ -z "$DEPLOY_ID" ] && [ "$STATUS" = "202" ] && [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
             echo "Deploy was queued; locating queued deploy for commit $GITHUB_SHA..."
             for i in $(seq 1 12); do
               sleep 5

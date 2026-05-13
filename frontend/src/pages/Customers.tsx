@@ -264,6 +264,40 @@ export default function Customers() {
     setDbdSuggestions([]);
   }
 
+  async function fetchDbdProfileByTaxId(taxId: string) {
+    if (!token) return null;
+    const res = await fetch(`/api/dbd/local/lookup?taxId=${encodeURIComponent(taxId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = await res.json() as DbdLookupResponse;
+    if (!res.ok) throw new Error(json.error ?? 'Lookup failed');
+    return json.data?.profile ?? null;
+  }
+
+  async function selectDbdSuggestion(suggestion: DbdLocalSuggestion) {
+    if (!token || suggestion.taxId.length !== 13) {
+      applyDbdSuggestion(suggestion);
+      return;
+    }
+
+    setDbdLoading(true);
+    setDbdNotice('');
+    try {
+      const enriched = await fetchDbdProfileByTaxId(suggestion.taxId);
+      applyDbdSuggestion(enriched ?? suggestion);
+    } catch (err) {
+      applyDbdSuggestion(suggestion);
+      setDbdNotice(
+        isThai
+          ? 'ใช้ข้อมูลจากรายการค้นหาแล้ว แต่ยัง enrich จากเลขภาษีไม่สำเร็จ กรุณาตรวจที่อยู่อีกครั้ง'
+          : 'Applied the search result, but tax ID enrichment failed. Please review the address.',
+      );
+      console.warn('DBD suggestion enrichment failed', err);
+    } finally {
+      setDbdLoading(false);
+    }
+  }
+
   async function lookupTaxIdFromOpenData() {
     if (!token || form.taxId.length !== 13) {
       setDbdNotice(isThai ? 'กรุณากรอกเลขผู้เสียภาษี 13 หลักก่อน' : 'Enter a 13-digit tax ID first');
@@ -273,16 +307,12 @@ export default function Customers() {
     setDbdLoading(true);
     setDbdNotice('');
     try {
-      const res = await fetch(`/api/dbd/local/lookup?taxId=${encodeURIComponent(form.taxId)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json() as DbdLookupResponse;
-      if (!res.ok) throw new Error(json.error ?? 'Lookup failed');
-      if (!json.data?.profile) {
+      const profile = await fetchDbdProfileByTaxId(form.taxId);
+      if (!profile) {
         setDbdNotice(isThai ? 'ไม่พบข้อมูลใน cache เปิด กรอกเองต่อได้' : 'No open-data match. You can continue manually.');
         return;
       }
-      applyDbdSuggestion(json.data.profile);
+      applyDbdSuggestion(profile);
     } catch (err) {
       setDbdNotice(err instanceof Error ? err.message : 'Lookup failed');
     } finally {
@@ -529,7 +559,7 @@ export default function Customers() {
                       <button
                         key={`${suggestion.taxId}-${suggestion.branchCode}-${suggestion.source}`}
                         type="button"
-                        onClick={() => applyDbdSuggestion(suggestion)}
+                        onClick={() => selectDbdSuggestion(suggestion)}
                         className="w-full border-b border-slate-50 px-3 py-2 text-left text-sm last:border-0 hover:bg-teal-50"
                       >
                         <div className="flex items-start justify-between gap-3">
