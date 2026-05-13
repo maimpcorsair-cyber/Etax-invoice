@@ -28,6 +28,7 @@ interface DbdLocalSuggestion {
   nameTh: string | null;
   nameEn: string | null;
   addressTh: string | null;
+  addressEn: string | null;
   branchCode: string;
   branchNameTh: string | null;
   branchNameEn: string | null;
@@ -44,6 +45,57 @@ interface DbdLocalSuggestion {
   vatLastSyncedAt: string | null;
   verifiedByThisCompany: boolean;
 }
+
+const THAI_CHARACTER_PATTERN = /[\u0E00-\u0E7F]/;
+const THAI_ADDRESS_TERMS: Array<[RegExp, string]> = [
+  [/กรุงเทพมหานคร|กรุงเทพฯ|กทม\./g, 'Bangkok'],
+  [/บริษัท/g, 'Company'],
+  [/จำกัด\s*\(มหาชน\)/g, 'Public Company Limited'],
+  [/จำกัด/g, 'Co., Ltd.'],
+  [/ประเทศไทย/g, 'Thailand'],
+  [/สำนักงานใหญ่/g, 'Head Office'],
+  [/เลขที่/g, 'No.'],
+  [/อาคาร/g, 'Building'],
+  [/ชั้นที่|ชั้น/g, 'Floor'],
+  [/เลขที่ห้อง/g, 'Room'],
+  [/หมู่บ้าน/g, 'Village'],
+  [/หมู่/g, 'Moo'],
+  [/ซอย/g, 'Soi'],
+  [/ถนน/g, 'Road'],
+  [/แขวง/g, 'Khwaeng'],
+  [/ตำบล/g, 'Tambon'],
+  [/เขต/g, 'Khet'],
+  [/อำเภอ/g, 'Amphoe'],
+  [/จังหวัด/g, 'Changwat'],
+  [/ชิดลม/g, 'Chit Lom'],
+  [/เพลินจิต/g, 'Phloen Chit'],
+  [/ลุมพินี/g, 'Lumphini'],
+  [/ปทุมวัน/g, 'Pathum Wan'],
+  [/คลองเตย/g, 'Khlong Toei'],
+  [/ระนอง/g, 'Ranong'],
+  [/สุขุมวิท/g, 'Sukhumvit'],
+  [/สาทร/g, 'Sathon'],
+  [/สีลม/g, 'Si Lom'],
+  [/บางรัก/g, 'Bang Rak'],
+  [/วัฒนา/g, 'Watthana'],
+  [/ห้วยขวาง/g, 'Huai Khwang'],
+  [/ดินแดง/g, 'Din Daeng'],
+  [/บางนา/g, 'Bang Na'],
+  [/ลาดพร้าว/g, 'Lat Phrao'],
+  [/จตุจักร/g, 'Chatuchak'],
+];
+
+const THAI_ROMANIZATION_BY_CODE: Record<number, string> = {
+  0x0e01: 'k', 0x0e02: 'kh', 0x0e03: 'kh', 0x0e04: 'kh', 0x0e05: 'kh', 0x0e06: 'kh', 0x0e07: 'ng',
+  0x0e08: 'ch', 0x0e09: 'ch', 0x0e0a: 'ch', 0x0e0b: 's', 0x0e0c: 'ch', 0x0e0d: 'y',
+  0x0e0e: 'd', 0x0e0f: 't', 0x0e10: 'th', 0x0e11: 'th', 0x0e12: 'th', 0x0e13: 'n',
+  0x0e14: 'd', 0x0e15: 't', 0x0e16: 'th', 0x0e17: 'th', 0x0e18: 'th', 0x0e19: 'n',
+  0x0e1a: 'b', 0x0e1b: 'p', 0x0e1c: 'ph', 0x0e1d: 'f', 0x0e1e: 'ph', 0x0e1f: 'f', 0x0e20: 'ph', 0x0e21: 'm',
+  0x0e22: 'y', 0x0e23: 'r', 0x0e24: 'rue', 0x0e25: 'l', 0x0e26: 'lue', 0x0e27: 'w', 0x0e28: 's', 0x0e29: 's',
+  0x0e2a: 's', 0x0e2b: 'h', 0x0e2c: 'l', 0x0e2d: 'o', 0x0e2e: 'h',
+  0x0e30: 'a', 0x0e32: 'a', 0x0e33: 'am', 0x0e34: 'i', 0x0e35: 'i', 0x0e36: 'ue', 0x0e37: 'ue',
+  0x0e38: 'u', 0x0e39: 'u', 0x0e40: 'e', 0x0e41: 'ae', 0x0e42: 'o', 0x0e43: 'ai', 0x0e44: 'ai',
+};
 
 interface DbdLookupResponse {
   data?: {
@@ -240,20 +292,46 @@ export default function Customers() {
     return new Date(value).toLocaleDateString(isThai ? 'th-TH' : 'en-US');
   }
 
+  function translateThaiTextFallback(value: string | null | undefined) {
+    if (!value) return '';
+    let translated = value;
+    for (const [pattern, replacement] of THAI_ADDRESS_TERMS) {
+      translated = translated.replace(pattern, replacement);
+    }
+    translated = Array.from(translated).map((char) => {
+      if (!THAI_CHARACTER_PATTERN.test(char)) return char;
+      return THAI_ROMANIZATION_BY_CODE[char.charCodeAt(0)] ?? '';
+    }).join('');
+
+    const cleaned = translated
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.)])/g, '$1')
+      .replace(/([(])\s+/g, '$1')
+      .trim();
+    return /[A-Za-z]/.test(cleaned) ? cleaned : '';
+  }
+
   function applyDbdSuggestion(suggestion: DbdLocalSuggestion) {
-    setForm((prev) => ({
-      ...prev,
-      nameTh: suggestion.nameTh ?? prev.nameTh,
-      nameEn: suggestion.nameEn ?? prev.nameEn ?? '',
-      taxId: suggestion.taxId || prev.taxId,
-      branchCode: suggestion.branchCode ?? prev.branchCode ?? '00000',
-      branchNameTh: suggestion.branchNameTh ?? prev.branchNameTh ?? '',
-      branchNameEn: suggestion.branchNameEn ?? prev.branchNameEn ?? '',
-      addressTh: suggestion.addressTh ?? suggestion.vatAddress ?? prev.addressTh,
-      email: suggestion.email ?? prev.email ?? '',
-      phone: suggestion.phone ?? prev.phone ?? '',
-      contactPerson: suggestion.contactPerson ?? prev.contactPerson ?? '',
-    }));
+    setForm((prev) => {
+      const addressTh = suggestion.addressTh ?? suggestion.vatAddress ?? prev.addressTh;
+      const nameEn = suggestion.nameEn ?? (prev.nameEn?.trim() ? prev.nameEn : translateThaiTextFallback(suggestion.nameTh));
+      const addressEn = suggestion.addressEn ?? (prev.addressEn?.trim() ? prev.addressEn : translateThaiTextFallback(addressTh));
+
+      return {
+        ...prev,
+        nameTh: suggestion.nameTh ?? prev.nameTh,
+        nameEn,
+        taxId: suggestion.taxId || prev.taxId,
+        branchCode: suggestion.branchCode ?? prev.branchCode ?? '00000',
+        branchNameTh: suggestion.branchNameTh ?? prev.branchNameTh ?? '',
+        branchNameEn: suggestion.branchNameEn ?? prev.branchNameEn ?? '',
+        addressTh,
+        addressEn,
+        email: suggestion.email ?? prev.email ?? '',
+        phone: suggestion.phone ?? prev.phone ?? '',
+        contactPerson: suggestion.contactPerson ?? prev.contactPerson ?? '',
+      };
+    });
     setAppliedDbdSuggestion(suggestion);
     setDbdNotice(
       isThai
@@ -266,7 +344,7 @@ export default function Customers() {
 
   async function fetchDbdProfileByTaxId(taxId: string) {
     if (!token) return null;
-    const res = await fetch(`/api/dbd/local/lookup?taxId=${encodeURIComponent(taxId)}`, {
+    const res = await fetch(`/api/dbd/local/lookup?taxId=${encodeURIComponent(taxId)}&refresh=1`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const json = await res.json() as DbdLookupResponse;

@@ -46,8 +46,11 @@ dbdRouter.get('/local/status', async (_req, res) => {
 
 dbdRouter.get('/local/lookup', async (req, res) => {
   try {
-    const { taxId } = z.object({ taxId: z.string().regex(/^\d{13}$/) }).parse(req.query);
-    const data = await lookupLocalJuristicProfile(req.user!, taxId);
+    const { taxId, refresh } = z.object({
+      taxId: z.string().regex(/^\d{13}$/),
+      refresh: z.coerce.boolean().optional(),
+    }).parse(req.query);
+    const data = await lookupLocalJuristicProfile(req.user!, taxId, { refresh });
     res.json({ data });
   } catch (err) {
     if (err instanceof z.ZodError) {

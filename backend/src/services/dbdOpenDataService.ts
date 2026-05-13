@@ -13,6 +13,7 @@ export interface LocalJuristicSuggestion {
   nameTh: string | null;
   nameEn: string | null;
   addressTh: string | null;
+  addressEn: string | null;
   branchCode: string;
   branchNameTh: string | null;
   branchNameEn: string | null;
@@ -84,6 +85,58 @@ const MOC_JURISTIC_API_URL = process.env.MOC_JURISTIC_API_URL ?? 'https://dataap
 const DBD_OPENAPI_JURISTIC_API_URL = process.env.DBD_OPENAPI_JURISTIC_API_URL ?? 'https://openapi.dbd.go.th/api/v1/juristic_person';
 const DBD_OPENAPI_JURISTIC_LOOKUP_ENABLED = process.env.DBD_OPENAPI_JURISTIC_LOOKUP_ENABLED !== 'false';
 const MOC_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.MOC_JURISTIC_LOOKUP_TIMEOUT_MS ?? '1500', 10);
+const DBD_OPENAPI_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.DBD_OPENAPI_JURISTIC_LOOKUP_TIMEOUT_MS ?? '5000', 10);
+
+const THAI_CHARACTER_PATTERN = /[\u0E00-\u0E7F]/;
+const THAI_ADDRESS_TERMS: Array<[RegExp, string]> = [
+  [/กรุงเทพมหานคร|กรุงเทพฯ|กทม\./g, 'Bangkok'],
+  [/บริษัท/g, 'Company'],
+  [/จำกัด\s*\(มหาชน\)/g, 'Public Company Limited'],
+  [/จำกัด/g, 'Co., Ltd.'],
+  [/ประเทศไทย/g, 'Thailand'],
+  [/สำนักงานใหญ่/g, 'Head Office'],
+  [/เลขที่/g, 'No.'],
+  [/อาคาร/g, 'Building'],
+  [/ชั้นที่|ชั้น/g, 'Floor'],
+  [/เลขที่ห้อง/g, 'Room'],
+  [/หมู่บ้าน/g, 'Village'],
+  [/หมู่/g, 'Moo'],
+  [/ซอย/g, 'Soi'],
+  [/ถนน/g, 'Road'],
+  [/แขวง/g, 'Khwaeng'],
+  [/ตำบล/g, 'Tambon'],
+  [/เขต/g, 'Khet'],
+  [/อำเภอ/g, 'Amphoe'],
+  [/จังหวัด/g, 'Changwat'],
+  [/ชิดลม/g, 'Chit Lom'],
+  [/เพลินจิต/g, 'Phloen Chit'],
+  [/ลุมพินี/g, 'Lumphini'],
+  [/ปทุมวัน/g, 'Pathum Wan'],
+  [/คลองเตย/g, 'Khlong Toei'],
+  [/ระนอง/g, 'Ranong'],
+  [/สุขุมวิท/g, 'Sukhumvit'],
+  [/สาทร/g, 'Sathon'],
+  [/สีลม/g, 'Si Lom'],
+  [/บางรัก/g, 'Bang Rak'],
+  [/วัฒนา/g, 'Watthana'],
+  [/ห้วยขวาง/g, 'Huai Khwang'],
+  [/ดินแดง/g, 'Din Daeng'],
+  [/บางนา/g, 'Bang Na'],
+  [/ลาดพร้าว/g, 'Lat Phrao'],
+  [/จตุจักร/g, 'Chatuchak'],
+];
+
+const THAI_ROMANIZATION_BY_CODE: Record<number, string> = {
+  0x0e01: 'k', 0x0e02: 'kh', 0x0e03: 'kh', 0x0e04: 'kh', 0x0e05: 'kh', 0x0e06: 'kh', 0x0e07: 'ng',
+  0x0e08: 'ch', 0x0e09: 'ch', 0x0e0a: 'ch', 0x0e0b: 's', 0x0e0c: 'ch', 0x0e0d: 'y',
+  0x0e0e: 'd', 0x0e0f: 't', 0x0e10: 'th', 0x0e11: 'th', 0x0e12: 'th', 0x0e13: 'n',
+  0x0e14: 'd', 0x0e15: 't', 0x0e16: 'th', 0x0e17: 'th', 0x0e18: 'th', 0x0e19: 'n',
+  0x0e1a: 'b', 0x0e1b: 'p', 0x0e1c: 'ph', 0x0e1d: 'f', 0x0e1e: 'ph', 0x0e1f: 'f', 0x0e20: 'ph', 0x0e21: 'm',
+  0x0e22: 'y', 0x0e23: 'r', 0x0e24: 'rue', 0x0e25: 'l', 0x0e26: 'lue', 0x0e27: 'w', 0x0e28: 's', 0x0e29: 's',
+  0x0e2a: 's', 0x0e2b: 'h', 0x0e2c: 'l', 0x0e2d: 'o', 0x0e2e: 'h',
+  0x0e30: 'a', 0x0e32: 'a', 0x0e33: 'am', 0x0e34: 'i', 0x0e35: 'i', 0x0e36: 'ue', 0x0e37: 'ue',
+  0x0e38: 'u', 0x0e39: 'u', 0x0e40: 'e', 0x0e41: 'ae', 0x0e42: 'o', 0x0e43: 'ai', 0x0e44: 'ai',
+};
 
 function normalizeTaxId(value: unknown) {
   if (typeof value === 'number') return String(value).replace(/\D/g, '').padStart(13, '0');
@@ -136,6 +189,58 @@ function pickObject(row: RawRow, aliases: string[]): RawRow | null {
 function compactJoin(parts: Array<string | null>) {
   const cleaned = parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part));
   return cleaned.length > 0 ? cleaned.join(' ') : null;
+}
+
+function containsThai(value: string | null | undefined) {
+  return Boolean(value && THAI_CHARACTER_PATTERN.test(value));
+}
+
+function romanizeThaiText(value: string) {
+  return Array.from(value).map((char) => {
+    if (!THAI_CHARACTER_PATTERN.test(char)) return char;
+    return THAI_ROMANIZATION_BY_CODE[char.charCodeAt(0)] ?? '';
+  }).join('');
+}
+
+function cleanupEnglishFallback(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.)])/g, '$1')
+    .replace(/([(])\s+/g, '$1')
+    .trim();
+}
+
+function translateThaiTextFallback(value: string | null | undefined) {
+  if (!value) return null;
+  let translated = value;
+  for (const [pattern, replacement] of THAI_ADDRESS_TERMS) {
+    translated = translated.replace(pattern, replacement);
+  }
+
+  translated = romanizeThaiText(translated);
+  const cleaned = cleanupEnglishFallback(translated);
+  return cleaned && /[A-Za-z]/.test(cleaned) ? cleaned : null;
+}
+
+function englishNameFallback(nameTh: string | null | undefined) {
+  if (!nameTh) return null;
+  return translateThaiTextFallback(nameTh);
+}
+
+function englishAddressFallback(addressTh: string | null | undefined) {
+  if (!addressTh) return null;
+  return translateThaiTextFallback(addressTh);
+}
+
+function hasBetterThaiAddress(candidate: string | null | undefined, current: string | null | undefined) {
+  if (!candidate) return false;
+  if (!current) return true;
+
+  const candidateIncomplete = looksLikeIncompleteThaiAddress(candidate);
+  const currentIncomplete = looksLikeIncompleteThaiAddress(current);
+  if (!candidateIncomplete && currentIncomplete) return true;
+  if (candidateIncomplete && !currentIncomplete) return false;
+  return candidate.length > current.length + 8;
 }
 
 function looksLikeIncompleteThaiAddress(address: string | null | undefined) {
@@ -684,7 +789,7 @@ async function fetchMocJuristicRecord(taxId: string): Promise<NormalizedMocJuris
 
 async function fetchDbdOpenApiJuristicRecord(taxId: string): Promise<NormalizedMocJuristicRecord | null> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Math.max(500, MOC_JURISTIC_LOOKUP_TIMEOUT_MS));
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, DBD_OPENAPI_JURISTIC_LOOKUP_TIMEOUT_MS));
 
   try {
     const url = new URL(`${DBD_OPENAPI_JURISTIC_API_URL.replace(/\/$/, '')}/${taxId}`);
@@ -834,11 +939,13 @@ function fromOpenData(row: {
   vatAddress: string | null;
   vatLastSyncedAt: Date | null;
 }): LocalJuristicSuggestion {
+  const addressTh = row.addressTh ?? row.vatAddress;
   return {
     taxId: row.taxId,
     nameTh: row.nameTh,
-    nameEn: row.nameEn,
-    addressTh: row.addressTh,
+    nameEn: row.nameEn ?? englishNameFallback(row.nameTh),
+    addressTh,
+    addressEn: englishAddressFallback(addressTh),
     branchCode: '00000',
     branchNameTh: null,
     branchNameEn: null,
@@ -871,17 +978,18 @@ function fromCustomer(customer: {
   contactPerson: string | null;
   updatedAt: Date;
 }, openData?: LocalJuristicSuggestion | null): LocalJuristicSuggestion {
-  const shouldUseOpenDataThaiAddress = (
-    looksLikeIncompleteThaiAddress(customer.addressTh) &&
-    openData?.addressTh &&
-    !looksLikeIncompleteThaiAddress(openData.addressTh)
-  );
+  const addressTh = hasBetterThaiAddress(openData?.addressTh, customer.addressTh)
+    ? openData!.addressTh!
+    : customer.addressTh;
+  const nameEn = customer.nameEn ?? openData?.nameEn ?? englishNameFallback(customer.nameTh);
+  const addressEn = customer.addressEn ?? openData?.addressEn ?? englishAddressFallback(addressTh);
 
   return {
     taxId: customer.taxId,
     nameTh: customer.nameTh,
-    nameEn: customer.nameEn ?? openData?.nameEn ?? null,
-    addressTh: shouldUseOpenDataThaiAddress ? openData!.addressTh! : customer.addressTh,
+    nameEn,
+    addressTh,
+    addressEn,
     branchCode: customer.branchCode ?? '00000',
     branchNameTh: customer.branchNameTh,
     branchNameEn: customer.branchNameEn ?? openData?.branchNameEn ?? null,
@@ -900,7 +1008,11 @@ function fromCustomer(customer: {
   };
 }
 
-export async function lookupLocalJuristicProfile(user: AuthPayload, taxIdInput: string): Promise<LocalJuristicLookupResult> {
+export async function lookupLocalJuristicProfile(
+  user: AuthPayload,
+  taxIdInput: string,
+  options: { refresh?: boolean } = {},
+): Promise<LocalJuristicLookupResult> {
   const taxId = normalizeTaxId(taxIdInput);
   if (taxId.length !== 13) throw new Error('Tax ID must be 13 digits');
 
@@ -914,6 +1026,7 @@ export async function lookupLocalJuristicProfile(user: AuthPayload, taxIdInput: 
 
   let openData = initialOpenData;
   const shouldTryMocLookup = (
+    options.refresh ||
     !openData?.nameEn ||
     !openData?.status ||
     !openData?.juristicType ||
