@@ -20,6 +20,10 @@ on:
       - 'render.yaml'
       - '.github/workflows/render-deploy.yml'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
     name: Migrate and Deploy Backend
@@ -58,6 +62,39 @@ jobs:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         working-directory: backend
         run: npx prisma migrate deploy
+
+      - name: Wait for Typecheck workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Waiting for Typecheck workflow on $GITHUB_SHA..."
+          for i in $(seq 1 60); do
+            TYPECHECK_RUN=$(gh run list \
+              --workflow Typecheck \
+              --commit "$GITHUB_SHA" \
+              --json databaseId,status,conclusion,url \
+              --limit 1)
+            RUN_ID=$(echo "$TYPECHECK_RUN" | jq -r '.[0].databaseId // empty')
+            STATUS=$(echo "$TYPECHECK_RUN" | jq -r '.[0].status // empty')
+            CONCLUSION=$(echo "$TYPECHECK_RUN" | jq -r '.[0].conclusion // empty')
+
+            if [ -z "$RUN_ID" ]; then
+              echo "  Typecheck run not visible yet (attempt $i)"
+            elif [ "$STATUS" = "completed" ]; then
+              echo "  Typecheck run $RUN_ID completed: $CONCLUSION"
+              if [ "$CONCLUSION" = "success" ]; then
+                exit 0
+              fi
+              echo "$TYPECHECK_RUN" | jq -c '.[0]'
+              exit 1
+            else
+              echo "  Typecheck run $RUN_ID is $STATUS (attempt $i)"
+            fi
+
+            sleep 5
+          done
+          echo "Timed out waiting for Typecheck workflow"
+          exit 1
 
       - name: Trigger deploy hook
         id: deploy
