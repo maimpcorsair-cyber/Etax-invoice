@@ -219,8 +219,12 @@ async function inspectService(apiKey, config, options) {
   const service = await resolveService(apiKey, config);
   const deploys = await listDeploys(apiKey, service.id, options.limit);
   const latest = deploys[0];
-  const matching = options.commit ? deploys.find((deploy) => commitMatches(deploy, options.commit)) : null;
-  const liveMatch = matching?.status === 'live';
+  const matchingDeploys = options.commit
+    ? deploys.filter((deploy) => commitMatches(deploy, options.commit))
+    : [];
+  const liveMatching = matchingDeploys.find((deploy) => deploy.status === 'live') || null;
+  const matching = liveMatching || matchingDeploys[0] || null;
+  const liveMatch = Boolean(liveMatching);
 
   console.log('');
   console.log(`Render service: ${service.name} (${service.id})`);
@@ -237,6 +241,11 @@ async function inspectService(apiKey, config, options) {
   if (options.commit) {
     if (liveMatch) {
       console.log(`OK: commit ${shortSha(options.commit)} is live on ${service.name}.`);
+      if (matchingDeploys[0]?.id && matchingDeploys[0].id !== liveMatching.id) {
+        console.log(
+          `Note: newer deploy ${matchingDeploys[0].id} for the same commit is currently ${matchingDeploys[0].status}.`,
+        );
+      }
     } else if (matching) {
       console.log(
         `NOT LIVE: commit ${shortSha(options.commit)} was found on ${service.name} with status=${matching.status}.`,

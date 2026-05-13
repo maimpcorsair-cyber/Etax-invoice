@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-14 03:08 Asia/Bangkok
+Last updated: 2026-05-14 03:28 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,13 +16,18 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Customer/Supplier counterparty master is implemented locally and pending deploy:
+- Customer/Supplier counterparty master is deployed:
   - Added Prisma schema/migration `20260514_customer_party_role` in both root and backend Prisma trees. `customers.partyRole` supports `customer`, `supplier`, and `both`, with existing `vendor_payee` rows backfilled as `supplier`.
   - `/api/customers` now accepts `partyRole=customer|supplier|both` filtering and persists `partyRole` on create/update. Supplier creation defaults `general` usage to `vendor_payee`.
   - Customers page is now `ลูกค้าและซัพพลายเออร์`: separate add buttons for customer/supplier, role filter chips, role badges, and role-aware add/edit copy.
   - Supplier readiness adds optional `bank_account` evidence and Drive uploads can now store it under `Billboy/{company}/Customers/{taxId name}/05_Bank_Accounts`.
   - Purchase invoices load saved suppliers for quick selection and mark an existing counterparty as `supplier`/`both` when a purchase invoice is saved or confirmed from OCR.
   - Verified locally: root/backend Prisma validate/generate, backend/frontend `npm run lint`, backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
+  - Deployed feature commit `c87aa11` (`Add supplier counterparty workflow`) to `main`. GitHub Typecheck run `25823629619` succeeded in `1m3s`.
+  - Production migration run `25823706096` completed successfully and applied `20260514_customer_party_role`.
+  - Render deploy proof: `c87aa11` is live on worker deploy `dep-d82dm9raa1nc738ovf3g` and API deploy `dep-d82dlh3rjlhs739fn51g`; a duplicate API deploy for the same commit (`dep-d82dm9raa1nc738ovf20`) was still `build_in_progress`, which made the old status workflow report a false negative.
+  - Production smoke checks after deploy: API `/api/health` returned HTTP 200; Vercel `/app/customers` returned HTTP 200; authenticated `GET /api/customers?partyRole=supplier&limit=5` returned HTTP 200.
+  - Render status checker was patched so it now passes when any deploy for the target commit is `live`, even if Render has a newer duplicate deploy for the same commit still queued/building.
 - Customer verification/readiness workflow is deployed:
   - Added Prisma schema/migration `20260514_customer_documents` for customer `customerKind`, `useCase`, `verificationStatus`, `vatEvidenceStatus`, and Drive-backed `customer_documents` metadata.
   - Added backend customer document APIs: list documents, upload evidence to Google Drive, mark uploaded/verified/rejected, delete metadata, and recalculate shared readiness.
