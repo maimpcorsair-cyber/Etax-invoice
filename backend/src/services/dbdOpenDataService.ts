@@ -143,11 +143,12 @@ function looksLikeIncompleteThaiAddress(address: string | null | undefined) {
   const normalized = address.replace(/\s+/g, ' ').trim();
   if (!normalized) return true;
 
-  const hasAddressNumber = /[0-9๐-๙]/.test(normalized);
-  const hasLocationMarker = /(ถนน|ซอย|อาคาร|หมู่|ชั้น|แขวง|ตำบล|เขต|อำเภอ|จังหวัด|กรุงเทพ)/.test(normalized);
-  const isVeryShort = normalized.length < 45;
+  const withoutPostcode = normalized.replace(/\s+[0-9๐-๙]{5}\s*$/, '').trim();
+  const hasPremiseNumber = /(^|\s)(เลขที่\s*)?[0-9๐-๙]+([/-][0-9๐-๙]+)?/.test(withoutPostcode);
+  const hasSpecificLocationMarker = /(ถนน|ซอย|อาคาร|หมู่|ชั้น|เลขที่|แขวง|ตำบล|เขต|อำเภอ)/.test(withoutPostcode);
+  const isVeryShort = withoutPostcode.length < 45;
 
-  return !hasAddressNumber || !hasLocationMarker || isVeryShort;
+  return !hasPremiseNumber || !hasSpecificLocationMarker || isVeryShort;
 }
 
 function composeThaiAddress(row: RawRow) {
@@ -870,11 +871,17 @@ function fromCustomer(customer: {
   contactPerson: string | null;
   updatedAt: Date;
 }, openData?: LocalJuristicSuggestion | null): LocalJuristicSuggestion {
+  const shouldUseOpenDataThaiAddress = (
+    looksLikeIncompleteThaiAddress(customer.addressTh) &&
+    openData?.addressTh &&
+    !looksLikeIncompleteThaiAddress(openData.addressTh)
+  );
+
   return {
     taxId: customer.taxId,
     nameTh: customer.nameTh,
     nameEn: customer.nameEn ?? openData?.nameEn ?? null,
-    addressTh: customer.addressTh,
+    addressTh: shouldUseOpenDataThaiAddress ? openData!.addressTh! : customer.addressTh,
     branchCode: customer.branchCode ?? '00000',
     branchNameTh: customer.branchNameTh,
     branchNameEn: customer.branchNameEn ?? openData?.branchNameEn ?? null,
