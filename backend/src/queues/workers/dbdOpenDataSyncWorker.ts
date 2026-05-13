@@ -12,6 +12,7 @@ const DEFAULT_CHUNK_SIZE = parseInt(process.env.RD_VAT_SYNC_JOB_CHUNK_SIZE ?? '1
 const DEFAULT_BATCH_DELAY_MS = parseInt(process.env.RD_VAT_SYNC_BATCH_DELAY_MS ?? '150', 10);
 const DEFAULT_DELAY_BETWEEN_JOBS_MS = parseInt(process.env.RD_VAT_SYNC_NEXT_JOB_DELAY_MS ?? '30000', 10);
 const DEFAULT_CONTINUE_UNTIL_ROW = parseInt(process.env.RD_VAT_SYNC_CONTINUE_UNTIL_ROW ?? '2000000', 10);
+const DEFAULT_LOCK_DURATION_MS = parseInt(process.env.RD_VAT_SYNC_LOCK_DURATION_MS ?? '900000', 10);
 
 function clamp(value: number | undefined, fallback: number, min: number, max: number) {
   if (!Number.isFinite(value ?? NaN)) return fallback;
@@ -102,7 +103,7 @@ export const dbdOpenDataSyncWorker = new Worker<DbdOpenDataSyncJobData>(
 
     return result;
   },
-  { connection: redis, concurrency: 1 },
+  { connection: redis, concurrency: 1, lockDuration: clamp(DEFAULT_LOCK_DURATION_MS, 900000, 30000, 3600000) },
 );
 
 dbdOpenDataSyncWorker.on('failed', (job, err) => {
