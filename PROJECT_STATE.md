@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-14 01:48 Asia/Bangkok
+Last updated: 2026-05-14 02:16 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,7 +16,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Customer verification/readiness workflow is implemented locally and pending deploy:
+- Customer verification/readiness workflow is deployed:
   - Added Prisma schema/migration `20260514_customer_documents` for customer `customerKind`, `useCase`, `verificationStatus`, `vatEvidenceStatus`, and Drive-backed `customer_documents` metadata.
   - Added backend customer document APIs: list documents, upload evidence to Google Drive, mark uploaded/verified/rejected, delete metadata, and recalculate shared readiness.
   - Customer add/edit now has usage type (`ซื้อขายทั่วไป`, `ออกใบกำกับภาษีเต็มรูป`, `เปิดเครดิต`, `ทำสัญญา/โครงการ`, `คู่ค้า/ผู้รับเงิน`) plus a readiness checklist. It warns but does not block work.
@@ -24,6 +24,10 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Dashboard stats now include customer readiness counts; Dashboard shows a customer-data action card; invoice buyer selection shows a nonblocking warning when selected customer evidence is incomplete.
   - Verified locally: backend Prisma schema validate from `backend/`, backend Prisma generate, backend/frontend `npm run lint`, backend/frontend `npm run typecheck`, backend/frontend `npm run build`, and `git diff --check` passed.
   - Backend lint debt was cleaned up while finishing this feature: removed unused helpers/imports, fixed `prefer-const`, and replaced control-character regex literals in filename/open-data sanitizers with explicit character filtering so full backend lint is now green.
+  - Deployed commit `72e14a7` (`Add customer verification readiness workflow`) to `main`. GitHub Typecheck run `25820334995` succeeded in `54s`.
+  - Production migration run `25820821005` completed successfully and applied `20260514_customer_documents`.
+  - Render deploy status run `25820748830` confirmed commit `72e14a7` live on API deploy `dep-d82cmqe47okc73d57o50` and worker deploy `dep-d82cmqe47okc73d57p0g`.
+  - Production smoke checks: `https://etax-invoice-api.onrender.com/api/health` returned HTTP 200; Vercel `/app/customers` returned HTTP 200 with updated static assets timestamped 2026-05-13 19:14 UTC.
 - Customer add/edit UX update is deployed:
   - Removed `Easy e-Receipt` wording from customer add/edit copy and type comments so the product no longer implies personal tax incentive/RD readiness in this form.
   - Added `บริษัท/นิติบุคคล` vs `บุคคลธรรมดา` mode in `frontend/src/pages/Customers.tsx`; individual mode hides DBD/RD autofill and branch/company-only fields, saves `taxId = personalId`, and defaults `branchCode` to `00000`.
