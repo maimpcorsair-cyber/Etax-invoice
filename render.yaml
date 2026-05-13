@@ -5,9 +5,9 @@ services:
     rootDir: backend
     plan: free
     healthCheckPath: /health
-    # GitHub Actions triggers the deploy hook after migrations and typecheck.
-    # Keep Render auto-deploy off to avoid duplicate deploys racing GitHub checks.
-    autoDeploy: false
+    # Let Render deploy after GitHub Typecheck passes. The GitHub deploy
+    # workflow is manual-only to avoid a circular "deploy check is pending" race.
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production
@@ -92,8 +92,9 @@ services:
     rootDir: backend
     plan: starter
     dockerCommand: node dist/worker.js
-    # Worker deploys should be triggered intentionally after API/migrations are healthy.
-    autoDeploy: false
+    # Let Render deploy after GitHub Typecheck passes. The GitHub deploy
+    # workflow is manual-only to avoid a circular "deploy check is pending" race.
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production
