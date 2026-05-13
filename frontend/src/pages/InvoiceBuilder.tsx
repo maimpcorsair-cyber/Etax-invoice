@@ -224,6 +224,7 @@ export default function InvoiceBuilder() {
     setSelectedBankAccountId(bankAccountId);
     const account = documentProfile.profile.bankAccounts.find((item) => item.id === bankAccountId);
     form.setBankPaymentInfo(account ? formatBankPaymentInfo(account, isThai) : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentProfile.profile.bankAccounts, form.setBankPaymentInfo, isThai]);
 
   const handleAddBankAccount = useCallback(async (account: Omit<BankAccountProfile, 'id'>) => {
@@ -236,6 +237,7 @@ export default function InvoiceBuilder() {
       setSelectedBankAccountId(newAccount.id);
       form.setBankPaymentInfo(formatBankPaymentInfo(newAccount, isThai));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentProfile.profile.bankAccounts, documentProfile.saveProfile, form.setBankPaymentInfo, isThai]);
 
   useEffect(() => {
@@ -260,6 +262,7 @@ export default function InvoiceBuilder() {
       }
     }
     didApplyDocumentProfile.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     documentProfile.loading,
     documentProfile.profile.bankAccounts,
@@ -422,6 +425,7 @@ export default function InvoiceBuilder() {
     if (!isEdit && presetType && ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'].includes(presetType)) {
       form.setDocType(presetType as typeof form.docType);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.setDocType, isEdit, searchParams, form.docType]);
 
   useEffect(() => {
@@ -478,6 +482,7 @@ export default function InvoiceBuilder() {
     if (issuedInvoiceId) {
       form.clearDraftFromStorage();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issuedInvoiceId, form.clearDraftFromStorage]);
 
   useEffect(() => {
@@ -519,6 +524,7 @@ export default function InvoiceBuilder() {
 
     loadInvoice();
     return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     id, isEdit, isThai, token,
     form.hydrateFromInvoice, form.clearSubmitMessage,

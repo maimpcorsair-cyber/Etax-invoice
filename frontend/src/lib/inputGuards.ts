@@ -1,5 +1,5 @@
-const THAI_TEXT_PATTERN = /^[\u0E00-\u0E7F0-9\s.,()\/&+\-'"]*$/;
-const ENGLISH_TEXT_PATTERN = /^[A-Za-z0-9\s.,()\/&+\-'"]*$/;
+const THAI_TEXT_PATTERN = /^[\u0E00-\u0E7F0-9\s.,()/&+\-'"]*$/;
+const ENGLISH_TEXT_PATTERN = /^[A-Za-z0-9\s.,()/&+\-'"]*$/;
 const THAI_TEXT_REQUIRED_PATTERN = /[\u0E00-\u0E7F]/;
 const ENGLISH_TEXT_REQUIRED_PATTERN = /[A-Za-z]/;
 

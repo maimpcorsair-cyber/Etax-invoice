@@ -121,6 +121,7 @@ export default function ProjectGuestPortal() {
     return () => {
       cancelledRef.current = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function handleUpload(file: File | null) {

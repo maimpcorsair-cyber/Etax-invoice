@@ -3,6 +3,8 @@ import { ArrowRight, BarChart3, FileCheck2, ReceiptText, Smartphone, Sparkles, S
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 
+// Shared image paths are exported for Login while this file still owns the app chrome components.
+// eslint-disable-next-line react-refresh/only-export-components
 export const mascotAssets = {
   hero: '/brand/billoy-hero-mascot.jpg',
   poses: '/brand/mascot/billoy-product-poses.jpg?v=20260506b',

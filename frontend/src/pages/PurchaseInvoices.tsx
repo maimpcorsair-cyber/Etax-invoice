@@ -53,6 +53,14 @@ interface DocumentStats {
   bySource: Record<string, number>;
 }
 
+interface DuplicateUploadPayload {
+  duplicates?: Array<{
+    fileName?: string | null;
+    fileSize?: number | null;
+    sameSize?: boolean;
+  }>;
+}
+
 const todayIso = () => new Date().toISOString().split('T')[0];
 
 function startOfMonthIso() {
@@ -599,7 +607,7 @@ export default function PurchaseInvoices() {
     setDocumentActionId(null);
   }
 
-  function askDuplicatePolicy(payload: any): 'rename' | 'replace' | 'skip' | null {
+  function askDuplicatePolicy(payload: DuplicateUploadPayload): 'rename' | 'replace' | 'skip' | null {
     const duplicate = payload?.duplicates?.[0];
     const sizeText = duplicate
       ? duplicate.sameSize

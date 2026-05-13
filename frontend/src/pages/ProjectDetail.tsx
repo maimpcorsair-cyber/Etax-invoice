@@ -150,6 +150,14 @@ interface DocumentIntake {
   updatedAt: string;
 }
 
+interface DuplicateUploadPayload {
+  duplicates?: Array<{
+    fileName?: string | null;
+    fileSize?: number | null;
+    sameSize?: boolean;
+  }>;
+}
+
 interface DocumentComment {
   id: string;
   authorType: string;
@@ -510,7 +518,7 @@ export default function ProjectDetail() {
     });
   }
 
-  function askDuplicatePolicy(payload: any): 'rename' | 'replace' | 'skip' | null {
+  function askDuplicatePolicy(payload: DuplicateUploadPayload): 'rename' | 'replace' | 'skip' | null {
     const duplicate = payload?.duplicates?.[0];
     const sizeText = duplicate
       ? duplicate.sameSize

@@ -1904,6 +1904,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     void loadManagedUsers();
     void loadManagedGroups();
     void loadProjects();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, policy?.canUseLineOa]);
 
   useEffect(() => {

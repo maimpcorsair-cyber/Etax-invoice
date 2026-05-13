@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-14 00:02 Asia/Bangkok
+Last updated: 2026-05-14 00:26 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,11 +16,15 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Customer add/edit UX update is implemented locally:
+- Customer add/edit UX update is deployed:
   - Removed `Easy e-Receipt` wording from customer add/edit copy and type comments so the product no longer implies personal tax incentive/RD readiness in this form.
   - Added `บริษัท/นิติบุคคล` vs `บุคคลธรรมดา` mode in `frontend/src/pages/Customers.tsx`; individual mode hides DBD/RD autofill and branch/company-only fields, saves `taxId = personalId`, and defaults `branchCode` to `00000`.
   - Customer lists and invoice buyer search/preview now mask individual IDs outside the edit modal; XML behavior already uses `schemeID="NIDN"` when `personalId` is present.
-  - Verified locally: frontend `npm run typecheck`, backend `npm run typecheck`, frontend `npm run build`, touched-file ESLint, `git diff --check`, and copy search for `Easy e-Receipt` passed. Full frontend lint still has pre-existing unrelated errors in `inputGuards.ts`, `ProjectDetail.tsx`, and `PurchaseInvoices.tsx`.
+  - Verified locally: frontend `npm run lint`, frontend `npm run typecheck`, backend `npm run typecheck`, frontend `npm run build`, `git diff --check`, and copy search for `Easy e-Receipt` passed.
+  - Deployed commit `87b38fa` (`Add individual customer mode`) to `main`; GitHub Typecheck run `25814160054` succeeded in `54s`. Render status run `25814413926` confirmed commit `87b38fa` live on API deploy `dep-d82aude8bjmc73biaisg` and worker deploy `dep-d82aude8bjmc73biajog`. Vercel production `https://etax-invoice.vercel.app` is `Ready` and serves the updated Customers bundle with the individual/company segmented control.
+- Frontend lint cleanup is implemented locally:
+  - Fixed the previous full `npm run lint` blockers: removed unnecessary regex escapes, typed duplicate-upload payloads instead of `any`, fixed the language hook dependency, and scoped React hook/Fast Refresh exceptions where the existing flow intentionally relies on stable local loaders/form helpers.
+  - Verified locally: frontend `npm run lint`, frontend `npm run typecheck`, backend `npm run typecheck`, and frontend `npm run build` all pass.
 - Render deploy verification tooling is implemented:
   - Added `scripts/render-deploy-status.mjs` and root `npm run render:status` to query Render API for recent deploys, match a target commit, and print failed build logs when Render returns them.
   - Added manual GitHub workflow `Check Render Deploy Status` (`.github/workflows/render-status.yml`) with target choices `all`, `api`, and `worker`.

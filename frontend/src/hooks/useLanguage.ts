@@ -43,7 +43,7 @@ export function useLanguage() {
         currency: 'THB',
         minimumFractionDigits: 2,
       }).format(amount),
-    [isThai],
+    [isThai, isChinese],
   );
 
   const formatDate = useCallback(
