@@ -248,6 +248,22 @@ function hasBetterThaiAddress(candidate: string | null | undefined, current: str
   return candidate.length > current.length + 8;
 }
 
+function extractThaiPostcode(address: string | null | undefined) {
+  return address?.match(/([0-9๐-๙]{5})\s*$/)?.[1] ?? null;
+}
+
+function appendPostcodeIfMissing(address: string | null | undefined, fallback: string | null | undefined) {
+  if (!address) return address ?? null;
+  if (extractThaiPostcode(address)) return address;
+  const postcode = extractThaiPostcode(fallback);
+  return postcode ? `${address} ${postcode}` : address;
+}
+
+function selectBestThaiAddress(primary: string | null | undefined, fallback: string | null | undefined) {
+  const selected = hasBetterThaiAddress(primary, fallback) ? primary : (fallback ?? primary);
+  return appendPostcodeIfMissing(selected, selected === primary ? fallback : primary);
+}
+
 function looksLikeIncompleteThaiAddress(address: string | null | undefined) {
   if (!address) return true;
   const normalized = address.replace(/\s+/g, ' ').trim();
@@ -944,7 +960,7 @@ function fromOpenData(row: {
   vatAddress: string | null;
   vatLastSyncedAt: Date | null;
 }): LocalJuristicSuggestion {
-  const addressTh = row.addressTh ?? row.vatAddress;
+  const addressTh = selectBestThaiAddress(row.addressTh, row.vatAddress);
   return {
     taxId: row.taxId,
     nameTh: row.nameTh,
