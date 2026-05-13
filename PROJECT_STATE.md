@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 23:18 Asia/Bangkok
+Last updated: 2026-05-14 00:02 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- Customer add/edit UX update is implemented locally:
+  - Removed `Easy e-Receipt` wording from customer add/edit copy and type comments so the product no longer implies personal tax incentive/RD readiness in this form.
+  - Added `บริษัท/นิติบุคคล` vs `บุคคลธรรมดา` mode in `frontend/src/pages/Customers.tsx`; individual mode hides DBD/RD autofill and branch/company-only fields, saves `taxId = personalId`, and defaults `branchCode` to `00000`.
+  - Customer lists and invoice buyer search/preview now mask individual IDs outside the edit modal; XML behavior already uses `schemeID="NIDN"` when `personalId` is present.
+  - Verified locally: frontend `npm run typecheck`, backend `npm run typecheck`, frontend `npm run build`, touched-file ESLint, `git diff --check`, and copy search for `Easy e-Receipt` passed. Full frontend lint still has pre-existing unrelated errors in `inputGuards.ts`, `ProjectDetail.tsx`, and `PurchaseInvoices.tsx`.
 - Render deploy verification tooling is implemented:
   - Added `scripts/render-deploy-status.mjs` and root `npm run render:status` to query Render API for recent deploys, match a target commit, and print failed build logs when Render returns them.
   - Added manual GitHub workflow `Check Render Deploy Status` (`.github/workflows/render-status.yml`) with target choices `all`, `api`, and `worker`.

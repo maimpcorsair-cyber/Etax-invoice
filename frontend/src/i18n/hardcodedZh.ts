@@ -395,8 +395,7 @@ export const hardcodedZh: Record<string, string> = {
     '根据税务局 PP.30 表格的每月增值税申报摘要',
   'MOST POPULAR': '最受欢迎',
   Name: '姓名',
-  'National ID (13 digits) — for individuals / Easy e-Receipt':
-    '国民身份证（13 位数字）— 个人/简易电子收据',
+  '13-digit individual ID *': '个人 13 位识别号 *',
   'Needs info': '需要信息',
   'Needs review': '需要审查',
   'Never logged in': '从未登录过',
@@ -737,8 +736,8 @@ export const hardcodedZh: Record<string, string> = {
   'Use when the customer pays immediately and both documents are issued together.':
     '当客户立即付款并且两份文件同时签发时使用。',
   'Used for document setup and tenant isolation.': '用于文档设置和租户隔离。',
-  'Used to issue e-Receipt for individuals under the Revenue Department Easy e-Receipt program':
-    '用于根据税务局简易电子收据计划为个人开具电子收据',
+  'Use this for individual customers. Billboy does not search government personal data; verify it with the customer before saving.':
+    '用于个人客户。Billboy 不会查询政府个人资料，请在保存前与客户确认。',
   'Useful for a sub-brand seal, campaign mark, or a document-specific badge without changing the main company identity.':
     '可用于子品牌印章、活动标记或文档特定徽章，而无需更改主要公司标识。',
   'User added. This account can now sign in with Google.':

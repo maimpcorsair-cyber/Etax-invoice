@@ -238,7 +238,7 @@ model Customer {
   email         String?
   phone         String?
   contactPerson String?
-  personalId    String? // เลขบัตรประชาชน 13 หลัก (สำหรับ Easy e-Receipt)
+  personalId    String? // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
   isActive      Boolean @default(true)
 
   createdAt DateTime @default(now())

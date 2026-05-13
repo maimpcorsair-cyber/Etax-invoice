@@ -14,6 +14,11 @@ interface Props {
   onToggleSection: () => void;
 }
 
+function maskPersonalId(value: string) {
+  if (value.length < 4) return '*************';
+  return `*********${value.slice(-4)}`;
+}
+
 export default function BuyerCard({
   customers,
   customerSearch,
@@ -88,7 +93,7 @@ export default function BuyerCard({
                       {isThai ? c.nameTh : (c.nameEn ?? c.nameTh)}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {c.taxId} · {c.branchCode}
+                      {c.personalId ? maskPersonalId(c.personalId) : `${c.taxId} · ${c.branchCode}`}
                     </div>
                   </button>
                 ))}
@@ -104,16 +109,17 @@ export default function BuyerCard({
               {selectedCustomer.nameEn && (
                 <div className="text-gray-500">{selectedCustomer.nameEn}</div>
               )}
-              <div className="text-gray-500">
-                เลขผู้เสียภาษี: {selectedCustomer.taxId} (สาขา{' '}
-                {selectedCustomer.branchCode})
-              </div>
-              <div className="text-gray-500">{selectedCustomer.addressTh}</div>
-              {selectedCustomer.personalId && (
+              {selectedCustomer.personalId ? (
                 <div className="text-gray-500">
-                  บัตร ปชช.: {selectedCustomer.personalId}
+                  {isThai ? 'เลขบุคคลธรรมดา' : 'Individual ID'}: {maskPersonalId(selectedCustomer.personalId)}
+                </div>
+              ) : (
+                <div className="text-gray-500">
+                  {isThai ? 'เลขผู้เสียภาษี' : 'Tax ID'}: {selectedCustomer.taxId} ({isThai ? 'สาขา' : 'branch'}{' '}
+                  {selectedCustomer.branchCode})
                 </div>
               )}
+              <div className="text-gray-500">{selectedCustomer.addressTh}</div>
               <button
                 type="button"
                 onClick={onClearCustomer}

@@ -18,7 +18,7 @@ interface InvoiceXmlData {
     branchCode: string;
     nameTh: string;
     addressTh: string;
-    personalId?: string;          // เลขบัตร ปชช. (สำหรับ Easy e-Receipt)
+    personalId?: string;          // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
   };
   items: {
     nameTh: string;

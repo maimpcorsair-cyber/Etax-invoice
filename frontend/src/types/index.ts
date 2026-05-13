@@ -89,7 +89,7 @@ export interface Customer {
   email?: string;
   phone?: string;
   contactPerson?: string;
-  personalId?: string;   // เลขบัตรประชาชน 13 หลัก (Easy e-Receipt)
+  personalId?: string;   // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
   isActive: boolean;
   createdAt: string;
 }

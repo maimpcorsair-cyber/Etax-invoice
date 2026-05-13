@@ -8,6 +8,8 @@ import type { Customer } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { digitsOnly, englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isFiveDigitBranchCode, isThaiText, isThirteenDigitId, thaiTextOnly } from '../lib/inputGuards';
 
+type CustomerKind = 'company' | 'individual';
+
 const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> = {
   nameTh: '',
   nameEn: '',
@@ -127,6 +129,7 @@ export default function Customers() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [customerKind, setCustomerKind] = useState<CustomerKind>('company');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +138,7 @@ export default function Customers() {
   const [dbdLoading, setDbdLoading] = useState(false);
   const [dbdNotice, setDbdNotice] = useState('');
   const [appliedDbdSuggestion, setAppliedDbdSuggestion] = useState<DbdLocalSuggestion | null>(null);
+  const isIndividual = customerKind === 'individual';
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
@@ -219,6 +223,7 @@ export default function Customers() {
       return;
     }
     setEditing(null);
+    setCustomerKind('company');
     setForm(EMPTY_FORM);
     setError('');
     resetDbdAssist();
@@ -226,11 +231,13 @@ export default function Customers() {
   }
 
   function openEdit(c: Customer) {
+    const existingPersonalId = c.personalId ?? '';
     setEditing(c);
+    setCustomerKind(existingPersonalId ? 'individual' : 'company');
     setForm({
       nameTh: c.nameTh,
       nameEn: c.nameEn ?? '',
-      taxId: c.taxId,
+      taxId: existingPersonalId || c.taxId,
       branchCode: c.branchCode ?? '00000',
       branchNameTh: c.branchNameTh ?? '',
       branchNameEn: c.branchNameEn ?? '',
@@ -239,7 +246,7 @@ export default function Customers() {
       email: c.email ?? '',
       phone: c.phone ?? '',
       contactPerson: c.contactPerson ?? '',
-      personalId: c.personalId ?? '',
+      personalId: existingPersonalId,
     });
     setError('');
     resetDbdAssist();
@@ -248,8 +255,29 @@ export default function Customers() {
 
   async function handleSave() {
     if (!form.nameTh.trim() || formValidation.nameTh) { setError(isThai ? 'กรุณากรอกชื่อภาษาไทยให้ถูกต้อง' : 'Please enter a valid Thai name'); return; }
-    if (form.taxId.length !== 13) { setError(isThai ? 'เลขผู้เสียภาษีต้องมี 13 หลัก' : 'Tax ID must be 13 digits'); return; }
+    if (form.taxId.length !== 13) {
+      setError(isIndividual
+        ? (isThai ? 'เลขประจำตัว 13 หลักต้องครบ' : 'The 13-digit individual ID is required')
+        : (isThai ? 'เลขผู้เสียภาษีต้องมี 13 หลัก' : 'Tax ID must be 13 digits'));
+      return;
+    }
     if (!form.addressTh.trim() || formValidation.addressTh) { setError(isThai ? 'กรุณากรอกที่อยู่ภาษาไทยให้ถูกต้อง' : 'Please enter a valid Thai address'); return; }
+
+    const payload = isIndividual
+      ? {
+        ...form,
+        taxId: form.taxId,
+        personalId: form.taxId,
+        branchCode: '00000',
+        branchNameTh: '',
+        branchNameEn: '',
+        nameEn: '',
+        addressEn: '',
+      }
+      : {
+        ...form,
+        personalId: form.personalId || '',
+      };
 
     setSaving(true);
     setError('');
@@ -259,7 +287,7 @@ export default function Customers() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -285,6 +313,46 @@ export default function Customers() {
 
   const field = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  function setKind(nextKind: CustomerKind) {
+    setCustomerKind(nextKind);
+    setError('');
+    if (nextKind === 'individual') {
+      resetDbdAssist();
+      setForm((prev) => {
+        const id = prev.personalId || prev.taxId;
+        return {
+          ...prev,
+          taxId: digitsOnly(id, 13),
+          personalId: digitsOnly(id, 13),
+          branchCode: '00000',
+          branchNameTh: '',
+          branchNameEn: '',
+          nameEn: '',
+          addressEn: '',
+        };
+      });
+    } else {
+      setForm((prev) => ({ ...prev, personalId: '' }));
+    }
+  }
+
+  function setIndividualId(value: string) {
+    const id = digitsOnly(value, 13);
+    setForm((prev) => ({ ...prev, taxId: id, personalId: id }));
+  }
+
+  function maskedCustomerId(customer: Customer) {
+    if (!customer.personalId) return customer.taxId;
+    const id = customer.personalId || customer.taxId;
+    if (id.length < 4) return '*************';
+    return `*********${id.slice(-4)}`;
+  }
+
+  function customerIdLabel(customer: Customer) {
+    if (customer.personalId) return isThai ? 'เลขบุคคลธรรมดา' : 'Individual ID';
+    return isThai ? 'เลขผู้เสียภาษี' : 'Tax ID';
+  }
 
   function sourceLabel(suggestion: DbdLocalSuggestion) {
     if (suggestion.verifiedByThisCompany) return isThai ? 'ข้อมูลที่บริษัทนี้เคยยืนยัน' : 'Company verified';
@@ -472,7 +540,9 @@ export default function Customers() {
               )}
               {/* Row 3: tax ID */}
               {c.taxId && (
-                <p className="text-xs text-gray-400 font-mono">ID: {c.taxId}</p>
+                <p className="text-xs text-gray-400 font-mono">
+                  {customerIdLabel(c)}: {maskedCustomerId(c)}
+                </p>
               )}
               {/* Row 4: actions */}
               <div className="flex items-center gap-2 pt-2">
@@ -541,7 +611,7 @@ export default function Customers() {
                       {c.nameEn && isThai && <p className="text-xs text-gray-400">{c.nameEn}</p>}
                       {!isThai && <p className="text-xs text-gray-400">{c.nameTh}</p>}
                     </td>
-                    <td className="table-cell font-mono text-xs hidden sm:table-cell">{c.taxId}</td>
+                    <td className="table-cell font-mono text-xs hidden sm:table-cell">{maskedCustomerId(c)}</td>
                     <td className="table-cell text-gray-500 hidden sm:table-cell">{c.phone ?? '—'}</td>
                     <td className="table-cell text-gray-500 hidden sm:table-cell">{c.email ?? '—'}</td>
                     <td className="table-cell">
@@ -602,26 +672,52 @@ export default function Customers() {
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
               )}
 
-              <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
-                      <Database className="h-4 w-4" />
-                      {isThai ? 'ช่วยเติมข้อมูลบริษัทจากข้อมูลเปิดฟรี' : 'Free open-data company autofill'}
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setKind('company')}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    customerKind === 'company'
+                      ? 'bg-white text-primary-800 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {isThai ? 'บริษัท/นิติบุคคล' : 'Company'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKind('individual')}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    customerKind === 'individual'
+                      ? 'bg-white text-primary-800 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {isThai ? 'บุคคลธรรมดา' : 'Individual'}
+                </button>
+              </div>
+
+              {!isIndividual && (
+                <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
+                        <Database className="h-4 w-4" />
+                        {isThai ? 'ช่วยเติมข้อมูลบริษัทจากข้อมูลเปิดฟรี' : 'Free open-data company autofill'}
+                      </div>
+                      <p className="mt-1 text-xs text-teal-700">
+                        {isThai
+                          ? 'ค้นจากข้อมูล DBD/RD ที่ sync ไว้ใน Billboy และข้อมูลลูกค้าที่บริษัทนี้เคยยืนยันแล้ว'
+                          : 'Search Billboy local DBD/RD cache plus this company’s verified customer data.'}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-teal-700">
-                      {isThai
-                        ? 'ค้นจากข้อมูล DBD/RD ที่ sync ไว้ใน Billboy และข้อมูลลูกค้าที่บริษัทนี้เคยยืนยันแล้ว'
-                        : 'Search Billboy local DBD/RD cache plus this company’s verified customer data.'}
-                    </p>
+                    {appliedDbdSuggestion && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-medium text-teal-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {sourceLabel(appliedDbdSuggestion)}
+                      </span>
+                    )}
                   </div>
-                  {appliedDbdSuggestion && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-medium text-teal-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {sourceLabel(appliedDbdSuggestion)}
-                    </span>
-                  )}
-                </div>
 
                 <div className="mt-3 relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-500" />
@@ -669,15 +765,24 @@ export default function Customers() {
                   <p className="mt-2 text-xs text-teal-700">{dbdNotice}</p>
                 )}
               </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">{t('customer.nameTh')} *</label>
-                  <input value={form.nameTh} onChange={(e) => field('nameTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.nameTh)} placeholder="บริษัท ตัวอย่าง จำกัด" />
+                  <label className="label">{isIndividual ? (isThai ? 'ชื่อ-นามสกุล *' : 'Full name *') : `${t('customer.nameTh')} *`}</label>
+                  <input
+                    value={form.nameTh}
+                    onChange={(e) => field('nameTh', thaiTextOnly(e.target.value))}
+                    className={guardedInputClass(formValidation.nameTh)}
+                    placeholder={isIndividual ? 'สมชาย ใจดี' : 'บริษัท ตัวอย่าง จำกัด'}
+                  />
                   <p className={inputGuide(formValidation.nameTh)}>
-                    {isThai ? 'ใช้ชื่อภาษาไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Thai only, e.g. บริษัท ตัวอย่าง จำกัด'}
+                    {isIndividual
+                      ? (isThai ? 'ใช้ชื่อตามเอกสารของลูกค้า เช่น สมชาย ใจดี' : 'Use the customer name for the document.')
+                      : (isThai ? 'ใช้ชื่อภาษาไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Thai only, e.g. บริษัท ตัวอย่าง จำกัด')}
                   </p>
                 </div>
+                {!isIndividual && (
                 <div>
                   <label className="label">{t('customer.nameEn')}</label>
                   <input value={form.nameEn} onChange={(e) => field('nameEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.nameEn)} placeholder="Example Co., Ltd." />
@@ -685,11 +790,24 @@ export default function Customers() {
                     {isThai ? 'ใช้ชื่ออังกฤษ เช่น Example Co., Ltd.' : 'English only, e.g. Example Co., Ltd.'}
                   </p>
                 </div>
+                )}
                 <div>
-                  <label className="label">{t('customer.taxId')} * (13 {isThai ? 'หลัก' : 'digits'})</label>
+                  <label className="label">
+                    {isIndividual
+                      ? (isThai ? 'เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา *' : '13-digit individual ID *')
+                      : `${t('customer.taxId')} * (13 ${isThai ? 'หลัก' : 'digits'})`}
+                  </label>
                   <div className="flex gap-2">
-                    <input value={form.taxId} onChange={(e) => field('taxId', digitsOnly(e.target.value, 13))} className={guardedInputClass(formValidation.taxId, 'font-mono')} placeholder="0000000000000" inputMode="numeric" maxLength={13} />
-                    <button
+                    <input
+                      value={form.taxId}
+                      onChange={(e) => (isIndividual ? setIndividualId(e.target.value) : field('taxId', digitsOnly(e.target.value, 13)))}
+                      className={guardedInputClass(formValidation.taxId, 'font-mono')}
+                      placeholder="0000000000000"
+                      inputMode="numeric"
+                      maxLength={13}
+                    />
+                    {!isIndividual && (
+                      <button
                       type="button"
                       onClick={lookupTaxIdFromOpenData}
                       disabled={dbdLoading || form.taxId.length !== 13}
@@ -698,12 +816,22 @@ export default function Customers() {
                       {dbdLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
                       {isThai ? 'ดึงข้อมูล' : 'Lookup'}
                     </button>
+                    )}
                   </div>
                   <p className={inputGuide(formValidation.taxId)}>
-                    {isThai ? `ตัวเลข ${form.taxId.length}/13 หลัก` : `${form.taxId.length}/13 digits`}
-                    {appliedDbdSuggestion?.taxId === form.taxId ? ` · ${sourceLabel(appliedDbdSuggestion)} · ${formatSyncDate(appliedDbdSuggestion.lastSyncedAt)}` : ''}
+                    {isIndividual
+                      ? (isThai
+                        ? 'ใช้เมื่อต้องออกเอกสารให้ลูกค้าบุคคลธรรมดา ระบบไม่ค้นข้อมูลบุคคลจากฐานรัฐ กรุณาตรวจสอบกับลูกค้าก่อนบันทึก'
+                        : 'Use this for individual customers. Billboy does not search government personal data; verify it with the customer before saving.')
+                      : (
+                        <>
+                          {isThai ? `ตัวเลข ${form.taxId.length}/13 หลัก` : `${form.taxId.length}/13 digits`}
+                          {appliedDbdSuggestion?.taxId === form.taxId ? ` · ${sourceLabel(appliedDbdSuggestion)} · ${formatSyncDate(appliedDbdSuggestion.lastSyncedAt)}` : ''}
+                        </>
+                      )}
                   </p>
                 </div>
+                {!isIndividual && (
                 <div>
                   <label className="label">{t('customer.branchCode')}</label>
                   <input value={form.branchCode} onChange={(e) => field('branchCode', digitsOnly(e.target.value, 5))} className={guardedInputClass(formValidation.branchCode, 'font-mono')} placeholder="00000" inputMode="numeric" maxLength={5} />
@@ -711,14 +839,19 @@ export default function Customers() {
                     {isThai ? `รหัสสาขา ${(form.branchCode ?? '').length}/5 หลัก` : `${(form.branchCode ?? '').length}/5 branch digits`}
                   </p>
                 </div>
+                )}
+                {!isIndividual && (
                 <div>
                   <label className="label">{isThai ? 'ชื่อสาขา (ไทย)' : 'Branch Name (TH)'}</label>
                   <input value={form.branchNameTh} onChange={(e) => field('branchNameTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.branchNameTh)} placeholder="สำนักงานใหญ่" />
                 </div>
+                )}
+                {!isIndividual && (
                 <div>
                   <label className="label">{isThai ? 'ชื่อสาขา (อังกฤษ)' : 'Branch Name (EN)'}</label>
                   <input value={form.branchNameEn} onChange={(e) => field('branchNameEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.branchNameEn)} placeholder="Head Office" />
                 </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="label">{t('customer.addressTh')} *</label>
                   <textarea value={form.addressTh} onChange={(e) => field('addressTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.addressTh)} rows={2} placeholder="123 ถนนตัวอย่าง แขวง... เขต... กรุงเทพฯ 10110" />
@@ -726,10 +859,12 @@ export default function Customers() {
                     {isThai ? 'ใช้ที่อยู่ภาษาไทยสำหรับเอกสารภาษี' : 'Use Thai address text for tax documents.'}
                   </p>
                 </div>
+                {!isIndividual && (
                 <div className="sm:col-span-2">
                   <label className="label">{t('customer.addressEn')}</label>
                   <textarea value={form.addressEn} onChange={(e) => field('addressEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.addressEn)} rows={2} placeholder="123 Example Road, Bangkok 10110" />
                 </div>
+                )}
                 <div>
                   <label className="label">{t('customer.email')}</label>
                   <input type="email" value={form.email} onChange={(e) => field('email', e.target.value)} className="input-field" placeholder="contact@example.com" />
@@ -741,24 +876,6 @@ export default function Customers() {
                 <div className="sm:col-span-2">
                   <label className="label">{t('customer.contactPerson')}</label>
                   <input value={form.contactPerson} onChange={(e) => field('contactPerson', e.target.value)} className="input-field" placeholder={isThai ? 'ชื่อผู้ติดต่อ' : 'Contact person name'} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="label">
-                    {isThai ? 'เลขบัตรประชาชน (13 หลัก) — สำหรับบุคคลธรรมดา / Easy e-Receipt' : 'National ID (13 digits) — for individuals / Easy e-Receipt'}
-                  </label>
-                  <input
-                    value={form.personalId ?? ''}
-                    onChange={(e) => field('personalId', digitsOnly(e.target.value, 13))}
-                    className={guardedInputClass(formValidation.personalId, 'font-mono')}
-                    placeholder="0000000000000"
-                    inputMode="numeric"
-                    maxLength={13}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    {isThai
-                      ? 'ใช้สำหรับออก e-Receipt ให้บุคคลธรรมดา ตามโครงการ Easy e-Receipt ของสรรพากร'
-                      : 'Used to issue e-Receipt for individuals under the Revenue Department Easy e-Receipt program'}
-                  </p>
                 </div>
               </div>
             </div>
