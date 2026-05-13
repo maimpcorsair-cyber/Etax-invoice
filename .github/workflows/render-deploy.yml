@@ -106,10 +106,20 @@ jobs:
           echo "Triggering Render deploy..."
           DEPLOY_MODE="hook"
           TRIGGERED_AFTER=$(date -u -d "2 minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
-          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -X POST "$RENDER_DEPLOY_HOOK_URL")
-          elif [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
+          if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
+            echo "Disabling Render auto deploy for this service before manual deploy..."
+            PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X PATCH "https://api.render.com/v1/services/$RENDER_SERVICE_ID" \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"autoDeploy":"no"}')
+            PATCH_STATUS=$(echo "$PATCH_RESPONSE" | tail -1)
+            PATCH_BODY=$(echo "$PATCH_RESPONSE" | sed '$d')
+            if [ "$PATCH_STATUS" != "200" ]; then
+              echo "Could not disable Render auto deploy: $PATCH_STATUS"
+              echo "$PATCH_BODY" | jq -c '.' 2>/dev/null || echo "$PATCH_BODY"
+              exit 1
+            fi
             DEPLOY_MODE="api"
             REQUEST_BODY=$(jq -nc '{clearCache:"clear"}')
             RESPONSE=$(curl -s -w "\n%{http_code}" \
@@ -117,6 +127,9 @@ jobs:
               -H "Authorization: Bearer $RENDER_API_KEY" \
               -H "Content-Type: application/json" \
               -d "$REQUEST_BODY")
+          elif [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X POST "$RENDER_DEPLOY_HOOK_URL")
           else
             echo "Neither RENDER_DEPLOY_HOOK_URL nor Render API credentials are configured"
             exit 1
