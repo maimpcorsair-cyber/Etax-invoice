@@ -52,9 +52,9 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - DBD OpenAPI lookup is enabled by default (`DBD_OPENAPI_JURISTIC_LOOKUP_ENABLED` is true unless set to `false`) and tries `https://openapi.dbd.go.th/api/v1/juristic_person/{taxId}` for English names/status/type even when MOC is disabled.
     - MOC lookup remains opt-in behind `MOC_JURISTIC_LOOKUP_ENABLED=true`; when enabled it is used only after DBD OpenAPI misses or fails.
     - Verified customer profiles now fallback to open-data `nameEn` when the tenant's saved customer has no English name, so old customer records no longer hide newly enriched English names.
-    - Pending local change: DBD OpenAPI Thai address enrichment now avoids duplicate address components and can replace a shorter RD VAT `addressTh` with a longer DBD address while preserving the RD postcode when DBD does not provide one. RD VAT status and `vatAddress` stay separate.
+    - DBD OpenAPI Thai address enrichment now avoids duplicate address components and can replace a shorter RD VAT `addressTh` with a longer DBD address while preserving the RD postcode when DBD does not provide one. RD VAT status and `vatAddress` stay separate.
     - Local verification on 2026-05-13: MOC `dataapi.moc.go.th` timed out after 8s, but DBD OpenAPI returned English names for `0107537001463` (`KRUNGTHAI FOOD PUBLIC COMPANY LIMITED`) and `0105532098360` (`SEALITE SHIPPING CO., LTD.`).
-    - Deployed commits `a635bed`, `914d802`, and `9ce79fb`; latest GitHub Typecheck run `25775188366` succeeded in `57s` and Render deploy run `25775188368` succeeded in `10m13s`.
+    - Deployed commits `a635bed`, `914d802`, `9ce79fb`, and `2f0e183`; latest GitHub Typecheck run `25779295070` succeeded in `53s` and Render deploy run `25779295033` succeeded in `12m15s`.
     - RD VAT remains the default fast source for Thai VAT name/address/status; DBD/MOC enrichment should be enabled only when the extra lookup latency is acceptable.
   - Database risk: current compact local cache is not expected to fill the DB immediately, but full province-wide imports should stay chunked/throttled and should not store full raw rows. Re-check Render Postgres storage before importing all Thai VAT branches.
 - Desktop navigation cleanup is deployed:
