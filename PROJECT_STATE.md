@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 20:00 Asia/Bangkok
+Last updated: 2026-05-13 23:05 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -80,7 +80,16 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - Added super-admin read-only queue status endpoint `GET /api/dbd/sync/job/status` to inspect BullMQ waiting/active/delayed/failed jobs before running large nationwide syncs.
     - Production queue-status verification showed a 1k province test job failed with BullMQ `job stalled more than allowable limit` while loading the large 120 MiB province CSV. Worker lock duration is now configurable via `RD_VAT_SYNC_LOCK_DURATION_MS` and defaults to 15 minutes for long RD VAT chunks.
     - RD VAT CSV sync now streams URL/file input and stops reading after the requested chunk. This avoids downloading the entire 120 MiB province CSV for every small chunk and keeps province imports cheaper on Render bandwidth/worker time.
-    - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
+    - Deployed live commits:
+      - `afc08bc` added queue status; API deploy `dep-d8272acm0tmc73aov2hg`, worker deploy `dep-d8272akm0tmc73aov3d0`.
+      - `8fd5d43` increased worker lock duration; API deploy `dep-d82769cm0tmc73ap237g`, worker deploy `dep-d82769cm0tmc73ap2430`.
+      - `1d9ade4` added streaming RD VAT CSV chunks; API deploy `dep-d827co7lk1mc739dfqv0`, worker deploy `dep-d827co7lk1mc739dfrqg`.
+    - Production verified: `/api/health` returned 200; `GET /api/dbd/sync/job/status` works and shows BullMQ counts/jobs; province test jobs `vatSourceIndex:1`, `vatStartRow:0`, `vatMaxRows:1000`, `autoContinue:false` completed successfully with source `rd-vat-provinces:2/2:https://data.rd.go.th/datafiles/vat/VAT_TaxpayerAddress_02.csv` in about 2 seconds each after streaming deploy. These first 1k province rows upserted 0 new rows, likely because they were already present or not usable VAT rows; run a later province chunk before full import.
+    - Production nationwide RD VAT import completed on 2026-05-13 by continuing the province source (`vatSourceIndex:1`) in safe 10k-row chunks through EOF. Verified final probe `vatStartRow:300000, vatMaxRows:10000` returned `recordsRead:0`, so the province CSV had no more rows after the `260000-300000` closing sweep. Production `GET /api/dbd/local/status` returned `dbdCount:387219`, `vatCount:387218`.
+    - Production queue after nationwide import: `GET /api/dbd/sync/job/status` returned `waiting:0`, `active:0`, `delayed:1` (weekly cron only), `failed:2` (old pre-fix jobs), `completed:50`, `paused:0`; no manual import job is currently running or waiting.
+    - Production lookup smoke checks after import: `0105535169497` returns full Thai address `26/30-31 อาคารอรกานต์ ชั้น 9 ซอยชิดลม ถนนเพลินจิต ลุมพินี เขตปทุมวัน กรุงเทพมหานคร 10330` plus English name/address; `0105532098360` returns full SSP Tower address; province searches for `เชียงใหม่`, `ภูเก็ต`, `ขอนแก่น`, and `หาดใหญ่` return 10 suggestions each from `rd-vat`.
+    - Operational note: worker auto-continue succeeded for many chunks but stopped twice while the latest completed chunk still had `recordsRead:10000`; final nationwide completion used direct `POST /api/dbd/sync` one chunk at a time from row `260000` onward. Before relying on weekly fully automated imports, harden/observe auto-continue or add an orchestrator that re-queues when the last run reads a full chunk and no manual job remains.
+    - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. GitHub Typecheck runs `25798845925`, `25799616155`, `25800036784`, and `25800744932` succeeded. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
   - Removed `ผู้ดูแลระบบ` / Admin from the main desktop navbar and moved it into the right-side user/profile menu for `admin` and `super_admin` users only.
