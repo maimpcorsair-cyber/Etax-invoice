@@ -138,6 +138,18 @@ function compactJoin(parts: Array<string | null>) {
   return cleaned.length > 0 ? cleaned.join(' ') : null;
 }
 
+function looksLikeIncompleteThaiAddress(address: string | null | undefined) {
+  if (!address) return true;
+  const normalized = address.replace(/\s+/g, ' ').trim();
+  if (!normalized) return true;
+
+  const hasAddressNumber = /[0-9๐-๙]/.test(normalized);
+  const hasLocationMarker = /(ถนน|ซอย|อาคาร|หมู่|ชั้น|แขวง|ตำบล|เขต|อำเภอ|จังหวัด|กรุงเทพ)/.test(normalized);
+  const isVeryShort = normalized.length < 45;
+
+  return !hasAddressNumber || !hasLocationMarker || isVeryShort;
+}
+
 function composeThaiAddress(row: RawRow) {
   return compactJoin([
     pick(row, ['address', 'addressTh', 'Address_TH', 'FullAddress', 'JuristicAddress', 'ที่อยู่', 'ที่ตั้งสำนักงานใหญ่']),
@@ -595,8 +607,8 @@ async function upsertMocJuristicRecord(record: NormalizedMocJuristicRecord) {
         THEN "juristic_open_data_cache"."addressTh"
         WHEN "juristic_open_data_cache"."addressTh" IS NULL
         THEN EXCLUDED."addressTh"
-        WHEN "juristic_open_data_cache"."source" = 'rd-vat'
-          AND LENGTH(EXCLUDED."addressTh") > LENGTH("juristic_open_data_cache"."addressTh")
+        WHEN LENGTH(EXCLUDED."addressTh") > LENGTH("juristic_open_data_cache"."addressTh")
+          AND EXCLUDED."addressTh" ~ '[0-9๐-๙]'
         THEN TRIM(CONCAT(
           EXCLUDED."addressTh",
           CASE
@@ -606,8 +618,6 @@ async function upsertMocJuristicRecord(record: NormalizedMocJuristicRecord) {
             ELSE ''
           END
         ))
-        WHEN "juristic_open_data_cache"."source" = 'rd-vat'
-        THEN "juristic_open_data_cache"."addressTh"
         ELSE COALESCE(EXCLUDED."addressTh", "juristic_open_data_cache"."addressTh")
       END,
       "status" = COALESCE(EXCLUDED."status", "juristic_open_data_cache"."status"),
@@ -896,7 +906,12 @@ export async function lookupLocalJuristicProfile(user: AuthPayload, taxIdInput: 
   ]);
 
   let openData = initialOpenData;
-  const shouldTryMocLookup = !openData?.nameEn || !openData?.status || !openData?.juristicType;
+  const shouldTryMocLookup = (
+    !openData?.nameEn ||
+    !openData?.status ||
+    !openData?.juristicType ||
+    looksLikeIncompleteThaiAddress(openData?.addressTh)
+  );
   if (shouldTryMocLookup) {
     const mocRecord = await fetchMocJuristicRecord(taxId);
     if (mocRecord) {
