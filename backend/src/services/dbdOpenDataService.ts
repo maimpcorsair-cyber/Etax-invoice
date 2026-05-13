@@ -184,15 +184,16 @@ function composeMocThaiAddress(row: RawRow) {
 function composeDbdOpenApiThaiAddress(row: RawRow) {
   const address = pickObject(row, ['OrganizationJuristicAddress', 'JuristicAddress', 'addressDetail']);
   const addressType = address ? pickObject(address, ['AddressType']) ?? address : row;
+  const fullAddress = pick(addressType, ['Address', 'FullAddress', 'JuristicAddress']);
 
   return compactJoin([
-    pick(addressType, ['Address', 'FullAddress', 'JuristicAddress']),
-    compactJoin([
+    fullAddress,
+    fullAddress ? null : compactJoin([
+      pick(addressType, ['AddressNo', 'HouseNo']),
       pick(addressType, ['Building']),
       pick(addressType, ['RoomNo']),
       pick(addressType, ['Floor']),
       pick(addressType, ['Village']),
-      pick(addressType, ['AddressNo', 'HouseNo']),
       pick(addressType, ['Moo']),
       pick(addressType, ['Soi']),
       pick(addressType, ['Yaek']),
@@ -590,7 +591,22 @@ async function upsertMocJuristicRecord(record: NormalizedMocJuristicRecord) {
       "nameTh" = COALESCE("juristic_open_data_cache"."nameTh", EXCLUDED."nameTh"),
       "nameEn" = COALESCE(EXCLUDED."nameEn", "juristic_open_data_cache"."nameEn"),
       "addressTh" = CASE
-        WHEN "juristic_open_data_cache"."source" = 'rd-vat' AND "juristic_open_data_cache"."addressTh" IS NOT NULL
+        WHEN EXCLUDED."addressTh" IS NULL
+        THEN "juristic_open_data_cache"."addressTh"
+        WHEN "juristic_open_data_cache"."addressTh" IS NULL
+        THEN EXCLUDED."addressTh"
+        WHEN "juristic_open_data_cache"."source" = 'rd-vat'
+          AND LENGTH(EXCLUDED."addressTh") > LENGTH("juristic_open_data_cache"."addressTh")
+        THEN TRIM(CONCAT(
+          EXCLUDED."addressTh",
+          CASE
+            WHEN "juristic_open_data_cache"."addressTh" ~ '[0-9]{5}$'
+              AND EXCLUDED."addressTh" !~ '[0-9]{5}$'
+            THEN CONCAT(' ', substring("juristic_open_data_cache"."addressTh" from '([0-9]{5})$'))
+            ELSE ''
+          END
+        ))
+        WHEN "juristic_open_data_cache"."source" = 'rd-vat'
         THEN "juristic_open_data_cache"."addressTh"
         ELSE COALESCE(EXCLUDED."addressTh", "juristic_open_data_cache"."addressTh")
       END,
