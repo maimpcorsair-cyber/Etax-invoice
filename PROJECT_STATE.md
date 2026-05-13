@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 15:57 Asia/Bangkok
+Last updated: 2026-05-13 16:07 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -22,6 +22,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Added `scripts/render-trigger-deploy.mjs`, root `npm run render:deploy`, and manual GitHub workflow `Trigger Render Deploy` to deploy `api`, `worker`, or `all` through the Render API without using the Render UI.
   - Required secret/env inputs: `RENDER_API_KEY`; API service uses existing GitHub secret `RENDER_SERVICE_ID`; worker verification can use new GitHub secret `RENDER_WORKER_SERVICE_ID` or service-name discovery.
   - This checker verifies whether the latest GitHub commit is actually live on Render; `/api/health` alone only proves the API is alive.
+  - Verified 2026-05-13: `Trigger Render Deploy` run `25789178101` deployed commit `51cb58b` to API deploy `dep-d823rj7aqgkc7392t67g` and worker deploy `dep-d823rj9j2pic73b1806g`; `Check Render Deploy Status` run `25789437409` confirmed both are `live`; production `/api/health` returned HTTP 200.
 - Free DBD/RD autofill + private verified cache is deployed:
   - Added Prisma models/migrations for `juristic_open_data_cache` and `dbd_open_data_sync_runs` in both root and backend Prisma trees.
   - Added local open-data APIs: `GET /api/dbd/local/lookup?taxId=...`, `GET /api/dbd/local/search?q=...`, `GET /api/dbd/local/status`, and super-admin `POST /api/dbd/sync`.
