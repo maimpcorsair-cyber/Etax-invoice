@@ -601,10 +601,21 @@ function parseRows(text: string): RawRow[] {
   }
 }
 
-function decodeSourceBuffer(buffer: Buffer, kind: 'dbd' | 'vat') {
-  const preferredEncoding = kind === 'vat'
+function getPreferredOpenDataEncoding(kind: 'dbd' | 'vat') {
+  return kind === 'vat'
     ? (process.env.RD_VAT_DATA_ENCODING ?? process.env.VAT_OPEN_DATA_ENCODING ?? 'windows-874')
     : (process.env.OPEN_DBD_DATA_ENCODING ?? process.env.DBD_OPEN_DATA_ENCODING ?? 'utf-8');
+}
+
+function detectOpenDataEncoding(buffer: Buffer, fallbackEncoding: string) {
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    return 'utf-8';
+  }
+  return fallbackEncoding;
+}
+
+function decodeSourceBuffer(buffer: Buffer, kind: 'dbd' | 'vat') {
+  const preferredEncoding = detectOpenDataEncoding(buffer, getPreferredOpenDataEncoding(kind));
   const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
   try {
@@ -722,19 +733,32 @@ async function readSourceText(kind: 'dbd' | 'vat', sourceIndex = 0): Promise<{ t
   return null;
 }
 
+async function* decodeStreamingOpenDataChunks(chunks: AsyncIterable<Buffer>, kind: 'dbd' | 'vat'): AsyncGenerator<string> {
+  let decoder: InstanceType<typeof TextDecoder> | null = null;
+
+  for await (const chunk of chunks) {
+    if (!decoder) {
+      decoder = new TextDecoder(detectOpenDataEncoding(chunk, getPreferredOpenDataEncoding(kind)));
+    }
+    yield decoder.decode(chunk, { stream: true }).replace(/\u0000/g, '');
+  }
+
+  if (!decoder) return;
+
+  const tail = decoder.decode();
+  if (tail) yield tail.replace(/\u0000/g, '');
+}
+
 async function* readSourceTextChunks(ref: OpenDataSourceRef, kind: 'dbd' | 'vat'): AsyncGenerator<string> {
-  const preferredEncoding = kind === 'vat'
-    ? (process.env.RD_VAT_DATA_ENCODING ?? process.env.VAT_OPEN_DATA_ENCODING ?? 'windows-874')
-    : (process.env.OPEN_DBD_DATA_ENCODING ?? process.env.DBD_OPEN_DATA_ENCODING ?? 'utf-8');
-  const decoder = new TextDecoder(preferredEncoding);
+  async function* fileChunks(): AsyncGenerator<Buffer> {
+    if (!ref.file) return;
+    for await (const chunk of createReadStream(ref.file)) {
+      yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    }
+  }
 
   if (ref.file) {
-    for await (const chunk of createReadStream(ref.file)) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      yield decoder.decode(buffer, { stream: true }).replace(/\u0000/g, '');
-    }
-    const tail = decoder.decode();
-    if (tail) yield tail.replace(/\u0000/g, '');
+    yield* decodeStreamingOpenDataChunks(fileChunks(), kind);
     return;
   }
 
@@ -745,14 +769,16 @@ async function* readSourceTextChunks(ref: OpenDataSourceRef, kind: 'dbd' | 'vat'
   if (!res.body) throw new Error(`${kind.toUpperCase()} open data response did not include a body`);
 
   const reader = res.body.getReader();
-  try {
+  async function* responseChunks(): AsyncGenerator<Buffer> {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      yield decoder.decode(value, { stream: true }).replace(/\u0000/g, '');
+      yield Buffer.from(value);
     }
-    const tail = decoder.decode();
-    if (tail) yield tail.replace(/\u0000/g, '');
+  }
+
+  try {
+    yield* decodeStreamingOpenDataChunks(responseChunks(), kind);
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
