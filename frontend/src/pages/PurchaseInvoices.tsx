@@ -9,7 +9,7 @@ import {
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import type { DocumentIntake, Invoice, PurchaseInvoice } from '../types';
+import type { Customer, DocumentIntake, Invoice, PurchaseInvoice } from '../types';
 import { EmptyState } from '../components/ui/AppChrome';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
@@ -191,6 +191,7 @@ export default function PurchaseInvoices() {
   const [reviewIntakes, setReviewIntakes] = useState<DocumentIntake[]>([]);
   const [documentLibrary, setDocumentLibrary] = useState<DocumentIntake[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<Customer[]>([]);
   const [uploadProjectId, setUploadProjectId] = useState(searchParams.get('projectId') ?? '');
   const [projectFilter, setProjectFilter] = useState(searchParams.get('projectId') ?? '');
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null);
@@ -235,7 +236,7 @@ export default function PurchaseInvoices() {
       if (to) params.set('to', to);
       if (search) params.set('search', search);
       if (projectFilter) params.set('projectId', projectFilter);
-      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes, storageRes, projectsRes] = await Promise.all([
+      const [res, attachPurchasesRes, salesRes, intakeRes, libraryRes, statsRes, storageRes, projectsRes, suppliersRes] = await Promise.all([
         fetch(`/api/purchase-invoices?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -260,6 +261,9 @@ export default function PurchaseInvoices() {
         fetch('/api/projects?status=all', {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        fetch('/api/customers?partyRole=supplier&limit=100', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       const json = await res.json();
       const attachPurchasesJson = await attachPurchasesRes.json();
@@ -269,6 +273,7 @@ export default function PurchaseInvoices() {
       const statsJson = await statsRes.json();
       const storageJson = await storageRes.json();
       const projectsJson = await projectsRes.json();
+      const suppliersJson = await suppliersRes.json();
       if (storageJson.data) setStorageUsage(storageJson.data);
       let data: PurchaseInvoice[] = json.data ?? [];
       if (vatTypeFilter !== 'all') data = data.filter((p) => p.vatType === vatTypeFilter);
@@ -279,6 +284,7 @@ export default function PurchaseInvoices() {
       setDocumentLibrary(libraryJson.data ?? []);
       setDocumentStats(statsJson.data ?? null);
       setProjects(projectsJson.data ?? []);
+      setSupplierOptions(suppliersJson.data ?? []);
     } catch {
       setItems([]);
       setAttachPurchaseTargets([]);
@@ -287,6 +293,7 @@ export default function PurchaseInvoices() {
       setDocumentLibrary([]);
       setDocumentStats(null);
       setProjects([]);
+      setSupplierOptions([]);
     } finally {
       setLoading(false);
     }
@@ -338,6 +345,27 @@ export default function PurchaseInvoices() {
     return true;
   });
   const purchaseTargetOptions = attachPurchaseTargets.length > 0 ? attachPurchaseTargets : items;
+  const supplierQuery = `${form.supplierName} ${form.supplierTaxId}`.trim().toLowerCase();
+  const supplierMatches = supplierQuery.length >= 2
+    ? supplierOptions.filter((supplier) => {
+      const haystack = [
+        supplier.nameTh,
+        supplier.nameEn,
+        supplier.taxId,
+        supplier.branchCode,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(supplierQuery) || haystack.includes(form.supplierName.trim().toLowerCase()) || haystack.includes(form.supplierTaxId);
+    }).slice(0, 5)
+    : supplierOptions.slice(0, 5);
+
+  function applySupplierOption(supplier: Customer) {
+    setForm((prev) => ({
+      ...prev,
+      supplierName: supplier.nameTh,
+      supplierTaxId: supplier.taxId,
+      supplierBranch: supplier.branchCode || '00000',
+    }));
+  }
 
   function documentTitle(doc: DocumentIntake) {
     return doc.ocrResult?.supplierName
@@ -1503,17 +1531,37 @@ export default function PurchaseInvoices() {
                     </select>
                   </div>
                 )}
-                <div className="sm:col-span-2">
-                  <label className="label">
-                    {isThai ? 'ชื่อผู้ขาย' : 'Supplier Name'} *
-                  </label>
-                  <input
-                    value={form.supplierName}
-                    onChange={(e) => field('supplierName', e.target.value)}
-                    className="input-field"
-                    placeholder={isThai ? 'บริษัท ผู้ขาย จำกัด' : 'Supplier Co., Ltd.'}
-                  />
-                </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">
+                      {isThai ? 'ชื่อผู้ขาย' : 'Supplier Name'} *
+                    </label>
+                    <input
+                      value={form.supplierName}
+                      onChange={(e) => field('supplierName', e.target.value)}
+                      className="input-field"
+                      placeholder={isThai ? 'บริษัท ผู้ขาย จำกัด' : 'Supplier Co., Ltd.'}
+                    />
+                    {supplierMatches.length > 0 && (
+                      <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50/60 p-2">
+                        <p className="mb-1 text-xs font-medium text-amber-900">
+                          {isThai ? 'ซัพพลายเออร์ที่บันทึกไว้' : 'Saved suppliers'}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {supplierMatches.map((supplier) => (
+                            <button
+                              key={supplier.id}
+                              type="button"
+                              onClick={() => applySupplierOption(supplier)}
+                              className="rounded-lg bg-white px-2 py-1 text-left text-xs text-slate-700 ring-1 ring-amber-100 hover:bg-amber-100"
+                            >
+                              <span className="block font-semibold">{supplier.nameTh}</span>
+                              <span className="font-mono text-slate-500">{supplier.taxId} · {supplier.branchCode || '00000'}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 <div>
                   <label className="label">
                     {isThai ? 'เลขผู้เสียภาษี' : 'Supplier Tax ID'} * (13 {isThai ? 'หลัก' : 'digits'})

@@ -15,6 +15,7 @@ import type { DriveCustomerDocumentFolder } from '../services/googleDriveService
 import {
   buildCustomerReadiness,
   normalizeCustomerKind,
+  normalizeCustomerPartyRole,
   normalizeCustomerUseCase,
 } from '../services/customerReadinessService';
 import type { CustomerDocumentType, CustomerUseCase } from '../services/customerReadinessService';
@@ -30,6 +31,7 @@ export const customersRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const customerKindSchema = z.enum(['company', 'individual']).default('company');
+const customerPartyRoleSchema = z.enum(['customer', 'supplier', 'both']).default('customer');
 const customerUseCaseSchema = z.enum(['general', 'full_tax_invoice', 'credit', 'contract_project', 'vendor_payee']).default('general');
 const documentTypeSchema = z.enum([
   'company_registration',
@@ -56,6 +58,7 @@ const customerSchema = z.object({
   phone: z.string().optional(),
   contactPerson: z.string().optional(),
   personalId: z.string().length(13).optional().or(z.literal('')),  // เลขบัตร ปชช. (บุคคลธรรมดา)
+  partyRole: customerPartyRoleSchema.optional(),
   customerKind: customerKindSchema.optional(),
   useCase: customerUseCaseSchema.optional(),
 });
@@ -79,17 +82,20 @@ function customerDriveFolder(documentType: CustomerDocumentType): DriveCustomerD
   if (documentType === 'company_registration') return '01_Registration';
   if (documentType === 'vat_certificate') return '02_VAT';
   if (documentType === 'director_id' || documentType === 'personal_id') return '04_ID_Verification';
+  if (documentType === 'bank_account') return '05_Bank_Accounts';
   return '03_Contracts_Credit';
 }
 
 function normalizeCustomerPayload(body: z.infer<typeof customerSchema>) {
   const customerKind = normalizeCustomerKind(body.customerKind, body.personalId);
   const useCase = normalizeCustomerUseCase(body.useCase);
+  const partyRole = normalizeCustomerPartyRole(body.partyRole, useCase);
   const personalId = customerKind === 'individual' ? body.personalId || body.taxId : body.personalId || '';
   return {
     ...body,
+    partyRole,
     customerKind,
-    useCase,
+    useCase: partyRole === 'supplier' && useCase === 'general' ? 'vendor_payee' : useCase,
     personalId,
     branchCode: customerKind === 'individual' ? '00000' : body.branchCode,
     branchNameTh: customerKind === 'individual' ? '' : body.branchNameTh,
@@ -102,8 +108,13 @@ function normalizeCustomerPayload(body: z.infer<typeof customerSchema>) {
 function normalizeCustomerPatch(body: Partial<z.infer<typeof customerSchema>>) {
   const update: Record<string, unknown> = { ...body };
   const explicitKind = body.customerKind;
+  const explicitRole = body.partyRole;
   if (explicitKind) update.customerKind = normalizeCustomerKind(explicitKind, body.personalId);
-  if (body.useCase) update.useCase = normalizeCustomerUseCase(body.useCase);
+  if (explicitRole) update.partyRole = normalizeCustomerPartyRole(explicitRole, body.useCase);
+  if (body.useCase || explicitRole === 'supplier') {
+    const useCase = normalizeCustomerUseCase(body.useCase);
+    update.useCase = explicitRole === 'supplier' && useCase === 'general' ? 'vendor_payee' : useCase;
+  }
   if (explicitKind === 'individual') {
     const personalId = body.personalId || body.taxId || '';
     update.taxId = personalId;
@@ -121,6 +132,7 @@ function normalizeCustomerPatch(body: Partial<z.infer<typeof customerSchema>>) {
 
 function withReadiness<T extends {
   documents?: Array<{ documentType: string; status: string }>;
+  partyRole?: string | null;
   customerKind?: string | null;
   useCase?: string | null;
   personalId?: string | null;
@@ -198,18 +210,27 @@ function supportedCustomerDocumentMimeType(mimeType: string) {
 
 customersRouter.get('/', async (req, res) => {
   try {
-    const { search, page = '1', limit = '50' } = req.query;
+    const { search, page = '1', limit = '50', partyRole } = req.query;
     const pageNumber = parseInt(page as string);
     const limitNumber = parseInt(limit as string);
     const skip = (pageNumber - 1) * limitNumber;
 
     const where: Record<string, unknown> = { companyId: req.user!.companyId, isActive: true };
+    const andFilters: Array<Record<string, unknown>> = [];
+    if (partyRole === 'customer' || partyRole === 'supplier') {
+      andFilters.push({ OR: [{ partyRole }, { partyRole: 'both' }] });
+    } else if (partyRole === 'both') {
+      andFilters.push({ partyRole: 'both' });
+    }
     if (search) {
-      where.OR = [
+      andFilters.push({ OR: [
         { nameTh: { contains: search as string } },
         { nameEn: { contains: search as string, mode: 'insensitive' } },
         { taxId: { contains: search as string } },
-      ];
+      ] });
+    }
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
     }
 
     const { customers, total } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {

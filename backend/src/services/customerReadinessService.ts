@@ -1,4 +1,5 @@
 export type CustomerKind = 'company' | 'individual';
+export type CustomerPartyRole = 'customer' | 'supplier' | 'both';
 export type CustomerUseCase = 'general' | 'full_tax_invoice' | 'credit' | 'contract_project' | 'vendor_payee';
 export type CustomerVerificationStatus = 'not_required' | 'missing' | 'partial' | 'complete';
 export type CustomerVatEvidenceStatus = 'not_required' | 'missing' | 'uploaded' | 'verified';
@@ -19,6 +20,7 @@ export interface CustomerReadinessDocument {
 }
 
 export interface CustomerReadinessInput {
+  partyRole?: string | null;
   customerKind?: string | null;
   useCase?: string | null;
   nameTh?: string | null;
@@ -47,6 +49,7 @@ export interface CustomerReadinessSummary {
 
 export const customerUseCases: CustomerUseCase[] = ['general', 'full_tax_invoice', 'credit', 'contract_project', 'vendor_payee'];
 export const customerKinds: CustomerKind[] = ['company', 'individual'];
+export const customerPartyRoles: CustomerPartyRole[] = ['customer', 'supplier', 'both'];
 
 export function normalizeCustomerKind(value?: string | null, personalId?: string | null): CustomerKind {
   if (value === 'company' || value === 'individual') return value;
@@ -55,6 +58,11 @@ export function normalizeCustomerKind(value?: string | null, personalId?: string
 
 export function normalizeCustomerUseCase(value?: string | null): CustomerUseCase {
   return customerUseCases.includes(value as CustomerUseCase) ? value as CustomerUseCase : 'general';
+}
+
+export function normalizeCustomerPartyRole(value?: string | null, useCase?: string | null): CustomerPartyRole {
+  if (value === 'customer' || value === 'supplier' || value === 'both') return value;
+  return useCase === 'vendor_payee' ? 'supplier' : 'customer';
 }
 
 function hasDocument(documents: CustomerReadinessDocument[], documentType: CustomerDocumentType) {
@@ -67,17 +75,20 @@ export function buildCustomerReadiness(
 ): CustomerReadinessSummary {
   const customerKind = normalizeCustomerKind(customer.customerKind, customer.personalId);
   const useCase = normalizeCustomerUseCase(customer.useCase);
+  const partyRole = normalizeCustomerPartyRole(customer.partyRole, useCase);
   const isCompany = customerKind === 'company';
+  const isSupplier = partyRole === 'supplier' || partyRole === 'both' || useCase === 'vendor_payee';
   const needsVatEvidence = isCompany && ['full_tax_invoice', 'credit', 'contract_project'].includes(useCase);
   const needsRegistration = isCompany && ['credit', 'contract_project', 'vendor_payee'].includes(useCase);
   const needsContract = ['credit', 'contract_project'].includes(useCase);
   const recommendsPersonalIdEvidence = !isCompany && ['credit', 'contract_project', 'vendor_payee'].includes(useCase);
+  const recommendsBankAccount = isSupplier;
 
   const items: CustomerReadinessItem[] = [
     {
       key: 'basic_identity',
-      labelTh: isCompany ? 'ข้อมูลบริษัทครบถ้วน' : 'ข้อมูลบุคคลครบถ้วน',
-      labelEn: isCompany ? 'Company details complete' : 'Individual details complete',
+      labelTh: isCompany ? (isSupplier ? 'ข้อมูลซัพพลายเออร์ครบถ้วน' : 'ข้อมูลบริษัทครบถ้วน') : 'ข้อมูลบุคคลครบถ้วน',
+      labelEn: isCompany ? (isSupplier ? 'Supplier details complete' : 'Company details complete') : 'Individual details complete',
       required: true,
       complete: Boolean(customer.nameTh && customer.taxId?.length === 13 && customer.addressTh),
     },
@@ -135,6 +146,17 @@ export function buildCustomerReadiness(
       required: false,
       documentType: 'personal_id',
       complete: hasDocument(documents, 'personal_id'),
+    });
+  }
+
+  if (recommendsBankAccount) {
+    items.push({
+      key: 'bank_account',
+      labelTh: 'หลักฐานบัญชีรับเงิน / ข้อมูลจ่ายเงิน',
+      labelEn: 'Bank account or payee evidence',
+      required: false,
+      documentType: 'bank_account',
+      complete: hasDocument(documents, 'bank_account'),
     });
   }
 

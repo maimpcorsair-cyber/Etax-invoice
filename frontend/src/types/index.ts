@@ -78,6 +78,7 @@ export interface Company {
 export interface Customer {
   id: string;
   companyId: string;
+  partyRole?: CustomerPartyRole;
   customerKind?: CustomerKind;
   useCase?: CustomerUseCase;
   verificationStatus?: CustomerVerificationStatus;
@@ -100,6 +101,7 @@ export interface Customer {
   readiness?: CustomerReadinessSummary;
 }
 
+export type CustomerPartyRole = 'customer' | 'supplier' | 'both';
 export type CustomerKind = 'company' | 'individual';
 export type CustomerUseCase = 'general' | 'full_tax_invoice' | 'credit' | 'contract_project' | 'vendor_payee';
 export type CustomerVerificationStatus = 'not_required' | 'missing' | 'partial' | 'complete';

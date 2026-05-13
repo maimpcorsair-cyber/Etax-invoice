@@ -3,9 +3,10 @@ import type { Customer } from '../types';
 
 interface Options {
   token: string | null;
+  partyRole?: 'customer' | 'supplier' | 'both' | 'all';
 }
 
-export function useCustomerSearch({ token }: Options) {
+export function useCustomerSearch({ token, partyRole = 'customer' }: Options) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -13,10 +14,11 @@ export function useCustomerSearch({ token }: Options) {
   useEffect(() => {
     if (!token) return;
     const fetchCustomers = async () => {
-      const params = customerSearch
-        ? `?search=${encodeURIComponent(customerSearch)}`
-        : '';
-      const res = await fetch(`/api/customers${params}`, {
+      const params = new URLSearchParams();
+      if (customerSearch) params.set('search', customerSearch);
+      if (partyRole !== 'all') params.set('partyRole', partyRole);
+      const query = params.toString();
+      const res = await fetch(`/api/customers${query ? `?${query}` : ''}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
@@ -24,7 +26,7 @@ export function useCustomerSearch({ token }: Options) {
     };
     const timer = setTimeout(fetchCustomers, 300);
     return () => clearTimeout(timer);
-  }, [customerSearch, token]);
+  }, [customerSearch, partyRole, token]);
 
   const clearResults = () => setCustomers([]);
   const clearCustomer = () => {

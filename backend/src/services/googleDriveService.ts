@@ -129,7 +129,8 @@ export type DriveCustomerDocumentFolder =
   | '01_Registration'
   | '02_VAT'
   | '03_Contracts_Credit'
-  | '04_ID_Verification';
+  | '04_ID_Verification'
+  | '05_Bank_Accounts';
 
 export interface DriveUploadOptions {
   projectCode?: string | null;

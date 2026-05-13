@@ -366,12 +366,12 @@ export default function Dashboard() {
       icon: UserCheck,
       href: '/app/customers',
       value: stats ? `${stats.customerReadiness?.actionNeeded ?? 0}` : '—',
-      title: isThai ? 'ลูกค้าข้อมูลยังไม่พร้อม' : 'Customer data to review',
+      title: isThai ? 'คู่ค้าข้อมูลยังไม่พร้อม' : 'Counterparty data to review',
       detail: stats?.customerReadiness?.vatEvidenceMissing
         ? (isThai ? `รอ ภ.พ.20 / VAT ${stats.customerReadiness.vatEvidenceMissing} ราย` : `${stats.customerReadiness.vatEvidenceMissing} VAT evidence items missing`)
-        : (isThai ? 'เช็คลูกค้าตามเคสก่อนเปิดเครดิต/สัญญา' : 'Review customer evidence by use case'),
+        : (isThai ? 'เช็คลูกค้า/ซัพพลายเออร์ตามเคสก่อนเปิดเครดิต/สัญญา' : 'Review customer and supplier evidence by use case'),
       tone: (stats?.customerReadiness?.actionNeeded ?? 0) > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-900',
-      action: isThai ? 'เปิดลูกค้า' : 'Open customers',
+      action: isThai ? 'เปิดคู่ค้า' : 'Open counterparties',
     },
   ];
 

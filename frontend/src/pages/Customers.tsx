@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
-import type { Customer, CustomerDocument, CustomerDocumentType, CustomerKind, CustomerReadinessSummary, CustomerUseCase } from '../types';
+import type { Customer, CustomerDocument, CustomerDocumentType, CustomerKind, CustomerPartyRole, CustomerReadinessSummary, CustomerUseCase } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { digitsOnly, englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isFiveDigitBranchCode, isThaiText, isThirteenDigitId, thaiTextOnly } from '../lib/inputGuards';
 
 const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> = {
+  partyRole: 'customer',
   customerKind: 'company',
   useCase: 'general',
   verificationStatus: 'not_required',
@@ -34,6 +35,12 @@ const CUSTOMER_USE_CASE_OPTIONS: Array<{ value: CustomerUseCase; labelTh: string
   { value: 'credit', labelTh: 'เปิดเครดิต', labelEn: 'Credit account' },
   { value: 'contract_project', labelTh: 'ทำสัญญา/โครงการ', labelEn: 'Contract / project' },
   { value: 'vendor_payee', labelTh: 'คู่ค้า/ผู้รับเงิน', labelEn: 'Vendor / payee' },
+];
+
+const PARTY_ROLE_OPTIONS: Array<{ value: CustomerPartyRole; labelTh: string; labelEn: string; descriptionTh: string; descriptionEn: string }> = [
+  { value: 'customer', labelTh: 'ลูกค้า', labelEn: 'Customer', descriptionTh: 'ใช้กับเอกสารขายและลูกหนี้', descriptionEn: 'For sales documents and receivables' },
+  { value: 'supplier', labelTh: 'ซัพพลายเออร์', labelEn: 'Supplier', descriptionTh: 'ใช้กับบันทึกซื้อ ภาษีซื้อ และจ่ายเงิน', descriptionEn: 'For purchases, input VAT, and payments' },
+  { value: 'both', labelTh: 'ทั้งสอง', labelEn: 'Both', descriptionTh: 'บริษัทเดียวกันเป็นได้ทั้งลูกค้าและผู้ขาย', descriptionEn: 'Same party can be buyer and vendor' },
 ];
 
 interface DbdLocalSuggestion {
@@ -138,6 +145,7 @@ export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [partyRoleFilter, setPartyRoleFilter] = useState<CustomerPartyRole | 'all'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [customerKind, setCustomerKind] = useState<CustomerKind>('company');
@@ -153,6 +161,8 @@ export default function Customers() {
   const [appliedDbdSuggestion, setAppliedDbdSuggestion] = useState<DbdLocalSuggestion | null>(null);
   const isIndividual = customerKind === 'individual';
   const currentUseCase = (form.useCase ?? 'general') as CustomerUseCase;
+  const currentPartyRole = (form.partyRole ?? 'customer') as CustomerPartyRole;
+  const isSupplierRole = currentPartyRole === 'supplier' || currentPartyRole === 'both' || currentUseCase === 'vendor_payee';
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
@@ -171,13 +181,14 @@ export default function Customers() {
     const needsRegistration = isCompany && ['credit', 'contract_project', 'vendor_payee'].includes(currentUseCase);
     const needsContract = ['credit', 'contract_project'].includes(currentUseCase);
     const recommendsPersonalIdEvidence = !isCompany && ['credit', 'contract_project', 'vendor_payee'].includes(currentUseCase);
+    const recommendsBankAccount = isSupplierRole;
     const hasDoc = (documentType: CustomerDocumentType) =>
       customerDocuments.some((doc) => doc.documentType === documentType && doc.status !== 'rejected');
 
     const items: CustomerReadinessSummary['items'] = [{
       key: 'basic_identity',
-      labelTh: isCompany ? 'ข้อมูลบริษัทครบถ้วน' : 'ข้อมูลบุคคลครบถ้วน',
-      labelEn: isCompany ? 'Company details complete' : 'Individual details complete',
+      labelTh: isCompany ? (isSupplierRole ? 'ข้อมูลซัพพลายเออร์ครบถ้วน' : 'ข้อมูลบริษัทครบถ้วน') : 'ข้อมูลบุคคลครบถ้วน',
+      labelEn: isCompany ? (isSupplierRole ? 'Supplier details complete' : 'Company details complete') : 'Individual details complete',
       required: true,
       complete: Boolean(form.nameTh && form.taxId.length === 13 && form.addressTh),
     }];
@@ -233,6 +244,16 @@ export default function Customers() {
         complete: hasDoc('personal_id'),
       });
     }
+    if (recommendsBankAccount) {
+      items.push({
+        key: 'bank_account',
+        labelTh: 'หลักฐานบัญชีรับเงิน / ข้อมูลจ่ายเงิน',
+        labelEn: 'Bank account or payee evidence',
+        required: false,
+        documentType: 'bank_account',
+        complete: hasDoc('bank_account'),
+      });
+    }
 
     const requiredItems = items.filter((item) => item.required);
     const missingRequiredCount = requiredItems.filter((item) => !item.complete).length;
@@ -253,13 +274,16 @@ export default function Customers() {
 
   const localReadiness = buildLocalReadiness();
 
-  const fetchCustomers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`/api/customers${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const fetchCustomers = useCallback(async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (partyRoleFilter !== 'all') params.set('partyRole', partyRoleFilter);
+        const query = params.toString();
+        const res = await fetch(`/api/customers${query ? `?${query}` : ''}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       const json = await res.json();
       setCustomers(json.data ?? []);
     } catch {
@@ -267,7 +291,7 @@ export default function Customers() {
     } finally {
       setLoading(false);
     }
-  }, [search, token]);
+    }, [partyRoleFilter, search, token]);
 
   useEffect(() => {
     const t = setTimeout(fetchCustomers, 300);
@@ -275,7 +299,7 @@ export default function Customers() {
   }, [fetchCustomers]);
 
   useEffect(() => {
-    if (!showModal || !token) return;
+      if (!showModal || !token || isIndividual) return;
     const trimmed = dbdQuery.trim();
     const digits = trimmed.replace(/\D/g, '');
     if (trimmed.length < 3 && digits.length < 3) {
@@ -309,7 +333,7 @@ export default function Customers() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [dbdQuery, showModal, token]);
+    }, [dbdQuery, isIndividual, showModal, token]);
 
   function resetDbdAssist() {
     setDbdQuery('');
@@ -319,14 +343,18 @@ export default function Customers() {
     setAppliedDbdSuggestion(null);
   }
 
-  function openCreate() {
+  function openCreate(initialRole: CustomerPartyRole = 'customer') {
     if (policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers) {
-      setError(isThai ? 'ถึงจำนวนลูกค้าสูงสุดของแพ็กเกจแล้ว' : 'You reached the customer limit for this plan');
+      setError(isThai ? 'ถึงจำนวนคู่ค้าสูงสุดของแพ็กเกจแล้ว' : 'You reached the counterparty limit for this plan');
       return;
     }
     setEditing(null);
     setCustomerKind('company');
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      partyRole: initialRole,
+      useCase: initialRole === 'supplier' ? 'vendor_payee' : 'general',
+    });
     setCustomerDocuments([]);
     setError('');
     resetDbdAssist();
@@ -341,6 +369,7 @@ export default function Customers() {
     setCustomerDocuments(c.documents ?? []);
     setForm({
       customerKind: kind,
+      partyRole: c.partyRole ?? (c.useCase === 'vendor_payee' ? 'supplier' : 'customer'),
       useCase: c.useCase ?? 'general',
       verificationStatus: c.verificationStatus ?? 'not_required',
       vatEvidenceStatus: c.vatEvidenceStatus ?? 'not_required',
@@ -374,10 +403,11 @@ export default function Customers() {
     }
     if (!form.addressTh.trim() || formValidation.addressTh) { setError(isThai ? 'กรุณากรอกที่อยู่ภาษาไทยให้ถูกต้อง' : 'Please enter a valid Thai address'); return; }
 
-    const payload = isIndividual
-      ? {
-        ...form,
-        customerKind: 'individual',
+      const payload = isIndividual
+        ? {
+          ...form,
+          partyRole: currentPartyRole,
+          customerKind: 'individual',
         useCase: currentUseCase,
         taxId: form.taxId,
         personalId: form.taxId,
@@ -387,9 +417,10 @@ export default function Customers() {
         nameEn: '',
         addressEn: '',
       }
-      : {
-        ...form,
-        customerKind: 'company',
+        : {
+          ...form,
+          partyRole: currentPartyRole,
+          customerKind: 'company',
         useCase: currentUseCase,
         personalId: form.personalId || '',
       };
@@ -434,7 +465,7 @@ export default function Customers() {
   const field = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  function setKind(nextKind: CustomerKind) {
+    function setKind(nextKind: CustomerKind) {
     setCustomerKind(nextKind);
     setError('');
     if (nextKind === 'individual') {
@@ -453,9 +484,22 @@ export default function Customers() {
           addressEn: '',
         };
       });
-    } else {
-      setForm((prev) => ({ ...prev, customerKind: 'company', personalId: '' }));
+      } else {
+        setForm((prev) => ({ ...prev, customerKind: 'company', personalId: '' }));
+      }
     }
+
+  function setPartyRole(nextRole: CustomerPartyRole) {
+    setError('');
+    setForm((prev) => {
+      const current = (prev.useCase ?? 'general') as CustomerUseCase;
+      const nextUseCase = nextRole === 'supplier' && current === 'general'
+        ? 'vendor_payee'
+        : nextRole === 'customer' && current === 'vendor_payee'
+          ? 'general'
+          : current;
+      return { ...prev, partyRole: nextRole, useCase: nextUseCase };
+    });
   }
 
   function setIndividualId(value: string) {
@@ -473,6 +517,18 @@ export default function Customers() {
   function customerIdLabel(customer: Customer) {
     if (customer.personalId) return isThai ? 'เลขบุคคลธรรมดา' : 'Individual ID';
     return isThai ? 'เลขผู้เสียภาษี' : 'Tax ID';
+  }
+
+  function partyRoleLabel(role?: string | null) {
+    if (role === 'supplier') return isThai ? 'ซัพพลายเออร์' : 'Supplier';
+    if (role === 'both') return isThai ? 'ลูกค้า + ซัพพลายเออร์' : 'Customer + supplier';
+    return isThai ? 'ลูกค้า' : 'Customer';
+  }
+
+  function partyRoleBadgeClass(role?: string | null) {
+    if (role === 'supplier') return 'bg-amber-50 text-amber-700 ring-amber-100';
+    if (role === 'both') return 'bg-violet-50 text-violet-700 ring-violet-100';
+    return 'bg-blue-50 text-blue-700 ring-blue-100';
   }
 
   function sourceLabel(suggestion: DbdLocalSuggestion) {
@@ -654,37 +710,71 @@ export default function Customers() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('customer.title')}</h1>
-        <button
-          onClick={openCreate}
-          className="btn-primary"
-          disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
-        >
-          <Plus className="w-4 h-4" />
-          {t('customer.add')}
-        </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{isThai ? 'ลูกค้าและซัพพลายเออร์' : 'Customers & Suppliers'}</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isThai ? 'ฐานข้อมูลคู่ค้ากลาง ใช้ร่วมกับเอกสารขาย บันทึกซื้อ ภาษี และการจ่ายเงิน' : 'One counterparty master for sales, purchases, VAT, and payments.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => openCreate('customer')}
+            className="btn-secondary"
+            disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
+          >
+            <Plus className="w-4 h-4" />
+            {isThai ? 'เพิ่มลูกค้า' : 'Add customer'}
+          </button>
+          <button
+            onClick={() => openCreate('supplier')}
+            className="btn-primary"
+            disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
+          >
+            <Truck className="w-4 h-4" />
+            {isThai ? 'เพิ่มซัพพลายเออร์' : 'Add supplier'}
+          </button>
+        </div>
       </div>
 
       {policy && (
         <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900">
           {isThai
-            ? `ลูกค้าในแพ็กเกจ ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`
-            : `Customers on ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`}
+            ? `คู่ค้าในแพ็กเกจ ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`
+            : `Counterparties on ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`}
         </div>
       )}
 
       {/* Search */}
       <div className="card">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('customer.search')}
-            className="input-field pl-9"
-          />
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'customer', 'supplier', 'both'] as const).map((role) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setPartyRoleFilter(role)}
+                className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  partyRoleFilter === role
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {role === 'supplier' ? <Truck className="h-3.5 w-3.5" /> : <Handshake className="h-3.5 w-3.5" />}
+                {role === 'all' ? (isThai ? 'ทั้งหมด' : 'All') : partyRoleLabel(role)}
+              </button>
+            ))}
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={isThai ? 'ค้นหาชื่อ เลขผู้เสียภาษี ลูกค้า หรือซัพพลายเออร์' : 'Search name, tax ID, customer, or supplier'}
+              className="input-field pl-9"
+            />
+          </div>
         </div>
       </div>
 
@@ -712,13 +802,17 @@ export default function Customers() {
                 </span>
               </div>
               {/* Row 2: subtitle name */}
-              {isThai && c.nameEn && c.nameEn !== c.nameTh && (
-                <p className="text-sm text-gray-500">{c.nameEn}</p>
-              )}
-              {!isThai && c.nameTh && (
-                <p className="text-sm text-gray-500">{c.nameTh}</p>
-              )}
-              {/* Row 3: tax ID */}
+                {isThai && c.nameEn && c.nameEn !== c.nameTh && (
+                  <p className="text-sm text-gray-500">{c.nameEn}</p>
+                )}
+                {!isThai && c.nameTh && (
+                  <p className="text-sm text-gray-500">{c.nameTh}</p>
+                )}
+                <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${partyRoleBadgeClass(c.partyRole)}`}>
+                  {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
+                  {partyRoleLabel(c.partyRole)}
+                </span>
+                {/* Row 3: tax ID */}
               {c.taxId && (
                 <p className="text-xs text-gray-400 font-mono">
                   {customerIdLabel(c)}: {maskedCustomerId(c)}
@@ -786,11 +880,15 @@ export default function Customers() {
               ) : (
                 customers.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="table-cell">
-                      <p className="font-medium">{isThai ? c.nameTh : (c.nameEn ?? c.nameTh)}</p>
-                      {c.nameEn && isThai && <p className="text-xs text-gray-400">{c.nameEn}</p>}
-                      {!isThai && <p className="text-xs text-gray-400">{c.nameTh}</p>}
-                    </td>
+                      <td className="table-cell">
+                        <p className="font-medium">{isThai ? c.nameTh : (c.nameEn ?? c.nameTh)}</p>
+                        {c.nameEn && isThai && <p className="text-xs text-gray-400">{c.nameEn}</p>}
+                        {!isThai && <p className="text-xs text-gray-400">{c.nameTh}</p>}
+                        <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${partyRoleBadgeClass(c.partyRole)}`}>
+                          {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
+                          {partyRoleLabel(c.partyRole)}
+                        </span>
+                      </td>
                     <td className="table-cell font-mono text-xs hidden sm:table-cell">{maskedCustomerId(c)}</td>
                     <td className="table-cell text-gray-500 hidden sm:table-cell">{c.phone ?? '—'}</td>
                     <td className="table-cell text-gray-500 hidden sm:table-cell">{c.email ?? '—'}</td>
@@ -838,21 +936,49 @@ export default function Customers() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">
-                {editing ? t('customer.edit') : t('customer.add')}
-              </h2>
+              <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                <h2 className="text-lg font-bold text-gray-900">
+                  {editing
+                    ? (isThai ? 'แก้ไขคู่ค้า' : 'Edit counterparty')
+                    : currentPartyRole === 'supplier'
+                      ? (isThai ? 'เพิ่มซัพพลายเออร์' : 'Add supplier')
+                      : (isThai ? 'เพิ่มลูกค้า' : 'Add customer')}
+                </h2>
               <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-gray-100">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-              )}
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+                )}
 
-              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                <div>
+                  <label className="label">{isThai ? 'บทบาทในระบบ' : 'Role in Billboy'}</label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {PARTY_ROLE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setPartyRole(option.value)}
+                        className={`rounded-xl border px-3 py-2 text-left transition ${
+                          currentPartyRole === option.value
+                            ? 'border-primary-300 bg-primary-50 text-primary-900 ring-2 ring-primary-100'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          {option.value === 'supplier' ? <Truck className="h-4 w-4" /> : <Handshake className="h-4 w-4" />}
+                          {isThai ? option.labelTh : option.labelEn}
+                        </span>
+                        <span className="mt-1 block text-xs opacity-75">{isThai ? option.descriptionTh : option.descriptionEn}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
                 <button
                   type="button"
                   onClick={() => setKind('company')}
@@ -1001,14 +1127,14 @@ export default function Customers() {
                 <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
-                        <Database className="h-4 w-4" />
-                        {isThai ? 'ค้นข้อมูลบริษัท' : 'Company lookup'}
-                      </div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
+                          <Database className="h-4 w-4" />
+                          {isSupplierRole ? (isThai ? 'ค้นข้อมูลซัพพลายเออร์' : 'Supplier lookup') : (isThai ? 'ค้นข้อมูลบริษัท' : 'Company lookup')}
+                        </div>
                       <p className="mt-1 text-xs text-teal-700">
                         {isThai
-                          ? 'เติมชื่อ เลขผู้เสียภาษี และที่อยู่จากข้อมูลเปิดหรือข้อมูลที่เคยบันทึกไว้'
-                          : 'Fill name, tax ID, and address from open data or saved company records.'}
+                            ? 'เติมชื่อ เลขผู้เสียภาษี และที่อยู่จากข้อมูลเปิดหรือข้อมูลที่เคยบันทึกไว้'
+                            : 'Fill name, tax ID, and address from open data or saved counterparty records.'}
                       </p>
                     </div>
                     {appliedDbdSuggestion && (
@@ -1022,10 +1148,10 @@ export default function Customers() {
                 <div className="mt-3 relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-500" />
                   <input
-                    value={dbdQuery}
+                      value={dbdQuery}
                     onChange={(e) => setDbdQuery(e.target.value)}
                     className="input-field pl-9 bg-white"
-                    placeholder={isThai ? 'พิมพ์ชื่อบริษัทหรือเลขผู้เสียภาษีอย่างน้อย 3 ตัว...' : 'Type company name or at least 3 tax ID digits...'}
+                      placeholder={isThai ? 'พิมพ์ชื่อบริษัท/ซัพพลายเออร์ หรือเลขผู้เสียภาษีอย่างน้อย 3 ตัว...' : 'Type company/supplier name or at least 3 tax ID digits...'}
                   />
                   {dbdLoading && (
                     <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-teal-500" />
@@ -1069,17 +1195,23 @@ export default function Customers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">{isIndividual ? (isThai ? 'ชื่อ-นามสกุล *' : 'Full name *') : `${t('customer.nameTh')} *`}</label>
+                    <label className="label">
+                      {isIndividual
+                        ? (isThai ? 'ชื่อ-นามสกุล *' : 'Full name *')
+                        : isSupplierRole
+                          ? (isThai ? 'ชื่อซัพพลายเออร์ (ไทย) *' : 'Supplier name (TH) *')
+                          : `${t('customer.nameTh')} *`}
+                    </label>
                   <input
                     value={form.nameTh}
                     onChange={(e) => field('nameTh', thaiTextOnly(e.target.value))}
                     className={guardedInputClass(formValidation.nameTh)}
-                    placeholder={isIndividual ? 'สมชาย ใจดี' : 'บริษัท ตัวอย่าง จำกัด'}
+                      placeholder={isIndividual ? 'สมชาย ใจดี' : isSupplierRole ? 'บริษัท ผู้ขาย จำกัด' : 'บริษัท ตัวอย่าง จำกัด'}
                   />
                   <p className={inputGuide(formValidation.nameTh)}>
                     {isIndividual
                       ? (isThai ? 'ใช้ชื่อตามเอกสารของลูกค้า เช่น สมชาย ใจดี' : 'Use the customer name for the document.')
-                      : (isThai ? 'ใช้ชื่อภาษาไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Thai only, e.g. บริษัท ตัวอย่าง จำกัด')}
+                        : (isThai ? 'ใช้ชื่อภาษาไทยตามเอกสารของคู่ค้า' : 'Use the Thai legal name from the counterparty document.')}
                   </p>
                 </div>
                 {!isIndividual && (
@@ -1095,7 +1227,9 @@ export default function Customers() {
                   <label className="label">
                     {isIndividual
                       ? (isThai ? 'เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา *' : '13-digit individual ID *')
-                      : `${t('customer.taxId')} * (13 ${isThai ? 'หลัก' : 'digits'})`}
+                        : isSupplierRole
+                          ? `${isThai ? 'เลขผู้เสียภาษีซัพพลายเออร์' : 'Supplier Tax ID'} * (13 ${isThai ? 'หลัก' : 'digits'})`
+                          : `${t('customer.taxId')} * (13 ${isThai ? 'หลัก' : 'digits'})`}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -1156,7 +1290,7 @@ export default function Customers() {
                   <label className="label">{t('customer.addressTh')} *</label>
                   <textarea value={form.addressTh} onChange={(e) => field('addressTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.addressTh)} rows={2} placeholder="123 ถนนตัวอย่าง แขวง... เขต... กรุงเทพฯ 10110" />
                   <p className={inputGuide(formValidation.addressTh)}>
-                    {isThai ? 'ใช้ที่อยู่ภาษาไทยสำหรับเอกสารภาษี' : 'Use Thai address text for tax documents.'}
+                      {isThai ? 'ใช้ที่อยู่ภาษาไทยสำหรับเอกสารภาษีและการตรวจ audit' : 'Use Thai address text for tax documents and audit checks.'}
                   </p>
                 </div>
                 {!isIndividual && (

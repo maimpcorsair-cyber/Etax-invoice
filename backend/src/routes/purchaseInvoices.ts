@@ -143,6 +143,30 @@ async function findDuplicatePurchase(companyId: string, supplierTaxId: string, i
   });
 }
 
+async function markExistingCounterpartyAsSupplier(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  supplierTaxId: string,
+  supplierBranch?: string | null,
+) {
+  if (!supplierTaxId || supplierTaxId.length !== 13) return;
+  const branchCode = supplierBranch || '00000';
+  const counterparty = await tx.customer.findFirst({
+    where: { companyId, taxId: supplierTaxId, branchCode },
+    select: { id: true, partyRole: true, useCase: true },
+  });
+  if (!counterparty) return;
+
+  await tx.customer.update({
+    where: { id: counterparty.id },
+    data: {
+      partyRole: counterparty.partyRole === 'customer' ? 'both' : counterparty.partyRole || 'supplier',
+      useCase: counterparty.useCase === 'general' ? 'vendor_payee' : counterparty.useCase,
+      isActive: true,
+    },
+  });
+}
+
 function normalizeOcrPurchasePayload(result: OcrResult, fileUrl?: string | null) {
   const supplierTaxId = (result.supplierTaxId ?? '').replace(/\D/g, '');
   const invoiceDate = result.invoiceDate || new Date().toISOString().slice(0, 10);
@@ -840,14 +864,22 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
       return;
     }
 
-    const created = await prisma.purchaseInvoice.create({
-      data: {
-        companyId: req.user!.companyId,
-        projectId: item.projectId,
-        ...normalized.payload,
-        total: normalized.payload.subtotal + normalized.payload.vatAmount,
-        createdBy: req.user!.userId,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      await markExistingCounterpartyAsSupplier(
+        tx,
+        req.user!.companyId,
+        normalized.payload.supplierTaxId,
+        normalized.payload.supplierBranch,
+      );
+      return tx.purchaseInvoice.create({
+        data: {
+          companyId: req.user!.companyId,
+          projectId: item.projectId,
+          ...normalized.payload,
+          total: normalized.payload.subtotal + normalized.payload.vatAmount,
+          createdBy: req.user!.userId,
+        },
+      });
     });
     const updated = await prisma.documentIntake.update({
       where: { id: item.id },
@@ -1027,6 +1059,7 @@ purchaseInvoicesRouter.post('/', requireRole('admin', 'super_admin', 'accountant
 
     const created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       await assertProjectBelongsToCompany(req.user!.companyId, body.projectId, tx);
+      await markExistingCounterpartyAsSupplier(tx, req.user!.companyId, body.supplierTaxId, body.supplierBranch);
       return tx.purchaseInvoice.create({
         data: {
           companyId: req.user!.companyId,
@@ -1101,6 +1134,7 @@ purchaseInvoicesRouter.patch('/:id', requireRole('admin', 'super_admin', 'accoun
 
     const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       await assertProjectBelongsToCompany(req.user!.companyId, body.projectId, tx);
+      await markExistingCounterpartyAsSupplier(tx, req.user!.companyId, body.supplierTaxId, body.supplierBranch);
       return tx.purchaseInvoice.update({
         where: { id: existing.id },
         data: {
