@@ -1,0 +1,40 @@
+name: Trigger Render Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Render service to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - api
+          - worker
+      clear_cache:
+        description: Clear Render build cache
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  trigger:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger Render deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_API_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_WORKER_SERVICE_ID: ${{ secrets.RENDER_WORKER_SERVICE_ID }}
+          RENDER_TARGET: ${{ inputs.target }}
+          RENDER_CLEAR_CACHE: ${{ inputs.clear_cache }}
+        run: node scripts/render-trigger-deploy.mjs

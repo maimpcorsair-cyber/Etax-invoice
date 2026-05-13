@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "render:status": "node scripts/render-deploy-status.mjs"
+    "render:status": "node scripts/render-deploy-status.mjs",
+    "render:deploy": "node scripts/render-trigger-deploy.mjs"
   },
   "devDependencies": {
     "prisma": "^5.22.0"
