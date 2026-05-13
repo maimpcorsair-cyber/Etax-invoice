@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 19:48 Asia/Bangkok
+Last updated: 2026-05-13 20:00 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -79,6 +79,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - Worker now skips DBD sync on continuation chunks and only runs DBD on the first source/start row, preventing accidental repeated full DBD imports if `OPEN_DBD_DATA_URL` is configured later.
     - Added super-admin read-only queue status endpoint `GET /api/dbd/sync/job/status` to inspect BullMQ waiting/active/delayed/failed jobs before running large nationwide syncs.
     - Production queue-status verification showed a 1k province test job failed with BullMQ `job stalled more than allowable limit` while loading the large 120 MiB province CSV. Worker lock duration is now configurable via `RD_VAT_SYNC_LOCK_DURATION_MS` and defaults to 15 minutes for long RD VAT chunks.
+    - RD VAT CSV sync now streams URL/file input and stops reading after the requested chunk. This avoids downloading the entire 120 MiB province CSV for every small chunk and keeps province imports cheaper on Render bandwidth/worker time.
     - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.

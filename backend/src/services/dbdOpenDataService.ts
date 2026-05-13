@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
@@ -7,6 +8,13 @@ import { tenantRlsContext, withRlsContext } from '../config/rls';
 import type { AuthPayload } from '../middleware/auth';
 
 type RawRow = Record<string, unknown>;
+type OpenDataSourceRef = {
+  source: string;
+  sourceIndex: number;
+  sourceCount: number;
+  file?: string;
+  url?: string;
+};
 
 export interface LocalJuristicSuggestion {
   taxId: string;
@@ -531,6 +539,54 @@ function* iterateCsvRows(text: string): Generator<RawRow> {
   yield* flushRow();
 }
 
+async function* iterateCsvRowsFromChunks(chunks: AsyncIterable<string>): AsyncGenerator<RawRow> {
+  let cell = '';
+  let row: string[] = [];
+  let quoted = false;
+  let headers: string[] | null = null;
+
+  const flushRow = function* (): Generator<RawRow> {
+    if (!row.some((item) => item.trim())) {
+      row = [];
+      cell = '';
+      return;
+    }
+
+    if (!headers) {
+      headers = row.map((header) => sanitizeOpenDataText(header).replace(/^\uFEFF/, ''));
+    } else {
+      yield csvRowToObject(headers, row);
+    }
+    row = [];
+    cell = '';
+  };
+
+  for await (const chunk of chunks) {
+    for (let index = 0; index < chunk.length; index += 1) {
+      const char = chunk[index];
+      const next = chunk[index + 1];
+      if (char === '"' && quoted && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === ',' && !quoted) {
+        row.push(cell);
+        cell = '';
+      } else if ((char === '\n' || char === '\r') && !quoted) {
+        if (char === '\r' && next === '\n') index += 1;
+        row.push(cell);
+        yield* flushRow();
+      } else {
+        cell += char;
+      }
+    }
+  }
+
+  row.push(cell);
+  yield* flushRow();
+}
+
 function parseRows(text: string): RawRow[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
@@ -616,7 +672,7 @@ export function getRdVatOpenDataSourceCount() {
   return Math.max(getOpenDataFiles('vat').length, getOpenDataUrls('vat').length);
 }
 
-async function readSourceText(kind: 'dbd' | 'vat', sourceIndex = 0): Promise<{ text: string; source: string; sourceIndex: number; sourceCount: number } | null> {
+function getOpenDataSourceRef(kind: 'dbd' | 'vat', sourceIndex = 0): OpenDataSourceRef | null {
   const files = getOpenDataFiles(kind);
   const urls = getOpenDataUrls(kind);
   const sourceCount = Math.max(files.length, urls.length);
@@ -630,25 +686,77 @@ async function readSourceText(kind: 'dbd' | 'vat', sourceIndex = 0): Promise<{ t
 
   if (file?.trim()) {
     return {
-      text: decodeSourceBuffer(await readFile(file.trim()), kind),
       source: describeOpenDataSource(kind, file.trim(), sourceIndex, sourceCount),
       sourceIndex,
       sourceCount,
+      file: file.trim(),
     };
   }
 
   if (url?.trim()) {
-    const res = await fetch(url.trim());
-    if (!res.ok) throw new Error(`${kind.toUpperCase()} open data returned ${res.status}`);
     return {
-      text: decodeSourceBuffer(Buffer.from(await res.arrayBuffer()), kind),
       source: describeOpenDataSource(kind, url.trim(), sourceIndex, sourceCount),
       sourceIndex,
       sourceCount,
+      url: url.trim(),
     };
   }
 
   return null;
+}
+
+async function readSourceText(kind: 'dbd' | 'vat', sourceIndex = 0): Promise<{ text: string; source: string; sourceIndex: number; sourceCount: number } | null> {
+  const ref = getOpenDataSourceRef(kind, sourceIndex);
+  if (!ref) return null;
+
+  if (ref.file) {
+    return { ...ref, text: decodeSourceBuffer(await readFile(ref.file), kind) };
+  }
+
+  if (ref.url) {
+    const res = await fetch(ref.url);
+    if (!res.ok) throw new Error(`${kind.toUpperCase()} open data returned ${res.status}`);
+    return { ...ref, text: decodeSourceBuffer(Buffer.from(await res.arrayBuffer()), kind) };
+  }
+
+  return null;
+}
+
+async function* readSourceTextChunks(ref: OpenDataSourceRef, kind: 'dbd' | 'vat'): AsyncGenerator<string> {
+  const preferredEncoding = kind === 'vat'
+    ? (process.env.RD_VAT_DATA_ENCODING ?? process.env.VAT_OPEN_DATA_ENCODING ?? 'windows-874')
+    : (process.env.OPEN_DBD_DATA_ENCODING ?? process.env.DBD_OPEN_DATA_ENCODING ?? 'utf-8');
+  const decoder = new TextDecoder(preferredEncoding);
+
+  if (ref.file) {
+    for await (const chunk of createReadStream(ref.file)) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      yield decoder.decode(buffer, { stream: true }).replace(/\u0000/g, '');
+    }
+    const tail = decoder.decode();
+    if (tail) yield tail.replace(/\u0000/g, '');
+    return;
+  }
+
+  if (!ref.url) return;
+
+  const res = await fetch(ref.url);
+  if (!res.ok) throw new Error(`${kind.toUpperCase()} open data returned ${res.status}`);
+  if (!res.body) throw new Error(`${kind.toUpperCase()} open data response did not include a body`);
+
+  const reader = res.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      yield decoder.decode(value, { stream: true }).replace(/\u0000/g, '');
+    }
+    const tail = decoder.decode();
+    if (tail) yield tail.replace(/\u0000/g, '');
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
 }
 
 async function recordSyncRun(input: Omit<SyncResult, 'status'> & { status: SyncResult['status']; triggeredBy?: string; startedAt: Date }) {
@@ -965,8 +1073,8 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
   );
 
   try {
-    const source = await readSourceText('vat', sourceIndex);
-    if (!source) {
+    const sourceRef = getOpenDataSourceRef('vat', sourceIndex);
+    if (!sourceRef) {
       const configuredSourceCount = getRdVatOpenDataSourceCount();
       const result: SyncResult = {
         kind: 'rd_vat',
@@ -987,7 +1095,10 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
     let recordsRead = 0;
     let recordsUpserted = 0;
 
-    if (/^\s*[\[{]/.test(source.text)) {
+    const source = sourceRef.source.toLowerCase().endsWith('.json')
+      ? await readSourceText('vat', sourceIndex)
+      : null;
+    if (source && /^\s*[\[{]/.test(source.text)) {
       const rows = parseRows(source.text).slice(startRow, maxRows ? startRow + maxRows : undefined);
       const records = rows.map(normalizeVatRecord).filter((record): record is NormalizedVatRecord => Boolean(record));
       recordsRead = rows.length;
@@ -995,7 +1106,7 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
     } else {
       let batch: NormalizedVatRecord[] = [];
       let rowIndex = 0;
-      for (const row of iterateCsvRows(source.text)) {
+      for await (const row of iterateCsvRowsFromChunks(readSourceTextChunks(sourceRef, 'vat'))) {
         rowIndex += 1;
         if (rowIndex <= startRow) continue;
         if (maxRows && recordsRead >= maxRows) break;
@@ -1020,9 +1131,9 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
     const result: SyncResult = {
       kind: 'rd_vat',
       status: 'success',
-      source: source.source,
-      sourceIndex: source.sourceIndex,
-      sourceCount: source.sourceCount,
+      source: sourceRef.source,
+      sourceIndex: sourceRef.sourceIndex,
+      sourceCount: sourceRef.sourceCount,
       recordsRead,
       recordsUpserted,
     };
