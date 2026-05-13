@@ -1,7 +1,7 @@
 import { Job, Worker } from 'bullmq';
 import redis from '../../config/redis';
 import { logger } from '../../config/logger';
-import { syncAllOpenDataCaches } from '../../services/dbdOpenDataService';
+import { getRdVatOpenDataSourceCount, syncAllOpenDataCaches } from '../../services/dbdOpenDataService';
 import {
   DBD_OPEN_DATA_SYNC_QUEUE_NAME,
   dbdOpenDataSyncQueue,
@@ -11,7 +11,7 @@ import {
 const DEFAULT_CHUNK_SIZE = parseInt(process.env.RD_VAT_SYNC_JOB_CHUNK_SIZE ?? '10000', 10);
 const DEFAULT_BATCH_DELAY_MS = parseInt(process.env.RD_VAT_SYNC_BATCH_DELAY_MS ?? '150', 10);
 const DEFAULT_DELAY_BETWEEN_JOBS_MS = parseInt(process.env.RD_VAT_SYNC_NEXT_JOB_DELAY_MS ?? '30000', 10);
-const DEFAULT_CONTINUE_UNTIL_ROW = parseInt(process.env.RD_VAT_SYNC_CONTINUE_UNTIL_ROW ?? '400000', 10);
+const DEFAULT_CONTINUE_UNTIL_ROW = parseInt(process.env.RD_VAT_SYNC_CONTINUE_UNTIL_ROW ?? '2000000', 10);
 
 function clamp(value: number | undefined, fallback: number, min: number, max: number) {
   if (!Number.isFinite(value ?? NaN)) return fallback;
@@ -27,10 +27,11 @@ function toSafeJobIdPart(value: string) {
     'weekly-open-data-sync',
     {
       triggeredBy: 'cron',
+      vatSourceIndex: 0,
       vatStartRow: 0,
       vatMaxRows: clamp(DEFAULT_CHUNK_SIZE, 10000, 1000, 50000),
       vatDelayMs: clamp(DEFAULT_BATCH_DELAY_MS, 150, 0, 5000),
-      continueUntilRow: clamp(DEFAULT_CONTINUE_UNTIL_ROW, 400000, 1, 1000000),
+      continueUntilRow: clamp(DEFAULT_CONTINUE_UNTIL_ROW, 2000000, 1, 5000000),
       delayBetweenJobsMs: clamp(DEFAULT_DELAY_BETWEEN_JOBS_MS, 30000, 0, 3600000),
       autoContinue: true,
     },
@@ -45,30 +46,39 @@ function toSafeJobIdPart(value: string) {
 export const dbdOpenDataSyncWorker = new Worker<DbdOpenDataSyncJobData>(
   DBD_OPEN_DATA_SYNC_QUEUE_NAME,
   async (job: Job<DbdOpenDataSyncJobData>) => {
+    const vatSourceIndex = clamp(job.data.vatSourceIndex, 0, 0, Number.MAX_SAFE_INTEGER);
     const vatStartRow = clamp(job.data.vatStartRow, 0, 0, Number.MAX_SAFE_INTEGER);
     const vatMaxRows = clamp(job.data.vatMaxRows, DEFAULT_CHUNK_SIZE, 1000, 50000);
     const vatDelayMs = clamp(job.data.vatDelayMs, DEFAULT_BATCH_DELAY_MS, 0, 5000);
     const continueUntilRow = job.data.continueUntilRow === undefined
       ? undefined
-      : clamp(job.data.continueUntilRow, DEFAULT_CONTINUE_UNTIL_ROW, 1, 1000000);
+      : clamp(job.data.continueUntilRow, DEFAULT_CONTINUE_UNTIL_ROW, 1, 5000000);
     const delayBetweenJobsMs = clamp(job.data.delayBetweenJobsMs, DEFAULT_DELAY_BETWEEN_JOBS_MS, 0, 3600000);
+    const shouldSyncDbd = vatSourceIndex === 0 && vatStartRow === 0;
 
     const result = await syncAllOpenDataCaches(job.data.triggeredBy, {
-      vat: { startRow: vatStartRow, maxRows: vatMaxRows, delayMs: vatDelayMs },
+      dbd: shouldSyncDbd,
+      vat: { sourceIndex: vatSourceIndex, startRow: vatStartRow, maxRows: vatMaxRows, delayMs: vatDelayMs },
     });
     logger.info('[DBD Open Data] Sync completed', result);
 
+    const sourceCount = result.vat.sourceCount ?? getRdVatOpenDataSourceCount();
+    const currentSourceIndex = result.vat.sourceIndex ?? vatSourceIndex;
+    const reachedSourceLimit = continueUntilRow !== undefined && vatStartRow + vatMaxRows >= continueUntilRow;
+    const sourceHasMoreRows = result.vat.recordsRead >= vatMaxRows && !reachedSourceLimit;
+    const hasNextSource = currentSourceIndex + 1 < sourceCount;
     const shouldContinue = job.data.autoContinue !== false
       && result.vat.status === 'success'
-      && result.vat.recordsRead >= vatMaxRows
-      && (continueUntilRow === undefined || vatStartRow + vatMaxRows < continueUntilRow);
+      && (sourceHasMoreRows || (!sourceHasMoreRows && hasNextSource));
 
     if (shouldContinue) {
-      const nextStartRow = vatStartRow + vatMaxRows;
+      const nextSourceIndex = sourceHasMoreRows ? currentSourceIndex : currentSourceIndex + 1;
+      const nextStartRow = sourceHasMoreRows ? vatStartRow + vatMaxRows : 0;
       await dbdOpenDataSyncQueue.add(
         'rd-vat-open-data-sync-chunk',
         {
           ...job.data,
+          vatSourceIndex: nextSourceIndex,
           vatStartRow: nextStartRow,
           vatMaxRows,
           vatDelayMs,
@@ -78,10 +88,16 @@ export const dbdOpenDataSyncWorker = new Worker<DbdOpenDataSyncJobData>(
         },
         {
           delay: delayBetweenJobsMs,
-          jobId: `rd-vat-open-data-sync-${toSafeJobIdPart(job.data.triggeredBy)}-${nextStartRow}`,
+          jobId: `rd-vat-open-data-sync-${toSafeJobIdPart(job.data.triggeredBy)}-${nextSourceIndex}-${nextStartRow}`,
         },
       );
-      logger.info('[DBD Open Data] Next RD VAT chunk queued', { nextStartRow, vatMaxRows, delayBetweenJobsMs });
+      logger.info('[DBD Open Data] Next RD VAT chunk queued', {
+        nextSourceIndex,
+        nextStartRow,
+        vatMaxRows,
+        delayBetweenJobsMs,
+        sourceCount,
+      });
     }
 
     return result;

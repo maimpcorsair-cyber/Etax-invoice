@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 16:07 Asia/Bangkok
+Last updated: 2026-05-13 19:25 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -64,14 +64,20 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - Lookup now treats Thai addresses without an address number or location marker as incomplete and re-runs DBD enrichment even when `nameEn/status/juristicType` are already cached. This fixes rows such as `0105535169497` where an earlier lookup cached English name but left a short RD address like `ชิดลม เพลินจิต ลุมพินี...`.
     - Incomplete-address detection now strips trailing postcode before checking for premise numbers, so `ชิดลม เพลินจิต ลุมพินี ปทุมวัน กรุงเทพมหานคร 10330` is still treated as incomplete, while `26/30-31 อาคารอรกานต์ ชั้น 9 ซอยชิดลม ถนนเพลินจิต...10330` is treated as complete. Verified customer profiles now use complete open-data `addressTh` when the saved customer address is incomplete.
     - Customer search dropdown now re-runs tax-ID lookup before applying a selected suggestion, so old short cache rows are enriched before they fill the form.
-    - Customer Tax ID lookup now supports `refresh=1`, uses a longer 5s timeout for DBD OpenAPI, exposes `addressEn` in local profile responses, and fills English name/address fallbacks from Thai text when official English fields are missing. This is intended to fix stale short Thai addresses and blank English fields in the customer modal.
+    - Customer Tax ID lookup now supports `refresh=1`, uses a longer 5s timeout for DBD OpenAPI, exposes `addressEn` in local profile responses, fills English name/address fallbacks from Thai text when official English fields are missing, and preserves RD VAT postcode when DBD returns a longer address without postcode. This fixes stale short Thai addresses and blank English fields in the customer modal.
     - Render `build_failed` with `failureReason:null`/`logs:null` was caused by exhausted Render pipeline minutes/spend limit, not the DBD/RD address code. GitHub Typecheck and local backend/frontend builds passed throughout.
     - `render.yaml` now uses `autoDeployTrigger: checksPass` for both `etax-invoice-api` and `etax-invoice-worker`, while `.github/workflows/render-deploy.yml` is manual-only (`workflow_dispatch`). This avoids the circular failure where the GitHub deploy workflow itself stayed pending while Render waited for all GitHub checks to pass.
     - The manual deploy workflow is kept as an emergency path only; it no longer patches Render `autoDeploy` settings.
     - Local verification on 2026-05-13: DBD OpenAPI returned full Thai registered addresses and English names for `0105535169497`, `0105532098360`, and `0107537001463`; DBD OpenAPI does not return postcode in those samples, so the system preserves RD VAT postcode when replacing a shorter RD address.
-    - Deployed commits `a635bed`, `914d802`, `9ce79fb`, `2f0e183`, and `ce0746f`; latest GitHub Typecheck run `25780205735` succeeded in `54s` and Render deploy run `25780205723` succeeded in `13m59s`.
+    - Deployed commits `a635bed`, `914d802`, `9ce79fb`, `2f0e183`, `ce0746f`, `417bb77`, `6399074`, and `3eb7abd`; latest GitHub Typecheck run `25792689322` succeeded in `1m2s`; Render deploy status run `25793076272` confirmed commit `3eb7abd` live on both API deploy `dep-d824tttoff2s739ibe70` and worker deploy `dep-d824tttoff2s739ibe90`.
     - RD VAT remains the default fast source for Thai VAT name/address/status; DBD/MOC enrichment should be enabled only when the extra lookup latency is acceptable.
   - Database risk: current compact local cache is not expected to fill the DB immediately, but full province-wide imports should stay chunked/throttled and should not store full raw rows. Re-check Render Postgres storage before importing all Thai VAT branches.
+  - Full RD VAT nationwide sync foundation is implemented locally:
+    - `RD_VAT_DATA_URLS`/`RD_VAT_DATA_FILES` support multiple RD VAT sources. If only legacy `RD_VAT_DATA_URL` is set, the worker automatically adds RD's province file `https://data.rd.go.th/datafiles/vat/VAT_TaxpayerAddress_02.csv` after the Bangkok file.
+    - DBD open-data worker jobs now carry `vatSourceIndex` and auto-continue source-by-source, so Bangkok chunks can finish before all-province chunks start. Default chunking remains 10k rows/job, 30s delay, concurrency 1.
+    - RD VAT upserts no longer store full CSV raw rows in `juristic_open_data_cache.raw`; existing `rd-vat` raw JSONB is cleared on re-upsert, while DBD/MOC raw data is preserved for non-RD rows.
+    - Worker now skips DBD sync on continuation chunks and only runs DBD on the first source/start row, preventing accidental repeated full DBD imports if `OPEN_DBD_DATA_URL` is configured later.
+    - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.
   - Removed `ผู้ดูแลระบบ` / Admin from the main desktop navbar and moved it into the right-side user/profile menu for `admin` and `super_admin` users only.

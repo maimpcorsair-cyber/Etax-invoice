@@ -51,7 +51,6 @@ interface NormalizedVatRecord {
   taxId: string;
   vatName: string | null;
   vatAddress: string | null;
-  raw: RawRow;
 }
 
 interface NormalizedMocJuristicRecord {
@@ -68,12 +67,15 @@ interface SyncResult {
   kind: 'dbd_juristic' | 'rd_vat';
   status: 'success' | 'skipped' | 'failed';
   source: string | null;
+  sourceIndex?: number;
+  sourceCount?: number;
   recordsRead: number;
   recordsUpserted: number;
   error?: string;
 }
 
 interface OpenDataSyncOptions {
+  sourceIndex?: number;
   startRow?: number;
   maxRows?: number;
   delayMs?: number;
@@ -86,6 +88,7 @@ const DBD_OPENAPI_JURISTIC_API_URL = process.env.DBD_OPENAPI_JURISTIC_API_URL ??
 const DBD_OPENAPI_JURISTIC_LOOKUP_ENABLED = process.env.DBD_OPENAPI_JURISTIC_LOOKUP_ENABLED !== 'false';
 const MOC_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.MOC_JURISTIC_LOOKUP_TIMEOUT_MS ?? '1500', 10);
 const DBD_OPENAPI_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.DBD_OPENAPI_JURISTIC_LOOKUP_TIMEOUT_MS ?? '5000', 10);
+const RD_VAT_PROVINCES_DATA_URL = 'https://data.rd.go.th/datafiles/vat/VAT_TaxpayerAddress_02.csv';
 
 const THAI_CHARACTER_PATTERN = /[\u0E00-\u0E7F]/;
 const THAI_ADDRESS_TERMS: Array<[RegExp, string]> = [
@@ -399,7 +402,6 @@ function normalizeVatRecord(row: RawRow): NormalizedVatRecord | null {
     taxId,
     vatName: pick(row, ['Name', 'OperatorName', 'VatName', 'ชื่อผู้ประกอบการ', 'ชื่อ']),
     vatAddress: composeThaiAddress(row),
-    raw: compactRawRow(row),
   };
 }
 
@@ -556,22 +558,94 @@ function decodeSourceBuffer(buffer: Buffer, kind: 'dbd' | 'vat') {
   }
 }
 
-async function readSourceText(kind: 'dbd' | 'vat'): Promise<{ text: string; source: string } | null> {
-  const url = kind === 'dbd'
-    ? process.env.OPEN_DBD_DATA_URL ?? process.env.DBD_OPEN_DATA_URL
-    : process.env.RD_VAT_DATA_URL ?? process.env.VAT_OPEN_DATA_URL;
-  const file = kind === 'dbd'
-    ? process.env.OPEN_DBD_DATA_FILE ?? process.env.DBD_OPEN_DATA_FILE
-    : process.env.RD_VAT_DATA_FILE ?? process.env.VAT_OPEN_DATA_FILE;
+function splitSourceList(value: string | undefined): string[] {
+  if (!value?.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter(Boolean);
+    }
+  } catch {
+    // Allow simple comma/newline-separated env values without JSON syntax.
+  }
+
+  return value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+}
+
+function uniqueSources(values: string[]) {
+  return Array.from(new Set(values));
+}
+
+function getOpenDataUrls(kind: 'dbd' | 'vat') {
+  if (kind === 'dbd') {
+    return uniqueSources(splitSourceList(process.env.OPEN_DBD_DATA_URLS ?? process.env.DBD_OPEN_DATA_URLS)
+      .concat(splitSourceList(process.env.OPEN_DBD_DATA_URL ?? process.env.DBD_OPEN_DATA_URL)));
+  }
+
+  const explicitUrls = splitSourceList(process.env.RD_VAT_DATA_URLS ?? process.env.VAT_OPEN_DATA_URLS);
+  if (explicitUrls.length > 0) return uniqueSources(explicitUrls);
+
+  const legacyUrls = splitSourceList(process.env.RD_VAT_DATA_URL ?? process.env.VAT_OPEN_DATA_URL);
+  if (legacyUrls.length === 0) return [];
+
+  const includeProvinces = process.env.RD_VAT_INCLUDE_PROVINCES_URL !== 'false';
+  return uniqueSources(includeProvinces ? legacyUrls.concat(RD_VAT_PROVINCES_DATA_URL) : legacyUrls);
+}
+
+function getOpenDataFiles(kind: 'dbd' | 'vat') {
+  return kind === 'dbd'
+    ? uniqueSources(splitSourceList(process.env.OPEN_DBD_DATA_FILES ?? process.env.DBD_OPEN_DATA_FILES)
+      .concat(splitSourceList(process.env.OPEN_DBD_DATA_FILE ?? process.env.DBD_OPEN_DATA_FILE)))
+    : uniqueSources(splitSourceList(process.env.RD_VAT_DATA_FILES ?? process.env.VAT_OPEN_DATA_FILES)
+      .concat(splitSourceList(process.env.RD_VAT_DATA_FILE ?? process.env.VAT_OPEN_DATA_FILE)));
+}
+
+function describeOpenDataSource(kind: 'dbd' | 'vat', source: string, index: number, count: number) {
+  const filename = source.split('/').pop() ?? source;
+  const rdVatLabel = filename.toLowerCase().includes('taxpayeraddress_02')
+    ? 'rd-vat-provinces'
+    : filename.toLowerCase().includes('taxpayeraddress_01')
+      ? 'rd-vat-bangkok'
+      : 'rd-vat';
+  const label = kind === 'vat' ? rdVatLabel : 'open-dbd';
+  return `${label}:${index + 1}/${count}:${source}`;
+}
+
+export function getRdVatOpenDataSourceCount() {
+  return Math.max(getOpenDataFiles('vat').length, getOpenDataUrls('vat').length);
+}
+
+async function readSourceText(kind: 'dbd' | 'vat', sourceIndex = 0): Promise<{ text: string; source: string; sourceIndex: number; sourceCount: number } | null> {
+  const files = getOpenDataFiles(kind);
+  const urls = getOpenDataUrls(kind);
+  const sourceCount = Math.max(files.length, urls.length);
+
+  if (sourceIndex < 0 || sourceIndex >= sourceCount) {
+    return null;
+  }
+
+  const file = files[sourceIndex];
+  const url = urls[sourceIndex];
 
   if (file?.trim()) {
-    return { text: decodeSourceBuffer(await readFile(file.trim()), kind), source: file.trim() };
+    return {
+      text: decodeSourceBuffer(await readFile(file.trim()), kind),
+      source: describeOpenDataSource(kind, file.trim(), sourceIndex, sourceCount),
+      sourceIndex,
+      sourceCount,
+    };
   }
 
   if (url?.trim()) {
     const res = await fetch(url.trim());
     if (!res.ok) throw new Error(`${kind.toUpperCase()} open data returned ${res.status}`);
-    return { text: decodeSourceBuffer(Buffer.from(await res.arrayBuffer()), kind), source: url.trim() };
+    return {
+      text: decodeSourceBuffer(Buffer.from(await res.arrayBuffer()), kind),
+      source: describeOpenDataSource(kind, url.trim(), sourceIndex, sourceCount),
+      sourceIndex,
+      sourceCount,
+    };
   }
 
   return null;
@@ -673,7 +747,7 @@ async function upsertVatRecords(records: NormalizedVatRecord[]) {
       ${now},
       ${now},
       ${now},
-      CAST(${JSON.stringify(record.raw)} AS jsonb)
+      NULL::jsonb
     )`);
 
     await prisma.$executeRaw`
@@ -696,7 +770,11 @@ async function upsertVatRecords(records: NormalizedVatRecord[]) {
           THEN EXCLUDED."addressTh"
           ELSE "juristic_open_data_cache"."addressTh"
         END,
-        "raw" = EXCLUDED."raw",
+        "raw" = CASE
+          WHEN "juristic_open_data_cache"."source" = 'rd-vat'
+          THEN NULL
+          ELSE "juristic_open_data_cache"."raw"
+        END,
         "lastSyncedAt" = GREATEST("juristic_open_data_cache"."lastSyncedAt", EXCLUDED."lastSyncedAt"),
         "updatedAt" = EXCLUDED."updatedAt"
     `;
@@ -874,6 +952,7 @@ export async function syncDbdOpenData(triggeredBy = 'manual'): Promise<SyncResul
 
 export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDataSyncOptions = {}): Promise<SyncResult> {
   const startedAt = new Date();
+  const sourceIndex = clampSyncNumber(options.sourceIndex, 0, 0, Number.MAX_SAFE_INTEGER);
   const startRow = clampSyncNumber(options.startRow, 0, 0, Number.MAX_SAFE_INTEGER);
   const maxRows = options.maxRows === undefined
     ? undefined
@@ -886,9 +965,21 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
   );
 
   try {
-    const source = await readSourceText('vat');
+    const source = await readSourceText('vat', sourceIndex);
     if (!source) {
-      const result: SyncResult = { kind: 'rd_vat', status: 'skipped', source: null, recordsRead: 0, recordsUpserted: 0, error: 'No RD_VAT_DATA_URL or RD_VAT_DATA_FILE configured' };
+      const configuredSourceCount = getRdVatOpenDataSourceCount();
+      const result: SyncResult = {
+        kind: 'rd_vat',
+        status: 'skipped',
+        source: null,
+        sourceIndex,
+        sourceCount: configuredSourceCount,
+        recordsRead: 0,
+        recordsUpserted: 0,
+        error: configuredSourceCount === 0
+          ? 'No RD_VAT_DATA_URLS, RD_VAT_DATA_URL, RD_VAT_DATA_FILES, or RD_VAT_DATA_FILE configured'
+          : `RD VAT source index ${sourceIndex} is outside configured source count ${configuredSourceCount}`,
+      };
       await recordSyncRun({ ...result, triggeredBy, startedAt });
       return result;
     }
@@ -926,21 +1017,46 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
       }
     }
 
-    const result: SyncResult = { kind: 'rd_vat', status: 'success', source: source.source, recordsRead, recordsUpserted };
+    const result: SyncResult = {
+      kind: 'rd_vat',
+      status: 'success',
+      source: source.source,
+      sourceIndex: source.sourceIndex,
+      sourceCount: source.sourceCount,
+      recordsRead,
+      recordsUpserted,
+    };
     await recordSyncRun({ ...result, triggeredBy, startedAt });
     return result;
   } catch (err) {
     const error = err instanceof Error ? err.message : 'RD VAT open data sync failed';
-    logger.error('RD VAT open data sync failed', { error: err });
-    const result: SyncResult = { kind: 'rd_vat', status: 'failed', source: null, recordsRead: 0, recordsUpserted: 0, error };
+    logger.error('RD VAT open data sync failed', { error: err, sourceIndex });
+    const result: SyncResult = {
+      kind: 'rd_vat',
+      status: 'failed',
+      source: null,
+      sourceIndex,
+      sourceCount: getRdVatOpenDataSourceCount(),
+      recordsRead: 0,
+      recordsUpserted: 0,
+      error,
+    };
     await recordSyncRun({ ...result, triggeredBy, startedAt });
     return result;
   }
 }
 
-export async function syncAllOpenDataCaches(triggeredBy = 'manual', options: { vat?: OpenDataSyncOptions } = {}) {
+export async function syncAllOpenDataCaches(triggeredBy = 'manual', options: { vat?: OpenDataSyncOptions; dbd?: boolean } = {}) {
+  const skippedDbd: SyncResult = {
+    kind: 'dbd_juristic',
+    status: 'skipped',
+    source: null,
+    recordsRead: 0,
+    recordsUpserted: 0,
+    error: 'DBD sync skipped for this chunk',
+  };
   const [dbd, vat] = await Promise.all([
-    syncDbdOpenData(triggeredBy),
+    options.dbd === false ? Promise.resolve(skippedDbd) : syncDbdOpenData(triggeredBy),
     syncRdVatOpenData(triggeredBy, options.vat),
   ]);
   return { dbd, vat };

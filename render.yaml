@@ -31,6 +31,8 @@ services:
         value: 420889491125-p2pgamg2kb3574o213ep0om8pn94suar.apps.googleusercontent.com
       - key: GOOGLE_AI_API_KEY
         sync: false
+      - key: RD_VAT_DATA_URLS
+        sync: false
       - key: RD_VAT_DATA_URL
         sync: false
       - key: OPEN_DBD_DATA_URL
@@ -108,6 +110,8 @@ services:
         sync: false
       - key: RD_ENVIRONMENT
         value: sandbox
+      - key: RD_VAT_DATA_URLS
+        sync: false
       - key: RD_VAT_DATA_URL
         sync: false
       - key: OPEN_DBD_DATA_URL

@@ -28,7 +28,10 @@ dbdRouter.get('/status', (_req, res) => {
       localOpenData: {
         provider: 'open-dbd-rd-vat',
         defaultSync: 'weekly',
-        requiredEnv: ['OPEN_DBD_DATA_URL or OPEN_DBD_DATA_FILE', 'RD_VAT_DATA_URL or RD_VAT_DATA_FILE'],
+        requiredEnv: [
+          'OPEN_DBD_DATA_URL or OPEN_DBD_DATA_FILE',
+          'RD_VAT_DATA_URLS/RD_VAT_DATA_URL or RD_VAT_DATA_FILES/RD_VAT_DATA_FILE',
+        ],
       },
     },
   });
@@ -83,12 +86,14 @@ dbdRouter.get('/local/search', async (req, res) => {
 dbdRouter.post('/sync', requireRole('super_admin'), async (req, res) => {
   try {
     const body = z.object({
+      vatSourceIndex: z.coerce.number().int().min(0).optional(),
       vatStartRow: z.coerce.number().int().min(0).optional(),
-      vatMaxRows: z.coerce.number().int().min(1).max(100000).optional(),
+      vatMaxRows: z.coerce.number().int().min(1).max(50000).default(10000),
       vatDelayMs: z.coerce.number().int().min(0).max(5000).optional(),
     }).parse(req.body ?? {});
     const data = await syncAllOpenDataCaches(`manual:${req.user!.userId}`, {
       vat: {
+        sourceIndex: body.vatSourceIndex,
         startRow: body.vatStartRow,
         maxRows: body.vatMaxRows,
         delayMs: body.vatDelayMs,
@@ -108,10 +113,11 @@ dbdRouter.post('/sync', requireRole('super_admin'), async (req, res) => {
 dbdRouter.post('/sync/job', requireRole('super_admin'), async (req, res) => {
   try {
     const body = z.object({
+      vatSourceIndex: z.coerce.number().int().min(0).default(0),
       vatStartRow: z.coerce.number().int().min(0).default(0),
       vatMaxRows: z.coerce.number().int().min(1000).max(50000).default(10000),
       vatDelayMs: z.coerce.number().int().min(0).max(5000).default(150),
-      continueUntilRow: z.coerce.number().int().min(1).max(1000000).optional(),
+      continueUntilRow: z.coerce.number().int().min(1).max(5000000).optional(),
       delayBetweenJobsMs: z.coerce.number().int().min(0).max(3600000).default(30000),
       autoContinue: z.coerce.boolean().default(true),
     }).parse(req.body ?? {});
@@ -120,6 +126,7 @@ dbdRouter.post('/sync/job', requireRole('super_admin'), async (req, res) => {
       'manual-open-data-sync',
       {
         triggeredBy: `manual:${req.user!.userId}`,
+        vatSourceIndex: body.vatSourceIndex,
         vatStartRow: body.vatStartRow,
         vatMaxRows: body.vatMaxRows,
         vatDelayMs: body.vatDelayMs,
