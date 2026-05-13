@@ -16,7 +16,6 @@ const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? 'admin@siamtech.co.th';
 const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD ?? 'Admin@123456';
 
 interface AuthResponse { token: string; user: { id: string; companyId: string; email: string; role: string } }
-interface ApiResponse { data?: any; period?: string }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, init);
@@ -51,14 +50,6 @@ async function createCustomer(companyId: string, nameTh: string, taxId: string) 
   );
 }
 
-// Helper: delete a customer after test
-async function deleteCustomer(companyId: string, taxId: string) {
-  await withSystemRlsContext(prisma, (tx) =>
-    tx.customer.deleteMany({ where: { companyId, taxId, branchCode: '00000' } }),
-    { role: 'system' }
-  );
-}
-
 // Helper: create an approved invoice with items (via Prisma to bypass access policy)
 async function createApprovedInvoice(
   companyId: string,
@@ -85,7 +76,7 @@ async function createApprovedInvoice(
 
     const invId = 'inv-pp30-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
 
-    const _invoice = await tx.invoice.create({
+    await tx.invoice.create({
       data: {
         id: invId,
         companyId,
@@ -122,47 +113,6 @@ async function createApprovedInvoice(
 
     return invId;
   }, { role: 'system' });
-}
-
-// Helper: create a credit note (T04) and cancel it
-async function createCancelledCreditNote(
-  companyId: string,
-  customerId: string,
-  userId: string,
-  items: { nameTh: string; quantity: number; unitPrice: number; vatType: string }[],
-  originalInvoiceId?: string
-) {
-  const auth = await adminAuth();
-  const h = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token };
-  const today = new Date().toISOString().split('T')[0];
-
-  const payload = {
-    type: 'credit_note',
-    invoiceDate: today,
-    dueDate: today,
-    buyerId: customerId,
-    language: 'th',
-    referenceInvoiceId: originalInvoiceId ?? null,
-    items: items.map((item: { nameTh: string; quantity: number; unitPrice: number; vatType: string }) => ({
-      nameTh: item.nameTh,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      vatType: item.vatType,
-    })),
-  };
-
-  const draft = await api<{ id: string }>('/api/invoices', {
-    method: 'POST', headers: h,
-    body: JSON.stringify(payload),
-  });
-
-  await api('/api/invoices/' + draft.id + '/issue', { method: 'POST', headers: h });
-  await api('/api/invoices/' + draft.id + '/cancel', {
-    method: 'POST', headers: h,
-    body: JSON.stringify({ reason: 'Test cancellation' }),
-  });
-
-  return draft.id;
 }
 
 // Get system DB access for cleanup

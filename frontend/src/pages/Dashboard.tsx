@@ -58,6 +58,10 @@ interface DashboardStats {
     };
   };
   monthlyRevenue: { month: string; total: number }[];
+  customerReadiness?: {
+    actionNeeded: number;
+    vatEvidenceMissing: number;
+  };
 }
 
 interface RdComplianceMonth {
@@ -306,6 +310,7 @@ export default function Dashboard() {
     aiReviewCount > 0,
     pendingRdCount > 0,
     (stats?.receivables.overdueOutstanding ?? 0) > 0,
+    (stats?.customerReadiness?.actionNeeded ?? 0) > 0,
     integrations ? readyIntegrations < 4 : false,
   ].filter(Boolean).length;
 
@@ -355,6 +360,18 @@ export default function Dashboard() {
       detail: isThai ? 'รวมขาย ซื้อ และสถานะ RD ไว้ในมุมมองเดียว' : 'Sales, purchase VAT, and RD readiness in one view',
       tone: currentMonth && currentMonth.complianceRate < 100 ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
       action: isThai ? 'เปิดสรุป VAT' : 'Open VAT summary',
+    },
+    {
+      key: 'customers',
+      icon: UserCheck,
+      href: '/app/customers',
+      value: stats ? `${stats.customerReadiness?.actionNeeded ?? 0}` : '—',
+      title: isThai ? 'ลูกค้าข้อมูลยังไม่พร้อม' : 'Customer data to review',
+      detail: stats?.customerReadiness?.vatEvidenceMissing
+        ? (isThai ? `รอ ภ.พ.20 / VAT ${stats.customerReadiness.vatEvidenceMissing} ราย` : `${stats.customerReadiness.vatEvidenceMissing} VAT evidence items missing`)
+        : (isThai ? 'เช็คลูกค้าตามเคสก่อนเปิดเครดิต/สัญญา' : 'Review customer evidence by use case'),
+      tone: (stats?.customerReadiness?.actionNeeded ?? 0) > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-900',
+      action: isThai ? 'เปิดลูกค้า' : 'Open customers',
     },
   ];
 
@@ -477,6 +494,8 @@ export default function Dashboard() {
             ? 'danger'
             : item.key === 'ar' && (stats?.receivables.overdueOutstanding ?? 0) > 0
               ? 'warning'
+              : item.key === 'customers' && (stats?.customerReadiness?.actionNeeded ?? 0) > 0
+                ? 'warning'
               : item.key === 'tax'
                 ? 'success'
                 : 'primary';

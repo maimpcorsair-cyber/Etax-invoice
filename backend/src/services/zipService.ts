@@ -34,7 +34,13 @@ function sanitizePath(path: string) {
   return path
     .replace(/\\/g, '/')
     .split('/')
-    .map((part) => part.replace(/[<>:"|?*\x00-\x1f]/g, '_').trim() || 'untitled')
+    .map((part) => {
+      const sanitized = Array.from(part).map((char) => {
+        const code = char.charCodeAt(0);
+        return code < 32 || '<>:"|?*'.includes(char) ? '_' : char;
+      }).join('');
+      return sanitized.trim() || 'untitled';
+    })
     .join('/')
     .replace(/^\/+/, '')
     .slice(0, 240);

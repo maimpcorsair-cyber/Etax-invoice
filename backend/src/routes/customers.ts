@@ -1,11 +1,23 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import type { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
+import { requireRole } from '../middleware/auth';
 import { generateCustomerStatementExcel } from '../services/exportService';
 import { generateCustomerStatementPdf } from '../services/pdfService';
 import { sendStatementToCustomer } from '../services/emailService';
 import { auditLog } from '../services/auditService';
+import { logger } from '../config/logger';
+import { uploadToDrive, isDriveConfigured } from '../services/googleDriveService';
+import type { DriveCustomerDocumentFolder } from '../services/googleDriveService';
+import {
+  buildCustomerReadiness,
+  normalizeCustomerKind,
+  normalizeCustomerUseCase,
+} from '../services/customerReadinessService';
+import type { CustomerDocumentType, CustomerUseCase } from '../services/customerReadinessService';
 import {
   getLimitErrorMessage,
   getUsageLimit,
@@ -15,6 +27,21 @@ import {
 } from '../services/accessPolicyService';
 
 export const customersRouter = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+const customerKindSchema = z.enum(['company', 'individual']).default('company');
+const customerUseCaseSchema = z.enum(['general', 'full_tax_invoice', 'credit', 'contract_project', 'vendor_payee']).default('general');
+const documentTypeSchema = z.enum([
+  'company_registration',
+  'vat_certificate',
+  'contract',
+  'credit_agreement',
+  'director_id',
+  'personal_id',
+  'bank_account',
+  'other',
+]);
+const documentStatusSchema = z.enum(['uploaded', 'verified', 'rejected']);
 
 const customerSchema = z.object({
   nameTh: z.string().min(1),
@@ -29,7 +56,145 @@ const customerSchema = z.object({
   phone: z.string().optional(),
   contactPerson: z.string().optional(),
   personalId: z.string().length(13).optional().or(z.literal('')),  // เลขบัตร ปชช. (บุคคลธรรมดา)
+  customerKind: customerKindSchema.optional(),
+  useCase: customerUseCaseSchema.optional(),
 });
+
+const customerDocumentPatchSchema = z.object({
+  status: documentStatusSchema.optional(),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+const customerDocumentUploadSchema = z.object({
+  documentType: documentTypeSchema,
+  requiredFor: customerUseCaseSchema.optional(),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+function sensitiveDocumentType(documentType: string) {
+  return ['director_id', 'personal_id'].includes(documentType);
+}
+
+function customerDriveFolder(documentType: CustomerDocumentType): DriveCustomerDocumentFolder {
+  if (documentType === 'company_registration') return '01_Registration';
+  if (documentType === 'vat_certificate') return '02_VAT';
+  if (documentType === 'director_id' || documentType === 'personal_id') return '04_ID_Verification';
+  return '03_Contracts_Credit';
+}
+
+function normalizeCustomerPayload(body: z.infer<typeof customerSchema>) {
+  const customerKind = normalizeCustomerKind(body.customerKind, body.personalId);
+  const useCase = normalizeCustomerUseCase(body.useCase);
+  const personalId = customerKind === 'individual' ? body.personalId || body.taxId : body.personalId || '';
+  return {
+    ...body,
+    customerKind,
+    useCase,
+    personalId,
+    branchCode: customerKind === 'individual' ? '00000' : body.branchCode,
+    branchNameTh: customerKind === 'individual' ? '' : body.branchNameTh,
+    branchNameEn: customerKind === 'individual' ? '' : body.branchNameEn,
+    nameEn: customerKind === 'individual' ? '' : body.nameEn,
+    addressEn: customerKind === 'individual' ? '' : body.addressEn,
+  };
+}
+
+function normalizeCustomerPatch(body: Partial<z.infer<typeof customerSchema>>) {
+  const update: Record<string, unknown> = { ...body };
+  const explicitKind = body.customerKind;
+  if (explicitKind) update.customerKind = normalizeCustomerKind(explicitKind, body.personalId);
+  if (body.useCase) update.useCase = normalizeCustomerUseCase(body.useCase);
+  if (explicitKind === 'individual') {
+    const personalId = body.personalId || body.taxId || '';
+    update.taxId = personalId;
+    update.personalId = personalId;
+    update.branchCode = '00000';
+    update.branchNameTh = '';
+    update.branchNameEn = '';
+    update.nameEn = '';
+    update.addressEn = '';
+  } else if (explicitKind === 'company') {
+    update.personalId = body.personalId || '';
+  }
+  return update;
+}
+
+function withReadiness<T extends {
+  documents?: Array<{ documentType: string; status: string }>;
+  customerKind?: string | null;
+  useCase?: string | null;
+  personalId?: string | null;
+  nameTh?: string | null;
+  taxId?: string | null;
+  branchCode?: string | null;
+  addressTh?: string | null;
+}>(customer: T) {
+  const documents = customer.documents ?? [];
+  return {
+    ...customer,
+    readiness: buildCustomerReadiness(customer, documents),
+  };
+}
+
+async function loadCustomerForCompany(companyId: string, customerId: string) {
+  return withRlsContext(prisma, { companyId, systemMode: false }, async (tx) => {
+    return tx.customer.findFirst({
+      where: { id: customerId, companyId, isActive: true },
+      include: { documents: { orderBy: { uploadedAt: 'desc' } } },
+    });
+  });
+}
+
+async function getDriveUploadContext(companyId: string, currentUserId: string) {
+  const [company, currentUser] = await Promise.all([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
+    }),
+    prisma.user.findFirst({
+      where: { id: currentUserId, companyId },
+      select: { email: true, googleRefreshToken: true },
+    }),
+  ]);
+
+  const owner = company?.googleDriveOwnerUserId
+    ? await prisma.user.findFirst({
+      where: { id: company.googleDriveOwnerUserId, companyId },
+      select: { email: true, googleRefreshToken: true },
+    })
+    : null;
+
+  return {
+    companyName: company?.nameTh ?? company?.nameEn ?? 'Billboy',
+    refreshToken: owner?.googleRefreshToken ?? currentUser?.googleRefreshToken ?? null,
+    shareWithEmails: [company?.email, owner?.email, currentUser?.email].filter(Boolean) as string[],
+  };
+}
+
+async function refreshCustomerReadiness(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  customerId: string,
+) {
+  const customer = await tx.customer.findFirst({
+    where: { id: customerId, companyId },
+    include: { documents: true },
+  });
+  if (!customer) return null;
+  const readiness = buildCustomerReadiness(customer, customer.documents);
+  return tx.customer.update({
+    where: { id: customer.id },
+    data: {
+      verificationStatus: readiness.status,
+      vatEvidenceStatus: readiness.vatEvidenceStatus,
+    },
+    include: { documents: true },
+  });
+}
+
+function supportedCustomerDocumentMimeType(mimeType: string) {
+  return ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(mimeType);
+}
 
 customersRouter.get('/', async (req, res) => {
   try {
@@ -49,18 +214,181 @@ customersRouter.get('/', async (req, res) => {
 
     const { customers, total } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       const [items, count] = await Promise.all([
-        tx.customer.findMany({ where, skip, take: limitNumber, orderBy: { nameTh: 'asc' } }),
+        tx.customer.findMany({
+          where,
+          skip,
+          take: limitNumber,
+          orderBy: { nameTh: 'asc' },
+          include: { documents: { orderBy: { uploadedAt: 'desc' } } },
+        }),
         tx.customer.count({ where }),
       ]);
 
       return { customers: items, total: count };
     });
 
-    res.json({ data: customers, pagination: { page: pageNumber, total } });
+    res.json({ data: customers.map(withReadiness), pagination: { page: pageNumber, total } });
   } catch {
     res.status(500).json({ error: 'Failed to fetch customers' });
   }
 });
+
+customersRouter.get('/:id/documents', async (req, res) => {
+  try {
+    const customer = await loadCustomerForCompany(req.user!.companyId, req.params.id);
+    if (!customer) {
+      res.status(404).json({ error: 'Customer not found' });
+      return;
+    }
+    res.json({ data: customer.documents, readiness: buildCustomerReadiness(customer, customer.documents) });
+  } catch (err) {
+    logger.error('Failed to fetch customer documents', { error: err, customerId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch customer documents' });
+  }
+});
+
+customersRouter.post(
+  '/:id/documents/upload',
+  requireRole('admin', 'super_admin', 'accountant'),
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: 'File is required' });
+        return;
+      }
+      if (!supportedCustomerDocumentMimeType(req.file.mimetype)) {
+        res.status(400).json({ error: 'Only PDF, JPG, PNG, and WebP customer documents are supported' });
+        return;
+      }
+      if (!isDriveConfigured()) {
+        res.status(503).json({ error: 'Google Drive is not configured' });
+        return;
+      }
+
+      const body = customerDocumentUploadSchema.parse(req.body);
+      const customer = await loadCustomerForCompany(req.user!.companyId, req.params.id);
+      if (!customer) {
+        res.status(404).json({ error: 'Customer not found' });
+        return;
+      }
+
+      const driveContext = await getDriveUploadContext(req.user!.companyId, req.user!.userId);
+      const driveResult = await uploadToDrive(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        driveContext.companyName,
+        driveContext.refreshToken,
+        {
+          customerCode: customer.taxId,
+          customerName: customer.nameTh,
+          customerDocumentFolder: customerDriveFolder(body.documentType),
+          shareWithEmails: driveContext.shareWithEmails,
+          duplicatePolicy: 'rename',
+        },
+      );
+
+      const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        await tx.customerDocument.create({
+          data: {
+            companyId: req.user!.companyId,
+            customerId: customer.id,
+            uploadedById: req.user!.userId,
+            documentType: body.documentType,
+            requiredFor: body.requiredFor ?? (customer.useCase as CustomerUseCase) ?? 'general',
+            status: 'uploaded',
+            fileName: driveResult.fileName,
+            mimeType: req.file!.mimetype,
+            fileSize: req.file!.size,
+            driveFileId: driveResult.fileId,
+            driveUrl: driveResult.url,
+            driveFolderId: driveResult.folderId,
+            driveFolderUrl: driveResult.folderUrl,
+            driveUserDrive: driveResult.userDrive,
+            sensitive: sensitiveDocumentType(body.documentType),
+            notes: body.notes ?? null,
+          },
+        });
+        return refreshCustomerReadiness(tx, req.user!.companyId, customer.id);
+      });
+
+      res.status(201).json({
+        data: updated?.documents ?? [],
+        readiness: updated ? buildCustomerReadiness(updated, updated.documents) : null,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ error: 'Validation error', details: err.errors });
+        return;
+      }
+      logger.error('Failed to upload customer document', { error: err, customerId: req.params.id });
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to upload customer document' });
+    }
+  },
+);
+
+customersRouter.patch(
+  '/:id/documents/:documentId',
+  requireRole('admin', 'super_admin', 'accountant'),
+  async (req, res) => {
+    try {
+      const body = customerDocumentPatchSchema.parse(req.body);
+      const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        const existing = await tx.customerDocument.findFirst({
+          where: { id: req.params.documentId, customerId: req.params.id, companyId: req.user!.companyId },
+        });
+        if (!existing) return null;
+
+        await tx.customerDocument.update({
+          where: { id: existing.id },
+          data: {
+            ...(body.status ? { status: body.status, verifiedAt: body.status === 'verified' ? new Date() : null } : {}),
+            ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          },
+        });
+        return refreshCustomerReadiness(tx, req.user!.companyId, req.params.id);
+      });
+      if (!updated) {
+        res.status(404).json({ error: 'Customer document not found' });
+        return;
+      }
+      res.json({ data: updated.documents, readiness: buildCustomerReadiness(updated, updated.documents) });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ error: 'Validation error', details: err.errors });
+        return;
+      }
+      logger.error('Failed to update customer document', { error: err, documentId: req.params.documentId });
+      res.status(500).json({ error: 'Failed to update customer document' });
+    }
+  },
+);
+
+customersRouter.delete(
+  '/:id/documents/:documentId',
+  requireRole('admin', 'super_admin', 'accountant'),
+  async (req, res) => {
+    try {
+      const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+        const existing = await tx.customerDocument.findFirst({
+          where: { id: req.params.documentId, customerId: req.params.id, companyId: req.user!.companyId },
+        });
+        if (!existing) return null;
+        await tx.customerDocument.delete({ where: { id: existing.id } });
+        return refreshCustomerReadiness(tx, req.user!.companyId, req.params.id);
+      });
+      if (!updated) {
+        res.status(404).json({ error: 'Customer document not found' });
+        return;
+      }
+      res.json({ data: updated.documents, readiness: buildCustomerReadiness(updated, updated.documents) });
+    } catch (err) {
+      logger.error('Failed to delete customer document metadata', { error: err, documentId: req.params.documentId });
+      res.status(500).json({ error: 'Failed to delete customer document' });
+    }
+  },
+);
 
 customersRouter.get('/:id/statement', async (req, res) => {
   try {
@@ -523,13 +851,20 @@ customersRouter.post('/', async (req, res) => {
       return;
     }
 
-    const body = customerSchema.parse(req.body);
+    const body = normalizeCustomerPayload(customerSchema.parse(req.body));
+    const readiness = buildCustomerReadiness(body, []);
     const customer = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return tx.customer.create({
-        data: { ...body, companyId: req.user!.companyId },
+        data: {
+          ...body,
+          companyId: req.user!.companyId,
+          verificationStatus: readiness.status,
+          vatEvidenceStatus: readiness.vatEvidenceStatus,
+        },
+        include: { documents: true },
       });
     });
-    res.status(201).json({ data: customer });
+    res.status(201).json({ data: withReadiness(customer) });
   } catch (err) {
     if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
     res.status(500).json({ error: 'Failed to create customer' });
@@ -538,15 +873,17 @@ customersRouter.post('/', async (req, res) => {
 
 customersRouter.put('/:id', async (req, res) => {
   try {
-    const body = customerSchema.partial().parse(req.body);
+    const body = normalizeCustomerPatch(customerSchema.partial().parse(req.body));
     const customer = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-      return tx.customer.updateMany({
+      const result = await tx.customer.updateMany({
         where: { id: req.params.id, companyId: req.user!.companyId },
-        data: body,
+        data: body as Prisma.CustomerUpdateManyMutationInput,
       });
+      if (result.count === 0) return null;
+      return refreshCustomerReadiness(tx, req.user!.companyId, req.params.id);
     });
-    if (customer.count === 0) { res.status(404).json({ error: 'Customer not found' }); return; }
-    res.json({ message: 'Customer updated' });
+    if (!customer) { res.status(404).json({ error: 'Customer not found' }); return; }
+    res.json({ message: 'Customer updated', data: withReadiness(customer) });
   } catch (err) {
     if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
     res.status(500).json({ error: 'Failed to update customer' });

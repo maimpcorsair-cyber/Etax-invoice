@@ -78,6 +78,10 @@ export interface Company {
 export interface Customer {
   id: string;
   companyId: string;
+  customerKind?: CustomerKind;
+  useCase?: CustomerUseCase;
+  verificationStatus?: CustomerVerificationStatus;
+  vatEvidenceStatus?: CustomerVatEvidenceStatus;
   nameTh: string;
   nameEn?: string;
   taxId: string;
@@ -92,6 +96,61 @@ export interface Customer {
   personalId?: string;   // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
   isActive: boolean;
   createdAt: string;
+  documents?: CustomerDocument[];
+  readiness?: CustomerReadinessSummary;
+}
+
+export type CustomerKind = 'company' | 'individual';
+export type CustomerUseCase = 'general' | 'full_tax_invoice' | 'credit' | 'contract_project' | 'vendor_payee';
+export type CustomerVerificationStatus = 'not_required' | 'missing' | 'partial' | 'complete';
+export type CustomerVatEvidenceStatus = 'not_required' | 'missing' | 'uploaded' | 'verified';
+export type CustomerDocumentType =
+  | 'company_registration'
+  | 'vat_certificate'
+  | 'contract'
+  | 'credit_agreement'
+  | 'director_id'
+  | 'personal_id'
+  | 'bank_account'
+  | 'other';
+
+export interface CustomerDocument {
+  id: string;
+  companyId: string;
+  customerId: string;
+  uploadedById?: string | null;
+  documentType: CustomerDocumentType;
+  requiredFor: CustomerUseCase | string;
+  status: 'uploaded' | 'verified' | 'rejected';
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  driveFileId?: string | null;
+  driveUrl?: string | null;
+  driveFolderId?: string | null;
+  driveFolderUrl?: string | null;
+  driveUserDrive?: boolean;
+  sensitive?: boolean;
+  notes?: string | null;
+  uploadedAt: string;
+  verifiedAt?: string | null;
+}
+
+export interface CustomerReadinessItem {
+  key: string;
+  labelTh: string;
+  labelEn: string;
+  required: boolean;
+  complete: boolean;
+  documentType?: CustomerDocumentType;
+}
+
+export interface CustomerReadinessSummary {
+  status: CustomerVerificationStatus;
+  vatEvidenceStatus: CustomerVatEvidenceStatus;
+  missingRequiredCount: number;
+  recommendedMissingCount: number;
+  items: CustomerReadinessItem[];
 }
 
 export interface CustomerStatementEntry {

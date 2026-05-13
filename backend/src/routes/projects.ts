@@ -956,7 +956,11 @@ function purchaseOrderHealth(
 }
 
 function safeFileName(value: string) {
-  return value.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 160) || 'untitled';
+  const sanitized = Array.from(value).map((char) => {
+    const code = char.charCodeAt(0);
+    return code < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char;
+  }).join('');
+  return sanitized.replace(/\s+/g, ' ').trim().slice(0, 160) || 'untitled';
 }
 
 projectsRouter.get('/users', async (req, res) => {

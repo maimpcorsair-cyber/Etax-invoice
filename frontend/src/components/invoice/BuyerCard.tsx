@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { Customer } from '../../types';
@@ -120,6 +120,18 @@ export default function BuyerCard({
                 </div>
               )}
               <div className="text-gray-500">{selectedCustomer.addressTh}</div>
+              {selectedCustomer.readiness && (
+                selectedCustomer.readiness.missingRequiredCount > 0 || selectedCustomer.readiness.recommendedMissingCount > 0
+              ) && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    {isThai
+                      ? `ข้อมูลลูกค้ายังต้องตรวจ ${selectedCustomer.readiness.missingRequiredCount + selectedCustomer.readiness.recommendedMissingCount} รายการ แต่ยังสร้างเอกสารต่อได้`
+                      : `${selectedCustomer.readiness.missingRequiredCount + selectedCustomer.readiness.recommendedMissingCount} customer readiness items need review. You can still continue.`}
+                  </span>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={onClearCustomer}

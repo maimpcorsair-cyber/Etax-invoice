@@ -382,6 +382,8 @@ dashboardRouter.get('/stats', async (req, res) => {
       rdPendingCount,
       receivableRows,
       monthlyRows,
+      customerActionNeeded,
+      customerVatEvidenceMissing,
     ] = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return Promise.all([
         tx.invoice.count({
@@ -427,6 +429,20 @@ dashboardRouter.get('/stats', async (req, res) => {
             ORDER BY month ASC
           `,
         ),
+        tx.customer.count({
+          where: {
+            companyId,
+            isActive: true,
+            verificationStatus: { in: ['missing', 'partial'] },
+          },
+        }),
+        tx.customer.count({
+          where: {
+            companyId,
+            isActive: true,
+            vatEvidenceStatus: 'missing',
+          },
+        }),
       ]);
     });
 
@@ -470,6 +486,10 @@ dashboardRouter.get('/stats', async (req, res) => {
           month: row.month,
           total: Number(row.total),
         })),
+        customerReadiness: {
+          actionNeeded: customerActionNeeded,
+          vatEvidenceMissing: customerVatEvidenceMissing,
+        },
       },
     });
   } catch (err) {

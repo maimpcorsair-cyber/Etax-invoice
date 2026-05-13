@@ -125,10 +125,19 @@ export type DriveDocumentFolder =
   | '05_Exports'
   | '99_Other';
 
+export type DriveCustomerDocumentFolder =
+  | '01_Registration'
+  | '02_VAT'
+  | '03_Contracts_Credit'
+  | '04_ID_Verification';
+
 export interface DriveUploadOptions {
   projectCode?: string | null;
   projectName?: string | null;
   documentFolder?: DriveDocumentFolder | null;
+  customerCode?: string | null;
+  customerName?: string | null;
+  customerDocumentFolder?: DriveCustomerDocumentFolder | null;
   shareAnyone?: boolean;
   shareWithEmails?: string[];
   duplicatePolicy?: 'rename' | 'replace' | 'skip' | 'error';
@@ -145,6 +154,21 @@ async function ensureProjectFolder(
 ): Promise<{ projectFolderId?: string; projectFolderUrl?: string; targetFolderId: string; targetFolderUrl: string }> {
   const rootId = await ensureChildFolder(driveClient, FOLDER_NAME);
   const companyId = await ensureChildFolder(driveClient, companyName, rootId);
+
+  if (options.customerName || options.customerCode) {
+    const customersId = await ensureChildFolder(driveClient, 'Customers', companyId);
+    const customerFolderName = sanitizeDriveName(
+      [options.customerCode, options.customerName].filter(Boolean).join(' '),
+    );
+    const customerId = await ensureChildFolder(driveClient, customerFolderName, customersId);
+    const targetId = await ensureChildFolder(driveClient, options.customerDocumentFolder ?? '03_Contracts_Credit', customerId);
+    return {
+      projectFolderId: customerId,
+      projectFolderUrl: driveFolderUrl(customerId),
+      targetFolderId: targetId,
+      targetFolderUrl: driveFolderUrl(targetId),
+    };
+  }
 
   if (!options.projectCode && !options.projectName) {
     return { targetFolderId: companyId, targetFolderUrl: driveFolderUrl(companyId) };
@@ -352,10 +376,7 @@ export async function uploadToDrive(
   userRefreshToken?: string | null,
   options: DriveUploadOptions = {},
 ): Promise<DriveUploadResult> {
-  let auth: Auth.OAuth2Client | Auth.GoogleAuth;
-  let userDrive = false;
-
-  ({ auth, userDrive } = buildDriveAuth(userRefreshToken));
+  const { auth, userDrive } = buildDriveAuth(userRefreshToken);
   logger.info(userDrive ? 'Drive upload: using user OAuth token' : 'Drive upload: using service account', { companyName });
 
   const driveClient = google.drive({ version: 'v3', auth: auth as never });

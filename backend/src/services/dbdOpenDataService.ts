@@ -161,7 +161,7 @@ function normalizeTaxId(value: unknown) {
 }
 
 function sanitizeOpenDataText(value: string) {
-  return value.replace(/\u0000/g, '').trim();
+  return value.split('\u0000').join('').trim();
 }
 
 function normalizeKey(value: string) {
@@ -205,10 +205,6 @@ function pickObject(row: RawRow, aliases: string[]): RawRow | null {
 function compactJoin(parts: Array<string | null>) {
   const cleaned = parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part));
   return cleaned.length > 0 ? cleaned.join(' ') : null;
-}
-
-function containsThai(value: string | null | undefined) {
-  return Boolean(value && THAI_CHARACTER_PATTERN.test(value));
 }
 
 function romanizeThaiText(value: string) {
@@ -493,52 +489,6 @@ function parseCsv(text: string): RawRow[] {
   return rows.slice(1).map((values) => csvRowToObject(headers, values));
 }
 
-function* iterateCsvRows(text: string): Generator<RawRow> {
-  let cell = '';
-  let row: string[] = [];
-  let quoted = false;
-  let headers: string[] | null = null;
-
-  const flushRow = function* (): Generator<RawRow> {
-    if (!row.some((item) => item.trim())) {
-      row = [];
-      cell = '';
-      return;
-    }
-
-    if (!headers) {
-      headers = row.map((header) => sanitizeOpenDataText(header).replace(/^\uFEFF/, ''));
-    } else {
-      yield csvRowToObject(headers, row);
-    }
-    row = [];
-    cell = '';
-  };
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-    if (char === '"' && quoted && next === '"') {
-      cell += '"';
-      index += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === ',' && !quoted) {
-      row.push(cell);
-      cell = '';
-    } else if ((char === '\n' || char === '\r') && !quoted) {
-      if (char === '\r' && next === '\n') index += 1;
-      row.push(cell);
-      yield* flushRow();
-    } else {
-      cell += char;
-    }
-  }
-
-  row.push(cell);
-  yield* flushRow();
-}
-
 async function* iterateCsvRowsFromChunks(chunks: AsyncIterable<string>): AsyncGenerator<RawRow> {
   let cell = '';
   let row: string[] = [];
@@ -619,9 +569,9 @@ function decodeSourceBuffer(buffer: Buffer, kind: 'dbd' | 'vat') {
   const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
   try {
-    return new TextDecoder(preferredEncoding).decode(bytes).replace(/\u0000/g, '');
+    return new TextDecoder(preferredEncoding).decode(bytes).split('\u0000').join('');
   } catch {
-    return buffer.toString('utf8').replace(/\u0000/g, '');
+    return buffer.toString('utf8').split('\u0000').join('');
   }
 }
 
@@ -740,13 +690,13 @@ async function* decodeStreamingOpenDataChunks(chunks: AsyncIterable<Buffer>, kin
     if (!decoder) {
       decoder = new TextDecoder(detectOpenDataEncoding(chunk, getPreferredOpenDataEncoding(kind)));
     }
-    yield decoder.decode(chunk, { stream: true }).replace(/\u0000/g, '');
+    yield decoder.decode(chunk, { stream: true }).split('\u0000').join('');
   }
 
   if (!decoder) return;
 
   const tail = decoder.decode();
-  if (tail) yield tail.replace(/\u0000/g, '');
+  if (tail) yield tail.split('\u0000').join('');
 }
 
 async function* readSourceTextChunks(ref: OpenDataSourceRef, kind: 'dbd' | 'vat'): AsyncGenerator<string> {
@@ -1124,7 +1074,7 @@ export async function syncRdVatOpenData(triggeredBy = 'manual', options: OpenDat
     const source = sourceRef.source.toLowerCase().endsWith('.json')
       ? await readSourceText('vat', sourceIndex)
       : null;
-    if (source && /^\s*[\[{]/.test(source.text)) {
+    if (source && /^\s*(?:\[|\{)/.test(source.text)) {
       const rows = parseRows(source.text).slice(startRow, maxRows ? startRow + maxRows : undefined);
       const records = rows.map(normalizeVatRecord).filter((record): record is NormalizedVatRecord => Boolean(record));
       recordsRead = rows.length;

@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
-import type { Customer } from '../types';
+import type { Customer, CustomerDocument, CustomerDocumentType, CustomerKind, CustomerReadinessSummary, CustomerUseCase } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { digitsOnly, englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isFiveDigitBranchCode, isThaiText, isThirteenDigitId, thaiTextOnly } from '../lib/inputGuards';
 
-type CustomerKind = 'company' | 'individual';
-
 const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> = {
+  customerKind: 'company',
+  useCase: 'general',
+  verificationStatus: 'not_required',
+  vatEvidenceStatus: 'not_required',
   nameTh: '',
   nameEn: '',
   taxId: '',
@@ -23,7 +25,16 @@ const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> 
   phone: '',
   contactPerson: '',
   personalId: '',
+  documents: [],
 };
+
+const CUSTOMER_USE_CASE_OPTIONS: Array<{ value: CustomerUseCase; labelTh: string; labelEn: string }> = [
+  { value: 'general', labelTh: 'ซื้อขายทั่วไป', labelEn: 'General trading' },
+  { value: 'full_tax_invoice', labelTh: 'ออกใบกำกับภาษีเต็มรูป', labelEn: 'Full tax invoice' },
+  { value: 'credit', labelTh: 'เปิดเครดิต', labelEn: 'Credit account' },
+  { value: 'contract_project', labelTh: 'ทำสัญญา/โครงการ', labelEn: 'Contract / project' },
+  { value: 'vendor_payee', labelTh: 'คู่ค้า/ผู้รับเงิน', labelEn: 'Vendor / payee' },
+];
 
 interface DbdLocalSuggestion {
   taxId: string;
@@ -133,12 +144,15 @@ export default function Customers() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [customerDocuments, setCustomerDocuments] = useState<CustomerDocument[]>([]);
+  const [uploadingDocType, setUploadingDocType] = useState<CustomerDocumentType | null>(null);
   const [dbdQuery, setDbdQuery] = useState('');
   const [dbdSuggestions, setDbdSuggestions] = useState<DbdLocalSuggestion[]>([]);
   const [dbdLoading, setDbdLoading] = useState(false);
   const [dbdNotice, setDbdNotice] = useState('');
   const [appliedDbdSuggestion, setAppliedDbdSuggestion] = useState<DbdLocalSuggestion | null>(null);
   const isIndividual = customerKind === 'individual';
+  const currentUseCase = (form.useCase ?? 'general') as CustomerUseCase;
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
@@ -150,6 +164,94 @@ export default function Customers() {
     addressEn: (form.addressEn ?? '').trim().length > 0 && !isEnglishText(form.addressEn ?? ''),
     personalId: !!form.personalId && form.personalId.length > 0 && !isThirteenDigitId(form.personalId),
   };
+
+  function buildLocalReadiness(): CustomerReadinessSummary {
+    const isCompany = customerKind === 'company';
+    const needsVatEvidence = isCompany && ['full_tax_invoice', 'credit', 'contract_project'].includes(currentUseCase);
+    const needsRegistration = isCompany && ['credit', 'contract_project', 'vendor_payee'].includes(currentUseCase);
+    const needsContract = ['credit', 'contract_project'].includes(currentUseCase);
+    const recommendsPersonalIdEvidence = !isCompany && ['credit', 'contract_project', 'vendor_payee'].includes(currentUseCase);
+    const hasDoc = (documentType: CustomerDocumentType) =>
+      customerDocuments.some((doc) => doc.documentType === documentType && doc.status !== 'rejected');
+
+    const items: CustomerReadinessSummary['items'] = [{
+      key: 'basic_identity',
+      labelTh: isCompany ? 'ข้อมูลบริษัทครบถ้วน' : 'ข้อมูลบุคคลครบถ้วน',
+      labelEn: isCompany ? 'Company details complete' : 'Individual details complete',
+      required: true,
+      complete: Boolean(form.nameTh && form.taxId.length === 13 && form.addressTh),
+    }];
+
+    if (needsRegistration) {
+      items.push({
+        key: 'company_registration',
+        labelTh: 'หนังสือรับรองบริษัท',
+        labelEn: 'Company registration',
+        required: true,
+        documentType: 'company_registration',
+        complete: hasDoc('company_registration'),
+      });
+    }
+    if (needsVatEvidence) {
+      items.push({
+        key: 'vat_certificate',
+        labelTh: 'ภ.พ.20 / หลักฐานจด VAT',
+        labelEn: 'VAT certificate',
+        required: true,
+        documentType: 'vat_certificate',
+        complete: hasDoc('vat_certificate'),
+      });
+    }
+    if (needsContract) {
+      const documentType: CustomerDocumentType = currentUseCase === 'credit' ? 'credit_agreement' : 'contract';
+      items.push({
+        key: 'contract_or_credit',
+        labelTh: currentUseCase === 'credit' ? 'เอกสารเปิดเครดิต/ข้อตกลงชำระเงิน' : 'สัญญาหรือเอกสารโครงการ',
+        labelEn: currentUseCase === 'credit' ? 'Credit terms document' : 'Contract or project document',
+        required: true,
+        documentType,
+        complete: hasDoc(documentType),
+      });
+    }
+    if (isCompany && needsContract) {
+      items.push({
+        key: 'director_id',
+        labelTh: 'สำเนาบัตรผู้มีอำนาจลงนาม (เฉพาะถ้าจำเป็น)',
+        labelEn: 'Authorized signer ID (only if needed)',
+        required: false,
+        documentType: 'director_id',
+        complete: hasDoc('director_id'),
+      });
+    }
+    if (recommendsPersonalIdEvidence) {
+      items.push({
+        key: 'personal_id',
+        labelTh: 'เอกสารยืนยันตัวตน (เฉพาะเคสสัญญา/วงเงินสูง)',
+        labelEn: 'Identity evidence (contract/high-value cases only)',
+        required: false,
+        documentType: 'personal_id',
+        complete: hasDoc('personal_id'),
+      });
+    }
+
+    const requiredItems = items.filter((item) => item.required);
+    const missingRequiredCount = requiredItems.filter((item) => !item.complete).length;
+    const recommendedMissingCount = items.filter((item) => !item.required && !item.complete).length;
+    const hasRequiredDoc = requiredItems.some((item) => item.documentType && item.complete);
+    const status = requiredItems.length <= 1 && currentUseCase === 'general'
+      ? 'not_required'
+      : missingRequiredCount === 0
+        ? 'complete'
+        : hasRequiredDoc
+          ? 'partial'
+          : 'missing';
+    const vatDoc = customerDocuments.find((doc) => doc.documentType === 'vat_certificate' && doc.status !== 'rejected');
+    const vatEvidenceStatus = !needsVatEvidence ? 'not_required' : vatDoc?.status === 'verified' ? 'verified' : vatDoc ? 'uploaded' : 'missing';
+
+    return { status, vatEvidenceStatus, missingRequiredCount, recommendedMissingCount, items };
+  }
+
+  const localReadiness = buildLocalReadiness();
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
@@ -225,6 +327,7 @@ export default function Customers() {
     setEditing(null);
     setCustomerKind('company');
     setForm(EMPTY_FORM);
+    setCustomerDocuments([]);
     setError('');
     resetDbdAssist();
     setShowModal(true);
@@ -233,8 +336,14 @@ export default function Customers() {
   function openEdit(c: Customer) {
     const existingPersonalId = c.personalId ?? '';
     setEditing(c);
-    setCustomerKind(existingPersonalId ? 'individual' : 'company');
+    const kind = c.customerKind ?? (existingPersonalId ? 'individual' : 'company');
+    setCustomerKind(kind);
+    setCustomerDocuments(c.documents ?? []);
     setForm({
+      customerKind: kind,
+      useCase: c.useCase ?? 'general',
+      verificationStatus: c.verificationStatus ?? 'not_required',
+      vatEvidenceStatus: c.vatEvidenceStatus ?? 'not_required',
       nameTh: c.nameTh,
       nameEn: c.nameEn ?? '',
       taxId: existingPersonalId || c.taxId,
@@ -247,6 +356,8 @@ export default function Customers() {
       phone: c.phone ?? '',
       contactPerson: c.contactPerson ?? '',
       personalId: existingPersonalId,
+      documents: c.documents ?? [],
+      readiness: c.readiness,
     });
     setError('');
     resetDbdAssist();
@@ -266,6 +377,8 @@ export default function Customers() {
     const payload = isIndividual
       ? {
         ...form,
+        customerKind: 'individual',
+        useCase: currentUseCase,
         taxId: form.taxId,
         personalId: form.taxId,
         branchCode: '00000',
@@ -276,8 +389,14 @@ export default function Customers() {
       }
       : {
         ...form,
+        customerKind: 'company',
+        useCase: currentUseCase,
         personalId: form.personalId || '',
       };
+    delete payload.documents;
+    delete payload.readiness;
+    delete payload.verificationStatus;
+    delete payload.vatEvidenceStatus;
 
     setSaving(true);
     setError('');
@@ -294,6 +413,7 @@ export default function Customers() {
         throw new Error(json.error ?? 'Save failed');
       }
       setShowModal(false);
+      setCustomerDocuments([]);
       fetchCustomers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -323,6 +443,7 @@ export default function Customers() {
         const id = prev.personalId || prev.taxId;
         return {
           ...prev,
+          customerKind: 'individual',
           taxId: digitsOnly(id, 13),
           personalId: digitsOnly(id, 13),
           branchCode: '00000',
@@ -333,7 +454,7 @@ export default function Customers() {
         };
       });
     } else {
-      setForm((prev) => ({ ...prev, personalId: '' }));
+      setForm((prev) => ({ ...prev, customerKind: 'company', personalId: '' }));
     }
   }
 
@@ -469,6 +590,65 @@ export default function Customers() {
     } finally {
       setDbdLoading(false);
     }
+  }
+
+  async function handleUploadCustomerDocument(documentType: CustomerDocumentType, file?: File | null) {
+    if (!editing || !file || !token) return;
+    setUploadingDocType(documentType);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('documentType', documentType);
+      formData.append('requiredFor', currentUseCase);
+
+      const res = await fetch(`/api/customers/${editing.id}/documents/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const json = await res.json() as { data?: CustomerDocument[]; readiness?: CustomerReadinessSummary; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Upload failed');
+      setCustomerDocuments(json.data ?? []);
+      setForm((prev) => ({ ...prev, documents: json.data ?? [], readiness: json.readiness }));
+      fetchCustomers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingDocType(null);
+    }
+  }
+
+  async function handleMarkDocumentVerified(document: CustomerDocument) {
+    if (!editing || !token) return;
+    setUploadingDocType(document.documentType);
+    try {
+      const res = await fetch(`/api/customers/${editing.id}/documents/${document.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: document.status === 'verified' ? 'uploaded' : 'verified' }),
+      });
+      const json = await res.json() as { data?: CustomerDocument[]; readiness?: CustomerReadinessSummary; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Update failed');
+      setCustomerDocuments(json.data ?? []);
+      setForm((prev) => ({ ...prev, documents: json.data ?? [], readiness: json.readiness }));
+      fetchCustomers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      setUploadingDocType(null);
+    }
+  }
+
+  function documentsForType(documentType: CustomerDocumentType) {
+    return customerDocuments.filter((doc) => doc.documentType === documentType && doc.status !== 'rejected');
+  }
+
+  function readinessTone(status: CustomerReadinessSummary['status']) {
+    if (status === 'complete') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    if (status === 'not_required') return 'border-slate-200 bg-slate-50 text-slate-700';
+    if (status === 'partial') return 'border-amber-200 bg-amber-50 text-amber-800';
+    return 'border-rose-200 bg-rose-50 text-rose-800';
   }
 
   return (
@@ -695,6 +875,126 @@ export default function Customers() {
                 >
                   {isThai ? 'บุคคลธรรมดา' : 'Individual'}
                 </button>
+              </div>
+
+              <div>
+                <label className="label">{isThai ? 'ประเภทการใช้งาน' : 'Usage type'}</label>
+                <select
+                  value={currentUseCase}
+                  onChange={(e) => field('useCase', e.target.value)}
+                  className="input-field"
+                >
+                  {CUSTOMER_USE_CASE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {isThai ? option.labelTh : option.labelEn}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isThai
+                    ? 'ระบบจะเตือนเอกสารที่ควรมีตามเคส แต่ยังไม่บล็อกการทำงาน'
+                    : 'Billboy shows the recommended evidence for this case without blocking the workflow.'}
+                </p>
+              </div>
+
+              <div className={`rounded-xl border p-4 ${readinessTone(localReadiness.status)}`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-bold">
+                      <ShieldCheck className="h-4 w-4" />
+                      {isThai ? 'ความพร้อมของข้อมูลลูกค้า' : 'Customer readiness'}
+                    </div>
+                    <p className="mt-1 text-xs opacity-85">
+                      {isThai
+                        ? 'เตือนก่อน ไม่บล็อกงาน: แนบเฉพาะเอกสารที่จำเป็นกับเคสนี้'
+                        : 'Warn first, do not block: attach only evidence needed for this case.'}
+                    </p>
+                  </div>
+                  <span className="inline-flex w-fit items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-xs font-semibold">
+                    {localReadiness.status === 'complete'
+                      ? (isThai ? 'พร้อม' : 'Complete')
+                      : localReadiness.status === 'not_required'
+                        ? (isThai ? 'เอกสารไม่จำเป็น' : 'No evidence needed')
+                        : localReadiness.status === 'partial'
+                          ? (isThai ? 'ใกล้ครบ' : 'Partial')
+                          : (isThai ? 'ต้องตรวจเพิ่ม' : 'Action needed')}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {localReadiness.items.map((item) => {
+                    const docs = item.documentType ? documentsForType(item.documentType) : [];
+                    const isUploading = item.documentType && uploadingDocType === item.documentType;
+                    return (
+                      <div key={item.key} className="rounded-lg bg-white/80 px-3 py-2 text-sm text-slate-700 ring-1 ring-white/70">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-start gap-2">
+                            {item.complete ? (
+                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                            ) : (
+                              <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${item.required ? 'text-amber-600' : 'text-slate-400'}`} />
+                            )}
+                            <div>
+                              <p className="font-medium text-slate-900">{isThai ? item.labelTh : item.labelEn}</p>
+                              <p className="text-xs text-slate-500">
+                                {item.required
+                                  ? (isThai ? 'ควรมีสำหรับเคสนี้' : 'Recommended for this case')
+                                  : (isThai ? 'optional เฉพาะกรณีจำเป็น' : 'Optional only when needed')}
+                              </p>
+                            </div>
+                          </div>
+                          {item.documentType && (
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              {editing ? (
+                                <>
+                                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                                    {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                                    {docs.length ? (isThai ? 'อัปโหลดเพิ่ม' : 'Upload more') : (isThai ? 'แนบไฟล์' : 'Upload')}
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                                      disabled={!!isUploading}
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        e.target.value = '';
+                                        handleUploadCustomerDocument(item.documentType!, file);
+                                      }}
+                                    />
+                                  </label>
+                                </>
+                              ) : (
+                                <span className="text-xs text-slate-500">{isThai ? 'บันทึกก่อนแนบไฟล์' : 'Save first'}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {docs.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {docs.map((doc) => (
+                              <span key={doc.id} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                                <span className="truncate">{doc.fileName}</span>
+                                {doc.driveUrl && (
+                                  <a href={doc.driveUrl} target="_blank" rel="noreferrer" className="text-primary-700 hover:text-primary-900">
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkDocumentVerified(doc)}
+                                  className={doc.status === 'verified' ? 'text-emerald-700' : 'text-slate-500 hover:text-emerald-700'}
+                                  title={isThai ? 'สลับสถานะตรวจแล้ว' : 'Toggle verified'}
+                                >
+                                  <CheckCircle2 className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {!isIndividual && (

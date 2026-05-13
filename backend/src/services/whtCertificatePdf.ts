@@ -1,7 +1,6 @@
 import puppeteer from 'puppeteer';
 import type { WhtCertificate, Company } from '@prisma/client';
 import { amountInWordsThai } from './invoiceService';
-import { logger } from '../config/logger';
 
 type WhtPdfData = WhtCertificate & {
   company: Pick<Company, 'nameTh' | 'nameEn' | 'taxId' | 'branchCode' | 'addressTh'>;
@@ -33,10 +32,6 @@ function formatDateTh(date: Date): string {
   return `${date.getDate()} ${months[date.getMonth()]} ${buddhistYear}`;
 }
 
-function formatDateEn(date: Date): string {
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-}
-
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
@@ -56,12 +51,7 @@ function buildWhtHtml(data: WhtPdfData): string {
 
   const incomeTypeLabel = INCOME_TYPE_LABELS_TH[data.incomeType ?? ''] ?? '';
   const rateLabel = WHT_RATE_LABELS_TH[data.whtRate] ?? `${data.whtRate}%`;
-  const whtRateNum = parseFloat(data.whtRate) / 100;
 
-  const paymentDate = data.paymentDate instanceof Date ? data.paymentDate : new Date(data.paymentDate);
-  const paymentDateStr = formatDateTh(paymentDate);
-
-  const totalWords = amountInWordsThai(data.totalAmount);
   const whtWords = amountInWordsThai(data.whtAmount);
 
   const sellerName = data.company.nameTh;

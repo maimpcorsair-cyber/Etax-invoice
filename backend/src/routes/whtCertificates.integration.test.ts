@@ -26,10 +26,6 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-async function sleep(ms: number) {
-  await new Promise((r) => setTimeout(r, ms));
-}
-
 function uniqueDigits(length: number): string {
   return Date.now().toString().slice(-length).padStart(length, '0');
 }
@@ -50,13 +46,6 @@ async function createCustomer(companyId: string, nameTh: string, taxId: string) 
       create: { id, companyId, nameTh, nameEn: nameTh, taxId, branchCode: '00000', addressTh: 'test address', isActive: true },
       update: { nameTh, nameEn: nameTh },
     }), { role: 'system' }
-  );
-}
-
-async function deleteCustomer(companyId: string, taxId: string) {
-  await withSystemRlsContext(prisma, (tx) =>
-    tx.customer.deleteMany({ where: { companyId, taxId, branchCode: '00000' } }),
-    { role: 'system' }
   );
 }
 
@@ -316,11 +305,10 @@ test('TC-WHT-006: second WHT cert on same invoice → 409', async () => {
   const customer = await createCustomer(auth.user.companyId, 'Customer WHT-006', '0105560000006');
   const invoice = await createApprovedInvoice(auth.user.companyId, customer.id, auth.user.id, 8000);
 
-  const certResp = await api<any>(
+  await api<any>(
     '/api/invoices/' + invoice.id + '/wht-certificate',
     { method: 'POST', headers: h, body: JSON.stringify({ whtRate: '1', paymentDate: paymentDateStr() }) }
   );
-  const cert = (certResp as any).data ?? certResp;
 
   let err: any = null;
   try {

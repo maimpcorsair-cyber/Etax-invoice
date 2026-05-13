@@ -212,13 +212,6 @@ interface LineEditSession {
   currentField: string;
 }
 
-function getMissingFields(result: OcrResult): typeof REQUIRED_OCR_FIELDS {
-  return REQUIRED_OCR_FIELDS.filter(f => {
-    const val = result[f.key];
-    return !val || val === '' || val === 0;
-  });
-}
-
 function templateFieldsFor(result: OcrResult) {
   if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
     return BANK_TRANSFER_TEMPLATE_FIELDS;
@@ -290,14 +283,6 @@ function detectLineFileMimeType(buffer: Buffer, headerContentType: string, messa
   if (header.includes('jpeg') || header.includes('jpg') || (buffer[0] === 0xff && buffer[1] === 0xd8)) return 'image/jpeg';
   if (messageType === 'image') return 'image/jpeg';
   return headerContentType || 'application/octet-stream';
-}
-
-function compactOcrSessionData(result: OcrResult, companyId: string): OcrResult & { companyId: string } {
-  return {
-    ...result,
-    companyId,
-    rawText: result.rawText ? result.rawText.slice(0, 1000) : undefined,
-  };
 }
 
 async function testRedisSessionWrite(): Promise<{ writeOk: boolean; info: Record<string, string | number> }> {
@@ -2576,7 +2561,6 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         projectName: resolved.project?.name,
       });
     }
-    let result: OcrResult | undefined;
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
 
     if (!supportedDocumentMimeType(contentType)) {
@@ -2592,7 +2576,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
 
     stage = 'document_ocr_pipeline';
     const analysis = await analyzeAccountingDocumentBuffer(buffer, contentType, companyId);
-    result = analysis.result;
+    const result = analysis.result;
     const qrText = analysis.qrText;
 
     if (!result) {

@@ -11,7 +11,7 @@ import { exportInvoicesToSheets } from '../services/googleSheetsService';
 import { sendInvoiceToCustomer } from '../services/emailService';
 import { cancelDocumentRD } from '../services/rdApiService';
 import { sendInvoiceIssuedNotification, sendInvoiceIssuedLineNotification } from '../services/notificationService';
-import { generatePdf, generatePdfFromHtml, buildHtmlForCompany } from '../services/pdfService';
+import { generatePdfFromHtml, buildHtmlForCompany } from '../services/pdfService';
 import {
   getLimitErrorMessage,
   getUsageLimit,
