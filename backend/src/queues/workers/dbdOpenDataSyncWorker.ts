@@ -56,6 +56,7 @@ export const dbdOpenDataSyncWorker = new Worker<DbdOpenDataSyncJobData>(
       : clamp(job.data.continueUntilRow, DEFAULT_CONTINUE_UNTIL_ROW, 1, 5000000);
     const delayBetweenJobsMs = clamp(job.data.delayBetweenJobsMs, DEFAULT_DELAY_BETWEEN_JOBS_MS, 0, 3600000);
     const shouldSyncDbd = vatSourceIndex === 0 && vatStartRow === 0;
+    const runId = toSafeJobIdPart(job.data.runId ?? String(job.id ?? job.timestamp ?? Date.now()));
 
     const result = await syncAllOpenDataCaches(job.data.triggeredBy, {
       dbd: shouldSyncDbd,
@@ -86,10 +87,11 @@ export const dbdOpenDataSyncWorker = new Worker<DbdOpenDataSyncJobData>(
           continueUntilRow,
           delayBetweenJobsMs,
           autoContinue: true,
+          runId,
         },
         {
           delay: delayBetweenJobsMs,
-          jobId: `rd-vat-open-data-sync-${toSafeJobIdPart(job.data.triggeredBy)}-${nextSourceIndex}-${nextStartRow}`,
+          jobId: `rd-vat-open-data-sync-${toSafeJobIdPart(job.data.triggeredBy)}-${runId}-${nextSourceIndex}-${nextStartRow}`,
         },
       );
       logger.info('[DBD Open Data] Next RD VAT chunk queued', {

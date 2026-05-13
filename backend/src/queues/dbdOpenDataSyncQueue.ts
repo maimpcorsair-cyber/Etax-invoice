@@ -12,6 +12,7 @@ export interface DbdOpenDataSyncJobData {
   continueUntilRow?: number;
   delayBetweenJobsMs?: number;
   autoContinue?: boolean;
+  runId?: string;
 }
 
 export const dbdOpenDataSyncQueue = new Queue<DbdOpenDataSyncJobData>(DBD_OPEN_DATA_SYNC_QUEUE_NAME, {
