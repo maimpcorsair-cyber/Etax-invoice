@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 19:25 Asia/Bangkok
+Last updated: 2026-05-13 19:36 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -77,6 +77,7 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
     - DBD open-data worker jobs now carry `vatSourceIndex` and auto-continue source-by-source, so Bangkok chunks can finish before all-province chunks start. Default chunking remains 10k rows/job, 30s delay, concurrency 1.
     - RD VAT upserts no longer store full CSV raw rows in `juristic_open_data_cache.raw`; existing `rd-vat` raw JSONB is cleared on re-upsert, while DBD/MOC raw data is preserved for non-RD rows.
     - Worker now skips DBD sync on continuation chunks and only runs DBD on the first source/start row, preventing accidental repeated full DBD imports if `OPEN_DBD_DATA_URL` is configured later.
+    - Added super-admin read-only queue status endpoint `GET /api/dbd/sync/job/status` to inspect BullMQ waiting/active/delayed/failed jobs before running large nationwide syncs.
     - Verified locally: backend `npm run typecheck`, backend `npm run build`, and `git diff --check` passed. A source-count smoke with legacy `RD_VAT_DATA_URL` returned `2` sources, but local DB is offline so the helper import also logged a Prisma localhost connection warning.
 - Desktop navigation cleanup is deployed:
   - Removed `การตั้งค่า` / Settings from the main desktop navbar and moved it into the right-side user/profile menu for all users.

@@ -47,6 +47,31 @@ dbdRouter.get('/local/status', async (_req, res) => {
   }
 });
 
+dbdRouter.get('/sync/job/status', requireRole('super_admin'), async (_req, res) => {
+  try {
+    const [counts, jobs] = await Promise.all([
+      dbdOpenDataSyncQueue.getJobCounts('waiting', 'active', 'delayed', 'failed', 'completed', 'paused'),
+      dbdOpenDataSyncQueue.getJobs(['waiting', 'active', 'delayed', 'failed'], 0, 10, false),
+    ]);
+    const summaries = await Promise.all(jobs.map(async (job) => ({
+      id: job.id,
+      name: job.name,
+      state: await job.getState(),
+      data: job.data,
+      progress: job.progress,
+      timestamp: job.timestamp ? new Date(job.timestamp).toISOString() : null,
+      processedOn: job.processedOn ? new Date(job.processedOn).toISOString() : null,
+      finishedOn: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
+      failedReason: job.failedReason ?? null,
+    })));
+
+    res.json({ data: { counts, jobs: summaries } });
+  } catch (err) {
+    logger.error('Failed to load local DBD/RD sync job status', { error: err });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to load local DBD/RD sync job status' });
+  }
+});
+
 dbdRouter.get('/local/lookup', async (req, res) => {
   try {
     const { taxId, refresh } = z.object({
