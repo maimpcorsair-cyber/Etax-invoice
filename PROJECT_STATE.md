@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-13 13:08 Asia/Bangkok
+Last updated: 2026-05-13 15:37 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- Render deploy verification tooling is implemented:
+  - Added `scripts/render-deploy-status.mjs` and root `npm run render:status` to query Render API for recent deploys, match a target commit, and print failed build logs when Render returns them.
+  - Added manual GitHub workflow `Check Render Deploy Status` (`.github/workflows/render-status.yml`) with target choices `all`, `api`, and `worker`.
+  - Required secret/env inputs: `RENDER_API_KEY`; API service uses existing GitHub secret `RENDER_SERVICE_ID`; worker verification can use new GitHub secret `RENDER_WORKER_SERVICE_ID` or service-name discovery.
+  - This checker verifies whether the latest GitHub commit is actually live on Render; `/api/health` alone only proves the API is alive.
 - Free DBD/RD autofill + private verified cache is deployed:
   - Added Prisma models/migrations for `juristic_open_data_cache` and `dbd_open_data_sync_runs` in both root and backend Prisma trees.
   - Added local open-data APIs: `GET /api/dbd/local/lookup?taxId=...`, `GET /api/dbd/local/search?q=...`, `GET /api/dbd/local/status`, and super-admin `POST /api/dbd/sync`.

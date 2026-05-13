@@ -1,0 +1,45 @@
+name: Check Render Deploy Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Render service to inspect
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - api
+          - worker
+      commit:
+        description: Commit SHA to verify. Leave empty for current main HEAD.
+        required: false
+        default: ''
+      require_live:
+        description: Fail the workflow if the commit is not live
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Render deploy status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Render deploy status
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_API_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_WORKER_SERVICE_ID: ${{ secrets.RENDER_WORKER_SERVICE_ID }}
+          CHECK_COMMIT: ${{ inputs.commit || github.sha }}
+          RENDER_TARGET: ${{ inputs.target }}
+          RENDER_REQUIRE_COMMIT_LIVE: ${{ inputs.require_live }}
+        run: node scripts/render-deploy-status.mjs
