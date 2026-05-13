@@ -146,6 +146,13 @@ jobs:
               exit 0
             elif [ "$STATE" = "deactivated" ] || [ "$STATE" = "build_failed" ]; then
               echo "Deploy failed: $STATE"
+              echo "$RESULT" | jq -c '{
+                status: (.status // .deploy.status // null),
+                id: (.id // .deploy.id // null),
+                failureReason: (.failureReason // .deploy.failureReason // .deploy.failureReasonText // null),
+                finishedAt: (.finishedAt // .deploy.finishedAt // null),
+                commit: (.commit // .deploy.commit // null)
+              }' 2>/dev/null || echo "$RESULT"
               exit 1
             fi
           done
