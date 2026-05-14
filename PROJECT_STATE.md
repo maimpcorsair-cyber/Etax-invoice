@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-15 03:22 Asia/Bangkok
+Last updated: 2026-05-15 04:11 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -20,9 +20,16 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Added optional product catalog fields via Prisma migration `20260515_product_catalog_fields` in both root and backend Prisma trees: `productType`, `category`, `accountCode`, `unitCost`, `defaultWhtRate`, and `internalNote`.
   - Product APIs now persist and search by product type, category, and account code while keeping WHT as an optional default, not a required main-field setting.
   - `สินค้าและบริการ` UX now separates simple daily fields from `ตั้งค่าขั้นสูง`; users can choose product/service/shipping/fee/deposit/discount, set category, price, VAT, optional cost, account code, default WHT, and internal note.
+  - Product catalog master data now syncs into the Company Workspace Google Sheet via tab `สินค้าและบริการ` with code, Thai/English names, type, category, unit, sale price, VAT, unit cost, gross margin, revenue account code, default WHT, status, and updated timestamp.
+  - Product page has a `Sync Sheet` action that exports the product master table through `/api/products/export/sheets`; it creates a spreadsheet/register only and does not create per-product Drive folders in v1.
+  - Company month-end workspace preview now includes the `สินค้าและบริการ` tab and product count; authenticated production `/api/dashboard/month-end-workspace` returned `summary.products=10` and `tabs.products.length=10`.
+  - Invoice item product picker now shows type/category/WHT hints and applies product `defaultWhtRate` as the invoice WHT suggestion when the invoice has no WHT selected yet. Invoice items still snapshot name, unit, price, and VAT into the document.
   - Verified locally: Prisma schema validate, backend/frontend `npm run typecheck`, backend/frontend `npm run build`, backend lint, frontend touched-file lint, and `git diff --check` passed. Local browser smoke reached login, but full modal smoke was blocked because local backend/API was not running.
+  - Verified latest Sheet sync change locally: backend/frontend `npm run typecheck`, backend/frontend `npm run build`, backend lint, frontend lint, and `git diff --check` passed.
   - Deployed commit `efdf833` (`Upgrade product catalog workflow`) to `main`; GitHub Typecheck run `25882865405` succeeded, Deploy to Render run `25882951410` succeeded in `7m58s`, and production `/api/health` returned HTTP 200.
+  - Deployed Sheet sync commit `fe88a11` (`Sync product catalog to sheets`) to `main`; GitHub Typecheck run `25885279641` succeeded, Deploy to Render run `25885374174` succeeded in `6m27s`, and backend `/api/health` returned HTTP 200 with version `2026-05-09d`.
   - Production verified: Vercel `/app/products` returned HTTP 200 with `last-modified: Thu, 14 May 2026 20:09:07 GMT`; production Products chunk `Products-DWXqSl7q.js` contains `ตั้งค่าขั้นสูง`, `ภาษีหัก ณ ที่จ่ายเริ่มต้น`, `productType`, and `defaultWhtRate`; authenticated production `/api/products` returns the new catalog fields.
+  - Production verified latest frontend: Vercel `/app/products` returned HTTP 200 with `last-modified: Thu, 14 May 2026 21:05:41 GMT`; production chunks contain `Sync Sheet`, `/api/products/export/sheets`, `สินค้าและบริการ`, and invoice WHT/product hints.
 - Customer evidence/Drive/Sheet workspace is deployed:
   - Customer `รายชื่อ` modal now makes `ใช้สำหรับ` a compact chip selector, moves optional credit terms below the main identity fields, and keeps supporting document actions at the bottom of the form.
   - `ข้อมูลและเอกสารประกอบ` now explains the Drive/Sheet model, shows compact actions for attaching a general file, opening the existing Drive folder, and viewing attached document details.
