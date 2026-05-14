@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -153,6 +153,7 @@ export default function Customers() {
   const [error, setError] = useState('');
   const [customerDocuments, setCustomerDocuments] = useState<CustomerDocument[]>([]);
   const [uploadingDocType, setUploadingDocType] = useState<CustomerDocumentType | null>(null);
+  const [showEvidenceDetails, setShowEvidenceDetails] = useState(false);
   const [dbdQuery, setDbdQuery] = useState('');
   const [dbdSuggestions, setDbdSuggestions] = useState<DbdLocalSuggestion[]>([]);
   const [dbdLoading, setDbdLoading] = useState(false);
@@ -277,6 +278,13 @@ export default function Customers() {
   }
 
   const localReadiness = buildLocalReadiness();
+  const requiredEvidenceItems = localReadiness.items.filter((item) => item.required);
+  const optionalEvidenceItems = localReadiness.items.filter((item) => !item.required);
+  const evidenceItems = localReadiness.items.filter((item) => item.documentType);
+  const attachedEvidenceCount = customerDocuments.filter((doc) => doc.status !== 'rejected').length;
+  const recommendedMissingCount = localReadiness.recommendedMissingCount ?? 0;
+  const totalMissingCount = localReadiness.missingRequiredCount + recommendedMissingCount;
+  const summaryReviewCount = localReadiness.status === 'not_required' ? 0 : totalMissingCount;
 
     const fetchCustomers = useCallback(async () => {
       setLoading(true);
@@ -360,6 +368,7 @@ export default function Customers() {
       useCase: initialRole === 'supplier' ? 'vendor_payee' : 'general',
     });
     setCustomerDocuments([]);
+    setShowEvidenceDetails(false);
     setError('');
     resetDbdAssist();
     setShowModal(true);
@@ -392,6 +401,7 @@ export default function Customers() {
       documents: c.documents ?? [],
       readiness: c.readiness,
     });
+    setShowEvidenceDetails(false);
     setError('');
     resetDbdAssist();
     setShowModal(true);
@@ -716,11 +726,19 @@ export default function Customers() {
     return customerDocuments.filter((doc) => doc.documentType === documentType && doc.status !== 'rejected');
   }
 
-  function readinessTone(status: CustomerReadinessSummary['status']) {
-    if (status === 'complete') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    if (status === 'not_required') return 'border-slate-200 bg-slate-50 text-slate-700';
-    if (status === 'partial') return 'border-amber-200 bg-amber-50 text-amber-800';
-    return 'border-rose-200 bg-rose-50 text-rose-800';
+  function readinessStatusLabel(status: CustomerReadinessSummary['status']) {
+    if (status === 'complete') return isThai ? 'พร้อมใช้งาน' : 'Ready';
+    if (status === 'not_required') return isThai ? 'เอกสารไม่จำเป็น' : 'No evidence needed';
+    if (status === 'partial') return isThai ? 'ใกล้ครบ' : 'Almost ready';
+    return totalMissingCount > 0
+      ? (isThai ? `ยังขาด ${totalMissingCount} รายการ` : `${totalMissingCount} item${totalMissingCount > 1 ? 's' : ''} to review`)
+      : (isThai ? 'ควรตรวจเพิ่ม' : 'Review suggested');
+  }
+
+  function readinessStatusClass(status: CustomerReadinessSummary['status']) {
+    if (status === 'complete') return 'bg-emerald-50 text-emerald-700 ring-emerald-100';
+    if (status === 'not_required') return 'bg-slate-100 text-slate-600 ring-slate-200';
+    return 'bg-amber-50 text-amber-700 ring-amber-100';
   }
 
   return (
@@ -1022,7 +1040,10 @@ export default function Customers() {
                 <label className="label">{isThai ? 'ใช้สำหรับ' : 'Use case'}</label>
                 <select
                   value={currentUseCase}
-                  onChange={(e) => field('useCase', e.target.value)}
+                  onChange={(e) => {
+                    field('useCase', e.target.value);
+                    setShowEvidenceDetails(false);
+                  }}
                   className="input-field"
                 >
                   {CUSTOMER_USE_CASE_OPTIONS.map((option) => (
@@ -1036,112 +1057,6 @@ export default function Customers() {
                     ? 'ระบบจะแนะนำเอกสารที่ควรมีตามงานนี้ แต่ยังบันทึกได้ก่อน'
                     : 'Billboy suggests useful evidence for this work, but you can save first.'}
                 </p>
-              </div>
-
-              <div className={`rounded-xl border p-4 ${readinessTone(localReadiness.status)}`}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-bold">
-                      <ShieldCheck className="h-4 w-4" />
-                      {isThai ? 'ข้อมูลและเอกสาร' : 'Details and evidence'}
-                    </div>
-                    <p className="mt-1 text-xs opacity-85">
-                      {isThai
-                        ? 'กรอกข้อมูลพื้นฐานก็เริ่มใช้งานได้ เอกสารแนบเพิ่มได้ภายหลัง'
-                        : 'Basic details are enough to start. Evidence can be attached later.'}
-                    </p>
-                  </div>
-                  <span className="inline-flex w-fit items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-xs font-semibold">
-                    {localReadiness.status === 'complete'
-                      ? (isThai ? 'พร้อม' : 'Complete')
-                      : localReadiness.status === 'not_required'
-                        ? (isThai ? 'เอกสารไม่จำเป็น' : 'No evidence needed')
-                        : localReadiness.status === 'partial'
-                          ? (isThai ? 'ใกล้ครบ' : 'Partial')
-                          : (isThai ? 'ต้องตรวจเพิ่ม' : 'Action needed')}
-                  </span>
-                </div>
-
-                {localReadiness.status === 'not_required' ? (
-                  <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-slate-700 ring-1 ring-white/70">
-                    {isThai ? 'กรอกข้อมูลพื้นฐานก็เริ่มใช้งานได้' : 'Basic details are enough to start.'}
-                  </p>
-                ) : (
-                <div className="mt-3 space-y-2">
-                  {localReadiness.items.map((item) => {
-                    const docs = item.documentType ? documentsForType(item.documentType) : [];
-                    const isUploading = item.documentType && uploadingDocType === item.documentType;
-                    return (
-                      <div key={item.key} className="rounded-lg bg-white/80 px-3 py-2 text-sm text-slate-700 ring-1 ring-white/70">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-start gap-2">
-                            {item.complete ? (
-                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                            ) : (
-                              <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${item.required ? 'text-amber-600' : 'text-slate-400'}`} />
-                            )}
-                            <div>
-                              <p className="font-medium text-slate-900">{isThai ? item.labelTh : item.labelEn}</p>
-                              <p className="text-xs text-slate-500">
-                                {item.required
-                                  ? (isThai ? 'ควรมีสำหรับงานนี้' : 'Recommended for this work')
-                                  : (isThai ? 'ไม่บังคับ แนบเมื่อจำเป็น' : 'Optional; attach when needed')}
-                              </p>
-                            </div>
-                          </div>
-                          {item.documentType && (
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              {editing ? (
-                                <>
-                                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                                    {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                                    {docs.length ? (isThai ? 'อัปโหลดเพิ่ม' : 'Upload more') : (isThai ? 'แนบไฟล์' : 'Upload')}
-                                    <input
-                                      type="file"
-                                      className="hidden"
-                                      accept="application/pdf,image/jpeg,image/png,image/webp"
-                                      disabled={!!isUploading}
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        e.target.value = '';
-                                        handleUploadCustomerDocument(item.documentType!, file);
-                                      }}
-                                    />
-                                  </label>
-                                </>
-                              ) : (
-                                <span className="text-xs text-slate-500">{isThai ? 'บันทึกก่อนแนบไฟล์' : 'Save first'}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {docs.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {docs.map((doc) => (
-                              <span key={doc.id} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                                <span className="truncate">{doc.fileName}</span>
-                                {doc.driveUrl && (
-                                  <a href={doc.driveUrl} target="_blank" rel="noreferrer" className="text-primary-700 hover:text-primary-900">
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleMarkDocumentVerified(doc)}
-                                  className={doc.status === 'verified' ? 'text-emerald-700' : 'text-slate-500 hover:text-emerald-700'}
-                                  title={isThai ? 'สลับสถานะตรวจแล้ว' : 'Toggle verified'}
-                                >
-                                  <CheckCircle2 className="h-3 w-3" />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                )}
               </div>
 
               {!isIndividual && (
@@ -1332,6 +1247,144 @@ export default function Customers() {
                   <label className="label">{isThai ? 'ผู้ประสานงาน' : 'Contact person'}</label>
                   <input value={form.contactPerson} onChange={(e) => field('contactPerson', e.target.value)} className="input-field" placeholder={isThai ? 'ชื่อผู้ประสานงาน' : 'Contact person name'} />
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <ShieldCheck className="h-4 w-4 text-slate-500" />
+                      {isThai ? 'ข้อมูลและเอกสารประกอบ' : 'Details and supporting documents'}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {isThai
+                        ? 'บันทึกได้ก่อน แล้วแนบเอกสารเพิ่มเติมภายหลัง'
+                        : 'You can save first and attach supporting documents later.'}
+                    </p>
+                  </div>
+                  <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${readinessStatusClass(localReadiness.status)}`}>
+                    {readinessStatusLabel(localReadiness.status)}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-lg bg-slate-50 px-3 py-2">
+                    <div className="font-semibold text-slate-900">{summaryReviewCount}</div>
+                    <div className="mt-0.5 text-slate-500">{isThai ? 'ควรตรวจ' : 'To review'}</div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-3 py-2">
+                    <div className="font-semibold text-slate-900">{attachedEvidenceCount}</div>
+                    <div className="mt-0.5 text-slate-500">{isThai ? 'แนบแล้ว' : 'Attached'}</div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-3 py-2">
+                    <div className="font-semibold text-slate-900">{evidenceItems.length}</div>
+                    <div className="mt-0.5 text-slate-500">{isThai ? 'เอกสารประกอบ' : 'Evidence'}</div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEvidenceDetails((value) => !value)}
+                  className="mt-3 flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  <span>{isThai ? 'ดูรายการเอกสาร' : 'View document checklist'}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showEvidenceDetails ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showEvidenceDetails && (
+                  <div className="mt-3 space-y-4">
+                    {[
+                      {
+                        key: 'required',
+                        title: isThai ? 'จำเป็นสำหรับงานนี้' : 'Recommended for this work',
+                        items: requiredEvidenceItems,
+                      },
+                      {
+                        key: 'optional',
+                        title: isThai ? 'แนบเมื่อจำเป็น' : 'Attach when needed',
+                        items: optionalEvidenceItems,
+                      },
+                    ].filter((group) => group.items.length > 0).map((group) => (
+                      <div key={group.key} className="space-y-2">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.title}</div>
+                        {group.items.map((item) => {
+                          const docs = item.documentType ? documentsForType(item.documentType) : [];
+                          const isUploading = item.documentType && uploadingDocType === item.documentType;
+                          return (
+                            <div key={item.key} className="rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-700">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex min-w-0 items-start gap-2">
+                                  {item.complete ? (
+                                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                  ) : (
+                                    <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${item.required ? 'text-amber-600' : 'text-slate-400'}`} />
+                                  )}
+                                  <div>
+                                    <p className="font-medium text-slate-900">{isThai ? item.labelTh : item.labelEn}</p>
+                                    <p className="text-xs text-slate-500">
+                                      {item.complete
+                                        ? (isThai ? 'ครบแล้ว' : 'Complete')
+                                        : item.required
+                                          ? (isThai ? 'ควรตรวจเพิ่ม' : 'Review suggested')
+                                          : (isThai ? 'ไม่บังคับ แนบเมื่อจำเป็น' : 'Optional; attach when needed')}
+                                    </p>
+                                  </div>
+                                </div>
+                                {item.documentType ? (
+                                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                    {editing ? (
+                                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                                        {docs.length ? (isThai ? 'อัปโหลดเพิ่ม' : 'Upload more') : (isThai ? 'แนบไฟล์' : 'Upload')}
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                                          disabled={!!isUploading}
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            e.target.value = '';
+                                            handleUploadCustomerDocument(item.documentType!, file);
+                                          }}
+                                        />
+                                      </label>
+                                    ) : (
+                                      <span className="text-xs text-slate-500">{isThai ? 'บันทึกก่อน แล้วค่อยแนบไฟล์' : 'Save first, then attach files'}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-500">{isThai ? 'กรอกในฟอร์มหลัก' : 'Fill in the main form'}</span>
+                                )}
+                              </div>
+                              {docs.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {docs.map((doc) => (
+                                    <span key={doc.id} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                                      <span className="truncate">{doc.fileName}</span>
+                                      {doc.driveUrl && (
+                                        <a href={doc.driveUrl} target="_blank" rel="noreferrer" className="text-primary-700 hover:text-primary-900">
+                                          <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMarkDocumentVerified(doc)}
+                                        className={doc.status === 'verified' ? 'text-emerald-700' : 'text-slate-500 hover:text-emerald-700'}
+                                        title={isThai ? 'สลับสถานะตรวจแล้ว' : 'Toggle verified'}
+                                      >
+                                        <CheckCircle2 className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

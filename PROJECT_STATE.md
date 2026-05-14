@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-14 16:01 Asia/Bangkok
+Last updated: 2026-05-14 16:36 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -23,6 +23,11 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
   - Heavy/unclear labels were softened: `ประเภทการใช้งาน` -> `ใช้สำหรับ`, `ความพร้อมของข้อมูลลูกค้า` -> `ข้อมูลและเอกสาร`, DBD lookup -> `ค้นข้อมูลบริษัท`, and search placeholders now focus on name/tax ID.
   - Verified locally: frontend `npm run lint`, frontend `npm run typecheck`, frontend `npm run build`, `git diff --check`, and Playwright local smoke on `/app/customers` confirmed one add button, All/Customer/Vendor filters, and the simplified add modal.
   - Deployed commit `ed9394b` (`Simplify customer directory UX`) to `main`; GitHub Typecheck run `25851356360` succeeded. Vercel production deployment `dpl_Cb51y8Y9gv3ASgNuvT7RH5sUjyyS` is `Ready` and aliases `https://etax-invoice.vercel.app`.
+- Customer evidence card polish is implemented locally and pending push/deploy:
+  - In the add/edit directory modal, `ข้อมูลและเอกสารประกอบ` moved below the main form fields and above the footer actions.
+  - The old large pink warning-style checklist was replaced with a white/gray audit summary: status badge, review/attached/evidence counts, and a collapsed `ดูรายการเอกสาร` checklist.
+  - Expanded checklist keeps existing upload, Drive link, and verified-toggle behavior; new records show `บันทึกก่อน แล้วค่อยแนบไฟล์`.
+  - Verified locally: frontend `npm run lint`, frontend `npm run typecheck`, frontend `npm run build`, and Playwright desktop/mobile smoke on `/app/customers`.
 - Customer/Supplier counterparty master is deployed:
   - Added Prisma schema/migration `20260514_customer_party_role` in both root and backend Prisma trees. `customers.partyRole` supports `customer`, `supplier`, and `both`, with existing `vendor_payee` rows backfilled as `supplier`.
   - `/api/customers` now accepts `partyRole=customer|supplier|both` filtering and persists `partyRole` on create/update. Supplier creation defaults `general` usage to `vendor_payee`.
