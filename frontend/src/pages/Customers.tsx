@@ -8,7 +8,12 @@ import type { Customer, CustomerDocument, CustomerDocumentType, CustomerKind, Cu
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { digitsOnly, englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isFiveDigitBranchCode, isThaiText, isThirteenDigitId, thaiTextOnly } from '../lib/inputGuards';
 
-const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> = {
+type CustomerForm = Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> & {
+  creditLimit?: string | number | null;
+  creditDays?: string | number | null;
+};
+
+const EMPTY_FORM: CustomerForm = {
   partyRole: 'customer',
   customerKind: 'company',
   useCase: 'general',
@@ -26,15 +31,23 @@ const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> 
   phone: '',
   contactPerson: '',
   personalId: '',
+  creditLimit: null,
+  creditDays: null,
   documents: [],
 };
 
-const CUSTOMER_USE_CASE_OPTIONS: Array<{ value: CustomerUseCase; labelTh: string; labelEn: string }> = [
-  { value: 'general', labelTh: 'ทั่วไป', labelEn: 'General' },
-  { value: 'full_tax_invoice', labelTh: 'ออกใบกำกับภาษีเต็มรูป', labelEn: 'Full tax invoice' },
-  { value: 'credit', labelTh: 'เปิดเครดิต', labelEn: 'Credit account' },
-  { value: 'contract_project', labelTh: 'ทำสัญญา/โครงการ', labelEn: 'Contract / project' },
-  { value: 'vendor_payee', labelTh: 'ผู้ขาย/ผู้รับเงิน', labelEn: 'Vendor / payee' },
+const CUSTOMER_USE_CASE_OPTIONS: Array<{
+  value: CustomerUseCase;
+  labelTh: string;
+  labelEn: string;
+  descriptionTh: string;
+  descriptionEn: string;
+}> = [
+  { value: 'general', labelTh: 'ทั่วไป', labelEn: 'General', descriptionTh: 'บันทึกชื่อไว้ใช้งานประจำ', descriptionEn: 'Save the name for everyday work' },
+  { value: 'full_tax_invoice', labelTh: 'ใบกำกับภาษี', labelEn: 'Tax invoice', descriptionTh: 'ต้องการข้อมูลภาษีให้ครบ', descriptionEn: 'Keep tax details complete' },
+  { value: 'credit', labelTh: 'เครดิต', labelEn: 'Credit', descriptionTh: 'มีวงเงินหรือกำหนดชำระ', descriptionEn: 'Track credit limit or payment days' },
+  { value: 'contract_project', labelTh: 'สัญญา/โปรเจค', labelEn: 'Contract / project', descriptionTh: 'ใช้กับงานสัญญาหรือโครงการ', descriptionEn: 'Use for contract or project work' },
+  { value: 'vendor_payee', labelTh: 'ผู้ขาย/ผู้รับเงิน', labelEn: 'Vendor / payee', descriptionTh: 'ใช้กับซื้อ ค่าใช้จ่าย หรือจ่ายเงิน', descriptionEn: 'Use for purchase, expense, or payment' },
 ];
 
 const PARTY_ROLE_OPTIONS: Array<{ value: 'customer' | 'supplier'; labelTh: string; labelEn: string; descriptionTh: string; descriptionEn: string }> = [
@@ -135,6 +148,41 @@ interface DbdSearchResponse {
   error?: string;
 }
 
+function moneyInput(value: string) {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const [whole, ...fractionParts] = cleaned.split('.');
+  const fraction = fractionParts.join('').slice(0, 2);
+  return fractionParts.length > 0 ? `${whole}.${fraction}` : whole;
+}
+
+function numericValue(value: unknown) {
+  return String(value ?? '').trim().replace(/,/g, '');
+}
+
+function optionalCreditLimit(value: unknown) {
+  const raw = numericValue(value);
+  if (!raw) return null;
+  const amount = Number(raw);
+  return Number.isFinite(amount) ? amount : NaN;
+}
+
+function optionalCreditDays(value: unknown) {
+  const raw = numericValue(value);
+  if (!raw) return null;
+  const days = Number(raw);
+  return Number.isInteger(days) ? days : NaN;
+}
+
+function formatMoney(value: unknown, locale: string) {
+  const amount = optionalCreditLimit(value);
+  if (amount === null || Number.isNaN(amount)) return '';
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'THB',
+    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  }).format(amount);
+}
+
 export default function Customers() {
   const { t } = useTranslation();
   const { isThai } = useLanguage();
@@ -178,6 +226,14 @@ export default function Customers() {
     addressTh: form.addressTh.trim().length > 0 && !isThaiText(form.addressTh, true),
     addressEn: (form.addressEn ?? '').trim().length > 0 && !isEnglishText(form.addressEn ?? ''),
     personalId: !!form.personalId && form.personalId.length > 0 && !isThirteenDigitId(form.personalId),
+    creditLimit: (() => {
+      const amount = optionalCreditLimit(form.creditLimit);
+      return amount !== null && (Number.isNaN(amount) || amount < 0);
+    })(),
+    creditDays: (() => {
+      const days = optionalCreditDays(form.creditDays);
+      return days !== null && (Number.isNaN(days) || days < 0);
+    })(),
   };
 
   function buildLocalReadiness(): CustomerReadinessSummary {
@@ -398,6 +454,8 @@ export default function Customers() {
       phone: c.phone ?? '',
       contactPerson: c.contactPerson ?? '',
       personalId: existingPersonalId,
+      creditLimit: c.creditLimit ?? null,
+      creditDays: c.creditDays ?? null,
       documents: c.documents ?? [],
       readiness: c.readiness,
     });
@@ -416,6 +474,11 @@ export default function Customers() {
       return;
     }
     if (!form.addressTh.trim() || formValidation.addressTh) { setError(isThai ? 'กรุณากรอกที่อยู่ภาษาไทยให้ถูกต้อง' : 'Please enter a valid Thai address'); return; }
+    if (formValidation.creditLimit) { setError(isThai ? 'วงเงินเครดิตต้องเป็นตัวเลข 0 ขึ้นไป' : 'Credit limit must be a number from 0 or higher'); return; }
+    if (formValidation.creditDays) { setError(isThai ? 'เครดิตกี่วันต้องเป็นจำนวนเต็ม 0 ขึ้นไป' : 'Credit days must be a whole number from 0 or higher'); return; }
+
+    const normalizedCreditLimit = optionalCreditLimit(form.creditLimit);
+    const normalizedCreditDays = optionalCreditDays(form.creditDays);
 
       const payload = isIndividual
         ? {
@@ -423,6 +486,8 @@ export default function Customers() {
           partyRole: currentPartyRole,
           customerKind: 'individual',
         useCase: currentUseCase,
+        creditLimit: normalizedCreditLimit,
+        creditDays: normalizedCreditDays,
         taxId: form.taxId,
         personalId: form.taxId,
         branchCode: '00000',
@@ -436,6 +501,8 @@ export default function Customers() {
           partyRole: currentPartyRole,
           customerKind: 'company',
         useCase: currentUseCase,
+        creditLimit: normalizedCreditLimit,
+        creditDays: normalizedCreditDays,
         personalId: form.personalId || '',
       };
     delete payload.documents;
@@ -555,6 +622,17 @@ export default function Customers() {
     if (role === 'supplier') return 'bg-amber-50 text-amber-700 ring-amber-100';
     if (role === 'both') return 'bg-violet-50 text-violet-700 ring-violet-100';
     return 'bg-blue-50 text-blue-700 ring-blue-100';
+  }
+
+  function creditTermsText(customer: Customer) {
+    const parts: string[] = [];
+    if (customer.creditDays !== null && customer.creditDays !== undefined) {
+      parts.push(isThai ? `เครดิต ${customer.creditDays} วัน` : `${customer.creditDays} credit days`);
+    }
+    if (customer.creditLimit !== null && customer.creditLimit !== undefined && formatMoney(customer.creditLimit, isThai ? 'th-TH' : 'en-US')) {
+      parts.push(isThai ? `วงเงิน ${formatMoney(customer.creditLimit, 'th-TH')}` : `Limit ${formatMoney(customer.creditLimit, 'en-US')}`);
+    }
+    return parts.join(' · ');
   }
 
   function sourceLabel(suggestion: DbdLocalSuggestion) {
@@ -838,6 +916,9 @@ export default function Customers() {
                   {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
                   {partyRoleLabel(c.partyRole)}
                 </span>
+                {creditTermsText(c) && (
+                  <p className="text-xs text-slate-500">{creditTermsText(c)}</p>
+                )}
                 {/* Row 3: tax ID */}
               {c.taxId && (
                 <p className="text-xs text-gray-400 font-mono">
@@ -914,6 +995,9 @@ export default function Customers() {
                           {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
                           {partyRoleLabel(c.partyRole)}
                         </span>
+                        {creditTermsText(c) && (
+                          <p className="mt-1 text-xs text-slate-500">{creditTermsText(c)}</p>
+                        )}
                       </td>
                     <td className="table-cell font-mono text-xs hidden sm:table-cell">{maskedCustomerId(c)}</td>
                     <td className="table-cell text-gray-500 hidden sm:table-cell">{c.phone ?? '—'}</td>
@@ -1036,27 +1120,85 @@ export default function Customers() {
                 </button>
               </div>
 
-              <div>
-                <label className="label">{isThai ? 'ใช้สำหรับ' : 'Use case'}</label>
-                <select
-                  value={currentUseCase}
-                  onChange={(e) => {
-                    field('useCase', e.target.value);
-                    setShowEvidenceDetails(false);
-                  }}
-                  className="input-field"
-                >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="label mb-0">{isThai ? 'ใช้สำหรับ' : 'Use for'}</label>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {isThai ? 'เปลี่ยนได้ภายหลัง' : 'Can be changed later'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {CUSTOMER_USE_CASE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {isThai ? option.labelTh : option.labelEn}
-                    </option>
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        field('useCase', option.value);
+                        setShowEvidenceDetails(false);
+                      }}
+                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                        currentUseCase === option.value
+                          ? 'border-primary-300 bg-primary-50 text-primary-900 ring-2 ring-primary-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">{isThai ? option.labelTh : option.labelEn}</span>
+                      <span className="mt-0.5 block text-xs opacity-75">{isThai ? option.descriptionTh : option.descriptionEn}</span>
+                    </button>
                   ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">
-                  {isThai
-                    ? 'ระบบจะแนะนำเอกสารที่ควรมีตามงานนี้ แต่ยังบันทึกได้ก่อน'
-                    : 'Billboy suggests useful evidence for this work, but you can save first.'}
-                </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {isThai ? 'เงื่อนไขเครดิต' : 'Credit terms'}
+                      <span className="ml-2 text-xs font-medium text-slate-400">{isThai ? 'ไม่บังคับ' : 'Optional'}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {isThai
+                        ? 'ใช้ช่วยเตือนวงเงินและกำหนดชำระในเอกสารขาย ไม่ใส่ก็ยังบันทึกได้'
+                        : 'Used for credit limit and due-date reminders. You can leave this blank.'}
+                    </p>
+                  </div>
+                  {currentUseCase === 'credit' && (
+                    <span className="inline-flex w-fit rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
+                      {isThai ? 'แนะนำให้ใส่' : 'Recommended'}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{isThai ? 'วงเงินเครดิต' : 'Credit limit'}</label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">฿</span>
+                      <input
+                        value={form.creditLimit ?? ''}
+                        onChange={(e) => field('creditLimit', moneyInput(e.target.value))}
+                        className={guardedInputClass(formValidation.creditLimit, 'pl-7')}
+                        placeholder="0.00"
+                        inputMode="decimal"
+                      />
+                    </div>
+                    <p className={inputGuide(formValidation.creditLimit)}>
+                      {isThai ? 'ตัวเลขเท่านั้น เช่น 50000' : 'Numbers only, e.g. 50000'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'เครดิตกี่วัน' : 'Credit days'}</label>
+                    <input
+                      value={form.creditDays ?? ''}
+                      onChange={(e) => field('creditDays', digitsOnly(e.target.value, 4))}
+                      className={guardedInputClass(formValidation.creditDays)}
+                      placeholder="30"
+                      inputMode="numeric"
+                    />
+                    <p className={inputGuide(formValidation.creditDays)}>
+                      {isThai ? 'เช่น 0, 7, 15, 30 หรือ 60 วัน' : 'For example 0, 7, 15, 30, or 60 days'}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {!isIndividual && (

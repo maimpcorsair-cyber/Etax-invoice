@@ -627,12 +627,19 @@ export default function InvoiceBuilder() {
             selectedCustomerId={customer.selectedCustomerId}
             showBuyerSection={showBuyerSection}
             onSearchChange={customer.setCustomerSearch}
-            onSelectCustomer={(custId, name) => {
+            onSelectCustomer={(selectedCustomer, name) => {
               form.clearSubmitMessage();
               preview.clearPreviewError();
-              customer.setSelectedCustomerId(custId);
+              customer.setSelectedCustomerId(selectedCustomer.id);
               customer.setCustomerSearch(name);
               customer.clearResults();
+              if (!form.dueDate && selectedCustomer.creditDays !== null && selectedCustomer.creditDays !== undefined) {
+                const invoiceDate = new Date(form.invoiceDate);
+                if (!Number.isNaN(invoiceDate.getTime())) {
+                  invoiceDate.setDate(invoiceDate.getDate() + Number(selectedCustomer.creditDays));
+                  form.setDueDate(invoiceDate.toISOString().slice(0, 10));
+                }
+              }
             }}
             onClearCustomer={customer.clearCustomer}
             onToggleSection={() => setShowBuyerSection((s) => !s)}

@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-14 16:41 Asia/Bangkok
+Last updated: 2026-05-15 00:44 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,6 +16,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
+- Customer credit terms are implemented locally and pending deploy verification:
+  - Added optional `customers.creditLimit` and `customers.creditDays` via Prisma migration `20260514_customer_credit_terms` in both root and backend Prisma trees.
+  - Backend customer create/update accepts optional nonnegative credit limit and 0-3650 credit days.
+  - `รายชื่อ` modal replaced the native `ใช้สำหรับ` dropdown with clearer selectable options and added an optional `เงื่อนไขเครดิต` section.
+  - Customer list and invoice buyer selection display credit terms; invoice builder auto-fills due date from `creditDays` only when the due date is still empty.
+  - Verified locally so far: backend/frontend `npm run typecheck`, backend/frontend `npm run lint`, frontend `npm run build`, root/backend Prisma validate, backend/root Prisma generate, `git diff --check`, and Playwright local smoke on `/app/customers` passed with mocked auth/API.
 - Customers directory UX rename is deployed:
   - Main Customers UI now uses `รายชื่อ` as the nav/menu concept, page title `รายชื่อลูกค้าและผู้ขาย`, subtitle `เก็บข้อมูลลูกค้า ผู้ขาย และบริษัทที่ใช้ในเอกสาร`, and a single primary button `เพิ่มรายชื่อ`.
   - Customer/Supplier wording was simplified in `frontend/src/pages/Customers.tsx`: UI uses `ลูกค้า`, `ผู้ขาย`, and `ลูกค้า + ผู้ขาย`; the separate `เพิ่มลูกค้า`/`เพิ่มซัพพลายเออร์` buttons were merged into one add flow.

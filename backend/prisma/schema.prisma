@@ -238,6 +238,8 @@ model Customer {
   email         String?
   phone         String?
   contactPerson String?
+  creditLimit   Decimal? @db.Decimal(12, 2)
+  creditDays    Int?
   personalId    String? // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
   partyRole     String  @default("customer") // customer | supplier | both
   customerKind  String  @default("company") // company | individual

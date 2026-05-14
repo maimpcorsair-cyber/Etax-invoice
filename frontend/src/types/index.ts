@@ -95,6 +95,8 @@ export interface Customer {
   phone?: string;
   contactPerson?: string;
   personalId?: string;   // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
+  creditLimit?: number | string | null;
+  creditDays?: number | null;
   isActive: boolean;
   createdAt: string;
   documents?: CustomerDocument[];

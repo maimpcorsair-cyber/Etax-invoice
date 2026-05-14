@@ -45,6 +45,20 @@ const documentTypeSchema = z.enum([
 ]);
 const documentStatusSchema = z.enum(['uploaded', 'verified', 'rejected']);
 
+const optionalCurrencySchema = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value === 'string') return Number(value.replace(/,/g, ''));
+  return value;
+}, z.number().min(0).max(9999999999.99).nullable().optional());
+
+const optionalCreditDaysSchema = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value === 'string') return Number(value);
+  return value;
+}, z.number().int().min(0).max(3650).nullable().optional());
+
 const customerSchema = z.object({
   nameTh: z.string().min(1),
   nameEn: z.string().optional(),
@@ -58,6 +72,8 @@ const customerSchema = z.object({
   phone: z.string().optional(),
   contactPerson: z.string().optional(),
   personalId: z.string().length(13).optional().or(z.literal('')),  // เลขบัตร ปชช. (บุคคลธรรมดา)
+  creditLimit: optionalCurrencySchema,
+  creditDays: optionalCreditDaysSchema,
   partyRole: customerPartyRoleSchema.optional(),
   customerKind: customerKindSchema.optional(),
   useCase: customerUseCaseSchema.optional(),

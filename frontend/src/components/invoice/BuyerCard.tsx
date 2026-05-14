@@ -9,7 +9,7 @@ interface Props {
   selectedCustomerId: string;
   showBuyerSection: boolean;
   onSearchChange: (v: string) => void;
-  onSelectCustomer: (id: string, name: string) => void;
+  onSelectCustomer: (customer: Customer, name: string) => void;
   onClearCustomer: () => void;
   onToggleSection: () => void;
 }
@@ -17,6 +17,17 @@ interface Props {
 function maskPersonalId(value: string) {
   if (value.length < 4) return '*************';
   return `*********${value.slice(-4)}`;
+}
+
+function formatCreditLimit(value: Customer['creditLimit'], locale: string) {
+  if (value === null || value === undefined || value === '') return '';
+  const amount = Number(String(value).replace(/,/g, ''));
+  if (!Number.isFinite(amount)) return '';
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'THB',
+    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  }).format(amount);
 }
 
 export default function BuyerCard({
@@ -79,7 +90,7 @@ export default function BuyerCard({
                     type="button"
                     onClick={() =>
                       onSelectCustomer(
-                        c.id,
+                        c,
                         isThai ? c.nameTh : (c.nameEn ?? c.nameTh),
                       )
                     }
@@ -120,6 +131,20 @@ export default function BuyerCard({
                 </div>
               )}
               <div className="text-gray-500">{selectedCustomer.addressTh}</div>
+              {(selectedCustomer.creditDays !== null && selectedCustomer.creditDays !== undefined) || selectedCustomer.creditLimit ? (
+                <div className="text-gray-500">
+                  {[
+                    selectedCustomer.creditDays !== null && selectedCustomer.creditDays !== undefined
+                      ? (isThai ? `เครดิต ${selectedCustomer.creditDays} วัน` : `${selectedCustomer.creditDays} credit days`)
+                      : '',
+                    selectedCustomer.creditLimit
+                      ? (isThai
+                        ? `วงเงิน ${formatCreditLimit(selectedCustomer.creditLimit, 'th-TH')}`
+                        : `Limit ${formatCreditLimit(selectedCustomer.creditLimit, 'en-US')}`)
+                      : '',
+                  ].filter(Boolean).join(' · ')}
+                </div>
+              ) : null}
               {selectedCustomer.readiness && (
                 selectedCustomer.readiness.missingRequiredCount > 0 || selectedCustomer.readiness.recommendedMissingCount > 0
               ) && (
