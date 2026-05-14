@@ -30,17 +30,16 @@ const EMPTY_FORM: Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> 
 };
 
 const CUSTOMER_USE_CASE_OPTIONS: Array<{ value: CustomerUseCase; labelTh: string; labelEn: string }> = [
-  { value: 'general', labelTh: 'ซื้อขายทั่วไป', labelEn: 'General trading' },
+  { value: 'general', labelTh: 'ทั่วไป', labelEn: 'General' },
   { value: 'full_tax_invoice', labelTh: 'ออกใบกำกับภาษีเต็มรูป', labelEn: 'Full tax invoice' },
   { value: 'credit', labelTh: 'เปิดเครดิต', labelEn: 'Credit account' },
   { value: 'contract_project', labelTh: 'ทำสัญญา/โครงการ', labelEn: 'Contract / project' },
-  { value: 'vendor_payee', labelTh: 'คู่ค้า/ผู้รับเงิน', labelEn: 'Vendor / payee' },
+  { value: 'vendor_payee', labelTh: 'ผู้ขาย/ผู้รับเงิน', labelEn: 'Vendor / payee' },
 ];
 
-const PARTY_ROLE_OPTIONS: Array<{ value: CustomerPartyRole; labelTh: string; labelEn: string; descriptionTh: string; descriptionEn: string }> = [
-  { value: 'customer', labelTh: 'ลูกค้า', labelEn: 'Customer', descriptionTh: 'ใช้กับเอกสารขายและลูกหนี้', descriptionEn: 'For sales documents and receivables' },
-  { value: 'supplier', labelTh: 'ซัพพลายเออร์', labelEn: 'Supplier', descriptionTh: 'ใช้กับบันทึกซื้อ ภาษีซื้อ และจ่ายเงิน', descriptionEn: 'For purchases, input VAT, and payments' },
-  { value: 'both', labelTh: 'ทั้งสอง', labelEn: 'Both', descriptionTh: 'บริษัทเดียวกันเป็นได้ทั้งลูกค้าและผู้ขาย', descriptionEn: 'Same party can be buyer and vendor' },
+const PARTY_ROLE_OPTIONS: Array<{ value: 'customer' | 'supplier'; labelTh: string; labelEn: string; descriptionTh: string; descriptionEn: string }> = [
+  { value: 'customer', labelTh: 'ลูกค้า', labelEn: 'Customer', descriptionTh: 'สำหรับออกเอกสารขาย', descriptionEn: 'For sales documents' },
+  { value: 'supplier', labelTh: 'ผู้ขาย', labelEn: 'Vendor', descriptionTh: 'สำหรับบันทึกซื้อ ค่าใช้จ่าย หรือเอกสารจากผู้ขาย', descriptionEn: 'For purchase records, expenses, and vendor documents' },
 ];
 
 interface DbdLocalSuggestion {
@@ -163,6 +162,11 @@ export default function Customers() {
   const currentUseCase = (form.useCase ?? 'general') as CustomerUseCase;
   const currentPartyRole = (form.partyRole ?? 'customer') as CustomerPartyRole;
   const isSupplierRole = currentPartyRole === 'supplier' || currentPartyRole === 'both' || currentUseCase === 'vendor_payee';
+  const primaryPartyRole: 'customer' | 'supplier' =
+    currentPartyRole === 'supplier' || (currentPartyRole === 'both' && currentUseCase === 'vendor_payee')
+      ? 'supplier'
+      : 'customer';
+  const usesBothSides = currentPartyRole === 'both';
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
@@ -187,8 +191,8 @@ export default function Customers() {
 
     const items: CustomerReadinessSummary['items'] = [{
       key: 'basic_identity',
-      labelTh: isCompany ? (isSupplierRole ? 'ข้อมูลซัพพลายเออร์ครบถ้วน' : 'ข้อมูลบริษัทครบถ้วน') : 'ข้อมูลบุคคลครบถ้วน',
-      labelEn: isCompany ? (isSupplierRole ? 'Supplier details complete' : 'Company details complete') : 'Individual details complete',
+      labelTh: isCompany ? (isSupplierRole ? 'ข้อมูลผู้ขายครบถ้วน' : 'ข้อมูลบริษัทครบถ้วน') : 'ข้อมูลบุคคลครบถ้วน',
+      labelEn: isCompany ? (isSupplierRole ? 'Vendor details complete' : 'Company details complete') : 'Individual details complete',
       required: true,
       complete: Boolean(form.nameTh && form.taxId.length === 13 && form.addressTh),
     }];
@@ -345,7 +349,7 @@ export default function Customers() {
 
   function openCreate(initialRole: CustomerPartyRole = 'customer') {
     if (policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers) {
-      setError(isThai ? 'ถึงจำนวนคู่ค้าสูงสุดของแพ็กเกจแล้ว' : 'You reached the counterparty limit for this plan');
+      setError(isThai ? 'ถึงจำนวนรายชื่อสูงสุดของแพ็กเกจแล้ว' : 'You reached the directory limit for this plan');
       return;
     }
     setEditing(null);
@@ -489,16 +493,28 @@ export default function Customers() {
       }
     }
 
-  function setPartyRole(nextRole: CustomerPartyRole) {
+  function getUseCaseForPrimaryRole(nextRole: 'customer' | 'supplier', current: CustomerUseCase) {
+    if (nextRole === 'supplier' && current === 'general') return 'vendor_payee';
+    if (nextRole === 'customer' && current === 'vendor_payee') return 'general';
+    return current;
+  }
+
+  function setPartyRole(nextRole: 'customer' | 'supplier') {
     setError('');
     setForm((prev) => {
       const current = (prev.useCase ?? 'general') as CustomerUseCase;
-      const nextUseCase = nextRole === 'supplier' && current === 'general'
-        ? 'vendor_payee'
-        : nextRole === 'customer' && current === 'vendor_payee'
-          ? 'general'
-          : current;
-      return { ...prev, partyRole: nextRole, useCase: nextUseCase };
+      const nextUseCase = getUseCaseForPrimaryRole(nextRole, current);
+      return { ...prev, partyRole: prev.partyRole === 'both' ? 'both' : nextRole, useCase: nextUseCase };
+    });
+  }
+
+  function setUsesBothSides(enabled: boolean) {
+    setError('');
+    setForm((prev) => {
+      const current = (prev.useCase ?? 'general') as CustomerUseCase;
+      if (enabled) return { ...prev, partyRole: 'both' };
+      const nextRole: 'customer' | 'supplier' = current === 'vendor_payee' ? 'supplier' : 'customer';
+      return { ...prev, partyRole: nextRole, useCase: getUseCaseForPrimaryRole(nextRole, current) };
     });
   }
 
@@ -520,8 +536,8 @@ export default function Customers() {
   }
 
   function partyRoleLabel(role?: string | null) {
-    if (role === 'supplier') return isThai ? 'ซัพพลายเออร์' : 'Supplier';
-    if (role === 'both') return isThai ? 'ลูกค้า + ซัพพลายเออร์' : 'Customer + supplier';
+    if (role === 'supplier') return isThai ? 'ผู้ขาย' : 'Vendor';
+    if (role === 'both') return isThai ? 'ลูกค้า + ผู้ขาย' : 'Customer + vendor';
     return isThai ? 'ลูกค้า' : 'Customer';
   }
 
@@ -712,27 +728,19 @@ export default function Customers() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{isThai ? 'ลูกค้าและซัพพลายเออร์' : 'Customers & Suppliers'}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{isThai ? 'รายชื่อลูกค้าและผู้ขาย' : 'Customer & Vendor Directory'}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {isThai ? 'ฐานข้อมูลคู่ค้ากลาง ใช้ร่วมกับเอกสารขาย บันทึกซื้อ ภาษี และการจ่ายเงิน' : 'One counterparty master for sales, purchases, VAT, and payments.'}
+            {isThai ? 'เก็บข้อมูลลูกค้า ผู้ขาย และบริษัทที่ใช้ในเอกสาร' : 'Manage customers, vendors, and company names used in documents.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => openCreate('customer')}
-            className="btn-secondary"
-            disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
-          >
-            <Plus className="w-4 h-4" />
-            {isThai ? 'เพิ่มลูกค้า' : 'Add customer'}
-          </button>
-          <button
-            onClick={() => openCreate('supplier')}
             className="btn-primary"
             disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
           >
-            <Truck className="w-4 h-4" />
-            {isThai ? 'เพิ่มซัพพลายเออร์' : 'Add supplier'}
+            <Plus className="w-4 h-4" />
+            {isThai ? 'เพิ่มรายชื่อ' : 'Add name'}
           </button>
         </div>
       </div>
@@ -740,8 +748,8 @@ export default function Customers() {
       {policy && (
         <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900">
           {isThai
-            ? `คู่ค้าในแพ็กเกจ ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`
-            : `Counterparties on ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`}
+            ? `รายชื่อในแพ็กเกจ ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`
+            : `Directory entries on ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`}
         </div>
       )}
 
@@ -749,7 +757,7 @@ export default function Customers() {
       <div className="card">
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            {(['all', 'customer', 'supplier', 'both'] as const).map((role) => (
+            {(['all', 'customer', 'supplier'] as const).map((role) => (
               <button
                 key={role}
                 type="button"
@@ -771,7 +779,7 @@ export default function Customers() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={isThai ? 'ค้นหาชื่อ เลขผู้เสียภาษี ลูกค้า หรือซัพพลายเออร์' : 'Search name, tax ID, customer, or supplier'}
+              placeholder={isThai ? 'ค้นหาชื่อหรือเลขผู้เสียภาษี' : 'Search name or tax ID'}
               className="input-field pl-9"
             />
           </div>
@@ -939,10 +947,8 @@ export default function Customers() {
               <div className="flex items-center justify-between p-5 border-b border-gray-100">
                 <h2 className="text-lg font-bold text-gray-900">
                   {editing
-                    ? (isThai ? 'แก้ไขคู่ค้า' : 'Edit counterparty')
-                    : currentPartyRole === 'supplier'
-                      ? (isThai ? 'เพิ่มซัพพลายเออร์' : 'Add supplier')
-                      : (isThai ? 'เพิ่มลูกค้า' : 'Add customer')}
+                    ? (isThai ? 'แก้ไขรายชื่อ' : 'Edit directory entry')
+                    : (isThai ? 'เพิ่มรายชื่อ' : 'Add directory entry')}
                 </h2>
               <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-gray-100">
                 <X className="w-5 h-5 text-gray-500" />
@@ -955,15 +961,15 @@ export default function Customers() {
                 )}
 
                 <div>
-                  <label className="label">{isThai ? 'บทบาทในระบบ' : 'Role in Billboy'}</label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <label className="label">{isThai ? 'รายชื่อนี้ใช้เป็น' : 'Use this entry as'}</label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {PARTY_ROLE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         type="button"
                         onClick={() => setPartyRole(option.value)}
                         className={`rounded-xl border px-3 py-2 text-left transition ${
-                          currentPartyRole === option.value
+                          primaryPartyRole === option.value
                             ? 'border-primary-300 bg-primary-50 text-primary-900 ring-2 ring-primary-100'
                             : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                         }`}
@@ -976,6 +982,15 @@ export default function Customers() {
                       </button>
                     ))}
                   </div>
+                  <label className="mt-2 inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={usesBothSides}
+                      onChange={(event) => setUsesBothSides(event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {isThai ? 'ใช้ได้ทั้งเป็นลูกค้าและผู้ขาย' : 'Use as both customer and vendor'}
+                  </label>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
@@ -1004,7 +1019,7 @@ export default function Customers() {
               </div>
 
               <div>
-                <label className="label">{isThai ? 'ประเภทการใช้งาน' : 'Usage type'}</label>
+                <label className="label">{isThai ? 'ใช้สำหรับ' : 'Use case'}</label>
                 <select
                   value={currentUseCase}
                   onChange={(e) => field('useCase', e.target.value)}
@@ -1018,8 +1033,8 @@ export default function Customers() {
                 </select>
                 <p className="mt-1 text-xs text-slate-500">
                   {isThai
-                    ? 'ระบบจะเตือนเอกสารที่ควรมีตามเคส แต่ยังไม่บล็อกการทำงาน'
-                    : 'Billboy shows the recommended evidence for this case without blocking the workflow.'}
+                    ? 'ระบบจะแนะนำเอกสารที่ควรมีตามงานนี้ แต่ยังบันทึกได้ก่อน'
+                    : 'Billboy suggests useful evidence for this work, but you can save first.'}
                 </p>
               </div>
 
@@ -1028,12 +1043,12 @@ export default function Customers() {
                   <div>
                     <div className="flex items-center gap-2 text-sm font-bold">
                       <ShieldCheck className="h-4 w-4" />
-                      {isThai ? 'ความพร้อมของข้อมูลลูกค้า' : 'Customer readiness'}
+                      {isThai ? 'ข้อมูลและเอกสาร' : 'Details and evidence'}
                     </div>
                     <p className="mt-1 text-xs opacity-85">
                       {isThai
-                        ? 'เตือนก่อน ไม่บล็อกงาน: แนบเฉพาะเอกสารที่จำเป็นกับเคสนี้'
-                        : 'Warn first, do not block: attach only evidence needed for this case.'}
+                        ? 'กรอกข้อมูลพื้นฐานก็เริ่มใช้งานได้ เอกสารแนบเพิ่มได้ภายหลัง'
+                        : 'Basic details are enough to start. Evidence can be attached later.'}
                     </p>
                   </div>
                   <span className="inline-flex w-fit items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-xs font-semibold">
@@ -1047,6 +1062,11 @@ export default function Customers() {
                   </span>
                 </div>
 
+                {localReadiness.status === 'not_required' ? (
+                  <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-sm text-slate-700 ring-1 ring-white/70">
+                    {isThai ? 'กรอกข้อมูลพื้นฐานก็เริ่มใช้งานได้' : 'Basic details are enough to start.'}
+                  </p>
+                ) : (
                 <div className="mt-3 space-y-2">
                   {localReadiness.items.map((item) => {
                     const docs = item.documentType ? documentsForType(item.documentType) : [];
@@ -1064,8 +1084,8 @@ export default function Customers() {
                               <p className="font-medium text-slate-900">{isThai ? item.labelTh : item.labelEn}</p>
                               <p className="text-xs text-slate-500">
                                 {item.required
-                                  ? (isThai ? 'ควรมีสำหรับเคสนี้' : 'Recommended for this case')
-                                  : (isThai ? 'optional เฉพาะกรณีจำเป็น' : 'Optional only when needed')}
+                                  ? (isThai ? 'ควรมีสำหรับงานนี้' : 'Recommended for this work')
+                                  : (isThai ? 'ไม่บังคับ แนบเมื่อจำเป็น' : 'Optional; attach when needed')}
                               </p>
                             </div>
                           </div>
@@ -1121,6 +1141,7 @@ export default function Customers() {
                     );
                   })}
                 </div>
+                )}
               </div>
 
               {!isIndividual && (
@@ -1129,12 +1150,12 @@ export default function Customers() {
                     <div>
                         <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
                           <Database className="h-4 w-4" />
-                          {isSupplierRole ? (isThai ? 'ค้นข้อมูลซัพพลายเออร์' : 'Supplier lookup') : (isThai ? 'ค้นข้อมูลบริษัท' : 'Company lookup')}
+                          {isThai ? 'ค้นข้อมูลบริษัท' : 'Company lookup'}
                         </div>
                       <p className="mt-1 text-xs text-teal-700">
                         {isThai
-                            ? 'เติมชื่อ เลขผู้เสียภาษี และที่อยู่จากข้อมูลเปิดหรือข้อมูลที่เคยบันทึกไว้'
-                            : 'Fill name, tax ID, and address from open data or saved counterparty records.'}
+                            ? 'ช่วยเติมชื่อ เลขผู้เสียภาษี และที่อยู่ให้อัตโนมัติ'
+                            : 'Fill name, tax ID, and address automatically when data is available.'}
                       </p>
                     </div>
                     {appliedDbdSuggestion && (
@@ -1151,7 +1172,7 @@ export default function Customers() {
                       value={dbdQuery}
                     onChange={(e) => setDbdQuery(e.target.value)}
                     className="input-field pl-9 bg-white"
-                      placeholder={isThai ? 'พิมพ์ชื่อบริษัท/ซัพพลายเออร์ หรือเลขผู้เสียภาษีอย่างน้อย 3 ตัว...' : 'Type company/supplier name or at least 3 tax ID digits...'}
+                      placeholder={isThai ? 'ค้นด้วยชื่อบริษัทหรือเลขผู้เสียภาษี' : 'Search by company name or tax ID'}
                   />
                   {dbdLoading && (
                     <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-teal-500" />
@@ -1199,7 +1220,7 @@ export default function Customers() {
                       {isIndividual
                         ? (isThai ? 'ชื่อ-นามสกุล *' : 'Full name *')
                         : isSupplierRole
-                          ? (isThai ? 'ชื่อซัพพลายเออร์ (ไทย) *' : 'Supplier name (TH) *')
+                          ? (isThai ? 'ชื่อผู้ขาย (ไทย) *' : 'Vendor name (TH) *')
                           : `${t('customer.nameTh')} *`}
                     </label>
                   <input
@@ -1211,7 +1232,7 @@ export default function Customers() {
                   <p className={inputGuide(formValidation.nameTh)}>
                     {isIndividual
                       ? (isThai ? 'ใช้ชื่อตามเอกสารของลูกค้า เช่น สมชาย ใจดี' : 'Use the customer name for the document.')
-                        : (isThai ? 'ใช้ชื่อภาษาไทยตามเอกสารของคู่ค้า' : 'Use the Thai legal name from the counterparty document.')}
+                        : (isThai ? 'ใช้ชื่อภาษาไทยตามเอกสาร' : 'Use the Thai legal name from the document.')}
                   </p>
                 </div>
                 {!isIndividual && (
@@ -1228,7 +1249,7 @@ export default function Customers() {
                     {isIndividual
                       ? (isThai ? 'เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา *' : '13-digit individual ID *')
                         : isSupplierRole
-                          ? `${isThai ? 'เลขผู้เสียภาษีซัพพลายเออร์' : 'Supplier Tax ID'} * (13 ${isThai ? 'หลัก' : 'digits'})`
+                          ? `${isThai ? 'เลขผู้เสียภาษีผู้ขาย' : 'Vendor Tax ID'} * (13 ${isThai ? 'หลัก' : 'digits'})`
                           : `${t('customer.taxId')} * (13 ${isThai ? 'หลัก' : 'digits'})`}
                   </label>
                   <div className="flex gap-2">
@@ -1308,8 +1329,8 @@ export default function Customers() {
                   <input value={form.phone} onChange={(e) => field('phone', e.target.value)} className="input-field" placeholder="02-xxx-xxxx" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="label">{t('customer.contactPerson')}</label>
-                  <input value={form.contactPerson} onChange={(e) => field('contactPerson', e.target.value)} className="input-field" placeholder={isThai ? 'ชื่อผู้ติดต่อ' : 'Contact person name'} />
+                  <label className="label">{isThai ? 'ผู้ประสานงาน' : 'Contact person'}</label>
+                  <input value={form.contactPerson} onChange={(e) => field('contactPerson', e.target.value)} className="input-field" placeholder={isThai ? 'ชื่อผู้ประสานงาน' : 'Contact person name'} />
                 </div>
               </div>
             </div>
@@ -1318,7 +1339,7 @@ export default function Customers() {
               <button onClick={() => setShowModal(false)} className="btn-secondary">{t('common.cancel')}</button>
               <button onClick={handleSave} disabled={saving} className="btn-primary">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {t('common.save')}
+                {isThai ? 'บันทึกรายชื่อ' : 'Save entry'}
               </button>
             </div>
           </div>

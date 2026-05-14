@@ -9,7 +9,7 @@
     "invoices": "Invoices",
     "createInvoice": "Create Sales Document",
     "receipts": "Receipts",
-    "customers": "Customers",
+    "customers": "Directory",
     "products": "Products / Services",
     "purchaseInvoices": "Purchase Invoices",
     "projects": "Projects",
@@ -147,7 +147,7 @@
     }
   },
   "customer": {
-    "title": "Customer",
+    "title": "Directory",
     "name": "Name / Company",
     "nameTh": "Thai Name",
     "nameEn": "English Name",
@@ -159,10 +159,10 @@
     "addressEn": "English Address",
     "email": "Email",
     "phone": "Phone",
-    "contactPerson": "Contact Person",
-    "add": "Add Customer",
-    "edit": "Edit Customer",
-    "search": "Search customers"
+    "contactPerson": "Coordinator",
+    "add": "Add Entry",
+    "edit": "Edit Entry",
+    "search": "Search directory"
   },
   "product": {
     "title": "Products / Services",
