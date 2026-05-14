@@ -141,6 +141,7 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
       expenses,
       actionDocs,
       projects,
+      customers,
     ] = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return Promise.all([
         tx.purchaseInvoice.findMany({
@@ -264,6 +265,37 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
             },
           },
         }),
+        tx.customer.findMany({
+          where: { companyId, isActive: true },
+          orderBy: { updatedAt: 'desc' },
+          take: 200,
+          select: {
+            id: true,
+            nameTh: true,
+            nameEn: true,
+            taxId: true,
+            partyRole: true,
+            useCase: true,
+            verificationStatus: true,
+            vatEvidenceStatus: true,
+            documents: {
+              where: { status: { not: 'rejected' } },
+              orderBy: { uploadedAt: 'desc' },
+              take: 20,
+              select: {
+                id: true,
+                documentType: true,
+                status: true,
+                fileName: true,
+                driveUrl: true,
+                driveFolderUrl: true,
+                driveUserDrive: true,
+                sensitive: true,
+                uploadedAt: true,
+              },
+            },
+          },
+        }),
       ]);
     });
 
@@ -335,6 +367,40 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
         files: project.documentIntakes.length,
       };
     });
+    const customerEvidenceRows = customers.flatMap((customer) => {
+      const base = {
+        customer: customer.nameTh || customer.nameEn || customer.taxId,
+        taxId: customer.taxId,
+        role: customer.partyRole,
+        useCase: customer.useCase,
+        readiness: customer.verificationStatus,
+        vatEvidence: customer.vatEvidenceStatus,
+      };
+      const docs = customer.documents.map((doc) => ({
+        id: doc.id,
+        ...base,
+        documentType: doc.documentType,
+        status: doc.status,
+        fileName: doc.sensitive ? 'Sensitive document' : doc.fileName,
+        storage: doc.driveUserDrive ? 'User Drive' : 'Billboy Drive',
+        uploadedAt: doc.uploadedAt.toISOString(),
+        folderUrl: doc.driveFolderUrl,
+        attachmentUrl: doc.sensitive ? null : doc.driveUrl,
+      }));
+      if (docs.length > 0) return docs;
+      if (customer.verificationStatus === 'not_required' && customer.vatEvidenceStatus === 'not_required') return [];
+      return [{
+        id: `${customer.id}-missing-evidence`,
+        ...base,
+        documentType: 'missing_evidence',
+        status: 'missing',
+        fileName: 'No supporting file attached',
+        storage: 'Google Drive',
+        uploadedAt: '',
+        folderUrl: null,
+        attachmentUrl: null,
+      }];
+    });
 
     const summary = {
       inputVat: inputVatRows.reduce((sum, item) => sum + item.vat, 0),
@@ -343,6 +409,7 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
       missingDocuments: missingRows.length,
       projectCount: projectRows.length,
       vatPayable: outputVatRows.reduce((sum, item) => sum + item.vat, 0) - inputVatRows.reduce((sum, item) => sum + item.vat, 0),
+      customerEvidence: customerEvidenceRows.length,
     };
 
     res.json({
@@ -353,6 +420,7 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
           inputVat: inputVatRows,
           outputVat: outputVatRows,
           expenses: expenseRows,
+          customerEvidence: customerEvidenceRows,
           missingDocs: missingRows,
           projectSummary: projectRows,
         },

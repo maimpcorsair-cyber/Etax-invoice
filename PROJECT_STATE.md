@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-15 00:44 Asia/Bangkok
+Last updated: 2026-05-15 02:02 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,12 +16,21 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Customer credit terms are implemented locally and pending deploy verification:
+- Pending local changes, not deployed yet:
+  - Customer `รายชื่อ` modal now makes `ใช้สำหรับ` a compact chip selector, moves optional credit terms below the main identity fields, and keeps supporting document actions at the bottom of the form.
+  - `ข้อมูลและเอกสารประกอบ` now explains the Drive/Sheet model, shows compact actions for attaching a general file, opening the existing Drive folder, and viewing attached document details.
+  - Company month-end workspace now includes a `รายชื่อและเอกสาร` / `Names & evidence` tab that indexes customer/vendor evidence metadata and Drive links, while sensitive documents hide direct file links.
+  - Verified locally: backend/frontend `npm run typecheck`, backend/frontend `npm run lint`, backend/frontend `npm run build`, `git diff --check`, and Playwright smoke on `/app/customers` with mocked auth/API.
+- Customer credit terms are deployed:
   - Added optional `customers.creditLimit` and `customers.creditDays` via Prisma migration `20260514_customer_credit_terms` in both root and backend Prisma trees.
   - Backend customer create/update accepts optional nonnegative credit limit and 0-3650 credit days.
   - `รายชื่อ` modal replaced the native `ใช้สำหรับ` dropdown with clearer selectable options and added an optional `เงื่อนไขเครดิต` section.
   - Customer list and invoice buyer selection display credit terms; invoice builder auto-fills due date from `creditDays` only when the due date is still empty.
   - Verified locally so far: backend/frontend `npm run typecheck`, backend/frontend `npm run lint`, frontend `npm run build`, root/backend Prisma validate, backend/root Prisma generate, `git diff --check`, and Playwright local smoke on `/app/customers` passed with mocked auth/API.
+  - Deployed commit `e8dfc37` (`Add customer credit terms`) to `main`; GitHub Typecheck run `25876199015` succeeded in `1m5s`.
+  - Production migration/deploy run `25876290665` succeeded in `11m1s` and applied `20260514_customer_credit_terms`; backend health returned HTTP 200.
+  - Render status run `25876863287` confirmed commit `e8dfc37` live on API deploy `dep-d830plj2auns73cv8dig` and worker deploy `dep-d830ovh9rddc73bi1jp0`.
+  - Vercel production `/app/customers` returned HTTP 200 with `last-modified: Thu, 14 May 2026 17:59:34 GMT`.
 - Customers directory UX rename is deployed:
   - Main Customers UI now uses `รายชื่อ` as the nav/menu concept, page title `รายชื่อลูกค้าและผู้ขาย`, subtitle `เก็บข้อมูลลูกค้า ผู้ขาย และบริษัทที่ใช้ในเอกสาร`, and a single primary button `เพิ่มรายชื่อ`.
   - Customer/Supplier wording was simplified in `frontend/src/pages/Customers.tsx`: UI uses `ลูกค้า`, `ผู้ขาย`, and `ลูกค้า + ผู้ขาย`; the separate `เพิ่มลูกค้า`/`เพิ่มซัพพลายเออร์` buttons were merged into one add flow.

@@ -10,11 +10,13 @@ export interface MonthEndWorkspace {
     missingDocuments: number;
     projectCount: number;
     vatPayable: number;
+    customerEvidence?: number;
   };
   tabs: {
     inputVat: Array<Record<string, unknown>>;
     outputVat: Array<Record<string, unknown>>;
     expenses: Array<Record<string, unknown>>;
+    customerEvidence?: Array<Record<string, unknown>>;
     missingDocs: Array<Record<string, unknown>>;
     projectSummary: Array<Record<string, unknown>>;
   };
@@ -82,6 +84,23 @@ function buildMonthEndTabs(workspace: MonthEndWorkspace, isThai: boolean) {
       rows: workspace.tabs.expenses,
     },
     {
+      id: 'customerEvidence',
+      label: isThai ? 'รายชื่อและเอกสาร' : 'Names & evidence',
+      columns: [
+        { key: 'customer', label: isThai ? 'รายชื่อ' : 'Name' },
+        { key: 'taxId', label: isThai ? 'เลขผู้เสียภาษี' : 'Tax ID' },
+        { key: 'role', label: isThai ? 'บทบาท' : 'Role' },
+        { key: 'useCase', label: isThai ? 'ใช้สำหรับ' : 'Use for' },
+        { key: 'documentType', label: isThai ? 'เอกสาร' : 'Document' },
+        { key: 'status', label: isThai ? 'สถานะไฟล์' : 'File status' },
+        { key: 'readiness', label: isThai ? 'ความพร้อม' : 'Readiness' },
+        { key: 'storage', label: isThai ? 'ที่เก็บ' : 'Storage' },
+        { key: 'attachmentUrl', label: isThai ? 'ไฟล์' : 'File', type: 'link' as const },
+        { key: 'folderUrl', label: isThai ? 'โฟลเดอร์' : 'Folder', type: 'link' as const },
+      ],
+      rows: workspace.tabs.customerEvidence ?? [],
+    },
+    {
       id: 'missingDocs',
       label: isThai ? 'ต้องตรวจ' : 'Missing docs',
       columns: [
@@ -141,6 +160,7 @@ export function MonthEndWorkspacePreview({
             { label: isThai ? 'ภาษีขายเดือนนี้' : 'Output VAT', value: formatCurrency(workspace.summary.outputVat), tone: 'primary' as const },
             { label: isThai ? 'ภาษีซื้อเดือนนี้' : 'Input VAT', value: formatCurrency(workspace.summary.inputVat), tone: 'success' as const },
             { label: isThai ? 'ภาษีสุทธิ' : 'Net VAT', value: formatCurrency(workspace.summary.vatPayable), tone: workspace.summary.vatPayable > 0 ? 'warning' as const : 'success' as const },
+            { label: isThai ? 'เอกสารในสารบัญ' : 'Evidence index', value: (workspace.summary.customerEvidence ?? 0).toLocaleString(), tone: (workspace.summary.customerEvidence ?? 0) > 0 ? 'primary' as const : 'success' as const },
             { label: isThai ? 'เอกสารต้องตรวจ' : 'Needs review', value: workspace.summary.missingDocuments.toLocaleString(), tone: workspace.summary.missingDocuments > 0 ? 'warning' as const : 'success' as const },
           ].map((item) => (
             <MetricCard

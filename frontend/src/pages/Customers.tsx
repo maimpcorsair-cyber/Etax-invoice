@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck, ChevronDown } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck, ChevronDown, FolderOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -341,6 +341,10 @@ export default function Customers() {
   const recommendedMissingCount = localReadiness.recommendedMissingCount ?? 0;
   const totalMissingCount = localReadiness.missingRequiredCount + recommendedMissingCount;
   const summaryReviewCount = localReadiness.status === 'not_required' ? 0 : totalMissingCount;
+  const selectedUseCaseOption = CUSTOMER_USE_CASE_OPTIONS.find((option) => option.value === currentUseCase) ?? CUSTOMER_USE_CASE_OPTIONS[0];
+  const evidenceFolderUrl = customerDocuments.find((doc) => doc.driveFolderUrl)?.driveFolderUrl ?? null;
+  const hasCreditTerms = form.creditLimit !== null && form.creditLimit !== undefined && String(form.creditLimit).trim() !== ''
+    || form.creditDays !== null && form.creditDays !== undefined && String(form.creditDays).trim() !== '';
 
     const fetchCustomers = useCallback(async () => {
       setLoading(true);
@@ -1120,14 +1124,19 @@ export default function Customers() {
                 </button>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="label mb-0">{isThai ? 'ใช้สำหรับ' : 'Use for'}</label>
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <label className="label mb-0">{isThai ? 'ใช้สำหรับ' : 'Use for'}</label>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {isThai ? selectedUseCaseOption.descriptionTh : selectedUseCaseOption.descriptionEn}
+                    </p>
+                  </div>
                   <span className="text-[11px] font-medium text-slate-400">
                     {isThai ? 'เปลี่ยนได้ภายหลัง' : 'Can be changed later'}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {CUSTOMER_USE_CASE_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -1136,68 +1145,15 @@ export default function Customers() {
                         field('useCase', option.value);
                         setShowEvidenceDetails(false);
                       }}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
                         currentUseCase === option.value
                           ? 'border-primary-300 bg-primary-50 text-primary-900 ring-2 ring-primary-100'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-900'
                       }`}
                     >
-                      <span className="block text-sm font-semibold">{isThai ? option.labelTh : option.labelEn}</span>
-                      <span className="mt-0.5 block text-xs opacity-75">{isThai ? option.descriptionTh : option.descriptionEn}</span>
+                      {isThai ? option.labelTh : option.labelEn}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">
-                      {isThai ? 'เงื่อนไขเครดิต' : 'Credit terms'}
-                      <span className="ml-2 text-xs font-medium text-slate-400">{isThai ? 'ไม่บังคับ' : 'Optional'}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {isThai
-                        ? 'ใช้ช่วยเตือนวงเงินและกำหนดชำระในเอกสารขาย ไม่ใส่ก็ยังบันทึกได้'
-                        : 'Used for credit limit and due-date reminders. You can leave this blank.'}
-                    </p>
-                  </div>
-                  {currentUseCase === 'credit' && (
-                    <span className="inline-flex w-fit rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
-                      {isThai ? 'แนะนำให้ใส่' : 'Recommended'}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="label">{isThai ? 'วงเงินเครดิต' : 'Credit limit'}</label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">฿</span>
-                      <input
-                        value={form.creditLimit ?? ''}
-                        onChange={(e) => field('creditLimit', moneyInput(e.target.value))}
-                        className={guardedInputClass(formValidation.creditLimit, 'pl-7')}
-                        placeholder="0.00"
-                        inputMode="decimal"
-                      />
-                    </div>
-                    <p className={inputGuide(formValidation.creditLimit)}>
-                      {isThai ? 'ตัวเลขเท่านั้น เช่น 50000' : 'Numbers only, e.g. 50000'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="label">{isThai ? 'เครดิตกี่วัน' : 'Credit days'}</label>
-                    <input
-                      value={form.creditDays ?? ''}
-                      onChange={(e) => field('creditDays', digitsOnly(e.target.value, 4))}
-                      className={guardedInputClass(formValidation.creditDays)}
-                      placeholder="30"
-                      inputMode="numeric"
-                    />
-                    <p className={inputGuide(formValidation.creditDays)}>
-                      {isThai ? 'เช่น 0, 7, 15, 30 หรือ 60 วัน' : 'For example 0, 7, 15, 30, or 60 days'}
-                    </p>
-                  </div>
                 </div>
               </div>
 
@@ -1391,6 +1347,64 @@ export default function Customers() {
                 </div>
               </div>
 
+              <details
+                className="group rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                open={currentUseCase === 'credit' || hasCreditTerms}
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                      {isThai ? 'เงื่อนไขเครดิต' : 'Credit terms'}
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                        {isThai ? 'ไม่บังคับ' : 'Optional'}
+                      </span>
+                      {currentUseCase === 'credit' && (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">
+                          {isThai ? 'แนะนำ' : 'Recommended'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {isThai
+                        ? 'ใส่เฉพาะรายที่มีวงเงินหรือกำหนดชำระ ระบบจะช่วยเตือนในเอกสารขาย'
+                        : 'Add only when this name has a credit limit or payment term.'}
+                    </p>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{isThai ? 'วงเงินเครดิต' : 'Credit limit'}</label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">฿</span>
+                      <input
+                        value={form.creditLimit ?? ''}
+                        onChange={(e) => field('creditLimit', moneyInput(e.target.value))}
+                        className={guardedInputClass(formValidation.creditLimit, 'pl-7')}
+                        placeholder="0.00"
+                        inputMode="decimal"
+                      />
+                    </div>
+                    <p className={inputGuide(formValidation.creditLimit)}>
+                      {isThai ? 'ตัวเลขเท่านั้น เช่น 50000' : 'Numbers only, e.g. 50000'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'เครดิตกี่วัน' : 'Credit days'}</label>
+                    <input
+                      value={form.creditDays ?? ''}
+                      onChange={(e) => field('creditDays', digitsOnly(e.target.value, 4))}
+                      className={guardedInputClass(formValidation.creditDays)}
+                      placeholder="30"
+                      inputMode="numeric"
+                    />
+                    <p className={inputGuide(formValidation.creditDays)}>
+                      {isThai ? 'เช่น 0, 7, 15, 30 หรือ 60 วัน' : 'For example 0, 7, 15, 30, or 60 days'}
+                    </p>
+                  </div>
+                </div>
+              </details>
+
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -1400,8 +1414,8 @@ export default function Customers() {
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {isThai
-                        ? 'บันทึกได้ก่อน แล้วแนบเอกสารเพิ่มเติมภายหลัง'
-                        : 'You can save first and attach supporting documents later.'}
+                        ? 'ไฟล์จริงเก็บใน Google Drive เป็นหมวด ส่วน Billboy และ Sheet ใช้เป็นสารบัญลิงก์ตรวจ audit'
+                        : 'Files live in organized Google Drive folders. Billboy and Sheets keep the audit index and links.'}
                     </p>
                   </div>
                   <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${readinessStatusClass(localReadiness.status)}`}>
@@ -1424,14 +1438,54 @@ export default function Customers() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowEvidenceDetails((value) => !value)}
-                  className="mt-3 flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                >
-                  <span>{isThai ? 'ดูรายการเอกสาร' : 'View document checklist'}</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showEvidenceDetails ? 'rotate-180' : ''}`} />
-                </button>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  {editing ? (
+                    <>
+                      <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-800 transition hover:bg-primary-100">
+                        {uploadingDocType === 'other' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                        {isThai ? 'แนบไฟล์ทั่วไป' : 'Attach general file'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          disabled={uploadingDocType === 'other'}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            handleUploadCustomerDocument('other', file);
+                          }}
+                        />
+                      </label>
+                      {evidenceFolderUrl ? (
+                        <a
+                          href={evidenceFolderUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          {isThai ? 'เปิดโฟลเดอร์ Drive' : 'Open Drive folder'}
+                        </a>
+                      ) : (
+                        <span className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                          {isThai ? 'โฟลเดอร์ Drive จะสร้างเมื่อแนบไฟล์แรก' : 'Drive folder is created on the first upload'}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                      {isThai ? 'บันทึกรายชื่อก่อน แล้วค่อยแนบไฟล์' : 'Save this name first, then attach files'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowEvidenceDetails((value) => !value)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {isThai ? 'ดูเอกสารที่แนบแล้ว' : 'View attached documents'}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showEvidenceDetails ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
 
                 {showEvidenceDetails && (
                   <div className="mt-3 space-y-4">
