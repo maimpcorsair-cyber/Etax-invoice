@@ -78,62 +78,6 @@ interface DbdLocalSuggestion {
   verifiedByThisCompany: boolean;
 }
 
-const THAI_CHARACTER_PATTERN = /[\u0E00-\u0E7F]/;
-const THAI_ADDRESS_TERMS: Array<[RegExp, string]> = [
-  [/กรุงเทพมหานคร|กรุงเทพฯ|กทม\./g, 'Bangkok'],
-  [/บริษัท/g, 'Company'],
-  [/จำกัด\s*\(มหาชน\)/g, 'Public Company Limited'],
-  [/จำกัด/g, 'Co., Ltd.'],
-  [/ประเทศไทย/g, 'Thailand'],
-  [/สำนักงานใหญ่/g, 'Head Office'],
-  [/เลขที่/g, 'No. '],
-  [/อาคาร/g, 'Building '],
-  [/ชั้นที่|ชั้น/g, 'Floor '],
-  [/เลขที่ห้อง/g, 'Room '],
-  [/หมู่บ้าน/g, 'Village '],
-  [/หมู่/g, 'Moo '],
-  [/ซอย/g, 'Soi '],
-  [/ถนน/g, 'Road '],
-  [/แขวง/g, 'Khwaeng '],
-  [/ตำบล/g, 'Tambon '],
-  [/เขต/g, 'Khet '],
-  [/อำเภอ/g, 'Amphoe '],
-  [/จังหวัด/g, 'Changwat '],
-  [/อรกานต์/g, 'Orakarn'],
-  [/เอสเอสพี\s*ทาวเวอร์/g, 'SSP Tower'],
-  [/พระรามที่\s*2/g, 'Rama II'],
-  [/บางมด/g, 'Bang Mot'],
-  [/จอมทอง/g, 'Chom Thong'],
-  [/ชิดลม/g, 'Chit Lom'],
-  [/เพลินจิต/g, 'Phloen Chit'],
-  [/ลุมพินี/g, 'Lumphini'],
-  [/ปทุมวัน/g, 'Pathum Wan'],
-  [/คลองเตย/g, 'Khlong Toei'],
-  [/ระนอง/g, 'Ranong'],
-  [/สุขุมวิท/g, 'Sukhumvit'],
-  [/สาทร/g, 'Sathon'],
-  [/สีลม/g, 'Si Lom'],
-  [/บางรัก/g, 'Bang Rak'],
-  [/วัฒนา/g, 'Watthana'],
-  [/ห้วยขวาง/g, 'Huai Khwang'],
-  [/ดินแดง/g, 'Din Daeng'],
-  [/บางนา/g, 'Bang Na'],
-  [/ลาดพร้าว/g, 'Lat Phrao'],
-  [/จตุจักร/g, 'Chatuchak'],
-];
-
-const THAI_ROMANIZATION_BY_CODE: Record<number, string> = {
-  0x0e01: 'k', 0x0e02: 'kh', 0x0e03: 'kh', 0x0e04: 'kh', 0x0e05: 'kh', 0x0e06: 'kh', 0x0e07: 'ng',
-  0x0e08: 'ch', 0x0e09: 'ch', 0x0e0a: 'ch', 0x0e0b: 's', 0x0e0c: 'ch', 0x0e0d: 'y',
-  0x0e0e: 'd', 0x0e0f: 't', 0x0e10: 'th', 0x0e11: 'th', 0x0e12: 'th', 0x0e13: 'n',
-  0x0e14: 'd', 0x0e15: 't', 0x0e16: 'th', 0x0e17: 'th', 0x0e18: 'th', 0x0e19: 'n',
-  0x0e1a: 'b', 0x0e1b: 'p', 0x0e1c: 'ph', 0x0e1d: 'f', 0x0e1e: 'ph', 0x0e1f: 'f', 0x0e20: 'ph', 0x0e21: 'm',
-  0x0e22: 'y', 0x0e23: 'r', 0x0e24: 'rue', 0x0e25: 'l', 0x0e26: 'lue', 0x0e27: 'w', 0x0e28: 's', 0x0e29: 's',
-  0x0e2a: 's', 0x0e2b: 'h', 0x0e2c: 'l', 0x0e2d: 'o', 0x0e2e: 'h',
-  0x0e30: 'a', 0x0e32: 'a', 0x0e33: 'am', 0x0e34: 'i', 0x0e35: 'i', 0x0e36: 'ue', 0x0e37: 'ue',
-  0x0e38: 'u', 0x0e39: 'u', 0x0e40: 'e', 0x0e41: 'ae', 0x0e42: 'o', 0x0e43: 'ai', 0x0e44: 'ai',
-};
-
 interface DbdLookupResponse {
   data?: {
     profile: DbdLocalSuggestion | null;
@@ -181,6 +125,10 @@ function formatMoney(value: unknown, locale: string) {
     currency: 'THB',
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
   }).format(amount);
+}
+
+function hasThaiPostcode(value: string | null | undefined) {
+  return Boolean(value?.match(/[0-9๐-๙]{5}\s*$/));
 }
 
 export default function Customers() {
@@ -235,6 +183,13 @@ export default function Customers() {
       return days !== null && (Number.isNaN(days) || days < 0);
     })(),
   };
+  const addressMissingPostcode = Boolean(form.addressTh.trim()) && !hasThaiPostcode(form.addressTh);
+  const dbdAppliedWithoutEnglishAddress = Boolean(
+    appliedDbdSuggestion
+    && appliedDbdSuggestion.taxId === form.taxId
+    && !appliedDbdSuggestion.addressEn
+    && !form.addressEn?.trim()
+  );
 
   function buildLocalReadiness(): CustomerReadinessSummary {
     const isCompany = customerKind === 'company';
@@ -650,30 +605,11 @@ export default function Customers() {
     return new Date(value).toLocaleDateString(isThai ? 'th-TH' : 'en-US');
   }
 
-  function translateThaiTextFallback(value: string | null | undefined) {
-    if (!value) return '';
-    let translated = value;
-    for (const [pattern, replacement] of THAI_ADDRESS_TERMS) {
-      translated = translated.replace(pattern, replacement);
-    }
-    translated = Array.from(translated).map((char) => {
-      if (!THAI_CHARACTER_PATTERN.test(char)) return char;
-      return THAI_ROMANIZATION_BY_CODE[char.charCodeAt(0)] ?? '';
-    }).join('');
-
-    const cleaned = translated
-      .replace(/\s+/g, ' ')
-      .replace(/\s+([,.)])/g, '$1')
-      .replace(/([(])\s+/g, '$1')
-      .trim();
-    return /[A-Za-z]/.test(cleaned) ? cleaned : '';
-  }
-
   function applyDbdSuggestion(suggestion: DbdLocalSuggestion) {
     setForm((prev) => {
       const addressTh = suggestion.addressTh ?? suggestion.vatAddress ?? prev.addressTh;
-      const nameEn = suggestion.nameEn ?? (prev.nameEn?.trim() ? prev.nameEn : translateThaiTextFallback(suggestion.nameTh));
-      const addressEn = suggestion.addressEn ?? (prev.addressEn?.trim() ? prev.addressEn : translateThaiTextFallback(addressTh));
+      const nameEn = suggestion.nameEn ?? prev.nameEn ?? '';
+      const addressEn = suggestion.addressEn ?? prev.addressEn ?? '';
 
       return {
         ...prev,
@@ -1323,14 +1259,21 @@ export default function Customers() {
                 <div className="sm:col-span-2">
                   <label className="label">{t('customer.addressTh')} *</label>
                   <textarea value={form.addressTh} onChange={(e) => field('addressTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.addressTh)} rows={2} placeholder="123 ถนนตัวอย่าง แขวง... เขต... กรุงเทพฯ 10110" />
-                  <p className={inputGuide(formValidation.addressTh)}>
-                      {isThai ? 'ใช้ที่อยู่ภาษาไทยสำหรับเอกสารภาษีและการตรวจ audit' : 'Use Thai address text for tax documents and audit checks.'}
+                  <p className={addressMissingPostcode ? 'mt-1 text-xs text-amber-600' : inputGuide(formValidation.addressTh)}>
+                    {addressMissingPostcode
+                      ? (isThai ? 'ควรตรวจรหัสไปรษณีย์ก่อนบันทึก หากข้อมูลเปิดไม่มีให้กรอกเอง' : 'Please verify the postcode before saving if open data did not include it.')
+                      : (isThai ? 'ใช้ที่อยู่ภาษาไทยสำหรับเอกสารภาษีและการตรวจ audit' : 'Use Thai address text for tax documents and audit checks.')}
                   </p>
                 </div>
                 {!isIndividual && (
                 <div className="sm:col-span-2">
                   <label className="label">{t('customer.addressEn')}</label>
-                  <textarea value={form.addressEn} onChange={(e) => field('addressEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.addressEn)} rows={2} placeholder="123 Example Road, Bangkok 10110" />
+                  <textarea value={form.addressEn} onChange={(e) => field('addressEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.addressEn)} rows={2} placeholder="226/368 Moo 3, San Phak Wan, Hang Dong, Chiang Mai 50230" />
+                  <p className={dbdAppliedWithoutEnglishAddress ? 'mt-1 text-xs text-slate-500' : inputGuide(formValidation.addressEn)}>
+                    {dbdAppliedWithoutEnglishAddress
+                      ? (isThai ? 'ไม่มีที่อยู่อังกฤษจากข้อมูลเปิด กรุณากรอกเองถ้าต้องใช้ออกเอกสารภาษาอังกฤษ' : 'No English address was found in open data. Enter it manually if needed for English documents.')
+                      : (isThai ? 'กรอกเฉพาะเมื่อมีที่อยู่อังกฤษจริง ระบบจะไม่แปลงจากภาษาไทยให้อัตโนมัติ' : 'Enter only a real English address. Billboy will not auto-romanize Thai addresses.')}
+                  </p>
                 </div>
                 )}
                 <div>

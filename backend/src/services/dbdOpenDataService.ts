@@ -50,6 +50,7 @@ interface NormalizedDbdRecord {
   nameTh: string | null;
   nameEn: string | null;
   addressTh: string | null;
+  addressEn: string | null;
   status: string | null;
   juristicType: string | null;
   raw: RawRow;
@@ -66,6 +67,7 @@ interface NormalizedMocJuristicRecord {
   nameTh: string | null;
   nameEn: string | null;
   addressTh: string | null;
+  addressEn: string | null;
   status: string | null;
   juristicType: string | null;
   raw: RawRow;
@@ -99,61 +101,6 @@ const DBD_OPENAPI_JURISTIC_LOOKUP_TIMEOUT_MS = parseInt(process.env.DBD_OPENAPI_
 const RD_VAT_PROVINCES_DATA_URL = 'https://data.rd.go.th/datafiles/vat/VAT_TaxpayerAddress_02.csv';
 
 const THAI_CHARACTER_PATTERN = /[\u0E00-\u0E7F]/;
-const THAI_ADDRESS_TERMS: Array<[RegExp, string]> = [
-  [/กรุงเทพมหานคร|กรุงเทพฯ|กทม\./g, 'Bangkok'],
-  [/บริษัท/g, 'Company'],
-  [/จำกัด\s*\(มหาชน\)/g, 'Public Company Limited'],
-  [/จำกัด/g, 'Co., Ltd.'],
-  [/ประเทศไทย/g, 'Thailand'],
-  [/สำนักงานใหญ่/g, 'Head Office'],
-  [/เลขที่/g, 'No. '],
-  [/อาคาร/g, 'Building '],
-  [/ชั้นที่|ชั้น/g, 'Floor '],
-  [/เลขที่ห้อง/g, 'Room '],
-  [/หมู่บ้าน/g, 'Village '],
-  [/หมู่/g, 'Moo '],
-  [/ซอย/g, 'Soi '],
-  [/ถนน/g, 'Road '],
-  [/แขวง/g, 'Khwaeng '],
-  [/ตำบล/g, 'Tambon '],
-  [/เขต/g, 'Khet '],
-  [/อำเภอ/g, 'Amphoe '],
-  [/จังหวัด/g, 'Changwat '],
-  [/อรกานต์/g, 'Orakarn'],
-  [/เอสเอสพี\s*ทาวเวอร์/g, 'SSP Tower'],
-  [/พระรามที่\s*2/g, 'Rama II'],
-  [/บางมด/g, 'Bang Mot'],
-  [/จอมทอง/g, 'Chom Thong'],
-  [/ชิดลม/g, 'Chit Lom'],
-  [/เพลินจิต/g, 'Phloen Chit'],
-  [/ลุมพินี/g, 'Lumphini'],
-  [/ปทุมวัน/g, 'Pathum Wan'],
-  [/คลองเตย/g, 'Khlong Toei'],
-  [/ระนอง/g, 'Ranong'],
-  [/สุขุมวิท/g, 'Sukhumvit'],
-  [/สาทร/g, 'Sathon'],
-  [/สีลม/g, 'Si Lom'],
-  [/บางรัก/g, 'Bang Rak'],
-  [/วัฒนา/g, 'Watthana'],
-  [/ห้วยขวาง/g, 'Huai Khwang'],
-  [/ดินแดง/g, 'Din Daeng'],
-  [/บางนา/g, 'Bang Na'],
-  [/ลาดพร้าว/g, 'Lat Phrao'],
-  [/จตุจักร/g, 'Chatuchak'],
-];
-
-const THAI_ROMANIZATION_BY_CODE: Record<number, string> = {
-  0x0e01: 'k', 0x0e02: 'kh', 0x0e03: 'kh', 0x0e04: 'kh', 0x0e05: 'kh', 0x0e06: 'kh', 0x0e07: 'ng',
-  0x0e08: 'ch', 0x0e09: 'ch', 0x0e0a: 'ch', 0x0e0b: 's', 0x0e0c: 'ch', 0x0e0d: 'y',
-  0x0e0e: 'd', 0x0e0f: 't', 0x0e10: 'th', 0x0e11: 'th', 0x0e12: 'th', 0x0e13: 'n',
-  0x0e14: 'd', 0x0e15: 't', 0x0e16: 'th', 0x0e17: 'th', 0x0e18: 'th', 0x0e19: 'n',
-  0x0e1a: 'b', 0x0e1b: 'p', 0x0e1c: 'ph', 0x0e1d: 'f', 0x0e1e: 'ph', 0x0e1f: 'f', 0x0e20: 'ph', 0x0e21: 'm',
-  0x0e22: 'y', 0x0e23: 'r', 0x0e24: 'rue', 0x0e25: 'l', 0x0e26: 'lue', 0x0e27: 'w', 0x0e28: 's', 0x0e29: 's',
-  0x0e2a: 's', 0x0e2b: 'h', 0x0e2c: 'l', 0x0e2d: 'o', 0x0e2e: 'h',
-  0x0e30: 'a', 0x0e32: 'a', 0x0e33: 'am', 0x0e34: 'i', 0x0e35: 'i', 0x0e36: 'ue', 0x0e37: 'ue',
-  0x0e38: 'u', 0x0e39: 'u', 0x0e40: 'e', 0x0e41: 'ae', 0x0e42: 'o', 0x0e43: 'ai', 0x0e44: 'ai',
-};
-
 function normalizeTaxId(value: unknown) {
   if (typeof value === 'number') return String(value).replace(/\D/g, '').padStart(13, '0');
   if (typeof value !== 'string') return '';
@@ -207,54 +154,6 @@ function compactJoin(parts: Array<string | null>) {
   return cleaned.length > 0 ? cleaned.join(' ') : null;
 }
 
-function romanizeThaiText(value: string) {
-  return Array.from(value).map((char) => {
-    if (!THAI_CHARACTER_PATTERN.test(char)) return char;
-    return THAI_ROMANIZATION_BY_CODE[char.charCodeAt(0)] ?? '';
-  }).join('');
-}
-
-function cleanupEnglishFallback(value: string) {
-  return value
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.)])/g, '$1')
-    .replace(/([(])\s+/g, '$1')
-    .trim();
-}
-
-function translateThaiTextFallback(value: string | null | undefined) {
-  if (!value) return null;
-  let translated = value;
-  for (const [pattern, replacement] of THAI_ADDRESS_TERMS) {
-    translated = translated.replace(pattern, replacement);
-  }
-
-  translated = romanizeThaiText(translated);
-  const cleaned = cleanupEnglishFallback(translated);
-  return cleaned && /[A-Za-z]/.test(cleaned) ? cleaned : null;
-}
-
-function englishNameFallback(nameTh: string | null | undefined) {
-  if (!nameTh) return null;
-  return translateThaiTextFallback(nameTh);
-}
-
-function englishAddressFallback(addressTh: string | null | undefined) {
-  if (!addressTh) return null;
-  return translateThaiTextFallback(addressTh);
-}
-
-function hasBetterThaiAddress(candidate: string | null | undefined, current: string | null | undefined) {
-  if (!candidate) return false;
-  if (!current) return true;
-
-  const candidateIncomplete = looksLikeIncompleteThaiAddress(candidate);
-  const currentIncomplete = looksLikeIncompleteThaiAddress(current);
-  if (!candidateIncomplete && currentIncomplete) return true;
-  if (candidateIncomplete && !currentIncomplete) return false;
-  return candidate.length > current.length + 8;
-}
-
 function extractThaiPostcode(address: string | null | undefined) {
   return address?.match(/([0-9๐-๙]{5})\s*$/)?.[1] ?? null;
 }
@@ -266,8 +165,24 @@ function appendPostcodeIfMissing(address: string | null | undefined, fallback: s
   return postcode ? `${address} ${postcode}` : address;
 }
 
+function thaiAddressScore(address: string | null | undefined) {
+  if (!address) return 0;
+  const normalized = address.replace(/\s+/g, ' ').trim();
+  if (!normalized) return 0;
+
+  let score = Math.min(normalized.length, 120) / 12;
+  if (/(^|\s)(เลขที่\s*)?[0-9๐-๙]+([/-][0-9๐-๙]+)?/.test(normalized)) score += 8;
+  if (/(อาคาร|หมู่บ้าน|ชั้น|ห้อง)/.test(normalized)) score += 4;
+  if (/(ถนน|ซอย|ตรอก|หมู่)/.test(normalized)) score += 6;
+  if (/(แขวง|ตำบล)/.test(normalized)) score += 5;
+  if (/(เขต|อำเภอ)/.test(normalized)) score += 5;
+  if (/(จังหวัด|กรุงเทพมหานคร|กรุงเทพฯ|กทม\.)/.test(normalized)) score += 5;
+  if (extractThaiPostcode(normalized)) score += 10;
+  return score;
+}
+
 function selectBestThaiAddress(primary: string | null | undefined, fallback: string | null | undefined) {
-  const selected = hasBetterThaiAddress(primary, fallback) ? primary : (fallback ?? primary);
+  const selected = thaiAddressScore(primary) >= thaiAddressScore(fallback) ? primary : fallback;
   return appendPostcodeIfMissing(selected, selected === primary ? fallback : primary);
 }
 
@@ -286,7 +201,7 @@ function looksLikeIncompleteThaiAddress(address: string | null | undefined) {
 
 function composeThaiAddress(row: RawRow) {
   return compactJoin([
-    pick(row, ['address', 'addressTh', 'Address_TH', 'FullAddress', 'JuristicAddress', 'ที่อยู่', 'ที่ตั้งสำนักงานใหญ่']),
+    pick(row, ['address', 'addressTh', 'Address_TH', 'FullAddress', 'JuristicAddress', 'JuristicAddressTH', 'FullAddressTH', 'ที่อยู่', 'ที่ตั้งสำนักงานใหญ่']),
     compactJoin([
       pick(row, ['Building', 'BuildingName', 'ชื่ออาคาร']),
       pick(row, ['RoomNo', 'Room', 'เลขที่ห้อง']),
@@ -301,7 +216,7 @@ function composeThaiAddress(row: RawRow) {
     pick(row, ['SubDistrict', 'Subdistrict', 'Tambon', 'ตำบล', 'แขวง']),
     pick(row, ['District', 'Amphur', 'อำเภอ', 'เขต']),
     pick(row, ['Province', 'จังหวัด']),
-    pick(row, ['Postcode', 'ZipCode', 'รหัสไปรษณีย์']),
+    pick(row, ['Postcode', 'PostalCode', 'PostCode', 'ZipCode', 'Zip', 'รหัสไปรษณีย์']),
   ]);
 }
 
@@ -324,6 +239,7 @@ function composeMocThaiAddress(row: RawRow) {
     pick(addressDetail, ['subDistrict']),
     pick(addressDetail, ['district']),
     pick(addressDetail, ['province']),
+    pick(addressDetail, ['postcode', 'postCode', 'postalCode', 'zipCode', 'zip']),
   ]);
 }
 
@@ -354,8 +270,52 @@ function composeDbdOpenApiThaiAddress(row: RawRow) {
     pickObject(addressType, ['CountrySubDivision'])
       ? pick(pickObject(addressType, ['CountrySubDivision'])!, ['CountrySubDivisionTextTH'])
       : pick(addressType, ['Province']),
-    pick(addressType, ['Postcode', 'ZipCode']),
+    pick(addressType, ['Postcode', 'PostCode', 'PostalCode', 'ZipCode', 'Zip']),
   ]);
+}
+
+function containsThai(value: string | null | undefined) {
+  return Boolean(value && THAI_CHARACTER_PATTERN.test(value));
+}
+
+function officialEnglishText(value: string | null | undefined) {
+  const text = value?.replace(/\s+/g, ' ').trim();
+  if (!text || containsThai(text) || !/[A-Za-z]/.test(text)) return null;
+  return text;
+}
+
+function composeOfficialEnglishAddress(row: RawRow): string | null {
+  const addressDetail = row.addressDetail && typeof row.addressDetail === 'object'
+    ? row.addressDetail as RawRow
+    : pickObject(row, ['OrganizationJuristicAddress', 'JuristicAddress', 'Address', 'addressDetail']) ?? row;
+  const addressType = pickObject(addressDetail, ['AddressType']) ?? addressDetail;
+
+  const fullAddress = officialEnglishText(pick(addressType, [
+    'addressEn',
+    'Address_EN',
+    'AddressEN',
+    'FullAddressEN',
+    'FullAddress_EN',
+    'JuristicAddressEN',
+    'OrganizationJuristicAddressEN',
+  ]));
+  if (fullAddress) return fullAddress;
+
+  const composed = compactJoin([
+    pick(addressType, ['AddressNoEN', 'HouseNoEN', 'houseNumberEn']),
+    pick(addressType, ['BuildingEN', 'buildingNameEn']),
+    pick(addressType, ['RoomNoEN', 'roomNoEn']),
+    pick(addressType, ['FloorEN', 'floorEn']),
+    pick(addressType, ['VillageEN', 'villageNameEn']),
+    pick(addressType, ['MooEN', 'mooEn']),
+    pick(addressType, ['SoiEN', 'soiEn']),
+    pick(addressType, ['RoadEN', 'StreetEN', 'roadEn', 'streetEn']),
+    pick(addressType, ['SubDistrictEN', 'TambonEN', 'subDistrictEn']),
+    pick(addressType, ['DistrictEN', 'AmphurEN', 'districtEn']),
+    pick(addressType, ['ProvinceEN', 'provinceEn']),
+    pick(addressType, ['Postcode', 'PostCode', 'PostalCode', 'ZipCode', 'Zip', 'postcode', 'postCode', 'postalCode', 'zipCode', 'zip']),
+  ]);
+  return officialEnglishText(composed);
 }
 
 function compactRawRow(row: RawRow): RawRow {
@@ -379,14 +339,16 @@ function normalizeDbdRecord(row: RawRow): NormalizedDbdRecord | null {
   ]));
   if (taxId.length !== 13) return null;
 
+  const addressEn = composeOfficialEnglishAddress(row);
   return {
     taxId,
     nameTh: pick(row, ['JuristicName_TH', 'JuristicNameTH', 'JuristicName', 'Name_TH', 'CompanyNameTH', 'ชื่อนิติบุคคล', 'ชื่อไทย', 'ชื่อ']),
     nameEn: pick(row, ['JuristicName_EN', 'JuristicNameEN', 'Name_EN', 'CompanyNameEN', 'ชื่ออังกฤษ']),
     addressTh: composeThaiAddress(row),
+    addressEn,
     status: pick(row, ['JuristicStatus', 'Status', 'สถานะ', 'สถานะนิติบุคคล']),
     juristicType: pick(row, ['JuristicType', 'JuristicTypeName', 'Type', 'ประเภท', 'ประเภทนิติบุคคล']),
-    raw: compactRawRow(row),
+    raw: { ...compactRawRow(row), ...(addressEn ? { addressEn } : {}) },
   };
 }
 
@@ -413,14 +375,16 @@ function normalizeMocJuristicRecord(row: RawRow): NormalizedMocJuristicRecord | 
   const taxId = normalizeTaxId(pick(row, ['juristicID', 'juristicId', 'juristic_id', 'OrganizationJuristicID']));
   if (taxId.length !== 13) return null;
 
+  const addressEn = composeOfficialEnglishAddress(row);
   return {
     taxId,
     nameTh: pick(row, ['juristicNameTH', 'juristicNameTh', 'OrganizationJuristicNameTH']),
     nameEn: pick(row, ['juristicNameEN', 'juristicNameEn', 'OrganizationJuristicNameEN']),
     addressTh: composeMocThaiAddress(row) ?? composeDbdOpenApiThaiAddress(row),
+    addressEn,
     status: pick(row, ['juristicStatus', 'OrganizationJuristicStatus']),
     juristicType: pick(row, ['juristicType', 'OrganizationJuristicType']),
-    raw: compactRawRow(row),
+    raw: { ...compactRawRow(row), ...(addressEn ? { addressEn } : {}) },
   };
 }
 
@@ -1154,6 +1118,7 @@ function fromOpenData(row: {
   nameTh: string | null;
   nameEn: string | null;
   addressTh: string | null;
+  raw: Prisma.JsonValue | null;
   status: string | null;
   juristicType: string | null;
   source: string;
@@ -1164,12 +1129,14 @@ function fromOpenData(row: {
   vatLastSyncedAt: Date | null;
 }): LocalJuristicSuggestion {
   const addressTh = selectBestThaiAddress(row.addressTh, row.vatAddress);
+  const raw = row.raw && typeof row.raw === 'object' && !Array.isArray(row.raw) ? row.raw as RawRow : {};
+  const mocRaw = raw.moc && typeof raw.moc === 'object' && !Array.isArray(raw.moc) ? raw.moc as RawRow : null;
   return {
     taxId: row.taxId,
     nameTh: row.nameTh,
-    nameEn: row.nameEn ?? englishNameFallback(row.nameTh),
+    nameEn: row.nameEn,
     addressTh,
-    addressEn: englishAddressFallback(addressTh),
+    addressEn: composeOfficialEnglishAddress(mocRaw ?? raw),
     branchCode: '00000',
     branchNameTh: null,
     branchNameEn: null,
@@ -1202,11 +1169,9 @@ function fromCustomer(customer: {
   contactPerson: string | null;
   updatedAt: Date;
 }, openData?: LocalJuristicSuggestion | null): LocalJuristicSuggestion {
-  const addressTh = hasBetterThaiAddress(openData?.addressTh, customer.addressTh)
-    ? openData!.addressTh!
-    : customer.addressTh;
-  const nameEn = customer.nameEn ?? openData?.nameEn ?? englishNameFallback(customer.nameTh);
-  const addressEn = customer.addressEn ?? openData?.addressEn ?? englishAddressFallback(addressTh);
+  const addressTh = customer.addressTh;
+  const nameEn = customer.nameEn ?? openData?.nameEn ?? null;
+  const addressEn = customer.addressEn ?? openData?.addressEn ?? null;
 
   return {
     taxId: customer.taxId,
