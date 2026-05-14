@@ -209,6 +209,206 @@ export function isSheetsConfigured(): boolean {
   return isDriveServiceAccountConfigured();
 }
 
+export interface CompanyWorkspaceSheetData {
+  period: string;
+  companyName: string;
+  sharedWithEmails?: Array<string | null | undefined>;
+  userRefreshToken?: string | null;
+  tabs: Record<string, Array<Record<string, unknown>>>;
+}
+
+function sheetCell(value: unknown): string | number {
+  if (value instanceof Date) return formatDate(value);
+  if (typeof value === 'number') return value;
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function rowsFromObjects(rows: Array<Record<string, unknown>>, columns: Array<{ key: string; label: string }>) {
+  return [
+    columns.map((column) => column.label),
+    ...rows.map((row) => columns.map((column) => sheetCell(row[column.key]))),
+  ];
+}
+
+export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheetData): Promise<string> {
+  const auth = getAuthWithDrive(data.userRefreshToken);
+  const sheets = google.sheets({ version: 'v4', auth });
+  const drive = google.drive({ version: 'v3', auth });
+  const title = `${data.companyName} - Billboy Company Workspace ${data.period}`;
+  const sheetDefs = [
+    {
+      title: 'สินค้าและบริการ',
+      rows: rowsFromObjects(data.tabs.products ?? [], [
+        { key: 'code', label: 'รหัส' },
+        { key: 'nameTh', label: 'ชื่อไทย' },
+        { key: 'nameEn', label: 'ชื่ออังกฤษ' },
+        { key: 'type', label: 'ประเภท' },
+        { key: 'category', label: 'หมวดหมู่' },
+        { key: 'unit', label: 'หน่วย' },
+        { key: 'unitPrice', label: 'ราคาขาย' },
+        { key: 'vat', label: 'VAT' },
+        { key: 'unitCost', label: 'ต้นทุน' },
+        { key: 'grossMargin', label: 'กำไรขั้นต้น' },
+        { key: 'accountCode', label: 'รหัสบัญชีรายได้' },
+        { key: 'defaultWhtRate', label: 'WHT เริ่มต้น' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'updatedAt', label: 'อัปเดตล่าสุด' },
+      ]),
+    },
+    {
+      title: 'ภาษีซื้อ',
+      rows: rowsFromObjects(data.tabs.inputVat ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'supplier', label: 'ผู้ขาย' },
+        { key: 'documentNo', label: 'เลขเอกสาร' },
+        { key: 'project', label: 'โปรเจค/บริษัท' },
+        { key: 'category', label: 'หมวด' },
+        { key: 'subtotal', label: 'ก่อน VAT' },
+        { key: 'vat', label: 'VAT' },
+        { key: 'total', label: 'รวม' },
+        { key: 'taxStatus', label: 'สถานะภาษี' },
+        { key: 'attachmentUrl', label: 'ไฟล์' },
+      ]),
+    },
+    {
+      title: 'ภาษีขาย',
+      rows: rowsFromObjects(data.tabs.outputVat ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'buyer', label: 'ลูกค้า' },
+        { key: 'documentNo', label: 'เลขเอกสาร' },
+        { key: 'project', label: 'โปรเจค/บริษัท' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'subtotal', label: 'ก่อน VAT' },
+        { key: 'vat', label: 'VAT' },
+        { key: 'total', label: 'รวม' },
+        { key: 'attachmentUrl', label: 'ไฟล์' },
+      ]),
+    },
+    {
+      title: 'ค่าใช้จ่าย',
+      rows: rowsFromObjects(data.tabs.expenses ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'voucherNo', label: 'เลข PV' },
+        { key: 'project', label: 'โปรเจค/บริษัท' },
+        { key: 'category', label: 'หมวด' },
+        { key: 'description', label: 'รายละเอียด' },
+        { key: 'amount', label: 'ยอด' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'attachmentUrl', label: 'ไฟล์' },
+      ]),
+    },
+    {
+      title: 'รายชื่อและเอกสาร',
+      rows: rowsFromObjects(data.tabs.customerEvidence ?? [], [
+        { key: 'customer', label: 'รายชื่อ' },
+        { key: 'taxId', label: 'เลขผู้เสียภาษี' },
+        { key: 'role', label: 'บทบาท' },
+        { key: 'useCase', label: 'ใช้สำหรับ' },
+        { key: 'documentType', label: 'เอกสาร' },
+        { key: 'status', label: 'สถานะไฟล์' },
+        { key: 'readiness', label: 'ความพร้อม' },
+        { key: 'storage', label: 'ที่เก็บ' },
+        { key: 'attachmentUrl', label: 'ไฟล์' },
+        { key: 'folderUrl', label: 'โฟลเดอร์' },
+      ]),
+    },
+    {
+      title: 'เอกสารต้องตรวจ',
+      rows: rowsFromObjects(data.tabs.missingDocs ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'fileName', label: 'ไฟล์' },
+        { key: 'project', label: 'โปรเจค/บริษัท' },
+        { key: 'source', label: 'ที่มา' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'drive', label: 'Drive' },
+        { key: 'issue', label: 'สิ่งที่ต้องทำ' },
+        { key: 'attachmentUrl', label: 'เปิด' },
+      ]),
+    },
+    {
+      title: 'สรุปโปรเจค',
+      rows: rowsFromObjects(data.tabs.projectSummary ?? [], [
+        { key: 'project', label: 'โปรเจค' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'budget', label: 'งบ' },
+        { key: 'revenue', label: 'รายรับ' },
+        { key: 'actual', label: 'ใช้จริง' },
+        { key: 'balance', label: 'เหลือ' },
+        { key: 'forecastProfit', label: 'กำไรคาดการณ์' },
+        { key: 'files', label: 'ไฟล์' },
+      ]),
+    },
+  ];
+
+  const spreadsheet = await sheets.spreadsheets.create({
+    requestBody: {
+      properties: { title },
+      sheets: sheetDefs.map((sheet, index) => ({ properties: { title: sheet.title, sheetId: index } })),
+    },
+  });
+  const spreadsheetId = spreadsheet.data.spreadsheetId!;
+
+  await Promise.all(sheetDefs.map((sheet) => sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${sheet.title}'!A1`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: sheet.rows },
+  })));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: sheetDefs.flatMap((_, sheetId) => [
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.059, green: 0.463, blue: 0.369 },
+                textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat)',
+          },
+        },
+        {
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+            fields: 'gridProperties.frozenRowCount',
+          },
+        },
+        {
+          autoResizeDimensions: {
+            dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 14 },
+          },
+        },
+      ]),
+    },
+  });
+
+  const shareTargets = Array.from(new Set(
+    (data.sharedWithEmails ?? [])
+      .map((email) => email?.trim().toLowerCase())
+      .filter((email): email is string => !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+  ));
+  await Promise.all(shareTargets.map(async (email) => {
+    try {
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        requestBody: { role: 'writer', type: 'user', emailAddress: email },
+        sendNotificationEmail: false,
+      });
+    } catch (err) {
+      logger.warn('Could not share company workspace sheet with user', { error: err, email });
+    }
+  }));
+
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+  logger.info(`Company workspace sheet created: ${url} (${data.period})`);
+  return url;
+}
+
 /**
  * Export expense vouchers to a new Google Sheet.
  * Returns the spreadsheet URL.

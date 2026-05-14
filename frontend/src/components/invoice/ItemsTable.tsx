@@ -15,6 +15,10 @@ interface Product {
   unit: string;
   unitPrice: number;
   vatType: string;
+  productType?: string | null;
+  category?: string | null;
+  accountCode?: string | null;
+  defaultWhtRate?: string | null;
 }
 
 interface Props {
@@ -25,6 +29,21 @@ interface Props {
   onAddItem: () => void;
   onRemoveItem: (i: number) => void;
   onUpdateItem: (i: number, field: keyof InvoiceItem, value: string | number) => void;
+  whtRate?: string;
+  onWhtRateChange?: (rate: string) => void;
+}
+
+function productTypeLabel(type: string | null | undefined, isThai: boolean) {
+  const labels: Record<string, { th: string; en: string }> = {
+    product: { th: 'สินค้า', en: 'Product' },
+    service: { th: 'บริการ', en: 'Service' },
+    shipping: { th: 'ค่าขนส่ง', en: 'Shipping' },
+    fee: { th: 'ค่าธรรมเนียม', en: 'Fee' },
+    deposit: { th: 'มัดจำ', en: 'Deposit' },
+    discount: { th: 'ส่วนลด', en: 'Discount' },
+  };
+  const label = labels[type ?? 'product'] ?? labels.product;
+  return isThai ? label.th : label.en;
 }
 
 function useProductSearch() {
@@ -47,10 +66,14 @@ function ProductSearchCell({
   item,
   index,
   onUpdateItem,
+  whtRate,
+  onWhtRateChange,
 }: {
   item: InvoiceItem;
   index: number;
   onUpdateItem: (i: number, field: keyof InvoiceItem, value: string | number) => void;
+  whtRate?: string;
+  onWhtRateChange?: (rate: string) => void;
 }) {
   const { isThai } = useLanguage();
   const { search } = useProductSearch();
@@ -113,11 +136,15 @@ function ProductSearchCell({
   const selectProduct = (p: Product) => {
     setQuery(p.nameTh);
     setOpen(false);
+    onUpdateItem(index, 'productId', p.id);
     onUpdateItem(index, 'nameTh', p.nameTh);
     onUpdateItem(index, 'nameEn', p.nameEn ?? '');
     onUpdateItem(index, 'unit', p.unit);
     onUpdateItem(index, 'unitPrice', p.unitPrice);
     onUpdateItem(index, 'vatType', p.vatType);
+    if (!whtRate && p.defaultWhtRate && onWhtRateChange) {
+      onWhtRateChange(p.defaultWhtRate);
+    }
   };
 
   const dropdown = open ? (
@@ -143,6 +170,21 @@ function ProductSearchCell({
             <div className="min-w-0">
               <div className="text-xs font-medium text-gray-900 truncate">{p.nameTh}</div>
               {p.nameEn && <div className="text-xs text-gray-500 truncate">{p.nameEn}</div>}
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                  {productTypeLabel(p.productType, isThai)}
+                </span>
+                {p.category && (
+                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    {p.category}
+                  </span>
+                )}
+                {p.defaultWhtRate && (
+                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                    WHT {p.defaultWhtRate}%
+                  </span>
+                )}
+              </div>
             </div>
             <div className="text-right shrink-0">
               <div className="text-xs font-semibold text-blue-700">
@@ -182,6 +224,8 @@ function ItemCard({
   formatCurrency,
   onRemove,
   onUpdate,
+  whtRate,
+  onWhtRateChange,
 }: {
   item: InvoiceItem;
   index: number;
@@ -190,6 +234,8 @@ function ItemCard({
   formatCurrency: (n: number) => string;
   onRemove: () => void;
   onUpdate: (field: keyof InvoiceItem, value: string | number) => void;
+  whtRate?: string;
+  onWhtRateChange?: (rate: string) => void;
 }) {
   const [showEn, setShowEn] = useState(!!item.nameEn);
 
@@ -204,6 +250,8 @@ function ItemCard({
           item={item}
           index={index}
           onUpdateItem={(_, field, value) => onUpdate(field, value)}
+          whtRate={whtRate}
+          onWhtRateChange={onWhtRateChange}
         />
         <button
           onClick={onRemove}
@@ -339,6 +387,8 @@ export default function ItemsTable({
   onAddItem,
   onRemoveItem,
   onUpdateItem,
+  whtRate,
+  onWhtRateChange,
 }: Props) {
   const { t } = useTranslation();
   const { isThai, formatCurrency } = useLanguage();
@@ -371,6 +421,8 @@ export default function ItemsTable({
             formatCurrency={formatCurrency}
             onRemove={() => onRemoveItem(i)}
             onUpdate={(field, value) => onUpdateItem(i, field, value)}
+            whtRate={whtRate}
+            onWhtRateChange={onWhtRateChange}
           />
         ))}
       </div>

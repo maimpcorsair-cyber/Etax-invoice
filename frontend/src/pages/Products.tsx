@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent } from 'lucide-react';
+import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent, FileSpreadsheet } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Product } from '../types';
@@ -54,6 +54,7 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [sheetExporting, setSheetExporting] = useState(false);
   const [error, setError] = useState('');
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
@@ -156,6 +157,24 @@ export default function Products() {
     }
   }
 
+  async function handleExportSheet() {
+    setSheetExporting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/products/export/sheets', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({})) as { data?: { url?: string }; error?: string; detail?: string };
+      if (!res.ok) throw new Error(json.error || json.detail || `HTTP ${res.status}`);
+      if (json.data?.url) window.open(json.data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google Sheets export failed');
+    } finally {
+      setSheetExporting(false);
+    }
+  }
+
   const field = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -196,15 +215,26 @@ export default function Products() {
             {isThai ? 'ตั้งรายการที่ใช้บ่อยสำหรับเอกสารขาย พร้อมหมวดหมู่ ภาษี และต้นทุนเมื่อจำเป็น' : 'Manage reusable sales items with categories, tax, and optional cost settings.'}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="btn-primary shrink-0"
-          disabled={!!policy && policy.maxProducts !== null && policy.usage.products >= policy.maxProducts}
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">{isThai ? 'เพิ่มสินค้า/บริการ' : 'Add Product / Service'}</span>
-          <span className="sm:hidden">{isThai ? 'เพิ่ม' : 'Add'}</span>
-        </button>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <button
+            onClick={handleExportSheet}
+            className="btn-secondary"
+            disabled={sheetExporting}
+            title={isThai ? 'ส่งออกทะเบียนสินค้าและบริการไป Google Sheet' : 'Export product catalog to Google Sheets'}
+          >
+            {sheetExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
+            <span className="hidden sm:inline">{isThai ? 'Sync Sheet' : 'Sync Sheet'}</span>
+          </button>
+          <button
+            onClick={openCreate}
+            className="btn-primary"
+            disabled={!!policy && policy.maxProducts !== null && policy.usage.products >= policy.maxProducts}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">{isThai ? 'เพิ่มสินค้า/บริการ' : 'Add Product / Service'}</span>
+            <span className="sm:hidden">{isThai ? 'เพิ่ม' : 'Add'}</span>
+          </button>
+        </div>
       </div>
 
       {policy && (

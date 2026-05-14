@@ -66,6 +66,25 @@ function asNumber(value: unknown): number {
   return 0;
 }
 
+function productTypeLabel(type?: string | null) {
+  const labels: Record<string, string> = {
+    product: 'สินค้า',
+    service: 'บริการ',
+    shipping: 'ค่าขนส่ง',
+    fee: 'ค่าธรรมเนียม',
+    deposit: 'มัดจำ',
+    discount: 'ส่วนลด',
+  };
+  return labels[type ?? ''] ?? 'สินค้า';
+}
+
+function vatLabel(type?: string | null) {
+  if (type === 'vat7') return 'VAT 7%';
+  if (type === 'vatZero') return 'VAT 0%';
+  if (type === 'vatExempt') return 'ยกเว้น VAT';
+  return type ?? '';
+}
+
 function monthRange(inputYear?: unknown, inputMonth?: unknown) {
   const now = new Date();
   const year = Number(inputYear) || now.getFullYear();
@@ -142,6 +161,7 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
       actionDocs,
       projects,
       customers,
+      products,
     ] = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       return Promise.all([
         tx.purchaseInvoice.findMany({
@@ -296,6 +316,27 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
             },
           },
         }),
+        tx.product.findMany({
+          where: { companyId },
+          orderBy: [{ isActive: 'desc' }, { nameTh: 'asc' }],
+          take: 5000,
+          select: {
+            id: true,
+            code: true,
+            nameTh: true,
+            nameEn: true,
+            productType: true,
+            category: true,
+            unit: true,
+            unitPrice: true,
+            vatType: true,
+            unitCost: true,
+            accountCode: true,
+            defaultWhtRate: true,
+            isActive: true,
+            updatedAt: true,
+          },
+        }),
       ]);
     });
 
@@ -401,6 +442,29 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
         attachmentUrl: null,
       }];
     });
+    const productRows = products.map((product) => {
+      const unitCost = asNumber(product.unitCost);
+      const grossMargin = product.unitCost !== null && asNumber(product.unitPrice) > 0
+        ? `${Math.round(((asNumber(product.unitPrice) - unitCost) / asNumber(product.unitPrice)) * 100)}%`
+        : '';
+      return {
+        id: product.id,
+        code: product.code,
+        nameTh: product.nameTh,
+        nameEn: product.nameEn ?? '',
+        type: productTypeLabel(product.productType),
+        category: product.category ?? '',
+        unit: product.unit,
+        unitPrice: asNumber(product.unitPrice),
+        vat: vatLabel(product.vatType),
+        unitCost: product.unitCost ?? '',
+        grossMargin,
+        accountCode: product.accountCode ?? '',
+        defaultWhtRate: product.defaultWhtRate ? `${product.defaultWhtRate}%` : '',
+        status: product.isActive ? 'ใช้งาน' : 'ปิดใช้งาน',
+        updatedAt: product.updatedAt,
+      };
+    });
 
     const summary = {
       inputVat: inputVatRows.reduce((sum, item) => sum + item.vat, 0),
@@ -410,6 +474,7 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
       projectCount: projectRows.length,
       vatPayable: outputVatRows.reduce((sum, item) => sum + item.vat, 0) - inputVatRows.reduce((sum, item) => sum + item.vat, 0),
       customerEvidence: customerEvidenceRows.length,
+      products: productRows.length,
     };
 
     res.json({
@@ -420,6 +485,7 @@ dashboardRouter.get('/month-end-workspace', async (req, res) => {
           inputVat: inputVatRows,
           outputVat: outputVatRows,
           expenses: expenseRows,
+          products: productRows,
           customerEvidence: customerEvidenceRows,
           missingDocs: missingRows,
           projectSummary: projectRows,

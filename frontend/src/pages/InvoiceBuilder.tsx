@@ -654,6 +654,8 @@ export default function InvoiceBuilder() {
             onAddItem={form.addItem}
             onRemoveItem={form.removeItem}
             onUpdateItem={form.updateItem}
+            whtRate={form.whtRate}
+            onWhtRateChange={form.setWhtRate}
           />
         </div>
         <div ref={notesRef} className="xl:col-span-2">

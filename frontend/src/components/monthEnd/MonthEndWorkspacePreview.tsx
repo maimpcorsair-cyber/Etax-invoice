@@ -11,11 +11,13 @@ export interface MonthEndWorkspace {
     projectCount: number;
     vatPayable: number;
     customerEvidence?: number;
+    products?: number;
   };
   tabs: {
     inputVat: Array<Record<string, unknown>>;
     outputVat: Array<Record<string, unknown>>;
     expenses: Array<Record<string, unknown>>;
+    products?: Array<Record<string, unknown>>;
     customerEvidence?: Array<Record<string, unknown>>;
     missingDocs: Array<Record<string, unknown>>;
     projectSummary: Array<Record<string, unknown>>;
@@ -82,6 +84,27 @@ function buildMonthEndTabs(workspace: MonthEndWorkspace, isThai: boolean) {
         { key: 'attachmentUrl', label: isThai ? 'ไฟล์' : 'File', type: 'link' as const },
       ],
       rows: workspace.tabs.expenses,
+    },
+    {
+      id: 'products',
+      label: isThai ? 'สินค้าและบริการ' : 'Products',
+      columns: [
+        { key: 'code', label: isThai ? 'รหัส' : 'Code' },
+        { key: 'nameTh', label: isThai ? 'ชื่อไทย' : 'Thai name' },
+        { key: 'nameEn', label: isThai ? 'ชื่ออังกฤษ' : 'English name' },
+        { key: 'type', label: isThai ? 'ประเภท' : 'Type' },
+        { key: 'category', label: isThai ? 'หมวดหมู่' : 'Category' },
+        { key: 'unit', label: isThai ? 'หน่วย' : 'Unit' },
+        { key: 'unitPrice', label: isThai ? 'ราคาขาย' : 'Price', type: 'currency' as const },
+        { key: 'vat', label: 'VAT' },
+        { key: 'unitCost', label: isThai ? 'ต้นทุน' : 'Cost', type: 'currency' as const },
+        { key: 'grossMargin', label: isThai ? 'กำไรขั้นต้น' : 'Margin' },
+        { key: 'accountCode', label: isThai ? 'บัญชีรายได้' : 'Revenue account' },
+        { key: 'defaultWhtRate', label: isThai ? 'WHT' : 'WHT' },
+        { key: 'status', label: isThai ? 'สถานะ' : 'Status' },
+        { key: 'updatedAt', label: isThai ? 'อัปเดตล่าสุด' : 'Updated', type: 'date' as const },
+      ],
+      rows: workspace.tabs.products ?? [],
     },
     {
       id: 'customerEvidence',
@@ -160,6 +183,7 @@ export function MonthEndWorkspacePreview({
             { label: isThai ? 'ภาษีขายเดือนนี้' : 'Output VAT', value: formatCurrency(workspace.summary.outputVat), tone: 'primary' as const },
             { label: isThai ? 'ภาษีซื้อเดือนนี้' : 'Input VAT', value: formatCurrency(workspace.summary.inputVat), tone: 'success' as const },
             { label: isThai ? 'ภาษีสุทธิ' : 'Net VAT', value: formatCurrency(workspace.summary.vatPayable), tone: workspace.summary.vatPayable > 0 ? 'warning' as const : 'success' as const },
+            { label: isThai ? 'สินค้า/บริการ' : 'Products', value: (workspace.summary.products ?? 0).toLocaleString(), tone: (workspace.summary.products ?? 0) > 0 ? 'primary' as const : 'success' as const },
             { label: isThai ? 'เอกสารในสารบัญ' : 'Evidence index', value: (workspace.summary.customerEvidence ?? 0).toLocaleString(), tone: (workspace.summary.customerEvidence ?? 0) > 0 ? 'primary' as const : 'success' as const },
             { label: isThai ? 'เอกสารต้องตรวจ' : 'Needs review', value: workspace.summary.missingDocuments.toLocaleString(), tone: workspace.summary.missingDocuments > 0 ? 'warning' as const : 'success' as const },
           ].map((item) => (
