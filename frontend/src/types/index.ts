@@ -213,6 +213,12 @@ export interface Product {
   unit: string;
   unitPrice: number;
   vatType: 'vat7' | 'vatExempt' | 'vatZero';
+  productType: 'product' | 'service' | 'fee' | 'shipping' | 'discount' | 'deposit';
+  category?: string | null;
+  accountCode?: string | null;
+  unitCost?: number | null;
+  defaultWhtRate?: '1' | '3' | '5' | null;
+  internalNote?: string | null;
   isActive: boolean;
 }
 

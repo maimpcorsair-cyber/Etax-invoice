@@ -12,14 +12,20 @@ import {
 export const productsRouter = Router();
 
 const productSchema = z.object({
-  code: z.string().min(1),
-  nameTh: z.string().min(1),
-  nameEn: z.string().optional(),
-  descriptionTh: z.string().optional(),
-  descriptionEn: z.string().optional(),
-  unit: z.string(),
+  code: z.string().trim().min(1),
+  nameTh: z.string().trim().min(1),
+  nameEn: z.string().trim().optional().nullable(),
+  descriptionTh: z.string().trim().optional().nullable(),
+  descriptionEn: z.string().trim().optional().nullable(),
+  unit: z.string().trim().min(1),
   unitPrice: z.number().min(0),
   vatType: z.enum(['vat7', 'vatExempt', 'vatZero']),
+  productType: z.enum(['product', 'service', 'fee', 'shipping', 'discount', 'deposit']).default('product'),
+  category: z.string().trim().optional().nullable(),
+  accountCode: z.string().trim().optional().nullable(),
+  unitCost: z.number().min(0).optional().nullable(),
+  defaultWhtRate: z.enum(['1', '3', '5']).optional().nullable(),
+  internalNote: z.string().trim().optional().nullable(),
 });
 
 productsRouter.get('/', async (req, res) => {
@@ -31,6 +37,9 @@ productsRouter.get('/', async (req, res) => {
         { nameTh: { contains: search as string } },
         { nameEn: { contains: search as string, mode: 'insensitive' } },
         { code: { contains: search as string, mode: 'insensitive' } },
+        { category: { contains: search as string, mode: 'insensitive' } },
+        { productType: { contains: search as string, mode: 'insensitive' } },
+        { accountCode: { contains: search as string, mode: 'insensitive' } },
       ];
     }
     const products = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {

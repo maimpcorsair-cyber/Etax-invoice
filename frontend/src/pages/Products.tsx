@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, X, Save, Loader2, Package } from 'lucide-react';
+import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Product } from '../types';
@@ -8,6 +8,21 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isThaiText, thaiTextOnly } from '../lib/inputGuards';
 
 const VAT_OPTIONS = ['vat7', 'vatExempt', 'vatZero'] as const;
+const PRODUCT_TYPE_OPTIONS = [
+  { value: 'product', labelTh: 'สินค้า', labelEn: 'Product', hintTh: 'ของที่ขายหรือส่งมอบ', hintEn: 'Goods or deliverables' },
+  { value: 'service', labelTh: 'บริการ', labelEn: 'Service', hintTh: 'งานบริการหรือค่าจ้าง', hintEn: 'Service or labor fee' },
+  { value: 'shipping', labelTh: 'ค่าขนส่ง', labelEn: 'Shipping', hintTh: 'ค่าส่งหรือโลจิสติกส์', hintEn: 'Delivery or logistics' },
+  { value: 'fee', labelTh: 'ค่าธรรมเนียม', labelEn: 'Fee', hintTh: 'ค่าดำเนินการ/ค่าบริการอื่น', hintEn: 'Processing or other fee' },
+  { value: 'deposit', labelTh: 'มัดจำ', labelEn: 'Deposit', hintTh: 'เงินล่วงหน้าหรือเงินจอง', hintEn: 'Advance or booking payment' },
+  { value: 'discount', labelTh: 'ส่วนลด', labelEn: 'Discount', hintTh: 'รายการลดราคา', hintEn: 'Discount line' },
+] as const;
+const UNIT_OPTIONS = ['ชิ้น', 'งาน', 'ครั้ง', 'เดือน', 'ปี', 'ชั่วโมง', 'วัน', 'ชุด', 'กล่อง', 'กิโลกรัม', 'เมตร', 'ลิตร'] as const;
+const WHT_OPTIONS = [
+  { value: '', labelTh: 'ไม่มี', labelEn: 'None' },
+  { value: '1', labelTh: '1%', labelEn: '1%' },
+  { value: '3', labelTh: '3%', labelEn: '3%' },
+  { value: '5', labelTh: '5%', labelEn: '5%' },
+] as const;
 
 const EMPTY_FORM: Omit<Product, 'id' | 'companyId' | 'isActive'> = {
   code: '',
@@ -18,6 +33,12 @@ const EMPTY_FORM: Omit<Product, 'id' | 'companyId' | 'isActive'> = {
   unit: '',
   unitPrice: 0,
   vatType: 'vat7',
+  productType: 'product',
+  category: '',
+  accountCode: '',
+  unitCost: null,
+  defaultWhtRate: null,
+  internalNote: '',
 };
 
 export default function Products() {
@@ -84,6 +105,12 @@ export default function Products() {
       unit: p.unit,
       unitPrice: p.unitPrice,
       vatType: p.vatType,
+      productType: p.productType ?? 'product',
+      category: p.category ?? '',
+      accountCode: p.accountCode ?? '',
+      unitCost: p.unitCost ?? null,
+      defaultWhtRate: p.defaultWhtRate ?? null,
+      internalNote: p.internalNote ?? '',
     });
     setError('');
     setShowModal(true);
@@ -94,16 +121,27 @@ export default function Products() {
     if (!form.nameTh.trim() || formValidation.nameTh) { setError(isThai ? 'กรุณากรอกชื่อภาษาไทยให้ถูกต้อง' : 'Please enter a valid Thai name'); return; }
     if (!form.unit.trim()) { setError(isThai ? 'กรุณากรอกหน่วย' : 'Unit is required'); return; }
     if (form.unitPrice < 0) { setError(isThai ? 'ราคาต้องไม่ติดลบ' : 'Price must be non-negative'); return; }
+    if (form.unitCost !== null && form.unitCost !== undefined && form.unitCost < 0) { setError(isThai ? 'ต้นทุนต้องไม่ติดลบ' : 'Cost must be non-negative'); return; }
 
     setSaving(true);
     setError('');
     try {
       const url = editing ? `/api/products/${editing.id}` : '/api/products';
       const method = editing ? 'PUT' : 'POST';
+      const payload = {
+        ...form,
+        nameEn: form.nameEn || null,
+        descriptionTh: form.descriptionTh || null,
+        descriptionEn: form.descriptionEn || null,
+        category: form.category || null,
+        accountCode: form.accountCode || null,
+        defaultWhtRate: form.defaultWhtRate || null,
+        internalNote: form.internalNote || null,
+      };
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -133,14 +171,31 @@ export default function Products() {
     return 'badge-success';
   };
 
+  const productTypeMeta = (type: Product['productType'] | string) =>
+    PRODUCT_TYPE_OPTIONS.find((option) => option.value === type) ?? PRODUCT_TYPE_OPTIONS[0];
+
+  const productTypeLabel = (type: Product['productType'] | string) => {
+    const meta = productTypeMeta(type);
+    return isThai ? meta.labelTh : meta.labelEn;
+  };
+
+  const grossMargin = form.unitCost && form.unitPrice > 0
+    ? Math.round(((form.unitPrice - form.unitCost) / form.unitPrice) * 100)
+    : null;
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          <span className="sm:hidden">{isThai ? 'สินค้า' : 'Products'}</span>
-          <span className="hidden sm:inline">{isThai ? 'สินค้าและบริการ' : 'Products / Services'}</span>
-        </h1>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            <span className="sm:hidden">{isThai ? 'สินค้า' : 'Products'}</span>
+            <span className="hidden sm:inline">{isThai ? 'สินค้าและบริการ' : 'Products / Services'}</span>
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {isThai ? 'ตั้งรายการที่ใช้บ่อยสำหรับเอกสารขาย พร้อมหมวดหมู่ ภาษี และต้นทุนเมื่อจำเป็น' : 'Manage reusable sales items with categories, tax, and optional cost settings.'}
+          </p>
+        </div>
         <button
           onClick={openCreate}
           className="btn-primary shrink-0"
@@ -168,7 +223,7 @@ export default function Products() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={isThai ? 'ค้นหาด้วยชื่อหรือรหัสสินค้า...' : 'Search by name or code...'}
+            placeholder={isThai ? 'ค้นหาชื่อ รหัส หมวดหมู่ หรือรหัสบัญชี' : 'Search name, code, category, or account code'}
             className="input-field pl-9"
           />
         </div>
@@ -199,6 +254,16 @@ export default function Products() {
               <div>
                 <p className="font-semibold text-gray-900">{p.nameTh}</p>
                 {p.nameEn && <p className="text-sm text-gray-500">{p.nameEn}</p>}
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                    {productTypeLabel(p.productType ?? 'product')}
+                  </span>
+                  {p.category && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                      {p.category}
+                    </span>
+                  )}
+                </div>
               </div>
               {/* Row 3: unit + price */}
               <div className="flex items-center justify-between text-sm">
@@ -232,6 +297,7 @@ export default function Products() {
               <tr>
                 <th className="table-header">{t('product.code')}</th>
                 <th className="table-header">{isThai ? 'ชื่อสินค้า/บริการ' : 'Name'}</th>
+                <th className="table-header">{isThai ? 'ประเภท/หมวด' : 'Type / Category'}</th>
                 <th className="table-header">{t('product.unit')}</th>
                 <th className="table-header text-right">{t('product.price')}</th>
                 <th className="table-header">{t('product.vatType')}</th>
@@ -242,13 +308,13 @@ export default function Products() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12">
+                  <td colSpan={8} className="text-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-500" />
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-500">
+                  <td colSpan={8} className="text-center py-12 text-gray-500">
                     <Package className="w-10 h-10 mx-auto mb-2 text-gray-300" />
                     {t('common.noData')}
                   </td>
@@ -261,6 +327,12 @@ export default function Products() {
                       <p className="font-medium">{isThai ? p.nameTh : (p.nameEn ?? p.nameTh)}</p>
                       {p.nameEn && isThai && <p className="text-xs text-gray-400">{p.nameEn}</p>}
                       {!isThai && <p className="text-xs text-gray-400">{p.nameTh}</p>}
+                    </td>
+                    <td className="table-cell">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium text-gray-700">{productTypeLabel(p.productType ?? 'product')}</span>
+                        {p.category && <span className="text-xs text-gray-400">{p.category}</span>}
+                      </div>
                     </td>
                     <td className="table-cell text-gray-500">{p.unit}</td>
                     <td className="table-cell text-right font-semibold">{formatCurrency(p.unitPrice)}</td>
@@ -292,7 +364,7 @@ export default function Products() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">
                 {editing ? t('product.edit') : t('product.add')}
@@ -302,10 +374,43 @@ export default function Products() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-5">
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
               )}
+
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{isThai ? 'รายการนี้เป็น' : 'This item is'}</p>
+                    <p className="text-xs text-gray-500">{isThai ? 'เลือกให้ตรงกับเอกสารและรายงานที่ต้องใช้' : 'Choose the best fit for documents and reports.'}</p>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                    <Layers3 className="h-3.5 w-3.5" />
+                    {isThai ? 'เปลี่ยนได้ภายหลัง' : 'Editable later'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {PRODUCT_TYPE_OPTIONS.map((option) => {
+                    const active = form.productType === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => field('productType', option.value as Product['productType'])}
+                        className={`rounded-xl border px-3 py-2 text-left transition-all ${
+                          active
+                            ? 'border-primary-300 bg-primary-50 shadow-sm ring-1 ring-primary-100'
+                            : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold text-gray-900">{isThai ? option.labelTh : option.labelEn}</span>
+                        <span className="block truncate text-xs text-gray-500">{isThai ? option.hintTh : option.hintEn}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -314,7 +419,10 @@ export default function Products() {
                 </div>
                 <div>
                   <label className="label">{t('product.unit')} *</label>
-                  <input value={form.unit} onChange={(e) => field('unit', e.target.value)} className="input-field" placeholder={isThai ? 'ชิ้น / ชั่วโมง / ปี' : 'pcs / hr / yr'} />
+                  <input value={form.unit} onChange={(e) => field('unit', e.target.value)} className="input-field" list="product-unit-options" placeholder={isThai ? 'ชิ้น / งาน / เดือน' : 'pcs / job / month'} />
+                  <datalist id="product-unit-options">
+                    {UNIT_OPTIONS.map((unit) => <option key={unit} value={unit} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="label">{t('product.nameTh')} *</label>
@@ -350,6 +458,18 @@ export default function Products() {
                   </select>
                 </div>
                 <div className="sm:col-span-2">
+                  <label className="label">{isThai ? 'หมวดหมู่' : 'Category'}</label>
+                  <input
+                    value={form.category ?? ''}
+                    onChange={(e) => field('category', e.target.value)}
+                    className="input-field"
+                    placeholder={isThai ? 'เช่น Software, Consulting, ค่าแรง, ค่าวัสดุ' : 'e.g. Software, Consulting, Labor, Materials'}
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    {isThai ? 'ไม่บังคับ แต่ช่วยให้ค้นหาและสรุปรายงานได้ง่ายขึ้น' : 'Optional, but useful for search and reporting.'}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
                   <label className="label">{isThai ? 'รายละเอียด (ไทย)' : 'Description (TH)'}</label>
                   <textarea value={form.descriptionTh} onChange={(e) => field('descriptionTh', thaiTextOnly(e.target.value))} className={guardedInputClass(formValidation.descriptionTh)} rows={2} placeholder={isThai ? 'รายละเอียดสินค้าเพิ่มเติม...' : 'Additional details...'} />
                 </div>
@@ -358,6 +478,77 @@ export default function Products() {
                   <textarea value={form.descriptionEn} onChange={(e) => field('descriptionEn', englishTextOnly(e.target.value))} className={guardedInputClass(formValidation.descriptionEn)} rows={2} placeholder="Additional details in English..." />
                 </div>
               </div>
+
+              <details className="group rounded-2xl border border-gray-200 bg-gray-50/70">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary-700 shadow-sm">
+                      <ReceiptText className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{isThai ? 'ตั้งค่าขั้นสูง' : 'Advanced settings'}</p>
+                      <p className="text-xs text-gray-500">
+                        {isThai ? 'บัญชี ต้นทุน และภาษีหัก ณ ที่จ่ายเริ่มต้น ไม่บังคับ' : 'Optional account, cost, and default WHT settings.'}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="grid grid-cols-1 gap-4 border-t border-gray-200 bg-white px-4 py-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{isThai ? 'รหัสบัญชีรายได้' : 'Revenue account code'}</label>
+                    <input
+                      value={form.accountCode ?? ''}
+                      onChange={(e) => field('accountCode', e.target.value)}
+                      className="input-field font-mono"
+                      placeholder={isThai ? 'เช่น 4110' : 'e.g. 4110'}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'ต้นทุนต่อหน่วย' : 'Unit cost'}</label>
+                    <input
+                      type="number"
+                      value={form.unitCost ?? ''}
+                      onChange={(e) => field('unitCost', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
+                      className="input-field text-right"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                    />
+                    {grossMargin !== null && (
+                      <p className={`mt-1 text-xs ${grossMargin < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {isThai ? `กำไรขั้นต้นประมาณ ${grossMargin}%` : `Approx. gross margin ${grossMargin}%`}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'ภาษีหัก ณ ที่จ่ายเริ่มต้น' : 'Default withholding tax'}</label>
+                    <select
+                      value={form.defaultWhtRate ?? ''}
+                      onChange={(e) => field('defaultWhtRate', (e.target.value || null) as Product['defaultWhtRate'])}
+                      className="input-field"
+                    >
+                      {WHT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{isThai ? option.labelTh : option.labelEn}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-gray-400">
+                      <BadgePercent className="h-3 w-3" />
+                      {isThai ? 'เป็นค่าแนะนำตอนออกเอกสาร ไม่ใช่ VAT และปรับในเอกสารจริงได้' : 'Suggested on documents. This is not VAT and remains editable.'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'หมายเหตุภายใน' : 'Internal note'}</label>
+                    <textarea
+                      value={form.internalNote ?? ''}
+                      onChange={(e) => field('internalNote', e.target.value)}
+                      className="input-field"
+                      rows={2}
+                      placeholder={isThai ? 'เห็นเฉพาะในระบบ' : 'Only visible inside Billboy'}
+                    />
+                  </div>
+                </div>
+              </details>
             </div>
 
             <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-100">

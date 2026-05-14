@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-15 02:02 Asia/Bangkok
+Last updated: 2026-05-15 03:10 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,7 +16,12 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Pending local changes, not deployed yet:
+- Product catalog upgrade is implemented and ready to deploy:
+  - Added optional product catalog fields via Prisma migration `20260515_product_catalog_fields` in both root and backend Prisma trees: `productType`, `category`, `accountCode`, `unitCost`, `defaultWhtRate`, and `internalNote`.
+  - Product APIs now persist and search by product type, category, and account code while keeping WHT as an optional default, not a required main-field setting.
+  - `สินค้าและบริการ` UX now separates simple daily fields from `ตั้งค่าขั้นสูง`; users can choose product/service/shipping/fee/deposit/discount, set category, price, VAT, optional cost, account code, default WHT, and internal note.
+  - Verified locally: Prisma schema validate, backend/frontend `npm run typecheck`, backend/frontend `npm run build`, frontend/backend touched-file lint, and `git diff --check` passed. Local browser smoke reached login, but full modal smoke was blocked because local backend/API was not running.
+- Customer evidence/Drive/Sheet workspace is deployed:
   - Customer `รายชื่อ` modal now makes `ใช้สำหรับ` a compact chip selector, moves optional credit terms below the main identity fields, and keeps supporting document actions at the bottom of the form.
   - `ข้อมูลและเอกสารประกอบ` now explains the Drive/Sheet model, shows compact actions for attaching a general file, opening the existing Drive folder, and viewing attached document details.
   - Company month-end workspace now includes a `รายชื่อและเอกสาร` / `Names & evidence` tab that indexes customer/vendor evidence metadata and Drive links, while sensitive documents hide direct file links.

@@ -340,17 +340,23 @@ model DbdOpenDataSyncRun {
 }
 
 model Product {
-  id            String  @id @default(cuid())
-  companyId     String
-  code          String
-  nameTh        String
-  nameEn        String?
-  descriptionTh String?
-  descriptionEn String?
-  unit          String
-  unitPrice     Float
-  vatType       VatType @default(vat7)
-  isActive      Boolean @default(true)
+  id             String  @id @default(cuid())
+  companyId      String
+  code           String
+  nameTh         String
+  nameEn         String?
+  descriptionTh  String?
+  descriptionEn  String?
+  unit           String
+  unitPrice      Float
+  vatType        VatType @default(vat7)
+  productType    String  @default("product") @map("product_type")
+  category       String?
+  accountCode    String? @map("account_code")
+  unitCost       Float?  @map("unit_cost")
+  defaultWhtRate String? @map("default_wht_rate")
+  internalNote   String? @map("internal_note")
+  isActive       Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -360,6 +366,8 @@ model Product {
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@index([companyId, productType])
+  @@index([companyId, category])
   @@map("products")
 }
 
