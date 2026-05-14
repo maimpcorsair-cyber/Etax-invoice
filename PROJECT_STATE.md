@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-14 15:55 Asia/Bangkok
+Last updated: 2026-05-14 16:01 Asia/Bangkok
 
 Use this file as the short handoff for Codex, Claude, or any other model before doing work in this repo. For durable rules and architecture, also read `AGENTS.md` and `CLAUDE.md`.
 
@@ -16,12 +16,13 @@ Use this file as the short handoff for Codex, Claude, or any other model before 
 
 - Frontend: Vercel project `etax-invoice`, production URL `https://etax-invoice.vercel.app`.
 - Backend: Render service `etax-invoice-api`, production URL `https://etax-invoice-api.onrender.com`.
-- Customers directory UX rename is implemented locally and pending push/deploy:
+- Customers directory UX rename is deployed:
   - Main Customers UI now uses `รายชื่อ` as the nav/menu concept, page title `รายชื่อลูกค้าและผู้ขาย`, subtitle `เก็บข้อมูลลูกค้า ผู้ขาย และบริษัทที่ใช้ในเอกสาร`, and a single primary button `เพิ่มรายชื่อ`.
   - Customer/Supplier wording was simplified in `frontend/src/pages/Customers.tsx`: UI uses `ลูกค้า`, `ผู้ขาย`, and `ลูกค้า + ผู้ขาย`; the separate `เพิ่มลูกค้า`/`เพิ่มซัพพลายเออร์` buttons were merged into one add flow.
   - Modal now says `เพิ่มรายชื่อ`/`แก้ไขรายชื่อ`, section `รายชื่อนี้ใช้เป็น`, shows only the two main choices (`ลูกค้า`, `ผู้ขาย`), and uses a checkbox `ใช้ได้ทั้งเป็นลูกค้าและผู้ขาย` to map to `partyRole=both`.
   - Heavy/unclear labels were softened: `ประเภทการใช้งาน` -> `ใช้สำหรับ`, `ความพร้อมของข้อมูลลูกค้า` -> `ข้อมูลและเอกสาร`, DBD lookup -> `ค้นข้อมูลบริษัท`, and search placeholders now focus on name/tax ID.
   - Verified locally: frontend `npm run lint`, frontend `npm run typecheck`, frontend `npm run build`, `git diff --check`, and Playwright local smoke on `/app/customers` confirmed one add button, All/Customer/Vendor filters, and the simplified add modal.
+  - Deployed commit `ed9394b` (`Simplify customer directory UX`) to `main`; GitHub Typecheck run `25851356360` succeeded. Vercel production deployment `dpl_Cb51y8Y9gv3ASgNuvT7RH5sUjyyS` is `Ready` and aliases `https://etax-invoice.vercel.app`.
 - Customer/Supplier counterparty master is deployed:
   - Added Prisma schema/migration `20260514_customer_party_role` in both root and backend Prisma trees. `customers.partyRole` supports `customer`, `supplier`, and `both`, with existing `vendor_payee` rows backfilled as `supplier`.
   - `/api/customers` now accepts `partyRole=customer|supplier|both` filtering and persists `partyRole` on create/update. Supplier creation defaults `general` usage to `vendor_payee`.
