@@ -46,11 +46,41 @@ export const lineRouter = Router();
 
 const OTP_TTL = 600; // 10 minutes
 const PROJECT_PORTAL_TTL = process.env.PROJECT_PORTAL_TTL ?? '7d';
-const lineWebhookDiagnostics: {
+
+// Webhook diagnostics live in Redis so they survive process restarts and stay
+// consistent across api + worker processes on Render.
+const WEBHOOK_DIAGNOSTICS_KEY = 'line:webhook-diagnostics';
+
+interface WebhookDiagnostics {
   lastWebhookAt?: string;
   lastEventCount?: number;
   lastUnhandledError?: { at: string; eventType?: string; message: string };
-} = {};
+}
+
+// In-memory mirror used by hot paths; kept in sync with Redis.
+const lineWebhookDiagnostics: WebhookDiagnostics = {};
+
+async function persistWebhookDiagnostics() {
+  try {
+    await redis.set(WEBHOOK_DIAGNOSTICS_KEY, JSON.stringify(lineWebhookDiagnostics));
+  } catch (err) {
+    logger.warn('[Line] persistWebhookDiagnostics failed', { error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+async function loadWebhookDiagnostics(): Promise<WebhookDiagnostics> {
+  try {
+    const raw = await redis.get(WEBHOOK_DIAGNOSTICS_KEY);
+    if (!raw) return { ...lineWebhookDiagnostics };
+    const parsed = JSON.parse(raw) as WebhookDiagnostics;
+    // refresh in-memory mirror so subsequent writes don't lose loaded fields
+    Object.assign(lineWebhookDiagnostics, parsed);
+    return parsed;
+  } catch (err) {
+    logger.warn('[Line] loadWebhookDiagnostics failed', { error: err instanceof Error ? err.message : String(err) });
+    return { ...lineWebhookDiagnostics };
+  }
+}
 
 function getFrontendBaseUrl() {
   const firstConfigured = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'https://etax-invoice.vercel.app')
@@ -1527,10 +1557,11 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
   const requiredColumns = ['targetType', 'targetId', 'purchaseInvoiceId'];
   const missingColumns = requiredColumns.filter((column) => !columns.includes(column));
 
+  const persistedWebhook = await loadWebhookDiagnostics();
   res.json({
     data: {
       checkedAt: new Date().toISOString(),
-      webhook: lineWebhookDiagnostics,
+      webhook: persistedWebhook,
       lineMessaging: getLineMessagingDiagnostics(),
       redis: redisResult.status === 'fulfilled'
         ? { ok: true, response: redisResult.value }
@@ -2677,8 +2708,23 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       await sendLineText(lineUserId, buildConfirmationSummary(enrichedResult));
     }
   } catch (err) {
-    logger.error('[Line] handleImageMessage failed', { err, stage });
-    await sendLineText(lineUserId, `ขอโทษ เกิดข้อผิดพลาดในการอ่านเอกสาร (ขั้นตอน: ${stage})`);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logger.error('[Line] handleImageMessage failed', { err, stage, errMsg });
+    let userMessage: string;
+    if (/timeout|ETIMEDOUT|aborted|ECONNRESET/i.test(errMsg)) {
+      userMessage = '⚠️ ระบบ AI ตอบช้าผิดปกติ กรุณาส่งเอกสารใหม่อีกครั้งใน 1-2 นาที';
+    } else if (/decode|invalid jpeg|jpeg|png|unsupported.*format/i.test(errMsg)) {
+      userMessage = '⚠️ ไฟล์รูปอ่านไม่ออก ลองส่งเป็น PDF หรือถ่ายใหม่ในรูปแบบ JPEG/PNG ปกติ (iPhone HEIC ยังไม่รองรับ)';
+    } else if (/api key|unauthorized|401|403|invalid_api_key/i.test(errMsg)) {
+      userMessage = '⚠️ ระบบ OCR มีปัญหา config ชั่วคราว ลองใหม่ในอีกสักครู่ หรือแจ้ง admin';
+    } else if (/quota|rate.?limit|429|insufficient_quota/i.test(errMsg)) {
+      userMessage = '⚠️ ใช้งานเยอะเกินโควต้าชั่วคราว ลองใหม่ใน 5 นาที';
+    } else if (/storage|s3|r2|upload/i.test(errMsg)) {
+      userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
+    } else {
+      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (ขั้นตอน: ${stage})\n\nไฟล์ถูกเก็บในระบบแล้ว ตรวจดูใน Input VAT หรือลองส่งใหม่เป็น PDF`;
+    }
+    await sendLineText(lineUserId, userMessage);
   }
 }
 
@@ -3100,6 +3146,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
     body = JSON.parse((req.body as Buffer).toString()) as LineWebhookBody;
     lineWebhookDiagnostics.lastWebhookAt = new Date().toISOString();
     lineWebhookDiagnostics.lastEventCount = body.events?.length ?? 0;
+    void persistWebhookDiagnostics();
     logger.info('[Line] Webhook parsed', { eventCount: body.events?.length ?? 0 });
   } catch (e) {
     logger.error('[Line] Webhook body parse failed', { error: String(e) });
@@ -3213,6 +3260,7 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
         eventType: event.type,
         message: err instanceof Error ? err.message : String(err),
       };
+      void persistWebhookDiagnostics();
       logger.error('[Line] Unhandled webhook event error', { err, eventType: event.type, replyTargetId, senderLineUserId: event.source.userId });
       try {
         if (!replyOnly) {

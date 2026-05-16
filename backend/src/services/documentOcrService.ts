@@ -7,6 +7,7 @@ import {
 } from './aiService';
 import { decodeQrFromImage } from './qrDecodeService';
 import { rasterizePdfToPngPages } from './pdfRasterService';
+import { parseThaiSlipQr, type ThaiSlipQrFields } from './thaiSlipQrParser';
 
 export const PURCHASE_RECORD_DOCUMENT_TYPES = new Set<OcrResult['documentType']>([
   'tax_invoice',
@@ -187,6 +188,30 @@ async function analyzePdfDocument(
   return { result, pageCount, source };
 }
 
+function mergeQrFieldsIntoResult(result: OcrResult, qr: ThaiSlipQrFields): OcrResult {
+  // QR transactionId / reference are deterministic — let them override OCR's read.
+  // But we don't override amount/parties since QR doesn't carry those reliably.
+  const reference = qr.reference ?? qr.transactionId ?? null;
+  const bankName = qr.bank ?? result.payment?.bankName ?? null;
+  const looksLikeSlip = !!qr.transactionId && !!qr.bank;
+
+  return {
+    ...result,
+    documentType: looksLikeSlip ? 'bank_transfer' : result.documentType,
+    documentTypeLabel: looksLikeSlip && !result.documentTypeLabel ? 'สลิปโอนเงิน' : result.documentTypeLabel,
+    invoiceNumber: result.invoiceNumber || qr.transactionId || '',
+    payment: {
+      ...(result.payment ?? {}),
+      reference: result.payment?.reference || reference || undefined,
+      bankName: result.payment?.bankName || bankName || undefined,
+    },
+    validationWarnings: [
+      ...(result.validationWarnings ?? []),
+      ...(qr.bank ? [`qr_verified:${qr.bank}`] : []),
+    ],
+  };
+}
+
 async function analyzeImageDocument(
   buffer: Buffer,
   mimeType: string,
@@ -196,6 +221,11 @@ async function analyzeImageDocument(
   stages.push('qr_decode');
   const qrResult = decodeQrFromImage(buffer, mimeType);
   const qrText = qrResult.ok ? qrResult.text : undefined;
+
+  const slipQrFields = qrText ? parseThaiSlipQr(qrText) : null;
+  if (slipQrFields && slipQrFields.confidence >= 0.6) {
+    stages.push(`qr_thai_slip:${slipQrFields.bank ?? 'unknown'}`);
+  }
 
   stages.push('ocr_image');
   let result = await ocrSupplierInvoice(buffer.toString('base64'), mimeType, {
@@ -207,6 +237,12 @@ async function analyzeImageDocument(
   if (shouldTrySlipSpecialist(result)) {
     const slipResult = await trySlipSpecialist(buffer, mimeType, qrText, stages);
     if (slipResult) result = slipResult;
+  }
+
+  // QR-augmented merge: when QR identifies the bank + transaction id, stamp those onto the result
+  // even if the OCR step came back weak. This makes the K+/SCB/BBL slip flow much more reliable.
+  if (slipQrFields && slipQrFields.confidence >= 0.6) {
+    result = mergeQrFieldsIntoResult(result, slipQrFields);
   }
 
   return { result, qrText };
@@ -222,24 +258,47 @@ export async function analyzeAccountingDocumentBuffer(
     throw new Error(`Unsupported file type: ${mimeType}`);
   }
 
-  if (mimeType === 'application/pdf') {
-    const pdf = await analyzePdfDocument(buffer, companyId, stages);
-    return { ...pdf, stages };
-  }
+  try {
+    if (mimeType === 'application/pdf') {
+      const pdf = await analyzePdfDocument(buffer, companyId, stages);
+      return { ...pdf, stages };
+    }
 
-  if (mimeType.startsWith('image/')) {
-    const image = await analyzeImageDocument(buffer, mimeType, companyId, stages);
-    return {
-      result: image.result,
-      qrText: image.qrText,
-      source: 'image',
-      stages,
+    if (mimeType.startsWith('image/')) {
+      const image = await analyzeImageDocument(buffer, mimeType, companyId, stages);
+      return {
+        result: image.result,
+        qrText: image.qrText,
+        source: 'image',
+        stages,
+      };
+    }
+
+    const result = await ocrSupplierInvoice(buffer.toString('base64'), mimeType, {
+      source: 'unknown',
+      companyId,
+    });
+    return { result, source: 'unknown', stages: [...stages, 'ocr_unknown'] };
+  } catch (err) {
+    // Never let an inner OCR step crash the whole pipeline — return an empty result
+    // with the stage list so the caller can show a meaningful message.
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error('[Document OCR] pipeline failed; returning empty result', { error: msg, stages });
+    const empty: OcrResult = {
+      documentType: 'other',
+      documentTypeLabel: 'เอกสารอื่น',
+      supplierName: '',
+      supplierTaxId: '',
+      supplierBranch: '00000',
+      invoiceNumber: '',
+      invoiceDate: '',
+      subtotal: 0,
+      vatAmount: 0,
+      total: 0,
+      confidence: 'low',
+      extractionProvider: 'none',
+      validationWarnings: [`pipeline_error:${msg.slice(0, 200)}`],
     };
+    return { result: empty, source: 'unknown', stages: [...stages, 'pipeline_caught_error'] };
   }
-
-  const result = await ocrSupplierInvoice(buffer.toString('base64'), mimeType, {
-    source: 'unknown',
-    companyId,
-  });
-  return { result, source: 'unknown', stages: ['ocr_unknown'] };
 }
