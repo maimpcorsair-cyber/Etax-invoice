@@ -217,7 +217,12 @@ export default function InvoiceBuilder() {
     const el = sectionRefs[key].current;
     const container = formScrollRef.current;
     if (!el || !container) return;
-    container.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
+    const hasInnerScroll = container.scrollHeight > container.clientHeight + 16;
+    if (hasInnerScroll) {
+      container.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
+      return;
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   const applyBankAccount = useCallback((bankAccountId: string) => {
@@ -554,10 +559,13 @@ export default function InvoiceBuilder() {
   }
 
   /* ── Form panel (shared between desktop left pane and mobile form tab) ── */
-  const formPanel = (
-    <div className="flex h-full min-h-[580px] flex-col overflow-hidden bg-white">
+  const renderFormPanel = (useInnerScroll = true) => (
+    <div className={useInnerScroll ? 'flex h-full min-h-[580px] flex-col overflow-hidden bg-white' : 'flex flex-col bg-white'}>
       {/* Stepper strip */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5">
+      <div className={useInnerScroll
+        ? 'flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5'
+        : 'sticky top-[84px] z-20 rounded-t-3xl border-b border-gray-200 bg-white/95 px-2 py-2 shadow-sm backdrop-blur'}
+      >
         <div className="flex gap-1 min-w-max overflow-x-auto pb-1 scrollbar-hide">
           {STEPPER_STEPS.map(({ key, labelTh, labelEn }, idx) => {
             const isActive = activeSection === key;
@@ -588,7 +596,12 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* Scrollable cards area */}
-      <div ref={formScrollRef} className="flex-1 overflow-y-auto bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0">
+      <div
+        ref={formScrollRef}
+        className={useInnerScroll
+          ? 'flex-1 overflow-y-auto bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'
+          : 'bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'}
+      >
         <div ref={settingsRef} className="xl:col-span-2">
           <DocumentSettingsCard
             docType={form.docType}
@@ -707,7 +720,7 @@ export default function InvoiceBuilder() {
   );
 
   /* ── Preview panel (shared between desktop right pane and mobile preview tab) ── */
-  const previewPanel = (
+  const renderPreviewPanel = (
     <div ref={previewPanelRef} className="flex h-full min-h-[580px] flex-col overflow-hidden bg-slate-100">
       {/* Preview toolbar */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
@@ -1034,21 +1047,21 @@ export default function InvoiceBuilder() {
 
         {/* Mobile/tablet: show selected tab panel */}
         <div className={`lg:hidden w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${mobileTab === 'form' ? 'flex h-[calc(100vh-180px)] min-h-[560px] flex-col' : 'hidden'}`}>
-          {formPanel}
+          {renderFormPanel()}
         </div>
         <div className={`lg:hidden w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${mobileTab === 'preview' ? 'flex h-[calc(100vh-180px)] min-h-[560px] flex-col' : 'hidden'}`}>
-          {previewPanel}
+          {renderPreviewPanel}
         </div>
 
         {/* Desktop (lg+): split pane — form left, preview right */}
         <div className="hidden w-full grid-cols-[minmax(620px,820px)_minmax(420px,1fr)] items-start gap-4 lg:grid">
           {/* LEFT: form panel */}
-          <div className="flex h-[calc(100vh-238px)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            {formPanel}
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            {renderFormPanel(false)}
           </div>
           {/* RIGHT: preview panel */}
-          <div className="flex h-[calc(100vh-238px)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            {previewPanel}
+          <div className="sticky top-[84px] flex max-h-[calc(100vh-108px)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            {renderPreviewPanel}
           </div>
         </div>
 
