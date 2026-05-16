@@ -25,6 +25,7 @@ import {
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { generateVoucherNumber } from '../services/expenseService';
 import { enqueueMasterSheetSync } from '../queues';
+import { linkRecentBenchmarksToIntake } from '../services/ocrBenchmarkService';
 
 export const purchaseInvoicesRouter = Router();
 
@@ -911,6 +912,7 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
     });
 
     void enqueueMasterSheetSync(req.user!.companyId);
+    void linkRecentBenchmarksToIntake(req.user!.companyId, item.id, true);
     res.status(201).json({ data: updated, purchaseInvoice: created });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

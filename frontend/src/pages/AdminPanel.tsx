@@ -2703,6 +2703,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                   </div>
                 </div>
 
+                <OcrBudgetInput
+                  isThai={isThai}
+                  token={token}
+                  initial={ocrStats.budget.monthlyBudgetThb}
+                  onSaved={(v) => setOcrStats((prev) => prev ? { ...prev, budget: { ...prev.budget, monthlyBudgetThb: v } } : prev)}
+                />
+
                 {ocrStats.monthSpendByProvider.length > 0 && (
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {ocrStats.monthSpendByProvider.map((row) => (
@@ -2754,6 +2761,66 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function OcrBudgetInput({ isThai, token, initial, onSaved }: { isThai: boolean; token: string | null; initial: number | null; onSaved: (value: number | null) => void }) {
+  const [value, setValue] = useState<string>(initial != null ? String(initial) : '');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const trimmed = value.trim();
+      const numericValue = trimmed === '' ? null : Number(trimmed);
+      if (numericValue !== null && (!Number.isFinite(numericValue) || numericValue < 0)) {
+        setMsg(isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number');
+        return;
+      }
+      const res = await fetch('/api/admin/ocr-budget', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ monthlyBudgetThb: numericValue }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      onSaved(numericValue);
+      setMsg(isThai ? 'บันทึกแล้ว' : 'Saved');
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs">
+      <div className="flex-1 min-w-[160px]">
+        <label className="block text-[11px] font-medium text-blue-900 mb-1">
+          {isThai ? 'งบ OCR ต่อเดือน (บาท) — เกินงบจะ skip Typhoon/GPT-4o อัตโนมัติ' : 'Monthly OCR budget (THB) — over-budget auto-skips Typhoon/GPT-4o'}
+        </label>
+        <input
+          type="number"
+          inputMode="decimal"
+          step="50"
+          min="0"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={isThai ? 'ไม่จำกัด' : 'unlimited'}
+          className="w-full rounded-md border border-blue-200 bg-white px-2 py-1 text-sm"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving}
+        className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+      >
+        {saving ? (isThai ? 'กำลังบันทึก...' : 'Saving…') : (isThai ? 'บันทึก' : 'Save')}
+      </button>
+      {msg && <span className="text-[11px] text-blue-900">{msg}</span>}
     </div>
   );
 }

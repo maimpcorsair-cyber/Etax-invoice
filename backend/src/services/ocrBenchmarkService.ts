@@ -89,6 +89,41 @@ export function computeCer(ocrText: string, truthText: string): number {
   return Math.min(1, prev[sLen] / tLen);
 }
 
+export async function markBenchmarksAccepted(intakeId: string, accepted: boolean): Promise<void> {
+  if (!intakeId) return;
+  try {
+    await prisma.ocrBenchmark.updateMany({
+      where: { intakeId },
+      data: { accepted },
+    });
+  } catch (err) {
+    logger.warn('[OCR] benchmark accept flag update failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// Link recent benchmarks (within last 10 minutes, no intakeId) to a freshly-created intake
+// and stamp acceptance. Used at confirm-purchase since OCR runs before intake is created.
+export async function linkRecentBenchmarksToIntake(
+  companyId: string,
+  intakeId: string,
+  accepted: boolean,
+): Promise<void> {
+  if (!companyId || !intakeId) return;
+  const since = new Date(Date.now() - 10 * 60_000);
+  try {
+    await prisma.ocrBenchmark.updateMany({
+      where: { companyId, intakeId: null, createdAt: { gte: since } },
+      data: { intakeId, accepted },
+    });
+  } catch (err) {
+    logger.warn('[OCR] benchmark link-to-intake failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export async function updateBenchmarkCer(
   intakeId: string,
   truthText: string,

@@ -123,6 +123,7 @@ app.listen(PORT, () => {
     import('./queues/workers/overdueReminderWorker'), // cron: runs daily at 08:00 for overdue Line notifications
     import('./queues/workers/dbdOpenDataSyncWorker'), // cron: syncs free DBD/RD open data weekly
     import('./queues/workers/masterSheetWorker'), // debounced: syncs company workspace Google Sheet
+    import('./queues/workers/ocrUsageResetWorker'), // cron: resets ocrUsageThisMonth on 1st of month
   ]).then((results) => {
     const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     if (rejected.length === 0) {

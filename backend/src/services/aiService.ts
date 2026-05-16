@@ -15,6 +15,28 @@ const THAI_HEAVY_TYPES = new Set<OcrResult['documentType']>([
   'withholding_tax',
 ]);
 
+// Cache budget check per company (60s TTL) to avoid hitting DB on every OCR call.
+const budgetCache = new Map<string, { exceededAt: number; expiresAt: number }>();
+async function isCompanyOverOcrBudget(companyId?: string): Promise<boolean> {
+  if (!companyId) return false;
+  const cached = budgetCache.get(companyId);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.exceededAt > 0;
+  try {
+    const row = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { ocrMonthlyBudgetThb: true, ocrUsageThisMonth: true },
+    });
+    const budget = row?.ocrMonthlyBudgetThb ? Number(row.ocrMonthlyBudgetThb) : null;
+    const used = row?.ocrUsageThisMonth ? Number(row.ocrUsageThisMonth) : 0;
+    const exceeded = budget !== null && budget > 0 && used >= budget;
+    budgetCache.set(companyId, { exceededAt: exceeded ? now : 0, expiresAt: now + 60_000 });
+    return exceeded;
+  } catch {
+    return false;
+  }
+}
+
 function ocrResultFieldScore(result: OcrResult): number {
   let score = 0;
   if (result.supplierName) score += 2;
@@ -201,6 +223,7 @@ interface OcrOptions {
   source?: 'text_pdf' | 'scan_pdf' | 'image' | 'text' | 'unknown';
   qrText?: string;
   companyId?: string;
+  intakeId?: string;
 }
 
 interface OpenRouterMessage {
@@ -1087,6 +1110,7 @@ Rules:
 
     void recordOcrBenchmark({
       companyId: options.companyId,
+      intakeId: options.intakeId,
       documentType: result.documentType,
       provider: azureResult?.ok ? 'azure+gemini-flash' : 'gemini-flash',
       model: mimeType === 'text/plain' ? geminiFastModel : geminiScanModel,
@@ -1095,6 +1119,8 @@ Rules:
       stage: 'primary',
     });
 
+    const overBudget = await isCompanyOverOcrBudget(options.companyId);
+
     // Engine routing: re-OCR Thai-heavy doc types with Typhoon when initial confidence is not high
     if (
       engineRouting !== 'legacy'
@@ -1102,6 +1128,7 @@ Rules:
       && isTyphoonConfigured()
       && THAI_HEAVY_TYPES.has(result.documentType)
       && result.confidence !== 'high'
+      && !overBudget
     ) {
       try {
         logger.info('[OCR] Routing to Typhoon for Thai-heavy doc', {
@@ -1115,6 +1142,7 @@ Rules:
         );
         void recordOcrBenchmark({
           companyId: options.companyId,
+      intakeId: options.intakeId,
           documentType: result.documentType,
           provider: 'typhoon',
           model: typhoonCall.model,
@@ -1151,7 +1179,10 @@ Rules:
     }
 
     if (shouldEscalateOcr(result, options)) {
-      const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured();
+      const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured() && !overBudget;
+      if (overBudget) {
+        logger.warn('[OCR] over budget — skipping premium escalation', { companyId: options.companyId });
+      }
       if (preferOpenAI) {
         try {
           logger.info('[OCR] Escalating to GPT-4o vision', {
@@ -1166,6 +1197,7 @@ Rules:
           );
           void recordOcrBenchmark({
             companyId: options.companyId,
+      intakeId: options.intakeId,
             documentType: result.documentType,
             provider: 'gpt4o',
             model: openaiCall.model,
@@ -1207,6 +1239,7 @@ Rules:
           const proResult = parseOcrJson(proRaw, result, azureResult?.content);
           void recordOcrBenchmark({
             companyId: options.companyId,
+      intakeId: options.intakeId,
             documentType: result.documentType,
             provider: 'gemini-pro',
             model: geminiProVerifyModel,
