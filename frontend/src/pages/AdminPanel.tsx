@@ -1841,7 +1841,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     providerMix: Array<{ provider: string; documentType: string; calls: number; avgLatencyMs: number; avgCostUsd: number }>;
     monthSpend: { calls: number; thb: number; usd: number; inputTokens: number; outputTokens: number };
     monthSpendByProvider: Array<{ provider: string; thb: number; usd: number }>;
-    budget: { monthlyBudgetThb: number | null; usageThisMonthThb: number };
+    quota: { tier: 'standard' | 'enhanced' | 'premium'; monthlyDocLimit: number | null; docsUsedThisMonth: number; overQuota: boolean };
     recent: Array<{ documentType: string; provider: string; model: string; confidence: string; stage: string; latencyMs: number; costThb: number; createdAt: string }>;
   } | null>(null);
   const [managedUsers, setManagedUsers] = useState<LineManagedUser[]>([]);
@@ -2683,32 +2683,7 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
 
             {ocrStats && (
               <div className="border-t border-gray-100 pt-4 space-y-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      {isThai ? 'OCR engine mix & ค่าใช้จ่าย' : 'OCR engine mix & spend'}
-                    </h4>
-                    <p className="text-[11px] text-gray-500">
-                      {isThai
-                        ? 'แสดงผลจากตาราง ocr_benchmarks / ocr_credit_ledger ในช่วง 30 วันล่าสุด'
-                        : 'Based on ocr_benchmarks / ocr_credit_ledger over the last 30 days.'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[11px] text-gray-500">{isThai ? 'ใช้ในเดือนนี้' : 'This month'}</p>
-                    <p className="text-lg font-bold text-gray-900">฿{ocrStats.monthSpend.thb.toLocaleString()}</p>
-                    {ocrStats.budget.monthlyBudgetThb != null && (
-                      <p className="text-[11px] text-gray-500">/ ฿{ocrStats.budget.monthlyBudgetThb.toLocaleString()}</p>
-                    )}
-                  </div>
-                </div>
-
-                <OcrBudgetInput
-                  isThai={isThai}
-                  token={token}
-                  initial={ocrStats.budget.monthlyBudgetThb}
-                  onSaved={(v) => setOcrStats((prev) => prev ? { ...prev, budget: { ...prev.budget, monthlyBudgetThb: v } } : prev)}
-                />
+                <OcrQuotaCard isThai={isThai} quota={ocrStats.quota} />
 
                 {ocrStats.monthSpendByProvider.length > 0 && (
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -2765,62 +2740,71 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
   );
 }
 
-function OcrBudgetInput({ isThai, token, initial, onSaved }: { isThai: boolean; token: string | null; initial: number | null; onSaved: (value: number | null) => void }) {
-  const [value, setValue] = useState<string>(initial != null ? String(initial) : '');
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+function OcrQuotaCard({
+  isThai,
+  quota,
+}: {
+  isThai: boolean;
+  quota: { tier: 'standard' | 'enhanced' | 'premium'; monthlyDocLimit: number | null; docsUsedThisMonth: number; overQuota: boolean };
+}) {
+  const tierLabel = {
+    standard: { th: 'มาตรฐาน (Gemini)', en: 'Standard (Gemini)' },
+    enhanced: { th: 'เก่งภาษาไทย (Typhoon)', en: 'Thai-enhanced (Typhoon)' },
+    premium: { th: 'พรีเมียม (GPT-4o)', en: 'Premium (GPT-4o)' },
+  }[quota.tier];
 
-  async function save() {
-    setSaving(true);
-    setMsg(null);
-    try {
-      const trimmed = value.trim();
-      const numericValue = trimmed === '' ? null : Number(trimmed);
-      if (numericValue !== null && (!Number.isFinite(numericValue) || numericValue < 0)) {
-        setMsg(isThai ? 'ตัวเลขไม่ถูกต้อง' : 'Invalid number');
-        return;
-      }
-      const res = await fetch('/api/admin/ocr-budget', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ monthlyBudgetThb: numericValue }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      onSaved(numericValue);
-      setMsg(isThai ? 'บันทึกแล้ว' : 'Saved');
-    } catch (err) {
-      setMsg(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  }
+  const tierTone = {
+    standard: 'bg-slate-100 text-slate-700 border-slate-200',
+    enhanced: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    premium: 'bg-violet-100 text-violet-700 border-violet-200',
+  }[quota.tier];
+
+  const used = quota.docsUsedThisMonth;
+  const limit = quota.monthlyDocLimit;
+  const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : null;
+  const barColor = pct == null
+    ? 'bg-emerald-500'
+    : pct >= 100
+      ? 'bg-rose-500'
+      : pct >= 80
+        ? 'bg-amber-500'
+        : 'bg-emerald-500';
 
   return (
-    <div className="flex flex-wrap items-end gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs">
-      <div className="flex-1 min-w-[160px]">
-        <label className="block text-[11px] font-medium text-blue-900 mb-1">
-          {isThai ? 'งบ OCR ต่อเดือน (บาท) — เกินงบจะ skip Typhoon/GPT-4o อัตโนมัติ' : 'Monthly OCR budget (THB) — over-budget auto-skips Typhoon/GPT-4o'}
-        </label>
-        <input
-          type="number"
-          inputMode="decimal"
-          step="50"
-          min="0"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={isThai ? 'ไม่จำกัด' : 'unlimited'}
-          className="w-full rounded-md border border-blue-200 bg-white px-2 py-1 text-sm"
-        />
+    <div className="rounded-lg border border-gray-100 bg-gradient-to-r from-slate-50 to-white p-3 space-y-2">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-gray-900">
+            {isThai ? 'โควต้า OCR เดือนนี้' : 'OCR quota this month'}
+          </h4>
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${tierTone}`}>
+            {isThai ? tierLabel.th : tierLabel.en}
+          </span>
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-bold text-gray-900 tabular-nums">
+            {used.toLocaleString()}
+            {limit != null ? <span className="text-gray-500 text-sm"> / {limit.toLocaleString()}</span> : <span className="text-gray-500 text-sm"> {isThai ? 'เอกสาร' : 'docs'}</span>}
+          </p>
+          {limit == null && (
+            <p className="text-[11px] text-violet-700">{isThai ? 'ไม่จำกัด' : 'Unlimited'}</p>
+          )}
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={save}
-        disabled={saving}
-        className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        {saving ? (isThai ? 'กำลังบันทึก...' : 'Saving…') : (isThai ? 'บันทึก' : 'Save')}
-      </button>
-      {msg && <span className="text-[11px] text-blue-900">{msg}</span>}
+
+      {pct != null && (
+        <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+          <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+
+      {quota.overQuota && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {isThai
+            ? 'ใช้โควต้าเดือนนี้ครบแล้ว — ระบบจะใช้ engine มาตรฐานต่อจนถึงวันที่ 1 เดือนหน้า ถ้าต้องการเก่งกว่านี้ ลองอัปเกรดแพ็กเกจ'
+            : 'You\'ve used this month\'s quota — system continues with the standard engine until the 1st. Upgrade your plan for more.'}
+        </div>
+      )}
     </div>
   );
 }

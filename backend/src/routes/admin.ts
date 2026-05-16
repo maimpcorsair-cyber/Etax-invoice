@@ -12,6 +12,7 @@ import {
   encryptConfigValue,
   resolveCompanyRuntimeConfig,
 } from '../services/companyConfigService';
+import { getOcrPolicyForCompany } from '../services/ocrPolicyService';
 import {
   getLimitErrorMessage,
   getUsageLimit,
@@ -616,7 +617,7 @@ adminRouter.get('/ocr-stats', async (req, res) => {
     const since = new Date(Date.now() - 30 * 86_400_000);
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-    const [providerMix, recent, monthSpend, company, budgetSpend] = await Promise.all([
+    const [providerMix, recent, monthSpend, policy, budgetSpend] = await Promise.all([
       prisma.ocrBenchmark.groupBy({
         by: ['provider', 'documentType'],
         where: { companyId, createdAt: { gte: since } },
@@ -644,10 +645,7 @@ adminRouter.get('/ocr-stats', async (req, res) => {
         _sum: { costThb: true, costUsd: true, inputTokens: true, outputTokens: true },
         _count: { _all: true },
       }),
-      prisma.company.findUnique({
-        where: { id: companyId },
-        select: { ocrMonthlyBudgetThb: true, ocrUsageThisMonth: true },
-      }),
+      getOcrPolicyForCompany(companyId),
       prisma.ocrCreditLedger.groupBy({
         by: ['provider'],
         where: { companyId, createdAt: { gte: monthStart } },
@@ -677,32 +675,16 @@ adminRouter.get('/ocr-stats', async (req, res) => {
           thb: Number((row._sum.costThb ?? 0).toFixed(2)),
           usd: Number((row._sum.costUsd ?? 0).toFixed(4)),
         })),
-        budget: {
-          monthlyBudgetThb: company?.ocrMonthlyBudgetThb ? Number(company.ocrMonthlyBudgetThb) : null,
-          usageThisMonthThb: company?.ocrUsageThisMonth ? Number(company.ocrUsageThisMonth) : 0,
+        quota: {
+          tier: policy.tier,
+          monthlyDocLimit: policy.monthlyDocLimit,
+          docsUsedThisMonth: policy.docsUsedThisMonth,
+          overQuota: policy.overQuota,
         },
       },
     });
   } catch (err) {
     void req;
     res.status(500).json({ error: 'Failed to load OCR stats', message: err instanceof Error ? err.message : String(err) });
-  }
-});
-
-const ocrBudgetSchema = z.object({ monthlyBudgetThb: z.number().min(0).nullable() });
-adminRouter.put('/ocr-budget', async (req, res) => {
-  try {
-    const body = ocrBudgetSchema.parse(req.body);
-    await prisma.company.update({
-      where: { id: req.user!.companyId },
-      data: { ocrMonthlyBudgetThb: body.monthlyBudgetThb },
-    });
-    res.json({ data: { monthlyBudgetThb: body.monthlyBudgetThb } });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation error', details: err.errors });
-      return;
-    }
-    res.status(500).json({ error: 'Failed to update OCR budget' });
   }
 });

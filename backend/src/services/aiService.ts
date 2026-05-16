@@ -4,6 +4,7 @@ import { analyzeAccountingDocumentWithAzure, isAzureDocumentIntelligenceConfigur
 import { callTyphoonVision, estimateTyphoonCostUsd, isTyphoonConfigured } from './typhoonOcrService';
 import { callOpenAIVision, estimateOpenAICostUsd, isOpenAIVisionConfigured } from './openaiVisionService';
 import { recordOcrBenchmark } from './ocrBenchmarkService';
+import { getOcrPolicyForCompany } from './ocrPolicyService';
 
 const engineRouting = (process.env.OCR_ENGINE_ROUTING ?? 'auto') as 'legacy' | 'auto' | 'premium';
 const THAI_HEAVY_TYPES = new Set<OcrResult['documentType']>([
@@ -15,27 +16,9 @@ const THAI_HEAVY_TYPES = new Set<OcrResult['documentType']>([
   'withholding_tax',
 ]);
 
-// Cache budget check per company (60s TTL) to avoid hitting DB on every OCR call.
-const budgetCache = new Map<string, { exceededAt: number; expiresAt: number }>();
-async function isCompanyOverOcrBudget(companyId?: string): Promise<boolean> {
-  if (!companyId) return false;
-  const cached = budgetCache.get(companyId);
-  const now = Date.now();
-  if (cached && cached.expiresAt > now) return cached.exceededAt > 0;
-  try {
-    const row = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: { ocrMonthlyBudgetThb: true, ocrUsageThisMonth: true },
-    });
-    const budget = row?.ocrMonthlyBudgetThb ? Number(row.ocrMonthlyBudgetThb) : null;
-    const used = row?.ocrUsageThisMonth ? Number(row.ocrUsageThisMonth) : 0;
-    const exceeded = budget !== null && budget > 0 && used >= budget;
-    budgetCache.set(companyId, { exceededAt: exceeded ? now : 0, expiresAt: now + 60_000 });
-    return exceeded;
-  } catch {
-    return false;
-  }
-}
+// Plan-based OCR policy is resolved per company via ocrPolicyService.
+// Tier mapping: starter=standard (Azure+Gemini), business=enhanced (+Typhoon),
+// enterprise=premium (+GPT-4o). Over-quota fallbacks happen silently.
 
 function ocrResultFieldScore(result: OcrResult): number {
   let score = 0;
@@ -1119,16 +1102,17 @@ Rules:
       stage: 'primary',
     });
 
-    const overBudget = await isCompanyOverOcrBudget(options.companyId);
+    const ocrPolicy = await getOcrPolicyForCompany(options.companyId);
 
     // Engine routing: re-OCR Thai-heavy doc types with Typhoon when initial confidence is not high
+    // Gated by plan tier (business+) and monthly doc quota.
     if (
       engineRouting !== 'legacy'
       && mimeType !== 'text/plain'
       && isTyphoonConfigured()
       && THAI_HEAVY_TYPES.has(result.documentType)
       && result.confidence !== 'high'
-      && !overBudget
+      && ocrPolicy.allowTyphoon
     ) {
       try {
         logger.info('[OCR] Routing to Typhoon for Thai-heavy doc', {
@@ -1179,9 +1163,13 @@ Rules:
     }
 
     if (shouldEscalateOcr(result, options)) {
-      const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured() && !overBudget;
-      if (overBudget) {
-        logger.warn('[OCR] over budget — skipping premium escalation', { companyId: options.companyId });
+      const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured() && ocrPolicy.allowOpenAI;
+      if (ocrPolicy.overQuota) {
+        logger.warn('[OCR] over monthly quota — silent fallback to standard tier', {
+          companyId: options.companyId,
+          docsUsedThisMonth: ocrPolicy.docsUsedThisMonth,
+          monthlyDocLimit: ocrPolicy.monthlyDocLimit,
+        });
       }
       if (preferOpenAI) {
         try {

@@ -37,6 +37,8 @@ export function getPromptPayTarget() {
   return null;
 }
 
+export type OcrTier = 'standard' | 'enhanced' | 'premium';
+
 type PlanDefinition = {
   key: BillingPlanKey;
   nameTh: string;
@@ -47,6 +49,7 @@ type PlanDefinition = {
   monthlyAmount: number | null;
   stripePriceEnv?: string;
   purchasable: boolean;
+  ocrTier: OcrTier;
 };
 
 const planDefinitions: Record<BillingPlanKey, PlanDefinition> = {
@@ -60,6 +63,7 @@ const planDefinitions: Record<BillingPlanKey, PlanDefinition> = {
     monthlyAmount: 29900,
     stripePriceEnv: 'STRIPE_PRICE_STARTER_MONTHLY',
     purchasable: true,
+    ocrTier: 'standard', // Azure + Gemini only
   },
   business: {
     key: 'business',
@@ -71,6 +75,7 @@ const planDefinitions: Record<BillingPlanKey, PlanDefinition> = {
     monthlyAmount: 99000,
     stripePriceEnv: 'STRIPE_PRICE_BUSINESS_MONTHLY',
     purchasable: true,
+    ocrTier: 'enhanced', // + Typhoon-OCR Thai specialist
   },
   enterprise: {
     key: 'enterprise',
@@ -81,6 +86,7 @@ const planDefinitions: Record<BillingPlanKey, PlanDefinition> = {
     docLimit: null,
     monthlyAmount: null,
     purchasable: false,
+    ocrTier: 'premium', // + GPT-4o escalation
   },
 };
 
