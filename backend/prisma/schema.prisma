@@ -140,6 +140,11 @@ model Company {
   googleDriveOwnerUserId   String?
   googleDriveOwnerLinkedAt DateTime?
 
+  // Master accounting Google Sheet
+  googleWorkspaceSheetId      String?
+  googleWorkspaceSheetUrl     String?
+  googleWorkspaceSheetSyncedAt DateTime?
+
   // Line OA settings
   lineNotifyEnabled   Boolean @default(false)
   overdueReminderDays Int     @default(3)
@@ -413,6 +418,12 @@ model Invoice {
   // Storage
   pdfUrl String?
   xmlUrl String?
+
+  // Google Drive
+  driveFileId    String?
+  driveUrl       String?
+  driveXmlFileId String?
+  driveXmlUrl    String?
 
   // Reference (for credit/debit notes and receipts linked to a tax invoice)
   referenceDocNumber String?
