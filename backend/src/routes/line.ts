@@ -2709,7 +2709,9 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    logger.error('[Line] handleImageMessage failed', { err, stage, errMsg });
+    const errCode = (err && typeof err === 'object' && 'code' in err) ? String((err as { code?: unknown }).code) : '';
+    const errMeta = (err && typeof err === 'object' && 'meta' in err) ? JSON.stringify((err as { meta?: unknown }).meta).slice(0, 200) : '';
+    logger.error('[Line] handleImageMessage failed', { err, stage, errMsg, errCode, errMeta });
     let userMessage: string;
     if (/timeout|ETIMEDOUT|aborted|ECONNRESET/i.test(errMsg)) {
       userMessage = '⚠️ ระบบ AI ตอบช้าผิดปกติ กรุณาส่งเอกสารใหม่อีกครั้งใน 1-2 นาที';
@@ -2723,11 +2725,11 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
     } else if (/reply.?token|invalid_reply_token|expired/i.test(errMsg)) {
       userMessage = '⚠️ ระบบใช้เวลาประมวลผลนานเกินจน LINE ปิด session ระบบบันทึกไฟล์แล้ว ตรวจดูใน Input VAT';
-    } else if (/prisma|column does not exist|relation.*does not exist/i.test(errMsg)) {
-      userMessage = '⚠️ Database ติด schema mismatch ชั่วคราว แจ้ง admin (อาจมี migration ค้าง)';
     } else {
-      const errSnippet = errMsg.slice(0, 80).replace(/[\n\r]+/g, ' ');
-      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (ขั้นตอน: ${stage})\n\n🔎 ${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว ตรวจดูใน Input VAT หรือลองส่งใหม่เป็น PDF`;
+      // Show the actual error code + first 150 chars of message so admin can identify root cause
+      const errSnippet = errMsg.slice(0, 150).replace(/[\n\r]+/g, ' ');
+      const codeStr = errCode ? `[${errCode}] ` : '';
+      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (${stage})\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว`;
     }
     await sendLineText(lineUserId, userMessage);
   }
