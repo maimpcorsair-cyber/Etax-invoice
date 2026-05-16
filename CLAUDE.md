@@ -3,7 +3,7 @@
 ETDA ขมธอ. 3-2560 — submits XAdES-BES signed XML to Revenue Department API.
 **Product ขายจริง** — multi-tenant SaaS สำหรับออกใบกำกับภาษีอิเล็กทรอนิกส์
 
-> **Start here for handoff:** read [`PROJECT_STATE.md`](PROJECT_STATE.md) first for the latest production/deploy/OCR status, recent commits, dirty local state, and next verification steps.
+> **Start here for handoff:** read [`AI_HANDOFF.md`](AI_HANDOFF.md) first, then [`PROJECT_STATE.md`](PROJECT_STATE.md) for the compact latest production/deploy status, recent commits, dirty local state, and next verification steps. Open `docs/state/PROJECT_HISTORY_2026-05.md` only when older detailed history is needed.
 
 ## Stack
 - **Frontend** `frontend/` — React 18 + Vite 5 + TypeScript 5 + Tailwind 3 + Zustand, port 3000
@@ -78,7 +78,7 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 
 ## Deploy status
 - `render-deploy.yml` is currently working on `main`; backend deploys have been verified through GitHub Actions and Render health.
-- See `PROJECT_STATE.md` for the current verified backend health version and CLI status.
+- See `PROJECT_STATE.md` for the current verified backend health version and CLI status. Use `docs/state/PROJECT_HISTORY_2026-05.md` only for older detailed deploy history.
 
 ## MCP tools ที่ใช้งานได้
 - `mcp__postgres__query` ✅ — query production DB ได้ตรงๆ
@@ -118,7 +118,7 @@ pkill -f "tsx watch"; cd backend && npx tsx watch src/index.ts &
 ```
 
 ## Handoff hygiene
-- Before final reply, update `PROJECT_STATE.md` when the work changes production/deploy status, CLI/tooling status, schema/database state, LINE/OCR behavior, important risks, or next verification steps. Keep it short and do not include secrets.
+- Before final reply, update `PROJECT_STATE.md` when the work changes production/deploy status, CLI/tooling status, schema/database state, LINE/OCR behavior, important risks, or next verification steps. Keep it short, do not include secrets, and put long history in `docs/state/`.
 
 ## Slash commands
 `/typecheck` `/health` `/db-shell "SQL"` `/logs [pattern]`

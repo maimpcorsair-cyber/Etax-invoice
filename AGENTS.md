@@ -2,7 +2,7 @@
 
 Full-stack e-Tax Invoice application compliant with **ETDA ขมธอ. 3-2560** (Thai Electronic Transactions Development Agency standard), submitting signed + timestamped XML documents to the **Revenue Department (กรมสรรพากร)** via their e-Tax API.
 
-> **Start here for handoff:** read [`PROJECT_STATE.md`](PROJECT_STATE.md) first for the latest production/deploy/OCR status, recent commits, dirty local state, and next verification steps.
+> **Start here for handoff:** read [`AI_HANDOFF.md`](AI_HANDOFF.md) first, then [`PROJECT_STATE.md`](PROJECT_STATE.md) for the compact latest production/deploy status, recent commits, dirty local state, and next verification steps. Open `docs/state/PROJECT_HISTORY_2026-05.md` only when older detailed history is needed.
 
 ## Stack
 
@@ -166,4 +166,4 @@ Cert:         backend/certs/test-company.p12 / etax-dev-password
 - After any cert change: `/sign-test`
 - Before committing: `/typecheck` then `/review`
 - If backend misbehaves: `/logs error` first, then `/health`
-- Before final reply, update `PROJECT_STATE.md` when the work changes production/deploy status, CLI/tooling status, schema/database state, LINE/OCR behavior, important risks, or next verification steps. Keep it short and do not include secrets.
+- Before final reply, update `PROJECT_STATE.md` when the work changes production/deploy status, CLI/tooling status, schema/database state, LINE/OCR behavior, important risks, or next verification steps. Keep it short, do not include secrets, and put long history in `docs/state/`.
