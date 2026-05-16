@@ -35,11 +35,11 @@ import {
   supportedDocumentMimeType,
 } from '../services/documentOcrService';
 import { setupRichMenu } from '../services/richMenuService';
-import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
+import { attemptAutoMatchAndPay } from '../services/paymentMatchingService';
 
 export const lineRouter = Router();
 
@@ -764,57 +764,52 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
     .join(' ');
 
   if (direction !== 'outgoing') {
-    const candidates = await prisma.invoice.findMany({
-      where: {
+    const match = await attemptAutoMatchAndPay(
+      {
         companyId,
-        isPaid: false,
-        status: { not: 'cancelled' },
-        OR: [
-          { total: { gte: amount - 1, lte: amount + 1 } },
-          reference ? { invoiceNumber: { contains: reference, mode: 'insensitive' } } : undefined,
-          counterparty ? { buyer: { nameTh: { contains: counterparty.slice(0, 40), mode: 'insensitive' } } } : undefined,
-        ].filter(Boolean) as Prisma.InvoiceWhereInput[],
+        amount,
+        paidAt,
+        reference,
+        counterpartyName: counterparty,
       },
-      include: { payments: true, buyer: { select: { nameTh: true } } },
-      orderBy: { invoiceDate: 'desc' },
-      take: 5,
-    });
-    const exact = candidates.find((invoice) => closeAmount(invoice.total - (invoice.paidAmount ?? 0), amount) || closeAmount(invoice.total, amount));
-    if (exact) {
-      const payment = await prisma.$transaction(async (tx) => {
-        const created = await tx.payment.create({
-          data: {
-            id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            invoiceId: exact.id,
-            amount,
-            method: 'transfer',
-            reference,
-            paidAt,
-            note: `นำเข้าจากสลิปโอนเงิน LINE OCR${result.payment?.bankName ? ` (${result.payment.bankName})` : ''}`,
-            createdBy: userId,
-            evidenceIntakeId: intakeId,
-            matchScore: 100,
-            matchedBy: 'auto',
-          },
-        });
-        const summary = await calculateInvoicePaymentSummary(tx, exact.id);
-        await tx.invoice.update({
-          where: { id: exact.id },
-          data: {
-            isPaid: summary.isPaid,
-            paidAt: summary.paidAt,
-            paidAmount: summary.paidAmount,
-          },
-        });
-        return created;
+      {
+        intakeId,
+        createdBy: userId,
+        note: `นำเข้าจากสลิปโอนเงิน LINE OCR${result.payment?.bankName ? ` (${result.payment.bankName})` : ''}`,
+      },
+    );
+
+    const amountFmt = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
+
+    if (match.status === 'auto_matched' && match.invoiceId) {
+      const invoice = await prisma.invoice.findUnique({
+        where: { id: match.invoiceId },
+        include: { buyer: { select: { nameTh: true } } },
       });
-      void payment;
+      const buyerName = invoice?.buyer.nameTh ?? '';
+      const invoiceNumber = invoice?.invoiceNumber ?? '';
       return {
         ok: true,
         status: 'saved',
-        targetId: exact.id,
+        targetId: match.invoiceId,
         targetType: 'sales_invoice',
-        message: `✅ บันทึกรับชำระจากสลิปแล้ว\n📄 ${exact.invoiceNumber}\n👤 ${exact.buyer.nameTh}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}`,
+        message: `✅ บันทึกรับชำระจากสลิปแล้ว (match ${match.matchScore}%)\n📄 ${invoiceNumber}\n👤 ${buyerName}\n💵 ${amountFmt}${bankTransferDetails(result)}`,
+      };
+    }
+
+    if (match.status === 'shortlist' && match.candidates[0]) {
+      const top = match.candidates[0];
+      const list = match.candidates
+        .slice(0, 3)
+        .map((c) => `• ${c.invoiceNumber} · ${c.buyerName} · ${c.score}%`)
+        .join('\n');
+      return {
+        ok: false,
+        status: 'needs_review',
+        targetType: 'sales_invoice',
+        targetId: top.invoiceId,
+        message: `🟡 ใกล้เคียงแล้วแต่ยังไม่ชัวร์ (${top.score}%) ขอให้ยืนยันในหน้าเอกสาร/รับชำระเงิน\nยอด: ${amountFmt}\nผู้สมัครต้น 3 อันดับ:\n${list}${bankTransferDetails(result)}`,
+        warnings: ['shortlist:sales_invoice'],
       };
     }
 
@@ -822,7 +817,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
       ok: false,
       status: 'needs_review',
       targetType: 'sales_invoice',
-      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}\nกรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
+      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้\nยอด: ${amountFmt}${bankTransferDetails(result)}\nกรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
       warnings: ['unmatched:sales_invoice'],
     };
   }

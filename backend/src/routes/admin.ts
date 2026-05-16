@@ -608,3 +608,101 @@ adminRouter.post('/signing-test', async (req, res) => {
     res.status(500).json({ success: false, steps });
   }
 });
+
+/* ─── OCR Stats (Phase B/E) ─── */
+adminRouter.get('/ocr-stats', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const since = new Date(Date.now() - 30 * 86_400_000);
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    const [providerMix, recent, monthSpend, company, budgetSpend] = await Promise.all([
+      prisma.ocrBenchmark.groupBy({
+        by: ['provider', 'documentType'],
+        where: { companyId, createdAt: { gte: since } },
+        _count: { _all: true },
+        _avg: { latencyMs: true, costUsd: true },
+        orderBy: { _count: { provider: 'desc' } },
+      }),
+      prisma.ocrBenchmark.findMany({
+        where: { companyId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          documentType: true,
+          provider: true,
+          model: true,
+          confidence: true,
+          stage: true,
+          latencyMs: true,
+          costThb: true,
+          createdAt: true,
+        },
+      }),
+      prisma.ocrCreditLedger.aggregate({
+        where: { companyId, createdAt: { gte: monthStart } },
+        _sum: { costThb: true, costUsd: true, inputTokens: true, outputTokens: true },
+        _count: { _all: true },
+      }),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { ocrMonthlyBudgetThb: true, ocrUsageThisMonth: true },
+      }),
+      prisma.ocrCreditLedger.groupBy({
+        by: ['provider'],
+        where: { companyId, createdAt: { gte: monthStart } },
+        _sum: { costThb: true, costUsd: true },
+      }),
+    ]);
+
+    res.json({
+      data: {
+        providerMix: providerMix.map((row) => ({
+          provider: row.provider,
+          documentType: row.documentType,
+          calls: row._count._all,
+          avgLatencyMs: Math.round(row._avg.latencyMs ?? 0),
+          avgCostUsd: Number((row._avg.costUsd ?? 0).toFixed(4)),
+        })),
+        recent,
+        monthSpend: {
+          calls: monthSpend._count._all,
+          thb: Number((monthSpend._sum.costThb ?? 0).toFixed(2)),
+          usd: Number((monthSpend._sum.costUsd ?? 0).toFixed(4)),
+          inputTokens: monthSpend._sum.inputTokens ?? 0,
+          outputTokens: monthSpend._sum.outputTokens ?? 0,
+        },
+        monthSpendByProvider: budgetSpend.map((row) => ({
+          provider: row.provider,
+          thb: Number((row._sum.costThb ?? 0).toFixed(2)),
+          usd: Number((row._sum.costUsd ?? 0).toFixed(4)),
+        })),
+        budget: {
+          monthlyBudgetThb: company?.ocrMonthlyBudgetThb ? Number(company.ocrMonthlyBudgetThb) : null,
+          usageThisMonthThb: company?.ocrUsageThisMonth ? Number(company.ocrUsageThisMonth) : 0,
+        },
+      },
+    });
+  } catch (err) {
+    void req;
+    res.status(500).json({ error: 'Failed to load OCR stats', message: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+const ocrBudgetSchema = z.object({ monthlyBudgetThb: z.number().min(0).nullable() });
+adminRouter.put('/ocr-budget', async (req, res) => {
+  try {
+    const body = ocrBudgetSchema.parse(req.body);
+    await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data: { ocrMonthlyBudgetThb: body.monthlyBudgetThb },
+    });
+    res.json({ data: { monthlyBudgetThb: body.monthlyBudgetThb } });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to update OCR budget' });
+  }
+});

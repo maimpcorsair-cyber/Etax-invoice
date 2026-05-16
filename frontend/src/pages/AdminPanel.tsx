@@ -1837,6 +1837,13 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
     ocrReadiness?: { productionReady: boolean; tier: string; warnings?: string[]; models?: { fastTextOrPdf?: string; scanImageOrPdf?: string; proEscalation?: string | null } };
   } | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
+  const [ocrStats, setOcrStats] = useState<{
+    providerMix: Array<{ provider: string; documentType: string; calls: number; avgLatencyMs: number; avgCostUsd: number }>;
+    monthSpend: { calls: number; thb: number; usd: number; inputTokens: number; outputTokens: number };
+    monthSpendByProvider: Array<{ provider: string; thb: number; usd: number }>;
+    budget: { monthlyBudgetThb: number | null; usageThisMonthThb: number };
+    recent: Array<{ documentType: string; provider: string; model: string; confidence: string; stage: string; latencyMs: number; costThb: number; createdAt: string }>;
+  } | null>(null);
   const [managedUsers, setManagedUsers] = useState<LineManagedUser[]>([]);
   const [managedUsersLoading, setManagedUsersLoading] = useState(false);
   const [userOtp, setUserOtp] = useState<null | { userId: string; userName: string; otp: string }>(null);
@@ -1929,6 +1936,28 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
       window.clearInterval(timer);
     };
   }, [token, policy?.canUseLineOa]);
+
+  useEffect(() => {
+    if (!statusOpen) return;
+    let cancelled = false;
+    async function loadOcrStats() {
+      try {
+        const res = await fetch('/api/admin/ocr-stats', { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const json = await res.json() as { data?: typeof ocrStats };
+        if (!cancelled) setOcrStats(json.data ?? null);
+      } catch {
+        if (!cancelled) setOcrStats(null);
+      }
+    }
+    void loadOcrStats();
+    const timer = window.setInterval(loadOcrStats, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, statusOpen]);
 
   async function handleUserLinkStart(user: LineManagedUser) {
     setMsg(null);
@@ -2649,6 +2678,77 @@ function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isTha
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {ocrStats && (
+              <div className="border-t border-gray-100 pt-4 space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      {isThai ? 'OCR engine mix & ค่าใช้จ่าย' : 'OCR engine mix & spend'}
+                    </h4>
+                    <p className="text-[11px] text-gray-500">
+                      {isThai
+                        ? 'แสดงผลจากตาราง ocr_benchmarks / ocr_credit_ledger ในช่วง 30 วันล่าสุด'
+                        : 'Based on ocr_benchmarks / ocr_credit_ledger over the last 30 days.'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] text-gray-500">{isThai ? 'ใช้ในเดือนนี้' : 'This month'}</p>
+                    <p className="text-lg font-bold text-gray-900">฿{ocrStats.monthSpend.thb.toLocaleString()}</p>
+                    {ocrStats.budget.monthlyBudgetThb != null && (
+                      <p className="text-[11px] text-gray-500">/ ฿{ocrStats.budget.monthlyBudgetThb.toLocaleString()}</p>
+                    )}
+                  </div>
+                </div>
+
+                {ocrStats.monthSpendByProvider.length > 0 && (
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    {ocrStats.monthSpendByProvider.map((row) => (
+                      <div key={row.provider} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <p className="text-[11px] text-gray-500">{row.provider}</p>
+                        <p className="text-sm font-semibold text-gray-900">฿{row.thb.toLocaleString()}</p>
+                        <p className="text-[10px] text-gray-500">${row.usd.toFixed(4)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {ocrStats.providerMix.length > 0 && (
+                  <div className="overflow-x-auto rounded-lg border border-gray-100">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">{isThai ? 'ประเภทเอกสาร' : 'Doc type'}</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">Engine</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-500">{isThai ? 'จำนวน' : 'Calls'}</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-500">{isThai ? 'เฉลี่ย ms' : 'Avg ms'}</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-500">{isThai ? 'ต้นทุน $' : 'Avg $'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {ocrStats.providerMix.slice(0, 12).map((row) => (
+                          <tr key={`${row.provider}-${row.documentType}`}>
+                            <td className="px-3 py-2 text-gray-900">{row.documentType}</td>
+                            <td className="px-3 py-2 text-gray-700">{row.provider}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-900">{row.calls}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-500">{row.avgLatencyMs}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-500">{row.avgCostUsd.toFixed(4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {ocrStats.providerMix.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    {isThai
+                      ? 'ยังไม่มีข้อมูล — ส่งเอกสารผ่าน LINE หรืออัปโหลดเอกสารสักฉบับ ระบบจะเริ่มบันทึก benchmark'
+                      : 'No data yet — send a document via LINE or upload one to start logging benchmarks.'}
+                  </p>
+                )}
               </div>
             )}
           </div>
