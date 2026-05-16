@@ -2721,8 +2721,13 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       userMessage = '⚠️ ใช้งานเยอะเกินโควต้าชั่วคราว ลองใหม่ใน 5 นาที';
     } else if (/storage|s3|r2|upload/i.test(errMsg)) {
       userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
+    } else if (/reply.?token|invalid_reply_token|expired/i.test(errMsg)) {
+      userMessage = '⚠️ ระบบใช้เวลาประมวลผลนานเกินจน LINE ปิด session ระบบบันทึกไฟล์แล้ว ตรวจดูใน Input VAT';
+    } else if (/prisma|column does not exist|relation.*does not exist/i.test(errMsg)) {
+      userMessage = '⚠️ Database ติด schema mismatch ชั่วคราว แจ้ง admin (อาจมี migration ค้าง)';
     } else {
-      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (ขั้นตอน: ${stage})\n\nไฟล์ถูกเก็บในระบบแล้ว ตรวจดูใน Input VAT หรือลองส่งใหม่เป็น PDF`;
+      const errSnippet = errMsg.slice(0, 80).replace(/[\n\r]+/g, ' ');
+      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (ขั้นตอน: ${stage})\n\n🔎 ${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว ตรวจดูใน Input VAT หรือลองส่งใหม่เป็น PDF`;
     }
     await sendLineText(lineUserId, userMessage);
   }
