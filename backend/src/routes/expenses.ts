@@ -10,6 +10,7 @@ import { hasFeatureAccess, resolveCompanyAccessPolicy } from '../services/access
 import { generateVoucherNumber, getExpenseLimit } from '../services/expenseService';
 import { uploadToDrive, isDriveConfigured, DriveDocumentFolder } from '../services/googleDriveService';
 import { exportExpensesToSheets, isSheetsConfigured } from '../services/googleSheetsService';
+import { enqueueMasterSheetSync } from '../queues';
 import { logger } from '../config/logger';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -624,6 +625,7 @@ expensesRouter.post('/:id/approve', requireRole('viewer'), async (req, res) => {
       ipAddress: req.ip ?? '', userAgent: req.get('user-agent') ?? '', language: 'th',
     });
 
+    void enqueueMasterSheetSync(companyId);
     res.json({ data: { ...updated, totalAmount: Number(updated.totalAmount), budgetGuard } });
   } catch (err) {
     if (err instanceof z.ZodError) {

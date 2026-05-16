@@ -24,6 +24,7 @@ import {
 } from '../services/documentOcrService';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { generateVoucherNumber } from '../services/expenseService';
+import { enqueueMasterSheetSync } from '../queues';
 
 export const purchaseInvoicesRouter = Router();
 
@@ -909,6 +910,7 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
       language: 'th',
     });
 
+    void enqueueMasterSheetSync(req.user!.companyId);
     res.status(201).json({ data: updated, purchaseInvoice: created });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -1101,6 +1103,7 @@ purchaseInvoicesRouter.post('/', requireRole('admin', 'super_admin', 'accountant
       language: 'th',
     });
 
+    void enqueueMasterSheetSync(req.user!.companyId);
     res.status(201).json({ data: created });
   } catch (err) {
     if (err instanceof z.ZodError) {

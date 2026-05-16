@@ -24,6 +24,8 @@ export const rdSubmissionQueue = new Queue('rd-submission', {
   },
 });
 
+export { masterSheetQueue, enqueueMasterSheetSync } from './workers/masterSheetWorker';
+
 logger.info('BullMQ queues initialized');
 
 export default { invoiceQueue, rdSubmissionQueue };

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator, TrendingUp, TrendingDown, FileSpreadsheet, Loader2,
-  ArrowRight, Calendar,
+  ArrowRight, Calendar, FolderOpen,
 } from 'lucide-react';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import { useLanguage } from '../hooks/useLanguage';
@@ -40,6 +40,8 @@ export default function VatSummary() {
   const [monthEndTab, setMonthEndTab] = useState('inputVat');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<'sales' | 'purchases' | null>(null);
+  const [auditExporting, setAuditExporting] = useState(false);
+  const [auditUrl, setAuditUrl] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -99,6 +101,27 @@ export default function VatSummary() {
       alert(isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed');
     } finally {
       setExporting(null);
+    }
+  }
+
+  async function handleAuditExport() {
+    setAuditExporting(true);
+    setAuditUrl(null);
+    try {
+      const res = await fetch('/api/audit/export-package', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month }),
+      });
+      const json = await res.json() as { data?: { url: string }; error?: string };
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setAuditUrl(json.data?.url ?? null);
+    } catch (err) {
+      alert(isThai
+        ? `สร้าง Audit Package ไม่สำเร็จ: ${err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'}`
+        : `Audit export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setAuditExporting(false);
     }
   }
 
@@ -255,6 +278,48 @@ export default function VatSummary() {
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
+            </div>
+          </div>
+
+          {/* Audit Export Package */}
+          <div className="card flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                <FolderOpen className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">
+                  {isThai ? 'Export สำหรับ Auditor' : 'Audit Export Package'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {isThai
+                    ? 'สร้าง Google Sheet รวมภาษีซื้อ ภาษีขาย และค่าใช้จ่าย สำหรับส่งผู้สอบบัญชี'
+                    : 'Creates a Google Sheet with input VAT, output VAT, and expenses for the auditor'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {auditUrl && (
+                <a
+                  href={auditUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:underline"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  {isThai ? 'เปิด Google Sheet' : 'Open Google Sheet'}
+                </a>
+              )}
+              <button
+                onClick={handleAuditExport}
+                disabled={auditExporting}
+                className="btn-secondary text-sm flex items-center gap-2"
+              >
+                {auditExporting
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <FolderOpen className="w-4 h-4" />}
+                {isThai ? (auditExporting ? 'กำลังสร้าง...' : `สร้าง Audit ${periodLabel}`) : (auditExporting ? 'Creating...' : `Export ${periodLabel}`)}
+              </button>
             </div>
           </div>
 

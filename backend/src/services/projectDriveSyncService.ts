@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
-import { downloadFromStorage } from './storageService';
+import { downloadFromStorage, isStorageConfigured } from './storageService';
 import {
   DriveDocumentFolder,
   ensureProjectDriveFolder,
@@ -277,4 +277,97 @@ export async function ensureProjectDriveFolderForUser(input: {
     data: { driveFolderId: folder.folderId, driveFolderUrl: folder.folderUrl },
   }));
   return folder;
+}
+
+/**
+ * Upload an invoice PDF and XML to the company's Google Drive (02_Tax_Invoices folder).
+ * Uses dedup policy "skip" — won't overwrite if the file already exists.
+ * Updates Invoice.driveFileId / driveUrl / driveXmlFileId / driveXmlUrl on success.
+ */
+export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
+  if (!isDriveConfigured()) return;
+  if (!isStorageConfigured()) return;
+
+  const invoice = await withSystemRlsContext(prisma, (tx) => tx.invoice.findFirst({
+    where: { id: invoiceId },
+    select: {
+      id: true,
+      companyId: true,
+      invoiceNumber: true,
+      driveFileId: true,
+      company: {
+        select: {
+          nameTh: true,
+          nameEn: true,
+          googleDriveOwnerUserId: true,
+          googleDriveOwnerLinkedAt: true,
+        },
+      },
+    },
+  }));
+
+  if (!invoice) return;
+  if (invoice.driveFileId) return; // Already synced — skip
+
+  const companyName = invoice.company.nameTh || invoice.company.nameEn || 'Company';
+  const storageKeyPdf = `invoices/${invoice.companyId}/${invoice.invoiceNumber}.pdf`;
+  const storageKeyXml = `invoices/${invoice.companyId}/${invoice.invoiceNumber}.xml`;
+
+  // Get Drive refresh token from the company's designated Drive owner
+  let userRefreshToken: string | null = null;
+  if (invoice.company.googleDriveOwnerUserId) {
+    const owner = await withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+      where: { id: invoice.company.googleDriveOwnerUserId! },
+      select: { googleRefreshToken: true },
+    }));
+    userRefreshToken = owner?.googleRefreshToken ?? null;
+  }
+
+  const updates: Record<string, string> = {};
+
+  // Upload PDF
+  try {
+    const pdfBuffer = await downloadFromStorage(storageKeyPdf);
+    const pdfResult = await uploadToDrive(
+      pdfBuffer,
+      `${invoice.invoiceNumber}.pdf`,
+      'application/pdf',
+      companyName,
+      userRefreshToken,
+      { documentFolder: '02_Tax_Invoices', duplicatePolicy: 'skip' },
+    );
+    if (pdfResult.fileId) {
+      updates.driveFileId = pdfResult.fileId;
+      updates.driveUrl = pdfResult.url;
+    }
+  } catch (err) {
+    logger.warn('[syncInvoiceToDrive] PDF not ready or upload failed', { error: err, invoiceId, storageKeyPdf });
+  }
+
+  // Upload XML
+  try {
+    const xmlBuffer = await downloadFromStorage(storageKeyXml);
+    const xmlResult = await uploadToDrive(
+      xmlBuffer,
+      `${invoice.invoiceNumber}.xml`,
+      'application/xml',
+      companyName,
+      userRefreshToken,
+      { documentFolder: '02_Tax_Invoices', duplicatePolicy: 'skip' },
+    );
+    if (xmlResult.fileId) {
+      updates.driveXmlFileId = xmlResult.fileId;
+      updates.driveXmlUrl = xmlResult.url;
+    }
+  } catch (err) {
+    logger.warn('[syncInvoiceToDrive] XML not ready or upload failed', { error: err, invoiceId, storageKeyXml });
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await withSystemRlsContext(prisma, (tx) => tx.invoice.update({
+      where: { id: invoiceId },
+      data: updates,
+    }));
+    logger.info('[syncInvoiceToDrive] Invoice synced to Drive', { invoiceId, ...updates });
+  }
 }

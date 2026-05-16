@@ -38,6 +38,7 @@ import { setupRichMenu } from '../services/richMenuService';
 import { calculateInvoicePaymentSummary } from '../services/paymentService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
+import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
 
 export const lineRouter = Router();
@@ -2734,6 +2735,13 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
           purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
         });
         await sendLineText(lineUserId, match.message);
+        if (match.ok) {
+          void syncDocumentIntakeToProjectDrive(intake.id, {
+            companyId: intake.companyId,
+            preferredUserId: intake.userId,
+            duplicatePolicy: 'skip',
+          });
+        }
         return;
       }
 
@@ -2769,6 +2777,12 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         purchaseInvoiceId: saved.id,
       });
       await replySavedPurchase(lineUserId, result, saved.id);
+      void syncDocumentIntakeToProjectDrive(intake.id, {
+        companyId: intake.companyId,
+        preferredUserId: intake.userId,
+        duplicatePolicy: 'skip',
+      });
+      void enqueueMasterSheetSync(intake.companyId);
     } catch (err) {
       logger.error('[Line] confirm_intake failed', { err, data });
       await sendLineText(lineUserId, 'ขอโทษ บันทึกเอกสารไม่สำเร็จ กรุณาตรวจในหน้า Input VAT');

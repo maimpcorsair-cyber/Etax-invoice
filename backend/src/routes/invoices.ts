@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
-import { invoiceQueue, rdSubmissionQueue } from '../queues';
+import { invoiceQueue, rdSubmissionQueue, enqueueMasterSheetSync } from '../queues';
 import { auditLog } from '../services/auditService';
 import { requireRole } from '../middleware/auth';
 import { generateInvoiceNumber } from '../services/invoiceService';
@@ -521,6 +521,8 @@ invoicesRouter.post('/', async (req, res) => {
       userAgent: req.get('user-agent') ?? '',
       language: body.language === 'both' ? 'th' : body.language,
     });
+
+    void enqueueMasterSheetSync(req.user!.companyId);
 
     res.status(201).json({
       data: {

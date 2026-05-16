@@ -5,6 +5,7 @@ import { withSystemRlsContext } from '../../config/rls';
 import { buildHtmlForCompany, generatePdfFromHtml } from '../../services/pdfService';
 import { generateRDXml } from '../../services/xmlService';
 import { uploadToStorage } from '../../services/storageService';
+import { syncInvoiceToDrive } from '../../services/projectDriveSyncService';
 import { logger } from '../../config/logger';
 
 interface PdfJobData {
@@ -166,6 +167,9 @@ export const pdfWorker = new Worker<PdfJobData>(
 
     await job.updateProgress(100);
     logger.info(`PDF/XML generated for invoice ${invoiceId}`);
+
+    // Fire-and-forget: sync to Google Drive (skip if Drive not configured)
+    void syncInvoiceToDrive(invoiceId);
 
     return { pdfUrl, xmlUrl };
   },

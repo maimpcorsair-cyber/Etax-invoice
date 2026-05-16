@@ -214,7 +214,13 @@ export interface CompanyWorkspaceSheetData {
   companyName: string;
   sharedWithEmails?: Array<string | null | undefined>;
   userRefreshToken?: string | null;
+  existingSheetId?: string | null;
   tabs: Record<string, Array<Record<string, unknown>>>;
+}
+
+export interface CompanyWorkspaceSheetResult {
+  url: string;
+  sheetId: string;
 }
 
 function sheetCell(value: unknown): string | number {
@@ -231,7 +237,7 @@ function rowsFromObjects(rows: Array<Record<string, unknown>>, columns: Array<{ 
   ];
 }
 
-export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheetData): Promise<string> {
+export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheetData): Promise<CompanyWorkspaceSheetResult> {
   const auth = getAuthWithDrive(data.userRefreshToken);
   const sheets = google.sheets({ version: 'v4', auth });
   const drive = google.drive({ version: 'v3', auth });
@@ -341,72 +347,127 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
     },
   ];
 
-  const spreadsheet = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: { title },
-      sheets: sheetDefs.map((sheet, index) => ({ properties: { title: sheet.title, sheetId: index } })),
-    },
-  });
-  const spreadsheetId = spreadsheet.data.spreadsheetId!;
+  let spreadsheetId: string;
+  let isNew = false;
 
-  await Promise.all(sheetDefs.map((sheet) => sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `'${sheet.title}'!A1`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: sheet.rows },
-  })));
+  if (data.existingSheetId) {
+    spreadsheetId = data.existingSheetId;
+    // Verify the sheet still exists; fall through to create if not
+    try {
+      const existing = await sheets.spreadsheets.get({ spreadsheetId, fields: 'spreadsheetId,sheets.properties' });
+      const existingTitles = new Set((existing.data.sheets ?? []).map((s) => s.properties?.title));
+
+      // Add any missing tabs
+      const missingTabs = sheetDefs.filter((def) => !existingTitles.has(def.title));
+      if (missingTabs.length > 0) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: missingTabs.map((tab) => ({
+              addSheet: { properties: { title: tab.title } },
+            })),
+          },
+        });
+      }
+
+      // Clear and rewrite each tab
+      await Promise.all(sheetDefs.map((sheet) => sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: `'${sheet.title}'`,
+      })));
+      await Promise.all(sheetDefs.map((sheet) => sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${sheet.title}'!A1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: sheet.rows },
+      })));
+    } catch (err) {
+      logger.warn('Existing workspace sheet not accessible, creating new one', { error: err, existingSheetId: data.existingSheetId });
+      data.existingSheetId = null;
+    }
+  }
+
+  if (!data.existingSheetId) {
+    const spreadsheet = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: { title },
+        sheets: sheetDefs.map((sheet, index) => ({ properties: { title: sheet.title, sheetId: index } })),
+      },
+    });
+    spreadsheetId = spreadsheet.data.spreadsheetId!;
+    isNew = true;
+
+    await Promise.all(sheetDefs.map((sheet) => sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${sheet.title}'!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: sheet.rows },
+    })));
+  }
+
+  // Refresh sheet metadata to get actual numeric sheetIds for formatting
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId!, fields: 'sheets.properties' });
+  const sheetIdMap = new Map(
+    (meta.data.sheets ?? []).map((s) => [s.properties?.title ?? '', s.properties?.sheetId ?? 0]),
+  );
 
   await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
+    spreadsheetId: spreadsheetId!,
     requestBody: {
-      requests: sheetDefs.flatMap((_, sheetId) => [
-        {
-          repeatCell: {
-            range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
-            cell: {
-              userEnteredFormat: {
-                backgroundColor: { red: 0.059, green: 0.463, blue: 0.369 },
-                textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+      requests: sheetDefs.flatMap((def) => {
+        const numericId = sheetIdMap.get(def.title) ?? 0;
+        return [
+          {
+            repeatCell: {
+              range: { sheetId: numericId, startRowIndex: 0, endRowIndex: 1 },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.059, green: 0.463, blue: 0.369 },
+                  textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                },
               },
+              fields: 'userEnteredFormat(backgroundColor,textFormat)',
             },
-            fields: 'userEnteredFormat(backgroundColor,textFormat)',
           },
-        },
-        {
-          updateSheetProperties: {
-            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
-            fields: 'gridProperties.frozenRowCount',
+          {
+            updateSheetProperties: {
+              properties: { sheetId: numericId, gridProperties: { frozenRowCount: 1 } },
+              fields: 'gridProperties.frozenRowCount',
+            },
           },
-        },
-        {
-          autoResizeDimensions: {
-            dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 14 },
+          {
+            autoResizeDimensions: {
+              dimensions: { sheetId: numericId, dimension: 'COLUMNS', startIndex: 0, endIndex: 14 },
+            },
           },
-        },
-      ]),
+        ];
+      }),
     },
   });
 
-  const shareTargets = Array.from(new Set(
-    (data.sharedWithEmails ?? [])
-      .map((email) => email?.trim().toLowerCase())
-      .filter((email): email is string => !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
-  ));
-  await Promise.all(shareTargets.map(async (email) => {
-    try {
-      await drive.permissions.create({
-        fileId: spreadsheetId,
-        requestBody: { role: 'writer', type: 'user', emailAddress: email },
-        sendNotificationEmail: false,
-      });
-    } catch (err) {
-      logger.warn('Could not share company workspace sheet with user', { error: err, email });
-    }
-  }));
+  // Only share on first creation to avoid repeated permission calls
+  if (isNew) {
+    const shareTargets = Array.from(new Set(
+      (data.sharedWithEmails ?? [])
+        .map((email) => email?.trim().toLowerCase())
+        .filter((email): email is string => !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+    ));
+    await Promise.all(shareTargets.map(async (email) => {
+      try {
+        await drive.permissions.create({
+          fileId: spreadsheetId!,
+          requestBody: { role: 'writer', type: 'user', emailAddress: email },
+          sendNotificationEmail: false,
+        });
+      } catch (err) {
+        logger.warn('Could not share company workspace sheet with user', { error: err, email });
+      }
+    }));
+  }
 
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
-  logger.info(`Company workspace sheet created: ${url} (${data.period})`);
-  return url;
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId!}`;
+  logger.info(`Company workspace sheet ${isNew ? 'created' : 'updated'}: ${url} (${data.period})`);
+  return { url, sheetId: spreadsheetId! };
 }
 
 /**

@@ -122,7 +122,10 @@ productsRouter.post('/export/sheets', async (req, res) => {
     }
 
     const [company, currentUser, products] = await Promise.all([
-      prisma.company.findUnique({ where: { id: req.user!.companyId }, select: { nameTh: true, nameEn: true } }),
+      prisma.company.findUnique({
+        where: { id: req.user!.companyId },
+        select: { nameTh: true, nameEn: true, googleWorkspaceSheetId: true },
+      }),
       prisma.user.findUnique({ where: { id: req.user!.userId }, select: { email: true, googleRefreshToken: true } }),
       withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => tx.product.findMany({
         where: { companyId: req.user!.companyId },
@@ -137,11 +140,12 @@ productsRouter.post('/export/sheets', async (req, res) => {
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const url = await exportCompanyWorkspaceToSheets({
+    const result = await exportCompanyWorkspaceToSheets({
       period: today,
       companyName: company.nameTh || company.nameEn || 'Billboy',
       sharedWithEmails: [currentUser?.email],
       userRefreshToken: currentUser?.googleRefreshToken ?? null,
+      existingSheetId: company.googleWorkspaceSheetId,
       tabs: {
         products: productSheetRows(products),
         inputVat: [],
@@ -153,7 +157,16 @@ productsRouter.post('/export/sheets', async (req, res) => {
       },
     });
 
-    res.json({ data: { url } });
+    await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data: {
+        googleWorkspaceSheetId: result.sheetId,
+        googleWorkspaceSheetUrl: result.url,
+        googleWorkspaceSheetSyncedAt: new Date(),
+      },
+    });
+
+    res.json({ data: { url: result.url } });
   } catch (err) {
     res.status(500).json({ error: 'Google Sheets product export failed', detail: err instanceof Error ? err.message : String(err) });
   }
