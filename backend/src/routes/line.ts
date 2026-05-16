@@ -745,7 +745,7 @@ function closeAmount(left: number, right: number) {
   return Math.abs(left - right) <= 1;
 }
 
-async function handleBankTransferDocument(lineUserId: string, result: OcrResult, companyId: string, userId: string): Promise<PaymentMatchResult> {
+async function handleBankTransferDocument(lineUserId: string, result: OcrResult, companyId: string, userId: string, intakeId?: string): Promise<PaymentMatchResult> {
   const amount = paymentAmount(result);
   if (!amount || amount <= 0) {
     return {
@@ -792,6 +792,9 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
             paidAt,
             note: `นำเข้าจากสลิปโอนเงิน LINE OCR${result.payment?.bankName ? ` (${result.payment.bankName})` : ''}`,
             createdBy: userId,
+            evidenceIntakeId: intakeId,
+            matchScore: 100,
+            matchedBy: 'auto',
           },
         });
         const summary = await calculateInvoicePaymentSummary(tx, exact.id);
@@ -2724,7 +2727,7 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         return;
       }
       if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
-        const match = await handleBankTransferDocument(lineUserId, result, intake.companyId, intake.userId);
+        const match = await handleBankTransferDocument(lineUserId, result, intake.companyId, intake.userId, intake.id);
         await updateDocumentIntake(intake.id, {
           status: match.status,
           ocrResult: result,

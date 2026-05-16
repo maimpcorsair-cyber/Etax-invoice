@@ -1,6 +1,36 @@
 import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { analyzeAccountingDocumentWithAzure, isAzureDocumentIntelligenceConfigured } from './azureDocumentService';
+import { callTyphoonVision, estimateTyphoonCostUsd, isTyphoonConfigured } from './typhoonOcrService';
+import { callOpenAIVision, estimateOpenAICostUsd, isOpenAIVisionConfigured } from './openaiVisionService';
+import { recordOcrBenchmark } from './ocrBenchmarkService';
+
+const engineRouting = (process.env.OCR_ENGINE_ROUTING ?? 'auto') as 'legacy' | 'auto' | 'premium';
+const THAI_HEAVY_TYPES = new Set<OcrResult['documentType']>([
+  'receipt',
+  'expense_receipt',
+  'bank_transfer',
+  'bank_statement',
+  'payment_advice',
+  'withholding_tax',
+]);
+
+function ocrResultFieldScore(result: OcrResult): number {
+  let score = 0;
+  if (result.supplierName) score += 2;
+  if (result.supplierTaxId) score += 1;
+  if (result.invoiceNumber) score += 2;
+  if (result.invoiceDate) score += 1;
+  if (result.total > 0) score += 2;
+  if (result.subtotal > 0) score += 1;
+  if (result.vatAmount > 0) score += 1;
+  if ((result.validationWarnings?.length ?? 0) === 0) score += 1;
+  return score;
+}
+
+function pickBestResult(a: OcrResult, b: OcrResult): OcrResult {
+  return ocrResultFieldScore(b) > ocrResultFieldScore(a) ? b : a;
+}
 
 const apiKey = process.env.OPENROUTER_API_KEY ?? '';
 const baseUrl = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
@@ -1055,6 +1085,59 @@ Rules:
       result.rawText = azureResult.content;
     }
 
+    void recordOcrBenchmark({
+      companyId: options.companyId,
+      documentType: result.documentType,
+      provider: azureResult?.ok ? 'azure+gemini-flash' : 'gemini-flash',
+      model: mimeType === 'text/plain' ? geminiFastModel : geminiScanModel,
+      latencyMs: 0,
+      confidence: result.confidence,
+      stage: 'primary',
+    });
+
+    // Engine routing: re-OCR Thai-heavy doc types with Typhoon when initial confidence is not high
+    if (
+      engineRouting !== 'legacy'
+      && mimeType !== 'text/plain'
+      && isTyphoonConfigured()
+      && THAI_HEAVY_TYPES.has(result.documentType)
+      && result.confidence !== 'high'
+    ) {
+      try {
+        logger.info('[OCR] Routing to Typhoon for Thai-heavy doc', {
+          documentType: result.documentType,
+          confidence: result.confidence,
+        });
+        const typhoonCall = await callTyphoonVision(
+          mimeType,
+          imageBase64,
+          buildVerifyPrompt(`${ocrPrompt}${vendorMemoryContext}`, result, false),
+        );
+        void recordOcrBenchmark({
+          companyId: options.companyId,
+          documentType: result.documentType,
+          provider: 'typhoon',
+          model: typhoonCall.model,
+          costUsd: estimateTyphoonCostUsd(typhoonCall),
+          latencyMs: typhoonCall.latencyMs,
+          confidence: result.confidence,
+          stage: 'verify',
+          inputTokens: typhoonCall.promptTokens,
+          outputTokens: typhoonCall.completionTokens,
+        });
+        if (typhoonCall.ok) {
+          const typhoonResult = parseOcrJson(typhoonCall.text, result, azureResult?.content);
+          if (typhoonResult && hasUsefulOcrData(typhoonResult)) {
+            typhoonResult.extractionProvider = `typhoon+${result.extractionProvider}`;
+            typhoonResult.verificationStage = 'fast';
+            result = pickBestResult(result, typhoonResult);
+          }
+        }
+      } catch (typhoonErr) {
+        logger.warn('[OCR] Typhoon routing failed', { error: String(typhoonErr) });
+      }
+    }
+
     if (mimeType !== 'text/plain' && (looksLikeUnclassifiedSlip(result) || looksLikeBankSlipCandidate(result))) {
       const slipResult = await ocrBankTransferSlip(imageBase64, mimeType, options.qrText);
       if (paymentAmountFromOcr(slipResult) > 0 || slipResult.invoiceNumber || slipResult.payment?.reference) {
@@ -1067,31 +1150,80 @@ Rules:
       }
     }
 
-    if (googleAiKey && proVerifyEnabled && shouldEscalateOcr(result, options)) {
-      try {
-        logger.info('[OCR] Escalating to Gemini Pro verify', {
-          model: geminiProVerifyModel,
-          confidence: result.confidence,
-          warnings: result.validationWarnings?.length ?? 0,
-          pageCount: options.pageCount,
-        });
-        const proRaw = await callGemini(
-          mimeType,
-          imageBase64,
-          buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, result, true),
-          ocrTimeoutMs,
-          geminiProVerifyModel,
-        );
-        const proResult = parseOcrJson(proRaw, result, azureResult?.content);
-        if (proResult && hasUsefulOcrData(proResult)) {
-          result = {
-            ...proResult,
-            extractionProvider: azureResult?.ok ? 'azure+gemini-pro-verify' : 'gemini-pro-verify',
-            verificationStage: 'pro',
-          };
+    if (shouldEscalateOcr(result, options)) {
+      const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured();
+      if (preferOpenAI) {
+        try {
+          logger.info('[OCR] Escalating to GPT-4o vision', {
+            confidence: result.confidence,
+            warnings: result.validationWarnings?.length ?? 0,
+            documentType: result.documentType,
+          });
+          const openaiCall = await callOpenAIVision(
+            mimeType,
+            imageBase64,
+            buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, result, true),
+          );
+          void recordOcrBenchmark({
+            companyId: options.companyId,
+            documentType: result.documentType,
+            provider: 'gpt4o',
+            model: openaiCall.model,
+            costUsd: estimateOpenAICostUsd(openaiCall),
+            latencyMs: openaiCall.latencyMs,
+            confidence: result.confidence,
+            stage: 'escalation',
+            inputTokens: openaiCall.promptTokens,
+            outputTokens: openaiCall.completionTokens,
+          });
+          if (openaiCall.ok) {
+            const openaiResult = parseOcrJson(openaiCall.text, result, azureResult?.content);
+            if (openaiResult && hasUsefulOcrData(openaiResult)) {
+              result = {
+                ...openaiResult,
+                extractionProvider: `gpt4o-verify+${result.extractionProvider ?? ''}`,
+                verificationStage: 'pro',
+              };
+            }
+          }
+        } catch (openaiErr) {
+          logger.warn('[OCR] GPT-4o escalation failed; keeping prior result', { error: String(openaiErr) });
         }
-      } catch (proErr) {
-        logger.warn('[OCR] Gemini Pro verify failed; keeping fast result', { error: String(proErr) });
+      } else if (googleAiKey && proVerifyEnabled) {
+        try {
+          logger.info('[OCR] Escalating to Gemini Pro verify', {
+            model: geminiProVerifyModel,
+            confidence: result.confidence,
+            warnings: result.validationWarnings?.length ?? 0,
+            pageCount: options.pageCount,
+          });
+          const proRaw = await callGemini(
+            mimeType,
+            imageBase64,
+            buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, result, true),
+            ocrTimeoutMs,
+            geminiProVerifyModel,
+          );
+          const proResult = parseOcrJson(proRaw, result, azureResult?.content);
+          void recordOcrBenchmark({
+            companyId: options.companyId,
+            documentType: result.documentType,
+            provider: 'gemini-pro',
+            model: geminiProVerifyModel,
+            latencyMs: 0,
+            confidence: proResult?.confidence ?? result.confidence,
+            stage: 'escalation',
+          });
+          if (proResult && hasUsefulOcrData(proResult)) {
+            result = {
+              ...proResult,
+              extractionProvider: azureResult?.ok ? 'azure+gemini-pro-verify' : 'gemini-pro-verify',
+              verificationStage: 'pro',
+            };
+          }
+        } catch (proErr) {
+          logger.warn('[OCR] Gemini Pro verify failed; keeping fast result', { error: String(proErr) });
+        }
       }
     }
 

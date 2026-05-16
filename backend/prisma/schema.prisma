@@ -145,6 +145,10 @@ model Company {
   googleWorkspaceSheetUrl     String?
   googleWorkspaceSheetSyncedAt DateTime?
 
+  // OCR cost controls
+  ocrMonthlyBudgetThb Decimal? @db.Decimal(10, 2)
+  ocrUsageThisMonth   Decimal  @default(0) @db.Decimal(10, 2)
+
   // Line OA settings
   lineNotifyEnabled   Boolean @default(false)
   overdueReminderDays Int     @default(3)
@@ -633,20 +637,61 @@ model AuditLog {
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  invoiceId String
-  amount    Float
-  method    String // cash, transfer, cheque, credit_card, other
-  reference String? // เลขอ้างอิงการชำระ / slip ref
-  paidAt    DateTime @default(now())
-  note      String?
-  createdBy String
-  createdAt DateTime @default(now())
+  id                String   @id @default(cuid())
+  invoiceId         String
+  amount            Float
+  method            String // cash, transfer, cheque, credit_card, other
+  reference         String? // เลขอ้างอิงการชำระ / slip ref
+  paidAt            DateTime @default(now())
+  note              String?
+  createdBy         String
+  createdAt         DateTime @default(now())
+  evidenceIntakeId  String? // DocumentIntake.id of the bank slip
+  matchScore        Int?    // 0-100 match confidence for auto-matched payments
+  matchedBy         String? // 'auto' | 'manual'
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+  @@index([evidenceIntakeId])
   @@map("payments")
+}
+
+model OcrBenchmark {
+  id           String   @id @default(cuid())
+  companyId    String
+  intakeId     String?
+  documentType String // detected type
+  provider     String // azure | typhoon | gpt4o | gemini-flash | gemini-pro | openrouter
+  model        String
+  costUsd      Float    @default(0)
+  costThb      Float    @default(0)
+  latencyMs    Int      @default(0)
+  cer          Float? // computed after user confirms ground truth
+  confidence   String // high | medium | low
+  accepted     Boolean? // user accepted output without edit?
+  stage        String // primary | verify | escalation
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, documentType, provider])
+  @@index([companyId, createdAt])
+  @@map("ocr_benchmarks")
+}
+
+model OcrCreditLedger {
+  id           String   @id @default(cuid())
+  companyId    String
+  intakeId     String?
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costUsd      Float
+  costThb      Float
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@map("ocr_credit_ledger")
 }
 
 model DocumentTemplate {
