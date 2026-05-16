@@ -104,7 +104,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
   res.status(500).json({ error: 'Internal server error', message: process.env.NODE_ENV === 'development' ? err.message : undefined });
 });
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`e-Tax Invoice API running on port ${PORT}`);
 
   const shouldLoadWorkers = process.env.ENABLE_WORKERS === 'true'

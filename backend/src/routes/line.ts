@@ -1485,7 +1485,7 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
       WHERE table_name = 'document_intakes'
         AND column_name IN ('targetType', 'targetId', 'purchaseInvoiceId')
     `,
-    prisma.documentIntake.findMany({
+    withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -1512,18 +1512,18 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
         createdAt: true,
         updatedAt: true,
       },
-    }),
-    prisma.lineUserLink.count({ where: { user: { companyId }, isActive: true } }),
-    prisma.lineGroupLink.count({ where: { companyId, isActive: true } }),
-    prisma.documentIntake.groupBy({
+    })),
+    withSystemRlsContext(prisma, (tx) => tx.lineUserLink.count({ where: { user: { companyId }, isActive: true } })),
+    withSystemRlsContext(prisma, (tx) => tx.lineGroupLink.count({ where: { companyId, isActive: true } })),
+    withSystemRlsContext(prisma, (tx) => tx.documentIntake.groupBy({
       by: ['status'],
       where: { companyId, createdAt: { gte: since } },
       _count: { _all: true },
-    }),
-    Promise.all([
-      prisma.documentIntake.count({ where: { companyId, storageKey: { not: null }, createdAt: { gte: since } } }),
-      prisma.documentIntake.count({ where: { companyId, fileBase64: { not: null }, createdAt: { gte: since } } }),
-      prisma.documentIntake.count({
+    })),
+    withSystemRlsContext(prisma, (tx) => Promise.all([
+      tx.documentIntake.count({ where: { companyId, storageKey: { not: null }, createdAt: { gte: since } } }),
+      tx.documentIntake.count({ where: { companyId, fileBase64: { not: null }, createdAt: { gte: since } } }),
+      tx.documentIntake.count({
         where: {
           companyId,
           createdAt: { gte: since },
@@ -1533,22 +1533,22 @@ lineRouter.get('/admin/live-status', authenticate, requireRole('admin', 'super_a
           ],
         },
       }),
-    ]),
-    prisma.documentIntake.groupBy({
+    ])),
+    withSystemRlsContext(prisma, (tx) => tx.documentIntake.groupBy({
       by: ['source'],
       where: { companyId, createdAt: { gte: since } },
       _count: { _all: true },
-    }),
-    prisma.documentIntake.groupBy({
+    })),
+    withSystemRlsContext(prisma, (tx) => tx.documentIntake.groupBy({
       by: ['mimeType'],
       where: { companyId, createdAt: { gte: since } },
       _count: { _all: true },
-    }),
-    Promise.all([
-      prisma.invoice.count({ where: { companyId, createdAt: { gte: since } } }),
-      prisma.purchaseInvoice.count({ where: { companyId, createdAt: { gte: since } } }),
-      prisma.documentIntake.count({ where: { companyId, createdAt: { gte: since } } }),
-    ]),
+    })),
+    withSystemRlsContext(prisma, (tx) => Promise.all([
+      tx.invoice.count({ where: { companyId, createdAt: { gte: since } } }),
+      tx.purchaseInvoice.count({ where: { companyId, createdAt: { gte: since } } }),
+      tx.documentIntake.count({ where: { companyId, createdAt: { gte: since } } }),
+    ])),
   ]);
 
   const columns = intakeColumnsResult.status === 'fulfilled'
