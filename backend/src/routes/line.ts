@@ -595,7 +595,7 @@ function buildConfirmationSummary(result: OcrResult) {
 }
 
 async function askForMissingField(lineUserId: string, intakeId: string, result: OcrResult, field: DocumentTemplateField) {
-  await prisma.documentIntake.update({
+  await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
     where: { id: intakeId },
     data: {
       status: 'awaiting_input',
@@ -603,7 +603,7 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
       warnings: [`missing:${field.key}`] as Prisma.InputJsonValue,
       error: field.key,
     },
-  });
+  }));
   await sendLineTextWithQuickReply(
     lineUserId,
     `อ่านเอกสารได้บางส่วนครับ ต้องการข้อมูลเพิ่มเฉพาะช่องนี้:\n\n📌 ${field.label}\n💡 ${field.hint}`,
@@ -612,7 +612,7 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
 }
 
 async function askForConfirmation(lineUserId: string, intakeId: string, result: OcrResult) {
-  await prisma.documentIntake.update({
+  await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
     where: { id: intakeId },
     data: {
       status: 'awaiting_confirmation',
@@ -620,7 +620,7 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
       warnings: result.validationWarnings as Prisma.InputJsonValue | undefined,
       error: null,
     },
-  });
+  }));
 
   // Gap #1: Show category picker quick reply before the confirm Flex card
   const aiCategory = result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '';
@@ -1929,10 +1929,10 @@ async function handleSessionReply(lineUserId: string, text: string): Promise<boo
 async function handleDurableIntakeReply(lineUserId: string, text: string): Promise<boolean> {
   let active;
   try {
-    active = await prisma.documentIntake.findFirst({
+    active = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
       where: { lineUserId, status: 'awaiting_input' },
       orderBy: { updatedAt: 'desc' },
-    });
+    }));
   } catch (err) {
     if (isMissingDocumentIntakeColumnError(err)) {
       logger.error('[Line] document_intakes schema is missing columns; deploy migrations before durable intake can work', { err });
@@ -1944,10 +1944,10 @@ async function handleDurableIntakeReply(lineUserId: string, text: string): Promi
 
   const trimmed = text.trim();
   if (trimmed === 'ยกเลิก') {
-    await prisma.documentIntake.update({
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
       where: { id: active.id },
       data: { status: 'needs_review', error: 'cancelled_by_user' },
-    });
+    }));
     await sendLineText(lineUserId, 'ยกเลิกการกรอกข้อมูลแล้ว เอกสารยังอยู่ในคิวรอตรวจ');
     return true;
   }
@@ -1976,14 +1976,14 @@ async function handleDurableIntakeReply(lineUserId: string, text: string): Promi
       updated[fieldKey] = trimmed;
     }
     const newResult = updated as unknown as OcrResult;
-    await prisma.documentIntake.update({
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
       where: { id: active.id },
       data: {
         ocrResult: newResult as unknown as Prisma.InputJsonValue,
         status: 'awaiting_confirmation',
         error: null,
       },
-    });
+    }));
     await sendLineFlexMessage(
       lineUserId,
       'อัพเดตแล้ว — กรุณายืนยัน',
@@ -2741,17 +2741,17 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
     const intakeId = parts[1];
     const category = parts.slice(2).join(':');
     try {
-      const intake = await prisma.documentIntake.findFirst({ where: { id: intakeId, lineUserId } });
+      const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({ where: { id: intakeId, lineUserId } }));
       const result = intake?.ocrResult as unknown as OcrResult | null;
       if (!intake || !result) {
         await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร');
         return;
       }
       const updatedResult: OcrResult = { ...result, postingSuggestion: category, expenseSubcategory: category };
-      await prisma.documentIntake.update({
+      await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
         where: { id: intakeId },
         data: { ocrResult: updatedResult as unknown as Prisma.InputJsonValue },
-      });
+      }));
       await sendLineFlexMessage(
         lineUserId,
         'สรุปเอกสาร — กรุณายืนยัน',
@@ -2767,9 +2767,9 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
   if (data.startsWith('confirm_intake:')) {
     const intakeId = data.slice('confirm_intake:'.length);
     try {
-      const intake = await prisma.documentIntake.findFirst({
+      const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
         where: { id: intakeId, lineUserId },
-      });
+      }));
       const result = intake?.ocrResult as unknown as OcrResult | null;
       if (!intake || !result) {
         await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร กรุณาส่งไฟล์ใหม่อีกครั้ง');
@@ -2880,19 +2880,19 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
 
   if (data.startsWith('cancel_intake:')) {
     const intakeId = data.slice('cancel_intake:'.length);
-    await prisma.documentIntake.updateMany({
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.updateMany({
       where: { id: intakeId, lineUserId },
       data: { status: 'needs_review', error: 'cancelled_by_user' },
-    });
+    }));
     await sendLineText(lineUserId, 'ยกเลิกแล้ว เอกสารยังอยู่ในคิวรอตรวจ');
     return;
   }
 
   if (data.startsWith('edit_intake:')) {
     const intakeId = data.slice('edit_intake:'.length);
-    const intake = await prisma.documentIntake.findFirst({
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
       where: { id: intakeId, lineUserId },
-    });
+    }));
     const result = intake?.ocrResult as unknown as OcrResult | null;
     if (!intake || !result) {
       await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร กรุณาส่งไฟล์ใหม่');
@@ -2928,10 +2928,10 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       vatAmount:     { label: 'ภาษีมูลค่าเพิ่ม', hint: 'ตัวเลขเท่านั้น เช่น 350' },
     };
     const meta = fieldMeta[fieldKey] ?? { label: fieldKey, hint: '' };
-    await prisma.documentIntake.update({
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
       where: { id: intakeId },
       data: { status: 'awaiting_input', error: `editintake:${fieldKey}` },
-    });
+    }));
     await sendLineTextWithQuickReply(
       lineUserId,
       `✏️ แก้ไข: ${meta.label}\n💡 ${meta.hint}\n\nพิมพ์ค่าใหม่ได้เลย:`,
