@@ -40,6 +40,7 @@ import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncSe
 import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
 import { attemptAutoMatchAndPay } from '../services/paymentMatchingService';
+import { createProjectDocumentFromIntake, isSupportedProjectDocumentType } from '../services/projectDocumentIntakeService';
 
 export const lineRouter = Router();
 
@@ -2739,6 +2740,42 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
             preferredUserId: intake.userId,
             duplicatePolicy: 'skip',
           });
+        }
+        return;
+      }
+
+      if (isSupportedProjectDocumentType(result.documentType)) {
+        if (!intake.projectId) {
+          await updateDocumentIntake(intake.id, {
+            status: 'needs_review',
+            ocrResult: result,
+            warnings: [...(result.validationWarnings ?? []), `project_required:${result.documentType}`],
+          });
+          await sendLineText(lineUserId, `📎 อ่านได้แล้ว แต่ต้องเลือกโปรเจคก่อน ${result.documentTypeLabel || result.documentType} จึงจะถูกบันทึก กรุณาตรวจในหน้าเอกสาร`);
+          return;
+        }
+        const projectDoc = await createProjectDocumentFromIntake({
+          intakeId: intake.id,
+          companyId: intake.companyId,
+          projectId: intake.projectId,
+          result,
+        });
+        const label = result.documentTypeLabel || result.documentType;
+        if (projectDoc.ok) {
+          await sendLineText(lineUserId, `✅ บันทึก ${label} แล้ว\n📄 เลขที่ ${projectDoc.documentNumber ?? '-'}\n🏢 ${result.supplierName || '-'}`);
+          void syncDocumentIntakeToProjectDrive(intake.id, {
+            companyId: intake.companyId,
+            preferredUserId: intake.userId,
+            duplicatePolicy: 'skip',
+          });
+          void enqueueMasterSheetSync(intake.companyId);
+        } else {
+          await updateDocumentIntake(intake.id, {
+            status: 'needs_review',
+            ocrResult: result,
+            warnings: [...(result.validationWarnings ?? []), `failed:${projectDoc.reason ?? 'unknown'}`],
+          });
+          await sendLineText(lineUserId, `⚠️ ${label} อ่านได้แต่บันทึกไม่สำเร็จ กรุณาตรวจในหน้าเอกสาร`);
         }
         return;
       }
