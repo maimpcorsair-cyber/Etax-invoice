@@ -555,7 +555,7 @@ export default function InvoiceBuilder() {
 
   /* ── Form panel (shared between desktop left pane and mobile form tab) ── */
   const formPanel = (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex h-full min-h-[580px] flex-col overflow-hidden bg-white">
       {/* Stepper strip */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5">
         <div className="flex gap-1 min-w-max overflow-x-auto pb-1 scrollbar-hide">
@@ -588,7 +588,7 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* Scrollable cards area */}
-      <div ref={formScrollRef} className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0">
+      <div ref={formScrollRef} className="flex-1 overflow-y-auto bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0">
         <div ref={settingsRef} className="xl:col-span-2">
           <DocumentSettingsCard
             docType={form.docType}
@@ -708,7 +708,7 @@ export default function InvoiceBuilder() {
 
   /* ── Preview panel (shared between desktop right pane and mobile preview tab) ── */
   const previewPanel = (
-    <div ref={previewPanelRef} className="flex flex-col h-full min-h-0 bg-gray-100">
+    <div ref={previewPanelRef} className="flex h-full min-h-[580px] flex-col overflow-hidden bg-slate-100">
       {/* Preview toolbar */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
         {/* Template selector button */}
@@ -858,14 +858,34 @@ export default function InvoiceBuilder() {
         )}
 
         {previewValidationErrors.length > 0 && !inlinePreviewHtml && !inlinePreviewLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 text-center text-slate-400 gap-3 py-16">
-            <Eye className="w-12 h-12 opacity-20" />
-            <p className="text-sm font-medium">
-              {isThai ? 'กรอกข้อมูลให้ครบก่อนดูตัวอย่าง' : 'Complete the form to see a live preview'}
-            </p>
-            <ul className="text-xs text-slate-400 space-y-1">
-              {previewValidationErrors.map((e) => <li key={e}>• {e}</li>)}
-            </ul>
+          <div className="flex w-full flex-1 items-start justify-center py-8">
+            <div className="w-full max-w-md rounded-3xl border border-amber-200 bg-white p-5 text-left shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <Eye className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    {isThai ? 'ตัวอย่างจะขึ้นเมื่อข้อมูลพร้อม' : 'Preview appears when the document is ready'}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    {isThai
+                      ? 'แก้รายการด้านซ้ายให้ครบก่อน ระบบจะสร้างตัวอย่างเอกสารให้อัตโนมัติ'
+                      : 'Finish the required fields on the left and Billboy will render the document preview automatically.'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                {previewValidationErrors.map((e, idx) => (
+                  <div key={e} className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
+                      {idx + 1}
+                    </span>
+                    <span>{e}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : inlinePreviewLoading && !inlinePreviewHtml ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16">
@@ -911,9 +931,20 @@ export default function InvoiceBuilder() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center flex-1 text-center text-slate-300 gap-3 py-16">
-            <Eye className="w-12 h-12 opacity-30" />
-            <p className="text-sm">{isThai ? 'ตัวอย่างจะแสดงที่นี่' : 'Preview will appear here'}</p>
+          <div className="flex w-full flex-1 items-start justify-center py-8">
+            <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
+                <Eye className="h-6 w-6" />
+              </div>
+              <p className="mt-3 text-sm font-bold text-slate-900">
+                {isThai ? 'พื้นที่ตัวอย่างเอกสาร' : 'Document preview'}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                {isThai
+                  ? 'เลือกผู้ซื้อและเพิ่มรายการสินค้าแล้วตัวอย่าง PDF จะอัปเดตที่นี่'
+                  : 'Choose a buyer and add line items to see the PDF-style preview here.'}
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -921,12 +952,9 @@ export default function InvoiceBuilder() {
   );
 
   return (
-    <div
-      className="flex flex-col overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8 -mt-6"
-      style={{ height: 'calc(100vh - 64px)' }}
-    >
+    <div className="-mx-4 -mt-6 min-h-[calc(100vh-64px)] bg-slate-50 sm:-mx-6 lg:-mx-8">
       {/* ── Full-width header ── */}
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 bg-gray-50 border-b border-gray-200 space-y-3">
+      <div className="space-y-3 px-4 pb-3 pt-4 sm:px-6 sm:pt-6">
         <InvoiceBuilderHeader
           isEdit={isEdit}
           isDraft={isDraft}
@@ -973,7 +1001,7 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* ── Mobile/tablet tab bar (below lg) ── */}
-      <div className="lg:hidden flex-shrink-0 flex bg-white border-b border-gray-200">
+      <div className="lg:hidden flex bg-white border-y border-gray-200">
         <button
           onClick={() => setMobileTab('form')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors border-b-2 ${
@@ -1002,24 +1030,24 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* ── Body: tab layout on mobile, split pane on desktop ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="px-4 pb-6 sm:px-6">
 
         {/* Mobile/tablet: show selected tab panel */}
-        <div className={`lg:hidden w-full min-h-0 ${mobileTab === 'form' ? 'flex flex-col' : 'hidden'}`}>
+        <div className={`lg:hidden w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${mobileTab === 'form' ? 'flex h-[calc(100vh-180px)] min-h-[560px] flex-col' : 'hidden'}`}>
           {formPanel}
         </div>
-        <div className={`lg:hidden w-full min-h-0 ${mobileTab === 'preview' ? 'flex flex-col' : 'hidden'}`}>
+        <div className={`lg:hidden w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${mobileTab === 'preview' ? 'flex h-[calc(100vh-180px)] min-h-[560px] flex-col' : 'hidden'}`}>
           {previewPanel}
         </div>
 
         {/* Desktop (lg+): split pane — form left, preview right */}
-        <div className="hidden lg:flex w-full min-h-0">
+        <div className="hidden w-full grid-cols-[minmax(620px,820px)_minmax(420px,1fr)] items-start gap-4 lg:grid">
           {/* LEFT: form panel */}
-          <div className="w-[62vw] max-w-[820px] min-w-[640px] flex-shrink-0 flex flex-col min-h-0 border-r border-gray-200">
+          <div className="flex h-[calc(100vh-238px)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             {formPanel}
           </div>
           {/* RIGHT: preview panel */}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex h-[calc(100vh-238px)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             {previewPanel}
           </div>
         </div>
