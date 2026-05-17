@@ -3618,22 +3618,19 @@ export async function processIntakeOcrPipeline(input: {
 }): Promise<void> {
   const { intakeId, lineUserId, pushTarget } = input;
 
-  // Mutex per-intake so the BullMQ worker and the recovery loop can't
-  // double-process the same upload — they were racing in production and
-  // the user got both "❌ ยังอ่านไม่ได้" AND "🤖 อ่านได้แต่ยังขาด" for the
-  // same receipt. SET NX EX 300s; lock auto-expires so a crashed dyno
-  // doesn't pin the intake forever.
+  // Short Redis lock so the BullMQ worker and the recovery loop don't
+  // race on the SAME tick. TTL is intentionally short (90s, matches the
+  // recovery loop's stale threshold) so a crashed dyno can't pin the
+  // intake — the worse failure mode is silent ghost uploads, and the
+  // user prefers duplicate messages over silence.
   const lockKey = `intake:processing:${intakeId}`;
   let acquired = false;
   try {
-    const result = await redis.set(lockKey, '1', 'EX', 300, 'NX');
+    const result = await redis.set(lockKey, '1', 'EX', 90, 'NX');
     acquired = result === 'OK';
   } catch (err) {
     logger.warn('[Line] processing-lock acquire failed', { err, intakeId });
-    // Best-effort: fall through and process anyway so a Redis blip doesn't
-    // stall every upload. Worst case is the rare double-process we're
-    // already living with.
-    acquired = true;
+    acquired = true; // Redis blip — proceed anyway
   }
   if (!acquired) {
     logger.info('[Line] skipping OCR pipeline — already in-flight', { intakeId });
@@ -4668,8 +4665,12 @@ async function scanStuckIntakes(): Promise<void> {
       });
     } catch (err) {
       logger.error('[Line] stuck-intake recovery failed', { err, intakeId: row.id });
-      // Release lock early so the next tick can retry sooner if it was a
-      // transient failure (network blip, OCR provider 5xx, etc.).
+    } finally {
+      // Always release the recovery lock — the per-intake processing lock
+      // inside processIntakeOcrPipeline is the real concurrency guard.
+      // Holding the recovery lock for 180s after a no-op (e.g. when
+      // processing lock was held) would create a long blackout window
+      // where the user sees no progress.
       try { await redis.del(lockKey); } catch { /* ignore */ }
     }
   }
