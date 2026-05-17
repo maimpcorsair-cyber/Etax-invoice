@@ -43,6 +43,7 @@ import {
 import { setupRichMenu } from '../services/richMenuService';
 import { isStorageConfigured, uploadToStorage, downloadFromStorage } from '../services/storageService';
 import { enqueueLineOcrJob } from '../queues/lineOcrQueue';
+import { getOcrPolicyForCompany } from '../services/ocrPolicyService';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
@@ -3323,6 +3324,51 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       logger.warn('[Line] no intake created; skipping queue enqueue');
       return;
     }
+
+    // ===== QUOTA ENFORCEMENT =====
+    // Hard-block OCR when the company is over its monthly document quota.
+    // We've already created the intake row + ack'd the user; bail out before
+    // spending OCR API tokens / queue capacity on a doc we can't process.
+    // Engine downgrade (Typhoon→Gemini, OpenAI→Gemini) is handled inside
+    // aiService for plan-tier mismatches that DON'T need a hard block.
+    const policy = await getOcrPolicyForCompany(companyId);
+    if (policy.overQuota) {
+      logger.info('[Line] OCR quota exceeded — blocking upload', {
+        companyId,
+        intakeId: intake.id,
+        docsUsedThisMonth: policy.docsUsedThisMonth,
+        monthlyDocLimit: policy.monthlyDocLimit,
+      });
+      await updateDocumentIntake(intake.id, {
+        status: 'needs_review',
+        error: `quota_exceeded:${policy.docsUsedThisMonth}/${policy.monthlyDocLimit}`,
+      });
+      const usedLine = policy.monthlyDocLimit
+        ? `${policy.docsUsedThisMonth}/${policy.monthlyDocLimit} เอกสาร`
+        : `${policy.docsUsedThisMonth} เอกสาร`;
+      await sendLineText(
+        lineUserId,
+        `🚫 โควต้าเดือนนี้เต็มแล้ว (${usedLine})\n\n` +
+        `ไฟล์ถูกเก็บในระบบแล้ว แต่ระบบจะยังไม่อ่านอัตโนมัติเพื่อรักษาต้นทุน\n\n` +
+        `• โควต้าจะรีเซ็ตวันที่ 1 ของเดือนถัดไป\n` +
+        `• อัปเกรดแผนได้ที่ Billboy → Admin → Subscription เพื่อเพิ่มโควต้า\n` +
+        `• ถ้าจำเป็นต้องอ่านด่วน ตรวจเองได้ที่หน้า Input VAT`,
+      );
+      return;
+    }
+
+    // Approaching-limit nudge (≥ 80%) — visible only when AT/over 80%, not at
+    // every upload. Soft warning, doesn't block the job.
+    if (policy.monthlyDocLimit && policy.docsUsedThisMonth >= Math.floor(policy.monthlyDocLimit * 0.8)) {
+      const remaining = policy.monthlyDocLimit - policy.docsUsedThisMonth;
+      if (remaining > 0 && remaining <= 10) {
+        await sendLineText(
+          lineUserId,
+          `⚠️ เหลือโควต้าเดือนนี้อีก ${remaining} ฉบับ (${policy.docsUsedThisMonth}/${policy.monthlyDocLimit}) — พิจารณาอัปเกรดแผนถ้าต้องการใช้งานต่อเนื่อง`,
+        );
+      }
+    }
+
     try {
       await enqueueLineOcrJob({
         intakeId: intake.id,
