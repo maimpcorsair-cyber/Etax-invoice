@@ -687,7 +687,7 @@ export function buildMatchOptionsBubble(intakeId: string, options: { askDirectio
   if (options.allowUpload) {
     buttons.push({
       type: 'button', style: 'secondary',
-      action: { type: 'message', label: '📤 อัพโหลดบิลเพิ่ม', text: 'อัพโหลดบิล' },
+      action: { type: 'postback', label: '📤 อัพโหลดบิลเพิ่ม', data: `upload_bill_for_slip:${intakeId}` },
     });
   }
   buttons.push({

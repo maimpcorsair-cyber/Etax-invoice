@@ -628,6 +628,76 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   );
 }
 
+async function tryAutoMatchPendingSlipWithPurchase(
+  lineUserId: string,
+  savedPurchase: { id: string; invoiceNumber: string; supplierName: string; total: number },
+  companyId: string,
+): Promise<boolean> {
+  let pendingSlipIntakeId: string | null = null;
+  try {
+    pendingSlipIntakeId = await redis.get(`line:pending_slip:${lineUserId}`);
+  } catch (err) {
+    logger.warn('[Line] redis get pending_slip failed', { err });
+  }
+  if (!pendingSlipIntakeId) return false;
+
+  const slipIntake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+    where: { id: pendingSlipIntakeId!, lineUserId, companyId },
+  }));
+  if (!slipIntake) {
+    try { await redis.del(`line:pending_slip:${lineUserId}`); } catch { /* noop */ }
+    return false;
+  }
+  const slipResult = slipIntake.ocrResult as unknown as OcrResult | null;
+  if (!slipResult) return false;
+
+  const slipAmount = Number(slipResult.payment?.amount ?? slipResult.total ?? 0);
+  if (slipAmount <= 0) return false;
+  // Accept the auto-match when amounts are within 1% (or ฿1 absolute).
+  const delta = Math.abs(slipAmount - savedPurchase.total);
+  const pct = delta / Math.max(savedPurchase.total, 1);
+  if (delta > 1 && pct > 0.01) {
+    logger.info('[Line] pending slip amount mismatch — not auto-matching', {
+      slipAmount, purchaseTotal: savedPurchase.total, delta, pct,
+    });
+    return false;
+  }
+
+  const paidAt = slipResult.payment?.paidAt ? new Date(slipResult.payment.paidAt) : new Date();
+  const refSuffix = slipResult.payment?.reference ? ` ref: ${slipResult.payment.reference}` : '';
+  const bankSuffix = slipResult.payment?.bankName ? ` (${slipResult.payment.bankName})` : '';
+
+  await prisma.purchaseInvoice.update({
+    where: { id: savedPurchase.id },
+    data: {
+      isPaid: true,
+      paidAt,
+      notes: `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}`,
+    },
+  });
+  await updateDocumentIntake(slipIntake.id, {
+    status: 'saved',
+    ocrResult: slipResult,
+    targetType: 'purchase_invoice',
+    targetId: savedPurchase.id,
+    purchaseInvoiceId: savedPurchase.id,
+  });
+  try { await redis.del(`line:pending_slip:${lineUserId}`); } catch { /* noop */ }
+
+  await sendLineFlexMessage(
+    lineUserId,
+    `✅ บันทึก ${savedPurchase.invoiceNumber} ฿${savedPurchase.total.toLocaleString('th-TH')} + จับคู่สลิปอัตโนมัติ`,
+    buildPaymentSlipFlexCard(slipResult, 'saved', {
+      matchedInvoiceNumber: savedPurchase.invoiceNumber,
+      matchedSupplierName: savedPurchase.supplierName,
+      matchScore: 100,
+      purchaseInvoiceId: savedPurchase.id,
+      intakeId: slipIntake.id,
+    }),
+  );
+  return true;
+}
+
 async function sendCandidateCarouselForSlip(lineUserId: string, intakeId: string, result: OcrResult) {
   const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
     where: { id: intakeId },
@@ -3045,7 +3115,13 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         targetId: saved.id,
         purchaseInvoiceId: saved.id,
       });
-      await replySavedPurchase(lineUserId, result, saved.id);
+
+      // Auto-match with a pending slip the user uploaded just before this bill.
+      const matched = await tryAutoMatchPendingSlipWithPurchase(lineUserId, saved, intake.companyId);
+      if (!matched) {
+        await replySavedPurchase(lineUserId, result, saved.id);
+      }
+
       void syncDocumentIntakeToProjectDrive(intake.id, {
         companyId: intake.companyId,
         preferredUserId: intake.userId,
@@ -3116,6 +3192,38 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       data: { status: 'needs_review', error: 'pending_manual_match' },
     }));
     await sendLineText(lineUserId, '⏭ ข้ามไปก่อน — สลิปนี้ยังไม่ได้จับคู่ คุณสามารถเข้าไปจับคู่ในหน้า Input VAT ภายหลังได้');
+    return;
+  }
+
+  if (data.startsWith('upload_bill_for_slip:')) {
+    const intakeId = data.slice('upload_bill_for_slip:'.length);
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    }));
+    if (!intake) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป กรุณาส่งสลิปใหม่');
+      return;
+    }
+    // Clear any stale awaiting_input intakes so the next file/text the user
+    // sends isn't intercepted by the missing-field flow.
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.updateMany({
+      where: { lineUserId, status: 'awaiting_input' },
+      data: { status: 'needs_review', error: 'replaced_by_bill_upload' },
+    }));
+    // Park the slip's intake id in Redis (30 min TTL). When the next image/PDF
+    // upload finishes OCR and is saved as an invoice/purchase, we auto-match.
+    try {
+      await redis.set(`line:pending_slip:${lineUserId}`, intakeId, 'EX', 1800);
+    } catch (err) {
+      logger.warn('[Line] redis set pending_slip failed', { err });
+    }
+    const result = intake.ocrResult as unknown as OcrResult | null;
+    const amt = Number(result?.payment?.amount ?? result?.total ?? 0);
+    const amtFmt = amt ? `฿${amt.toLocaleString('th-TH')}` : '';
+    await sendLineText(
+      lineUserId,
+      `📷 ส่งรูปหรือไฟล์ PDF ของบิลที่ยอด ${amtFmt} มาในแชทได้เลย\n\nระบบจะอ่านและคู่กับสลิปนี้ให้อัตโนมัติ (ภายใน 30 นาที)`,
+    );
     return;
   }
 
