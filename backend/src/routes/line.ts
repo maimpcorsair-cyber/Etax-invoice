@@ -635,6 +635,254 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   );
 }
 
+// ---------------------------------------------------------------------------
+// Upload batch — coalesces multiple files uploaded close together (e.g. a
+// slip + a bill) into a single combined summary card. Each file still gets
+// its own intake row, but the user-facing confirmation card waits until the
+// batch settles (no new file for BATCH_WINDOW_MS), so we can auto-pair
+// slips with bills by amount and ask 'ยืนยันบันทึกทั้งหมด' once.
+// ---------------------------------------------------------------------------
+const UPLOAD_BATCH_WINDOW_MS = 6000;
+const UPLOAD_BATCH_TTL_SECONDS = 120;
+const UPLOAD_BATCH_PENDING_TTL_SECONDS = 3600;
+
+interface UploadBatchState {
+  id: string;
+  intakeIds: string[];
+  startedAt: number;
+  lastFileAt: number;
+}
+
+function uploadBatchKey(lineUserId: string) { return `line:upload_batch:${lineUserId}`; }
+function uploadBatchPendingKey(batchId: string) { return `line:batch_pending:${batchId}`; }
+function uploadBatchCloseLockKey(batchId: string) { return `line:upload_batch_closing:${batchId}`; }
+
+async function peekUploadBatchPosition(lineUserId: string): Promise<number> {
+  try {
+    const raw = await redis.get(uploadBatchKey(lineUserId));
+    if (!raw) return 1;
+    const batch = JSON.parse(raw) as UploadBatchState;
+    const fresh = (Date.now() - batch.lastFileAt) < UPLOAD_BATCH_WINDOW_MS * 8;
+    return fresh ? batch.intakeIds.length + 1 : 1;
+  } catch {
+    return 1;
+  }
+}
+
+async function joinOrCreateUploadBatch(lineUserId: string, intakeId: string): Promise<{ batchId: string; position: number; total: number }> {
+  const key = uploadBatchKey(lineUserId);
+  const now = Date.now();
+  let batch: UploadBatchState;
+  try {
+    const raw = await redis.get(key);
+    if (raw) {
+      batch = JSON.parse(raw) as UploadBatchState;
+      if (!batch.id || (now - batch.lastFileAt) > UPLOAD_BATCH_WINDOW_MS * 8) {
+        batch = { id: crypto.randomUUID().slice(0, 16), intakeIds: [], startedAt: now, lastFileAt: now };
+      }
+    } else {
+      batch = { id: crypto.randomUUID().slice(0, 16), intakeIds: [], startedAt: now, lastFileAt: now };
+    }
+  } catch {
+    batch = { id: crypto.randomUUID().slice(0, 16), intakeIds: [], startedAt: now, lastFileAt: now };
+  }
+  if (!batch.intakeIds.includes(intakeId)) batch.intakeIds.push(intakeId);
+  batch.lastFileAt = now;
+  await redis.set(key, JSON.stringify(batch), 'EX', UPLOAD_BATCH_TTL_SECONDS);
+  return { batchId: batch.id, position: batch.intakeIds.length, total: batch.intakeIds.length };
+}
+
+function scheduleUploadBatchClose(lineUserId: string, batchId: string) {
+  setTimeout(async () => {
+    let raw: string | null = null;
+    try { raw = await redis.get(uploadBatchKey(lineUserId)); } catch { return; }
+    if (!raw) return;
+    let batch: UploadBatchState;
+    try { batch = JSON.parse(raw) as UploadBatchState; } catch { return; }
+    if (batch.id !== batchId) return;
+    const elapsed = Date.now() - batch.lastFileAt;
+    if (elapsed < UPLOAD_BATCH_WINDOW_MS - 250) return; // a newer file extended the batch
+    // Acquire close lock so concurrent timers don't both fire
+    let acquired: 'OK' | null = null;
+    try { acquired = await redis.set(uploadBatchCloseLockKey(batchId), '1', 'EX', 30, 'NX'); } catch { /* noop */ }
+    if (acquired !== 'OK') return;
+    try { await redis.del(uploadBatchKey(lineUserId)); } catch { /* noop */ }
+    try {
+      await closeUploadBatch(lineUserId, batch.intakeIds, batchId);
+    } catch (err) {
+      logger.error('[Line] close upload batch failed', { err, batchId });
+    }
+  }, UPLOAD_BATCH_WINDOW_MS + 300);
+}
+
+async function routePostOcrIntake(lineUserId: string, intake: { id: string; companyId: string; userId: string; projectId: string | null; fileUrl: string | null }, result: OcrResult): Promise<void> {
+  if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
+    const hasAmount = Number(result.payment?.amount ?? result.total ?? 0) > 0;
+    if (!hasAmount) {
+      await askForMissingField(lineUserId, intake.id, result, BANK_TRANSFER_TEMPLATE_FIELDS[0]);
+      return;
+    }
+    await askForConfirmation(lineUserId, intake.id, result);
+    return;
+  }
+  if (REVIEW_ONLY_DOCUMENT_TYPES.has(result.documentType) || !PURCHASE_RECORD_DOCUMENT_TYPES.has(result.documentType)) {
+    await sendLineText(lineUserId, buildReviewOnlySummary(result));
+    return;
+  }
+  const [missing] = missingTemplateFields(result);
+  if (missing) {
+    await askForMissingField(lineUserId, intake.id, result, missing);
+    return;
+  }
+  await askForConfirmation(lineUserId, intake.id, result);
+}
+
+async function closeUploadBatch(lineUserId: string, intakeIds: string[], batchId: string): Promise<void> {
+  if (intakeIds.length === 0) return;
+  const intakes = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+    where: { id: { in: intakeIds }, lineUserId },
+    orderBy: { createdAt: 'asc' },
+  }));
+  if (intakes.length === 0) return;
+
+  if (intakes.length === 1) {
+    const intake = intakes[0];
+    const result = intake.ocrResult as unknown as OcrResult | null;
+    if (!result) return;
+    await routePostOcrIntake(lineUserId, intake, result);
+    return;
+  }
+
+  // Multi-doc — auto-pair slips with bills by amount, then send combined card.
+  await sendUploadBatchSummary(lineUserId, intakes, batchId);
+}
+
+type BatchIntake = { id: string; ocrResult: Prisma.JsonValue; companyId: string; status: string };
+
+async function sendUploadBatchSummary(lineUserId: string, intakes: BatchIntake[], batchId: string): Promise<void> {
+  const slips: BatchIntake[] = [];
+  const bills: BatchIntake[] = [];
+  for (const i of intakes) {
+    const r = i.ocrResult as unknown as OcrResult | null;
+    if (!r) continue;
+    if (r.documentType === 'bank_transfer' || r.documentType === 'payment_advice') slips.push(i);
+    else bills.push(i);
+  }
+
+  const pairs: Array<{ slip: BatchIntake; bill: BatchIntake }> = [];
+  const remainingBills = [...bills];
+  const remainingSlips: BatchIntake[] = [];
+  for (const slip of slips) {
+    const sr = slip.ocrResult as unknown as OcrResult;
+    const slipAmount = Number(sr.payment?.amount ?? sr.total ?? 0);
+    if (!slipAmount) { remainingSlips.push(slip); continue; }
+    const matchIdx = remainingBills.findIndex((b) => {
+      const br = b.ocrResult as unknown as OcrResult;
+      const total = Number(br.total ?? 0);
+      if (total <= 0) return false;
+      const delta = Math.abs(total - slipAmount);
+      const pct = delta / Math.max(total, 1);
+      return delta <= 1 || pct <= 0.01;
+    });
+    if (matchIdx >= 0) {
+      pairs.push({ slip, bill: remainingBills[matchIdx] });
+      remainingBills.splice(matchIdx, 1);
+    } else {
+      remainingSlips.push(slip);
+    }
+  }
+
+  await redis.set(uploadBatchPendingKey(batchId), JSON.stringify({ intakeIds: intakes.map((i) => i.id) }), 'EX', UPLOAD_BATCH_PENDING_TTL_SECONDS);
+
+  // Brief text summary first
+  const linePairs = pairs.length > 0 ? `\n💞 จับคู่ในชุดได้ ${pairs.length} คู่` : '';
+  const lineUnpaired = remainingBills.length + remainingSlips.length > 0
+    ? `\n📌 ยังไม่จับคู่ ${remainingBills.length + remainingSlips.length} ใบ`
+    : '';
+  await sendLineText(
+    lineUserId,
+    `📦 อ่านเอกสารทั้งหมด ${intakes.length} ฉบับเสร็จแล้ว${linePairs}${lineUnpaired}\n\nตรวจดูสรุปด้านล่างแล้วกด "ยืนยันบันทึกทั้งหมด"`,
+  );
+
+  const bubbles: object[] = [];
+  for (const pair of pairs) {
+    bubbles.push(buildBatchPairBubble(pair.slip, pair.bill));
+  }
+  for (const slip of remainingSlips) {
+    const r = slip.ocrResult as unknown as OcrResult;
+    bubbles.push(buildPaymentSlipFlexCard(r, 'pending', { intakeId: slip.id }));
+  }
+  for (const bill of remainingBills) {
+    const r = bill.ocrResult as unknown as OcrResult;
+    bubbles.push(buildIntakeConfirmFlexCard(r, bill.id));
+  }
+  bubbles.push(buildBatchConfirmAllBubble(batchId, intakes.length));
+
+  await sendLineFlexCarousel(
+    lineUserId,
+    `📦 พบ ${intakes.length} เอกสารใน batch — เลือกยืนยันทีละใบหรือทั้งหมด`,
+    bubbles.slice(0, 12),
+  );
+}
+
+function buildBatchPairBubble(slip: BatchIntake, bill: BatchIntake): object {
+  const sr = slip.ocrResult as unknown as OcrResult;
+  const br = bill.ocrResult as unknown as OcrResult;
+  const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+  const slipAmount = Number(sr.payment?.amount ?? sr.total ?? 0);
+  const billTotal = Number(br.total ?? 0);
+  const row = (label: string, value: string, bold = false) => ({
+    type: 'box', layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'xs', color: '#888888', flex: 3 },
+      { type: 'text', text: value, size: bold ? 'md' : 'sm', color: '#111111', flex: 5, align: 'end' as const, wrap: true, weight: bold ? 'bold' as const : 'regular' as const },
+    ],
+  });
+  return {
+    type: 'bubble', size: 'kilo',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: '#16a34a',
+      contents: [{ type: 'text', text: '💞 จับคู่ในชุดอัตโนมัติ', color: '#ffffff', size: 'sm', weight: 'bold' as const }],
+    },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        row('💰 สลิป', `${sr.documentTypeLabel || 'สลิปโอนเงิน'} ${fmt(slipAmount)}`),
+        row('📄 บิล', `${br.supplierName || br.documentTypeLabel || 'บิล'} ${fmt(billTotal)}`),
+        { type: 'separator', margin: 'sm' },
+        row('🎯 ยอดตรง', '✓ จับคู่อัตโนมัติ'),
+      ],
+    },
+    footer: {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        { type: 'button', style: 'secondary', action: { type: 'postback', label: `✏️ แก้สลิป`, data: `edit_intake:${slip.id}` } },
+        { type: 'button', style: 'secondary', action: { type: 'postback', label: `✏️ แก้บิล`, data: `edit_intake:${bill.id}` } },
+      ],
+    },
+  };
+}
+
+function buildBatchConfirmAllBubble(batchId: string, count: number): object {
+  return {
+    type: 'bubble', size: 'kilo',
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'md',
+      contents: [
+        { type: 'text', text: '📦 ยืนยันบันทึกชุดนี้', weight: 'bold' as const, size: 'lg', align: 'center' as const },
+        { type: 'text', text: `${count} เอกสาร — กดยืนยันเดียวจบ`, size: 'sm', color: '#666666', align: 'center' as const, wrap: true },
+      ],
+    },
+    footer: {
+      type: 'box', layout: 'vertical', spacing: 'sm',
+      contents: [
+        { type: 'button', style: 'primary', color: '#16a34a', action: { type: 'postback', label: '✅ ยืนยันบันทึกทั้งหมด', data: `batch_confirm:${batchId}` } },
+        { type: 'button', style: 'secondary', action: { type: 'postback', label: '↩️ ยกเลิกชุดนี้', data: `batch_cancel:${batchId}` } },
+      ],
+    },
+  };
+}
+
 async function performConfirmedIntakeSave(
   lineUserId: string,
   intake: { id: string; companyId: string; userId: string; projectId: string | null; fileUrl: string | null },
@@ -660,20 +908,31 @@ async function performConfirmedIntakeSave(
     if (isAutoMatched && match.flexCard) {
       await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
     } else {
-      // Slip saved, no match yet. Use the green 'saved' Flex header so the
-      // user knows their action succeeded — the absence of a match isn't an
-      // error, just a pending state.
-      const amt = Number(result.payment?.amount ?? result.total ?? 0);
-      const amtLabel = amt ? `฿${amt.toLocaleString('th-TH')}` : '';
-      await sendLineFlexMessage(
-        lineUserId,
-        `✅ บันทึกสลิปแล้ว ${amtLabel}`.trim(),
-        buildPaymentSlipFlexCard(result, 'saved', { intakeId: intake.id }),
-      );
-      await sendLineText(
-        lineUserId,
-        `บันทึกสลิปเข้าระบบแล้ว ✅\nยังไม่ได้จับคู่กับบิล — สามารถส่งบิลที่ตรงยอดมาในแชทเพื่อจับคู่อัตโนมัติ หรือเข้าจับคู่ในเว็บภายหลังได้`,
-      );
+      // Slip saved, no in-db match yet. Before giving up, check the
+      // pending_bill Redis flag — if the user uploaded a bill earlier and
+      // chose to keep it pending until a slip arrived, this is our chance to
+      // match it now (out-of-order pairing).
+      const matchedFromPending = await tryAutoMatchPendingBillWithSlip(lineUserId, intake.id, result);
+      if (!matchedFromPending) {
+        // Park this slip in Redis so the NEXT bill uploaded by the user can
+        // auto-match against it (out-of-order pairing the other direction).
+        try {
+          await redis.set(`line:pending_slip:${lineUserId}`, intake.id, 'EX', 1800);
+        } catch (err) {
+          logger.warn('[Line] redis set pending_slip from save failed', { err });
+        }
+        const amt = Number(result.payment?.amount ?? result.total ?? 0);
+        const amtLabel = amt ? `฿${amt.toLocaleString('th-TH')}` : '';
+        await sendLineFlexMessage(
+          lineUserId,
+          `✅ บันทึกสลิปแล้ว ${amtLabel}`.trim(),
+          buildPaymentSlipFlexCard(result, 'saved', { intakeId: intake.id }),
+        );
+        await sendLineText(
+          lineUserId,
+          `บันทึกสลิปเข้าระบบแล้ว ✅\nยังไม่ได้จับคู่กับบิล — สามารถส่งบิลที่ตรงยอดมาในแชทเพื่อจับคู่อัตโนมัติ หรือเข้าจับคู่ในเว็บภายหลังได้`,
+        );
+      }
     }
     void syncDocumentIntakeToProjectDrive(intake.id, {
       companyId: intake.companyId,
@@ -753,6 +1012,10 @@ async function performConfirmedIntakeSave(
 
   const matched = await tryAutoMatchPendingSlipWithPurchase(lineUserId, saved, intake.companyId);
   if (!matched) {
+    // Park this bill in Redis so the next slip the user uploads can
+    // auto-match against it (out-of-order pairing).
+    try { await redis.set(`line:pending_bill:${lineUserId}`, intake.id, 'EX', 1800); }
+    catch (err) { logger.warn('[Line] redis set pending_bill failed', { err }); }
     await replySavedPurchase(lineUserId, result, saved.id);
   }
 
@@ -762,6 +1025,71 @@ async function performConfirmedIntakeSave(
     duplicatePolicy: 'skip',
   });
   void enqueueMasterSheetSync(intake.companyId);
+}
+
+async function tryAutoMatchPendingBillWithSlip(
+  lineUserId: string,
+  slipIntakeId: string,
+  slipResult: OcrResult,
+): Promise<boolean> {
+  let pendingBillIntakeId: string | null = null;
+  try { pendingBillIntakeId = await redis.get(`line:pending_bill:${lineUserId}`); } catch (err) {
+    logger.warn('[Line] redis get pending_bill failed', { err });
+  }
+  if (!pendingBillIntakeId) return false;
+
+  const billIntake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+    where: { id: pendingBillIntakeId!, lineUserId },
+  }));
+  if (!billIntake || !billIntake.purchaseInvoiceId) {
+    try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
+    return false;
+  }
+  const purchase = await prisma.purchaseInvoice.findFirst({
+    where: { id: billIntake.purchaseInvoiceId, companyId: billIntake.companyId },
+  });
+  if (!purchase) {
+    try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
+    return false;
+  }
+  const slipAmount = Number(slipResult.payment?.amount ?? slipResult.total ?? 0);
+  if (slipAmount <= 0) return false;
+  const delta = Math.abs(slipAmount - purchase.total);
+  const pct = delta / Math.max(purchase.total, 1);
+  if (delta > 1 && pct > 0.01) return false;
+
+  const paidAt = slipResult.payment?.paidAt ? new Date(slipResult.payment.paidAt) : new Date();
+  const refSuffix = slipResult.payment?.reference ? ` ref: ${slipResult.payment.reference}` : '';
+  const bankSuffix = slipResult.payment?.bankName ? ` (${slipResult.payment.bankName})` : '';
+  await prisma.purchaseInvoice.update({
+    where: { id: purchase.id },
+    data: {
+      isPaid: true,
+      paidAt,
+      notes: [purchase.notes, `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}`].filter(Boolean).join('\n'),
+    },
+  });
+  await updateDocumentIntake(slipIntakeId, {
+    status: 'saved',
+    ocrResult: slipResult,
+    targetType: 'purchase_invoice',
+    targetId: purchase.id,
+    purchaseInvoiceId: purchase.id,
+  });
+  try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
+  await sendLineFlexMessage(
+    lineUserId,
+    `✅ จับคู่อัตโนมัติ: สลิป ↔ ${purchase.invoiceNumber}`,
+    buildPaymentSlipFlexCard(slipResult, 'saved', {
+      matchedInvoiceNumber: purchase.invoiceNumber,
+      matchedSupplierName: purchase.supplierName,
+      matchScore: 100,
+      purchaseInvoiceId: purchase.id,
+      intakeId: slipIntakeId,
+    }),
+  );
+  await sendLineText(lineUserId, `🔗 พบบิลที่ค้างจับคู่อยู่ ระบบจับคู่ให้อัตโนมัติ (ยอดตรง ฿${purchase.total.toLocaleString('th-TH')})`);
+  return true;
 }
 
 async function tryAutoMatchPendingSlipWithPurchase(
@@ -2976,6 +3304,16 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       return;
     }
 
+    // Immediate progress ack so the user sees the bot received the file
+    // BEFORE the 10-20s OCR call runs. If another file just arrived (batch
+    // already open), say "#N" so they know we're processing them together.
+    const ackPosition = await peekUploadBatchPosition(lineUserId);
+    if (ackPosition === 1) {
+      await sendLineText(lineUserId, '📥 รับเอกสารแล้ว — กำลังอ่าน...');
+    } else {
+      await sendLineText(lineUserId, `📥 เพิ่มเอกสาร #${ackPosition} — กำลังอ่านพร้อมกัน ${ackPosition} ฉบับ...`);
+    }
+
     await updateDocumentIntake(intake?.id, { status: 'processing' });
 
     stage = 'document_ocr_pipeline';
@@ -3071,112 +3409,87 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       return;
     }
 
-    if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
-      stage = 'match_bank_transfer';
-      const enrichedResult = {
-        ...result,
-        qrText,
-      } as OcrResult;
-
-      // Duplicate slip detection — same transaction reference seen recently.
-      // Don't silently re-save; warn the user with what we found and let
-      // them decide. (Common case: user keeps re-uploading to test, or
-      // accidentally re-shares the same slip.)
-      if (intake?.id) {
-        const dup = await findDuplicateSlipIntake(enrichedResult, companyId, intake.id);
-        if (dup) {
-          const ageDays = Math.round((Date.now() - new Date(dup.createdAt).getTime()) / 86_400_000);
-          const ageLabel = ageDays === 0 ? 'วันนี้' : `${ageDays} วันก่อน`;
-          const statusLabel = dup.status === 'saved' ? 'บันทึกแล้ว' : 'รอตรวจ';
-          await updateDocumentIntake(intake.id, {
-            status: 'needs_review',
-            ocrResult: enrichedResult,
-            warnings: [...(enrichedResult.validationWarnings ?? []), `duplicate_slip:${dup.id}`],
-            error: `duplicate_slip:${dup.id}`,
-          });
-          await sendLineFlexMessage(
-            lineUserId,
-            `⚠️ สลิปซ้ำ — เลขรายการเดียวกันเคยส่งแล้ว (${ageLabel})`,
-            buildPaymentSlipFlexCard(enrichedResult, 'unmatched', { intakeId: intake.id }),
-          );
-          await sendLineText(
-            lineUserId,
-            `⚠️ สลิปนี้เคยส่งมาแล้ว (${ageLabel}, ${statusLabel})\nเลขรายการ: ${enrichedResult.payment?.reference ?? '-'}\n\nถ้าต้องการบันทึกซ้ำให้กด "บันทึก" บนการ์ดด้านบน — มิฉะนั้นไฟล์จะค้างในคิวรอตรวจ`,
-          );
-          return;
-        }
-      }
-
-      // For bank slips we ALWAYS go straight to the summary card so the user
-      // sees who paid whom and how much. If amount is missing we ask for it
-      // in a quick reply; we never ask for supplier tax-id on a slip.
-      const hasAmount = (enrichedResult.payment?.amount ?? enrichedResult.total ?? 0) > 0;
-      if (intake?.id) {
-        if (!hasAmount) {
-          const amountField = BANK_TRANSFER_TEMPLATE_FIELDS[0];
-          await askForMissingField(lineUserId, intake.id, enrichedResult, amountField);
-          return;
-        }
-        await askForConfirmation(lineUserId, intake.id, enrichedResult);
-        return;
-      }
-      const match = await handleBankTransferDocument(lineUserId, enrichedResult, companyId, resolved.userId);
-      if (match.flexCard) {
-        await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
-      } else {
-        await sendLineText(lineUserId, match.message);
-      }
-      return;
-    }
-
-    if (REVIEW_ONLY_DOCUMENT_TYPES.has(result.documentType) || !PURCHASE_RECORD_DOCUMENT_TYPES.has(result.documentType)) {
-      await updateDocumentIntake(intake?.id, {
-        status: 'needs_review',
-        ocrResult: {
-          ...result,
-          qrText,
-        } as OcrResult,
-        warnings: documentIntakeWarningsForOcr(result, analysis.stages),
-      });
-      await sendLineText(lineUserId, buildReviewOnlySummary(result));
-      return;
-    }
-
-    // Check for missing required fields based on the document template
-    const missingFields = missingTemplateFields(result);
-
-    if (missingFields.length > 0) {
-      const [firstField, ...restFields] = missingFields;
-      void restFields;
-      const enrichedResult = {
-        ...result,
-        qrText,
-      } as OcrResult;
-      if (intake?.id) {
-        await askForMissingField(lineUserId, intake.id, enrichedResult, firstField);
-      } else {
-        await sendLineText(
-          lineUserId,
-          `${buildOcrTextSummary(result, 'อ่านเอกสารได้บางส่วน แต่ยังไม่บันทึกเพราะข้อมูลสำคัญไม่ครบ')}\n\n` +
-          `ช่องแรกที่ขาด: ${firstField.label}`,
-        );
-      }
-      return;
-    }
-
-    // All required fields present — ask for confirmation before writing accounting records.
-    const tempId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    void tempId;
     const enrichedResult = {
       ...result,
       qrText,
     } as OcrResult;
-    if (intake?.id) {
-      stage = 'await_confirmation';
-      await askForConfirmation(lineUserId, intake.id, enrichedResult);
-    } else {
-      await sendLineText(lineUserId, buildConfirmationSummary(enrichedResult));
+
+    // Duplicate slip detection — same transaction reference seen recently.
+    // This bypasses batching: the duplicate warning IS the response.
+    if (intake?.id && (enrichedResult.documentType === 'bank_transfer' || enrichedResult.documentType === 'payment_advice')) {
+      const dup = await findDuplicateSlipIntake(enrichedResult, companyId, intake.id);
+      if (dup) {
+        const ageDays = Math.round((Date.now() - new Date(dup.createdAt).getTime()) / 86_400_000);
+        const ageLabel = ageDays === 0 ? 'วันนี้' : `${ageDays} วันก่อน`;
+        const statusLabel = dup.status === 'saved' ? 'บันทึกแล้ว' : 'รอตรวจ';
+        await updateDocumentIntake(intake.id, {
+          status: 'needs_review',
+          ocrResult: enrichedResult,
+          warnings: [...(enrichedResult.validationWarnings ?? []), `duplicate_slip:${dup.id}`],
+          error: `duplicate_slip:${dup.id}`,
+        });
+        await sendLineFlexMessage(
+          lineUserId,
+          `⚠️ สลิปซ้ำ — เลขรายการเดียวกันเคยส่งแล้ว (${ageLabel})`,
+          buildPaymentSlipFlexCard(enrichedResult, 'unmatched', { intakeId: intake.id }),
+        );
+        await sendLineText(
+          lineUserId,
+          `⚠️ สลิปนี้เคยส่งมาแล้ว (${ageLabel}, ${statusLabel})\nเลขรายการ: ${enrichedResult.payment?.reference ?? '-'}\n\nถ้าต้องการบันทึกซ้ำให้กด "บันทึก" บนการ์ดด้านบน — มิฉะนั้นไฟล์จะค้างในคิวรอตรวจ`,
+        );
+        return;
+      }
     }
+
+    // Review-only documents (contracts/statements/etc) bypass batching — they
+    // just need a quick text summary, not a confirmation card.
+    if (REVIEW_ONLY_DOCUMENT_TYPES.has(enrichedResult.documentType) || !PURCHASE_RECORD_DOCUMENT_TYPES.has(enrichedResult.documentType)) {
+      const isBankSlip = enrichedResult.documentType === 'bank_transfer' || enrichedResult.documentType === 'payment_advice';
+      if (!isBankSlip) {
+        await updateDocumentIntake(intake?.id, {
+          status: 'needs_review',
+          ocrResult: enrichedResult,
+          warnings: documentIntakeWarningsForOcr(result, analysis.stages),
+        });
+        await sendLineText(lineUserId, buildReviewOnlySummary(result));
+        return;
+      }
+    }
+
+    // No intake row (rare — usually private chat fallback) — fall back to
+    // immediate text summary without batching.
+    if (!intake?.id) {
+      await sendLineText(lineUserId, buildConfirmationSummary(enrichedResult));
+      return;
+    }
+
+    // Persist the OCR result on the intake so it survives across the batch
+    // window even if this process restarts.
+    await updateDocumentIntake(intake.id, {
+      status: 'awaiting_confirmation',
+      ocrResult: enrichedResult,
+      warnings: enrichedResult.validationWarnings,
+      error: undefined,
+    });
+
+    // Add to upload batch — if the user is uploading multiple files within a
+    // few seconds (e.g. a slip + a bill together), we coalesce them into a
+    // single combined summary card with auto-pairing.
+    stage = 'enqueue_batch';
+    const { batchId, position } = await joinOrCreateUploadBatch(lineUserId, intake.id);
+
+    // Brief 'OCR done' ack per file (no Flex card yet — that comes when the
+    // batch settles).
+    const amt = Number(enrichedResult.payment?.amount ?? enrichedResult.total ?? 0);
+    const amtStr = amt ? ` ฿${amt.toLocaleString('th-TH')}` : '';
+    const typeLabel = enrichedResult.documentTypeLabel || enrichedResult.documentType;
+    await sendLineText(lineUserId, `✓ #${position} อ่านเสร็จ: ${typeLabel}${amtStr}`);
+
+    // Schedule the batch close. Multiple files schedule multiple timers; only
+    // the timer that sees the most recent lastFileAt actually triggers the
+    // close (others bail out early). This gives us a debounce of ~6 seconds
+    // after the LAST file in the batch.
+    scheduleUploadBatchClose(lineUserId, batchId);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     const errCode = (err && typeof err === 'object' && 'code' in err) ? String((err as { code?: unknown }).code) : '';
@@ -3252,6 +3565,51 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
     return;
   }
 
+
+  if (data.startsWith('batch_confirm:')) {
+    const batchId = data.slice('batch_confirm:'.length);
+    let raw: string | null = null;
+    try { raw = await redis.get(uploadBatchPendingKey(batchId)); } catch { /* noop */ }
+    if (!raw) {
+      await sendLineText(lineUserId, '⚠️ Batch หมดอายุแล้ว — กดบันทึกทีละใบในการ์ดด้านบนได้เลย');
+      return;
+    }
+    let parsed: { intakeIds: string[] };
+    try { parsed = JSON.parse(raw); } catch {
+      await sendLineText(lineUserId, '⚠️ Batch state เสียหาย — กรุณาบันทึกทีละใบ');
+      return;
+    }
+    const intakes = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+      where: { id: { in: parsed.intakeIds }, lineUserId },
+      orderBy: { createdAt: 'asc' },
+    }));
+    let savedCount = 0;
+    let failedCount = 0;
+    for (const intake of intakes) {
+      const result = intake.ocrResult as unknown as OcrResult | null;
+      if (!result) { failedCount += 1; continue; }
+      try {
+        await performConfirmedIntakeSave(lineUserId, intake, result);
+        savedCount += 1;
+      } catch (err) {
+        logger.error('[Line] batch_confirm one intake failed', { err, id: intake.id });
+        failedCount += 1;
+      }
+    }
+    try { await redis.del(uploadBatchPendingKey(batchId)); } catch { /* noop */ }
+    const summary = failedCount === 0
+      ? `✅ บันทึก ${savedCount} เอกสารเรียบร้อย — ระบบสร้าง record + sync Drive/Sheet ให้แล้ว`
+      : `บันทึกสำเร็จ ${savedCount}/${savedCount + failedCount} เอกสาร (อีก ${failedCount} ใบมีปัญหา ตรวจในหน้า Input VAT)`;
+    await sendLineText(lineUserId, summary);
+    return;
+  }
+
+  if (data.startsWith('batch_cancel:')) {
+    const batchId = data.slice('batch_cancel:'.length);
+    try { await redis.del(uploadBatchPendingKey(batchId)); } catch { /* noop */ }
+    await sendLineText(lineUserId, '↩️ ยกเลิกชุดนี้แล้ว — เอกสารยังอยู่ในคิวรอตรวจ คุณกลับเข้าไปจัดการในหน้า Input VAT ได้');
+    return;
+  }
 
   if (data.startsWith('skip_field:')) {
     const [, intakeId, fieldKey] = data.split(':');
