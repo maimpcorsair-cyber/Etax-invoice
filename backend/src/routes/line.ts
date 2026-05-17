@@ -628,6 +628,118 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   );
 }
 
+async function performConfirmedIntakeSave(
+  lineUserId: string,
+  intake: { id: string; companyId: string; userId: string; projectId: string | null; fileUrl: string | null },
+  result: OcrResult,
+): Promise<void> {
+  if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
+    const match = await handleBankTransferDocument(lineUserId, result, intake.companyId, intake.userId, intake.id);
+    await updateDocumentIntake(intake.id, {
+      status: match.status,
+      ocrResult: result,
+      warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
+      error: match.ok ? undefined : match.message,
+      targetType: match.targetType,
+      targetId: match.targetId,
+      purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
+    });
+    if (match.flexCard) {
+      await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
+    } else {
+      await sendLineText(lineUserId, match.message);
+    }
+    if (match.ok) {
+      void syncDocumentIntakeToProjectDrive(intake.id, {
+        companyId: intake.companyId,
+        preferredUserId: intake.userId,
+        duplicatePolicy: 'skip',
+      });
+    }
+    return;
+  }
+
+  if (isSupportedProjectDocumentType(result.documentType)) {
+    if (!intake.projectId) {
+      await updateDocumentIntake(intake.id, {
+        status: 'needs_review',
+        ocrResult: result,
+        warnings: [...(result.validationWarnings ?? []), `project_required:${result.documentType}`],
+      });
+      await sendLineText(lineUserId, `📎 อ่านได้แล้ว แต่ต้องเลือกโปรเจคก่อน ${result.documentTypeLabel || result.documentType} จึงจะถูกบันทึก กรุณาตรวจในหน้าเอกสาร`);
+      return;
+    }
+    const projectDoc = await createProjectDocumentFromIntake({
+      intakeId: intake.id,
+      companyId: intake.companyId,
+      projectId: intake.projectId,
+      result,
+    });
+    const label = result.documentTypeLabel || result.documentType;
+    if (projectDoc.ok) {
+      await sendLineText(lineUserId, `✅ บันทึก ${label} แล้ว\n📄 เลขที่ ${projectDoc.documentNumber ?? '-'}\n🏢 ${result.supplierName || '-'}`);
+      void syncDocumentIntakeToProjectDrive(intake.id, {
+        companyId: intake.companyId,
+        preferredUserId: intake.userId,
+        duplicatePolicy: 'skip',
+      });
+      void enqueueMasterSheetSync(intake.companyId);
+    } else {
+      await updateDocumentIntake(intake.id, {
+        status: 'needs_review',
+        ocrResult: result,
+        warnings: [...(result.validationWarnings ?? []), `failed:${projectDoc.reason ?? 'unknown'}`],
+      });
+      await sendLineText(lineUserId, `⚠️ ${label} อ่านได้แต่บันทึกไม่สำเร็จ กรุณาตรวจในหน้าเอกสาร`);
+    }
+    return;
+  }
+
+  const duplicate = await findDuplicatePurchaseFromOcr(result, intake.companyId, intake.id);
+  if (duplicate) {
+    await updateDocumentIntake(intake.id, {
+      status: 'needs_review',
+      ocrResult: result,
+      warnings: [...(result.validationWarnings ?? []), 'duplicate:purchase_invoice'],
+      error: `duplicate:${duplicate.id}`,
+      targetType: 'purchase_invoice',
+      targetId: duplicate.id,
+      purchaseInvoiceId: duplicate.id,
+    });
+    await sendLineText(
+      lineUserId,
+      `⚠️ พบเอกสารนี้เคยบันทึกแล้ว จึงยังไม่บันทึกซ้ำ\n📄 ${duplicate.invoiceNumber}\n🏢 ${duplicate.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(duplicate.total)}\n\nตรวจได้ที่หน้า Input VAT`,
+    );
+    return;
+  }
+
+  const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id, intake.userId);
+  await prisma.purchaseInvoice.update({
+    where: { id: saved.id },
+    data: { pdfUrl: documentIntakeFileUrl(intake.id, intake.fileUrl) },
+  });
+  await updateDocumentIntake(intake.id, {
+    status: 'saved',
+    ocrResult: result,
+    warnings: result.validationWarnings,
+    targetType: 'purchase_invoice',
+    targetId: saved.id,
+    purchaseInvoiceId: saved.id,
+  });
+
+  const matched = await tryAutoMatchPendingSlipWithPurchase(lineUserId, saved, intake.companyId);
+  if (!matched) {
+    await replySavedPurchase(lineUserId, result, saved.id);
+  }
+
+  void syncDocumentIntakeToProjectDrive(intake.id, {
+    companyId: intake.companyId,
+    preferredUserId: intake.userId,
+    duplicatePolicy: 'skip',
+  });
+  void enqueueMasterSheetSync(intake.companyId);
+}
+
 async function tryAutoMatchPendingSlipWithPurchase(
   lineUserId: string,
   savedPurchase: { id: string; invoiceNumber: string; supplierName: string; total: number },
@@ -2999,11 +3111,10 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         where: { id: intakeId },
         data: { ocrResult: updatedResult as unknown as Prisma.InputJsonValue },
       }));
-      await sendLineFlexMessage(
-        lineUserId,
-        'สรุปเอกสาร — กรุณายืนยัน',
-        buildIntakeConfirmFlexCard(updatedResult, intakeId),
-      );
+      // Picking the category IS the user's confirmation — save directly and
+      // send the final '✅ บันทึกค่าใช้จ่ายสำเร็จ' card instead of asking
+      // for confirmation a second time.
+      await performConfirmedIntakeSave(lineUserId, intake, updatedResult);
     } catch (err) {
       logger.error('[Line] set_category failed', { err, data });
       await sendLineText(lineUserId, 'ขอโทษ เกิดข้อผิดพลาดในการบันทึกหมวด');
@@ -3022,118 +3133,14 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร กรุณาส่งไฟล์ใหม่อีกครั้ง');
         return;
       }
-      if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
-        const match = await handleBankTransferDocument(lineUserId, result, intake.companyId, intake.userId, intake.id);
-        await updateDocumentIntake(intake.id, {
-          status: match.status,
-          ocrResult: result,
-          warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
-          error: match.ok ? undefined : match.message,
-          targetType: match.targetType,
-          targetId: match.targetId,
-          purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
-        });
-        if (match.flexCard) {
-          await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
-        } else {
-          await sendLineText(lineUserId, match.message);
-        }
-        if (match.ok) {
-          void syncDocumentIntakeToProjectDrive(intake.id, {
-            companyId: intake.companyId,
-            preferredUserId: intake.userId,
-            duplicatePolicy: 'skip',
-          });
-        }
-        return;
-      }
-
-      if (isSupportedProjectDocumentType(result.documentType)) {
-        if (!intake.projectId) {
-          await updateDocumentIntake(intake.id, {
-            status: 'needs_review',
-            ocrResult: result,
-            warnings: [...(result.validationWarnings ?? []), `project_required:${result.documentType}`],
-          });
-          await sendLineText(lineUserId, `📎 อ่านได้แล้ว แต่ต้องเลือกโปรเจคก่อน ${result.documentTypeLabel || result.documentType} จึงจะถูกบันทึก กรุณาตรวจในหน้าเอกสาร`);
-          return;
-        }
-        const projectDoc = await createProjectDocumentFromIntake({
-          intakeId: intake.id,
-          companyId: intake.companyId,
-          projectId: intake.projectId,
-          result,
-        });
-        const label = result.documentTypeLabel || result.documentType;
-        if (projectDoc.ok) {
-          await sendLineText(lineUserId, `✅ บันทึก ${label} แล้ว\n📄 เลขที่ ${projectDoc.documentNumber ?? '-'}\n🏢 ${result.supplierName || '-'}`);
-          void syncDocumentIntakeToProjectDrive(intake.id, {
-            companyId: intake.companyId,
-            preferredUserId: intake.userId,
-            duplicatePolicy: 'skip',
-          });
-          void enqueueMasterSheetSync(intake.companyId);
-        } else {
-          await updateDocumentIntake(intake.id, {
-            status: 'needs_review',
-            ocrResult: result,
-            warnings: [...(result.validationWarnings ?? []), `failed:${projectDoc.reason ?? 'unknown'}`],
-          });
-          await sendLineText(lineUserId, `⚠️ ${label} อ่านได้แต่บันทึกไม่สำเร็จ กรุณาตรวจในหน้าเอกสาร`);
-        }
-        return;
-      }
-
-      const duplicate = await findDuplicatePurchaseFromOcr(result, intake.companyId, intake.id);
-      if (duplicate) {
-        await updateDocumentIntake(intake.id, {
-          status: 'needs_review',
-          ocrResult: result,
-          warnings: [...(result.validationWarnings ?? []), 'duplicate:purchase_invoice'],
-          error: `duplicate:${duplicate.id}`,
-          targetType: 'purchase_invoice',
-          targetId: duplicate.id,
-          purchaseInvoiceId: duplicate.id,
-        });
-        await sendLineText(
-          lineUserId,
-          `⚠️ พบเอกสารนี้เคยบันทึกแล้ว จึงยังไม่บันทึกซ้ำ\n📄 ${duplicate.invoiceNumber}\n🏢 ${duplicate.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(duplicate.total)}\n\nตรวจได้ที่หน้า Input VAT`,
-        );
-        return;
-      }
-
-      const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id, intake.userId);
-      await prisma.purchaseInvoice.update({
-        where: { id: saved.id },
-        data: { pdfUrl: documentIntakeFileUrl(intake.id, intake.fileUrl) },
-      });
-      await updateDocumentIntake(intake.id, {
-        status: 'saved',
-        ocrResult: result,
-        warnings: result.validationWarnings,
-        targetType: 'purchase_invoice',
-        targetId: saved.id,
-        purchaseInvoiceId: saved.id,
-      });
-
-      // Auto-match with a pending slip the user uploaded just before this bill.
-      const matched = await tryAutoMatchPendingSlipWithPurchase(lineUserId, saved, intake.companyId);
-      if (!matched) {
-        await replySavedPurchase(lineUserId, result, saved.id);
-      }
-
-      void syncDocumentIntakeToProjectDrive(intake.id, {
-        companyId: intake.companyId,
-        preferredUserId: intake.userId,
-        duplicatePolicy: 'skip',
-      });
-      void enqueueMasterSheetSync(intake.companyId);
+      await performConfirmedIntakeSave(lineUserId, intake, result);
     } catch (err) {
       logger.error('[Line] confirm_intake failed', { err, data });
       await sendLineText(lineUserId, 'ขอโทษ บันทึกเอกสารไม่สำเร็จ กรุณาตรวจในหน้า Input VAT');
     }
     return;
   }
+
 
   if (data.startsWith('cancel_intake:')) {
     const intakeId = data.slice('cancel_intake:'.length);
