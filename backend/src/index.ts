@@ -124,6 +124,7 @@ app.listen(Number(PORT), '0.0.0.0', () => {
     import('./queues/workers/dbdOpenDataSyncWorker'), // cron: syncs free DBD/RD open data weekly
     import('./queues/workers/masterSheetWorker'), // debounced: syncs company workspace Google Sheet
     import('./queues/workers/ocrUsageResetWorker'), // cron: resets ocrUsageThisMonth on 1st of month
+    import('./queues/workers/lineOcrWorker'), // concurrent: processes LINE OCR jobs off the webhook
   ]).then((results) => {
     const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     if (rejected.length === 0) {

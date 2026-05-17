@@ -41,7 +41,8 @@ import {
   supportedDocumentMimeType,
 } from '../services/documentOcrService';
 import { setupRichMenu } from '../services/richMenuService';
-import { isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { isStorageConfigured, uploadToStorage, downloadFromStorage } from '../services/storageService';
+import { enqueueLineOcrJob } from '../queues/lineOcrQueue';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
@@ -3313,15 +3314,104 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     }
 
     // ===== ASYNC BOUNDARY =====
-    // Webhook responds 200 to LINE NOW. The heavy OCR (10-20s) + routing
-    // continues in the background. At 1k+ concurrent users this is the
-    // difference between healthy and falling over (LINE webhook timeout
-    // is ~5s; sync OCR would also block one Node event-loop slot per user).
-    // Subsequent messages use push (reply token already consumed by ack).
-    void (async () => {
-      let asyncStage = 'document_ocr_pipeline';
-      try {
-    await updateDocumentIntake(intake?.id, { status: 'processing' });
+    // Webhook returns 200 to LINE NOW. The actual OCR + routing runs on
+    // the worker dyno via BullMQ — survives Render restarts, retries on
+    // failure, and lets us scale the worker pool independently of the web
+    // dyno. The reply-token ack above is the only message this handler
+    // sends; everything after the worker picks up the job goes via push.
+    if (!intake?.id) {
+      logger.warn('[Line] no intake created; skipping queue enqueue');
+      return;
+    }
+    try {
+      await enqueueLineOcrJob({
+        intakeId: intake.id,
+        lineUserId,
+        pushTarget: messageContext.lineGroupId ?? messageContext.lineRoomId,
+      });
+    } catch (enqueueErr) {
+      // Fall back to inline processing so the user still gets a response
+      // even if Redis/BullMQ is down. This is the same path the system
+      // ran on before we added the queue.
+      logger.error('[Line] BullMQ enqueue failed, falling back to inline OCR', { enqueueErr, intakeId: intake.id });
+      void processIntakeOcrPipeline({
+        intakeId: intake.id,
+        lineUserId,
+        pushTarget: messageContext.lineGroupId ?? messageContext.lineRoomId,
+      }).catch((err) => logger.error('[Line] inline OCR fallback failed', { err }));
+    }
+    return;
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errCode = (err && typeof err === 'object' && 'code' in err) ? String((err as { code?: unknown }).code) : '';
+    const errMeta = (err && typeof err === 'object' && 'meta' in err) ? JSON.stringify((err as { meta?: unknown }).meta).slice(0, 200) : '';
+    logger.error('[Line] handleImageMessage failed', { err, stage, errMsg, errCode, errMeta });
+    let userMessage: string;
+    if (/timeout|ETIMEDOUT|aborted|ECONNRESET/i.test(errMsg)) {
+      userMessage = '⚠️ ระบบ AI ตอบช้าผิดปกติ กรุณาส่งเอกสารใหม่อีกครั้งใน 1-2 นาที';
+    } else if (/decode|invalid jpeg|jpeg|png|unsupported.*format/i.test(errMsg)) {
+      userMessage = '⚠️ ไฟล์รูปอ่านไม่ออก ลองส่งเป็น PDF หรือถ่ายใหม่ในรูปแบบ JPEG/PNG ปกติ (iPhone HEIC ยังไม่รองรับ)';
+    } else if (/api key|unauthorized|401|403|invalid_api_key/i.test(errMsg)) {
+      userMessage = '⚠️ ระบบ OCR มีปัญหา config ชั่วคราว ลองใหม่ในอีกสักครู่ หรือแจ้ง admin';
+    } else if (/quota|rate.?limit|429|insufficient_quota/i.test(errMsg)) {
+      userMessage = '⚠️ ใช้งานเยอะเกินโควต้าชั่วคราว ลองใหม่ใน 5 นาที';
+    } else if (/storage|s3|r2|upload/i.test(errMsg)) {
+      userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
+    } else if (/reply.?token|invalid_reply_token|expired/i.test(errMsg)) {
+      userMessage = '⚠️ ระบบใช้เวลาประมวลผลนานเกินจน LINE ปิด session ระบบบันทึกไฟล์แล้ว ตรวจดูใน Input VAT';
+    } else {
+      const errSnippet = errMsg.slice(0, 150).replace(/[\n\r]+/g, ' ');
+      const codeStr = errCode ? `[${errCode}] ` : '';
+      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (${stage})\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว`;
+    }
+    await sendLineText(lineUserId, userMessage);
+  }
+}
+
+/**
+ * Run the LINE OCR + routing pipeline for a previously-created
+ * DocumentIntake row. Called from the BullMQ worker (see
+ * queues/workers/lineOcrWorker.ts) and from the inline fallback when the
+ * queue is unavailable.
+ *
+ * All user-facing messages go via push (LINE reply token expired long
+ * before this point), routed to `pushTarget` (groupId/roomId) when set
+ * so group conversations get their responses in the group.
+ */
+export async function processIntakeOcrPipeline(input: {
+  intakeId: string;
+  lineUserId: string;
+  pushTarget?: string;
+}): Promise<void> {
+  const { intakeId, lineUserId, pushTarget } = input;
+  await withLineReplyToken('', () => runIntakeOcrPipelineInner({ intakeId, lineUserId }), { pushTarget });
+}
+
+async function runIntakeOcrPipelineInner(input: { intakeId: string; lineUserId: string }): Promise<void> {
+  const { intakeId, lineUserId } = input;
+  let asyncStage = 'load_intake';
+  try {
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId },
+    }));
+    if (!intake) {
+      logger.warn('[Line] processIntakeOcrPipeline: intake not found', { intakeId });
+      return;
+    }
+    const companyId = intake.companyId;
+    const contentType = intake.mimeType;
+
+    asyncStage = 'load_buffer';
+    let buffer: Buffer;
+    if (intake.storageKey) {
+      buffer = await downloadFromStorage(intake.storageKey);
+    } else if (intake.fileBase64) {
+      buffer = Buffer.from(intake.fileBase64, 'base64');
+    } else {
+      throw new Error('Intake has no file content (no storageKey or fileBase64)');
+    }
+
+    await updateDocumentIntake(intake.id, { status: 'processing' });
 
     asyncStage = 'document_ocr_pipeline';
     const analysis = await analyzeAccountingDocumentBuffer(buffer, contentType, companyId);
@@ -3482,7 +3572,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     // Add to upload batch — if the user is uploading multiple files within a
     // few seconds (e.g. a slip + a bill together), we coalesce them into a
     // single combined summary card with auto-pairing.
-    stage = 'enqueue_batch';
+    asyncStage = 'enqueue_batch';
     const { batchId } = await joinOrCreateUploadBatch(lineUserId, intake.id);
 
     // No per-file 'OCR done' push — the user already saw '📥 กำลังอ่าน...'
@@ -3494,58 +3584,33 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     // close (others bail out early). This gives us a debounce of ~6 seconds
     // after the LAST file in the batch.
     scheduleUploadBatchClose(lineUserId, batchId);
-      } catch (asyncErr) {
-        const errMsg = asyncErr instanceof Error ? asyncErr.message : String(asyncErr);
-        const errCode = (asyncErr && typeof asyncErr === 'object' && 'code' in asyncErr) ? String((asyncErr as { code?: unknown }).code) : '';
-        logger.error('[Line] async OCR pipeline failed', { err: asyncErr, asyncStage, errMsg, errCode, intakeId: intake?.id });
-        let userMessage: string;
-        if (/timeout|ETIMEDOUT|aborted|ECONNRESET/i.test(errMsg)) {
-          userMessage = '⚠️ ระบบ AI ตอบช้าผิดปกติ กรุณาส่งเอกสารใหม่อีกครั้งใน 1-2 นาที';
-        } else if (/decode|invalid jpeg|jpeg|png|unsupported.*format/i.test(errMsg)) {
-          userMessage = '⚠️ ไฟล์รูปอ่านไม่ออก ลองส่งเป็น PDF หรือถ่ายใหม่ในรูปแบบ JPEG/PNG ปกติ';
-        } else if (/api key|unauthorized|401|403|invalid_api_key/i.test(errMsg)) {
-          userMessage = '⚠️ ระบบ OCR มีปัญหา config ชั่วคราว ลองใหม่ในอีกสักครู่';
-        } else if (/quota|rate.?limit|429|insufficient_quota/i.test(errMsg)) {
-          userMessage = '⚠️ ใช้งานเยอะเกินโควต้าชั่วคราว ลองใหม่ใน 5 นาที';
-        } else if (/storage|s3|r2|upload/i.test(errMsg)) {
-          userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
-        } else {
-          const errSnippet = errMsg.slice(0, 150).replace(/[\n\r]+/g, ' ');
-          const codeStr = errCode ? `[${errCode}] ` : '';
-          userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (${asyncStage})\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว`;
-        }
-        try { await sendLineText(lineUserId, userMessage); } catch (sendErr) {
-          logger.error('[Line] async error notification failed', { sendErr });
-        }
-      }
-    })();
-    // Webhook returns now — async pipeline continues in background.
-    return;
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    const errCode = (err && typeof err === 'object' && 'code' in err) ? String((err as { code?: unknown }).code) : '';
-    const errMeta = (err && typeof err === 'object' && 'meta' in err) ? JSON.stringify((err as { meta?: unknown }).meta).slice(0, 200) : '';
-    logger.error('[Line] handleImageMessage failed', { err, stage, errMsg, errCode, errMeta });
+  } catch (asyncErr) {
+    const errMsg = asyncErr instanceof Error ? asyncErr.message : String(asyncErr);
+    const errCode = (asyncErr && typeof asyncErr === 'object' && 'code' in asyncErr) ? String((asyncErr as { code?: unknown }).code) : '';
+    logger.error('[Line] OCR pipeline failed', { err: asyncErr, asyncStage, errMsg, errCode, intakeId });
     let userMessage: string;
     if (/timeout|ETIMEDOUT|aborted|ECONNRESET/i.test(errMsg)) {
       userMessage = '⚠️ ระบบ AI ตอบช้าผิดปกติ กรุณาส่งเอกสารใหม่อีกครั้งใน 1-2 นาที';
     } else if (/decode|invalid jpeg|jpeg|png|unsupported.*format/i.test(errMsg)) {
-      userMessage = '⚠️ ไฟล์รูปอ่านไม่ออก ลองส่งเป็น PDF หรือถ่ายใหม่ในรูปแบบ JPEG/PNG ปกติ (iPhone HEIC ยังไม่รองรับ)';
+      userMessage = '⚠️ ไฟล์รูปอ่านไม่ออก ลองส่งเป็น PDF หรือถ่ายใหม่ในรูปแบบ JPEG/PNG ปกติ';
     } else if (/api key|unauthorized|401|403|invalid_api_key/i.test(errMsg)) {
-      userMessage = '⚠️ ระบบ OCR มีปัญหา config ชั่วคราว ลองใหม่ในอีกสักครู่ หรือแจ้ง admin';
+      userMessage = '⚠️ ระบบ OCR มีปัญหา config ชั่วคราว ลองใหม่ในอีกสักครู่';
     } else if (/quota|rate.?limit|429|insufficient_quota/i.test(errMsg)) {
       userMessage = '⚠️ ใช้งานเยอะเกินโควต้าชั่วคราว ลองใหม่ใน 5 นาที';
     } else if (/storage|s3|r2|upload/i.test(errMsg)) {
       userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
-    } else if (/reply.?token|invalid_reply_token|expired/i.test(errMsg)) {
-      userMessage = '⚠️ ระบบใช้เวลาประมวลผลนานเกินจน LINE ปิด session ระบบบันทึกไฟล์แล้ว ตรวจดูใน Input VAT';
     } else {
-      // Show the actual error code + first 150 chars of message so admin can identify root cause
       const errSnippet = errMsg.slice(0, 150).replace(/[\n\r]+/g, ' ');
       const codeStr = errCode ? `[${errCode}] ` : '';
-      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (${stage})\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว`;
+      userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (${asyncStage})\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว`;
     }
-    await sendLineText(lineUserId, userMessage);
+    try {
+      await sendLineText(lineUserId, userMessage);
+    } catch (sendErr) {
+      logger.error('[Line] OCR error notification failed', { sendErr });
+    }
+    // Re-throw so BullMQ records the failure and (if attempts remaining) retries.
+    throw asyncErr;
   }
 }
 
