@@ -232,6 +232,15 @@ export interface OcrResult {
     withholdingTaxRate?: number;
     description?: string;
   };
+  // Foreign currency support. When set, subtotal/vatAmount/total are the
+  // THB-equivalent values (after applying exchangeRate). The original-
+  // currency amounts are preserved here for display + audit.
+  originalCurrency?: string;     // e.g. 'USD', 'EUR', 'JPY', 'THB'
+  exchangeRate?: number;          // 1 unit of originalCurrency in THB
+  exchangeRateSource?: 'document' | 'cache' | 'fx_api' | 'fallback' | 'manual';
+  originalTotal?: number;
+  originalSubtotal?: number;
+  originalVatAmount?: number;
 }
 
 interface OcrOptions {
@@ -521,6 +530,67 @@ async function findKnownVendor(companyId: string, supplierTaxId: string, supplie
   return best?.row ?? null;
 }
 
+/**
+ * Convert a foreign-currency invoice to THB so the rest of the system
+ * (PurchaseInvoice rows, Flex cards, accounting reports) can use the
+ * THB-equivalent amounts uniformly.
+ *
+ * - If documentMetadata.currency is THB (or missing), no-op
+ * - originalTotal/originalSubtotal/originalVatAmount preserved on the
+ *   result for display + audit
+ * - exchangeRate priority: rate printed on document > FX API > fallback
+ * - subtotal/vatAmount/total are REPLACED with the THB-converted values
+ */
+async function convertForeignCurrencyToThb(result: OcrResult): Promise<OcrResult> {
+  const declared = (result.originalCurrency ?? result.documentMetadata?.currency ?? '').toUpperCase();
+  if (!declared || declared === 'THB') return result;
+
+  // Figure out which numeric field holds the foreign-currency amounts.
+  // The LLM is instructed to populate originalTotal when currency != THB,
+  // but older prompts populated 'total' with the foreign value — handle
+  // both gracefully.
+  const originalTotal = result.originalTotal ?? result.total;
+  const originalSubtotal = result.originalSubtotal ?? result.subtotal;
+  const originalVatAmount = result.originalVatAmount ?? result.vatAmount;
+
+  if (!originalTotal || originalTotal <= 0) {
+    return result; // nothing to convert
+  }
+
+  let lookup: { rate: number; source: NonNullable<OcrResult['exchangeRateSource']>; asOf: string };
+  try {
+    const { lookupFxRateToThb } = await import('./fxRateService');
+    lookup = await lookupFxRateToThb(declared, {
+      documentRate: result.exchangeRate && result.exchangeRate > 0 ? result.exchangeRate : undefined,
+      dateIso: result.invoiceDate || undefined,
+    });
+  } catch (err) {
+    logger.warn('[OCR] FX lookup failed; leaving foreign amounts unchanged', {
+      error: err instanceof Error ? err.message : String(err),
+      currency: declared,
+    });
+    return result;
+  }
+
+  const warnings = new Set(result.validationWarnings ?? []);
+  warnings.add(`สกุลเงินต่างประเทศ ${declared} แปลงเป็น THB ที่อัตรา ${lookup.rate} (${lookup.source})`);
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    ...result,
+    originalCurrency: declared,
+    exchangeRate: lookup.rate,
+    exchangeRateSource: lookup.source,
+    originalTotal,
+    originalSubtotal,
+    originalVatAmount,
+    subtotal: round2(originalSubtotal * lookup.rate),
+    vatAmount: round2(originalVatAmount * lookup.rate),
+    total: round2(originalTotal * lookup.rate),
+    validationWarnings: [...warnings],
+  };
+}
+
 async function applyBusinessValidation(result: OcrResult, companyId?: string): Promise<OcrResult> {
   const warnings = new Set(result.validationWarnings ?? validateOcrResult(result));
   if (!companyId) {
@@ -658,6 +728,11 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
     expenseSubcategory: parsed.expenseSubcategory,
     taxTreatment: parsed.taxTreatment,
     postingSuggestion: parsed.postingSuggestion,
+    originalCurrency: parsed.originalCurrency,
+    exchangeRate: parsed.exchangeRate ? Number(parsed.exchangeRate) : undefined,
+    originalTotal: parsed.originalTotal ? Number(parsed.originalTotal) : undefined,
+    originalSubtotal: parsed.originalSubtotal ? Number(parsed.originalSubtotal) : undefined,
+    originalVatAmount: parsed.originalVatAmount ? Number(parsed.originalVatAmount) : undefined,
   };
   result.validationWarnings = [
     ...validateOcrResult(result),
@@ -1128,8 +1203,18 @@ Rules:
     "withholdingTaxRate": 0,
     "description": "short extracted description"
   },
+  "originalCurrency": "ISO-4217 currency code printed on the document — e.g. 'USD', 'EUR', 'JPY', 'CNY'. Set to 'THB' (or omit) when amounts are in Thai Baht.",
+  "exchangeRate": "the FX rate printed on the document if present (e.g. invoices that say 'USD / THB @ 32.589600' → 32.589600). Number, not string. Omit or set 0 when no rate is printed.",
+  "originalTotal": "total amount in the originalCurrency (when not THB). Same arithmetic role as 'total' but kept in the foreign currency. Set ONLY when currency != THB.",
+  "originalSubtotal": "subtotal in the originalCurrency. Set ONLY when currency != THB.",
+  "originalVatAmount": "VAT amount in the originalCurrency. Set ONLY when currency != THB.",
   "rawText": "all text found in document"
-}`;
+}
+
+Currency rules:
+- Most Thai documents are THB — only set originalCurrency / originalTotal etc when the doc is clearly in a foreign currency (e.g. invoice from GAC, Lazada international, Stripe, AWS).
+- Some documents mix currencies per line item (e.g. some USD line + some THB duty). In that case use the top-level 'Total Amount' currency as originalCurrency and originalTotal. Don't try to split per-line.
+- When document prints both currencies side-by-side ('USD 100.00 / THB 3,250.00'), use the foreign as originalTotal and the THB as 'total'.`;
 
   try {
     let raw = '';
@@ -1372,6 +1457,7 @@ Rules:
 
     result.validationWarnings = result.validationWarnings?.length ? result.validationWarnings : validateOcrResult(result);
     result = await applyBusinessValidation(result, options.companyId);
+    result = await convertForeignCurrencyToThb(result);
     result.needsHumanReview = shouldHumanReviewOcr(result);
     return result;
   } catch (err) {

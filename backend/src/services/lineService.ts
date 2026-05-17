@@ -404,6 +404,15 @@ export function buildInvoiceFlexCard(inv: InvoiceSummary): object {
   };
 }
 
+function formatForeignAmount(currency: string, amount: number): string {
+  // Use Intl.NumberFormat for currencies we know LINE renders cleanly.
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), maximumFractionDigits: 2 }).format(amount);
+  } catch {
+    return `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${currency.toUpperCase()}`;
+  }
+}
+
 function buildOcrFlexCardContents(result: OcrResult): { header: object; body: object } {
   const fmt = (n: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
@@ -434,8 +443,16 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
   const category = result.expenseCategory || result.postingSuggestion;
   const subcategory = result.expenseSubcategory;
 
+  // Foreign currency display — show '$2,765.55 USD ≈ ฿90,116.93' when the
+  // doc was originally in a non-THB currency. The Thai amount is the
+  // converted value (auto-computed via fxRateService).
+  const isForeign = !!(result.originalCurrency && result.originalCurrency !== 'THB' && result.originalTotal);
+  const totalDisplay = isForeign && result.originalTotal
+    ? `${formatForeignAmount(result.originalCurrency!, result.originalTotal)} ≈ ${fmt(result.total)}`
+    : (result.total ? fmt(result.total) : '-');
+
   const bodyContents: object[] = [
-    row('ยอดรวม', result.total ? fmt(result.total) : '-', true),
+    row('ยอดรวม', totalDisplay, true),
     row('ประเภทเอกสาร', result.documentTypeLabel || '-'),
     row('วันที่', result.invoiceDate || '-'),
     { type: 'separator', margin: 'sm' },
@@ -443,6 +460,10 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
     row('เลขผู้เสียภาษี', taxIdDisplay),
     row('เลขที่เอกสาร', result.invoiceNumber || '-'),
   ];
+
+  if (isForeign && result.exchangeRate) {
+    bodyContents.push(row('💱 อัตราแลกเปลี่ยน', `${result.originalCurrency} → THB @ ${result.exchangeRate.toLocaleString('th-TH', { maximumFractionDigits: 6 })}`));
+  }
 
   if (category || subcategory) {
     bodyContents.push({ type: 'separator', margin: 'sm' });
