@@ -43,6 +43,7 @@ import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
 import { attemptAutoMatchAndPay } from '../services/paymentMatchingService';
 import { createProjectDocumentFromIntake, isSupportedProjectDocumentType } from '../services/projectDocumentIntakeService';
+import { parseThaiSlipQr } from '../services/thaiSlipQrParser';
 
 export const lineRouter = Router();
 
@@ -636,9 +637,26 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
 
   // Show paypers-style summary card so the user sees what we understood
   // (document type, amount, date, seller, category) BEFORE we ask anything.
+  // Bank slips get a specialized payment card with from/to/reference rows;
+  // everything else uses the generic intake confirm card.
+  const isBankSlip = result.documentType === 'bank_transfer' || result.documentType === 'payment_advice';
+  const amountForAlt = result.payment?.amount ?? result.total ?? 0;
+  const altText = `📄 ${result.documentTypeLabel || 'เอกสาร'} ${amountForAlt ? `฿${amountForAlt.toLocaleString('th-TH')}` : ''}`.trim();
+
+  if (isBankSlip) {
+    await sendLineFlexMessage(
+      lineUserId,
+      altText,
+      buildPaymentSlipFlexCard(result, 'pending', { intakeId }),
+    );
+    // For bank slips we don't ask for category — confirm/edit buttons are
+    // on the Flex card and matching happens on confirm.
+    return;
+  }
+
   await sendLineFlexMessage(
     lineUserId,
-    `📄 ${result.documentTypeLabel || 'เอกสาร'} ${result.total ? `฿${result.total.toLocaleString('th-TH')}` : ''}`.trim(),
+    altText,
     buildIntakeConfirmFlexCard(result, intakeId),
   );
 
@@ -2647,6 +2665,25 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     const result = analysis.result;
     const qrText = analysis.qrText;
 
+    // QR-based reclassification: when QR clearly identifies a Thai bank slip
+    // (KBank/SCB/BBL/etc verify URL or PromptPay TLV), force documentType to
+    // bank_transfer regardless of LLM guess — slips don't have supplierTaxId
+    // and shouldn't go through the purchase-record missing-field flow.
+    if (result && qrText) {
+      const slipFields = parseThaiSlipQr(qrText);
+      if (slipFields && slipFields.confidence >= 0.6 && slipFields.bank) {
+        if (result.documentType !== 'bank_transfer' && result.documentType !== 'payment_advice') {
+          logger.info('[Line] QR-forced reclassification to bank_transfer', {
+            from: result.documentType,
+            bank: slipFields.bank,
+            confidence: slipFields.confidence,
+          });
+          result.documentType = 'bank_transfer';
+          result.documentTypeLabel = `สลิปโอนเงิน (${slipFields.bank})`;
+        }
+      }
+    }
+
     if (!result) {
       await updateDocumentIntake(intake?.id, {
         status: 'failed',
@@ -2682,12 +2719,16 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         ...result,
         qrText,
       } as OcrResult;
-      const [field] = missingTemplateFields(enrichedResult);
-      if (field && intake?.id) {
-        await askForMissingField(lineUserId, intake.id, enrichedResult, field);
-        return;
-      }
+      // For bank slips we ALWAYS go straight to the summary card so the user
+      // sees who paid whom and how much. If amount is missing we ask for it
+      // in a quick reply; we never ask for supplier tax-id on a slip.
+      const hasAmount = (enrichedResult.payment?.amount ?? enrichedResult.total ?? 0) > 0;
       if (intake?.id) {
+        if (!hasAmount) {
+          const amountField = BANK_TRANSFER_TEMPLATE_FIELDS[0];
+          await askForMissingField(lineUserId, intake.id, enrichedResult, amountField);
+          return;
+        }
         await askForConfirmation(lineUserId, intake.id, enrichedResult);
         return;
       }

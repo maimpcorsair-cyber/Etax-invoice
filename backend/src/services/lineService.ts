@@ -701,6 +701,19 @@ export function buildPaymentSlipFlexCard(
       type: 'button', style: 'secondary', flex: 1,
       action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
     });
+  } else if (status === 'pending' && opts.intakeId) {
+    footerButtons.push({
+      type: 'button', style: 'primary', color: '#16a34a', flex: 1,
+      action: { type: 'postback', label: '✅ บันทึก', data: `confirm_intake:${opts.intakeId}` },
+    });
+    footerButtons.push({
+      type: 'button', style: 'secondary', flex: 1,
+      action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
+    });
+    footerButtons.push({
+      type: 'button', style: 'secondary', flex: 1,
+      action: { type: 'postback', label: '❌ ยกเลิก', data: `cancel_intake:${opts.intakeId}` },
+    });
   }
 
   const headerCfg = headerByStatus[status];
