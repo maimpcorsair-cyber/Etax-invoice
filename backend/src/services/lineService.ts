@@ -580,6 +580,147 @@ export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: st
   };
 }
 
+export type PaymentSlipStatus = 'matched' | 'shortlist' | 'unmatched' | 'saved' | 'pending';
+
+export function buildPaymentSlipFlexCard(
+  result: OcrResult,
+  status: PaymentSlipStatus,
+  opts: {
+    matchedInvoiceNumber?: string;
+    matchedCustomerName?: string;
+    matchedSupplierName?: string;
+    matchScore?: number;
+    intakeId?: string;
+    purchaseInvoiceId?: string;
+    invoiceId?: string;
+  } = {},
+): object {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+
+  const payment = result.payment ?? {};
+  const amount = Number(payment.amount ?? result.total ?? 0);
+  const direction = payment.direction ?? 'unknown';
+
+  const headerByStatus: Record<PaymentSlipStatus, { color: string; text: string }> = {
+    matched:   { color: '#16a34a', text: '✅ จับคู่สลิปกับเอกสารแล้ว' },
+    saved:     { color: '#16a34a', text: '✅ บันทึกสลิปโอนเงิน' },
+    shortlist: { color: '#d97706', text: '🟡 พบเอกสารคล้าย — ช่วยยืนยัน' },
+    pending:   { color: '#d97706', text: '🟡 รอตรวจสอบ' },
+    unmatched: { color: '#dc2626', text: '🔍 สลิปโอนเงิน — ยังไม่พบคู่' },
+  };
+
+  const directionBadge = direction === 'incoming'
+    ? { label: '🟢 เงินเข้า (รับจากลูกค้า)', bg: '#dcfce7', fg: '#166534' }
+    : direction === 'outgoing'
+      ? { label: '🔵 เงินออก (จ่ายผู้ขาย)', bg: '#dbeafe', fg: '#1e40af' }
+      : null;
+
+  const row = (label: string, value: string, bold = false) => ({
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'sm', color: '#888888', flex: 3 },
+      { type: 'text', text: value, size: bold ? 'lg' : 'sm', color: '#111111', flex: 5, align: 'end' as const, wrap: true, weight: bold ? 'bold' as const : 'regular' as const },
+    ],
+  });
+
+  const partyLine = (party?: { name?: string; account?: string }) => {
+    if (!party?.name && !party?.account) return '-';
+    if (party.name && party.account) return `${party.name}\n${party.account}`;
+    return party.name || party.account || '-';
+  };
+
+  const bodyContents: object[] = [];
+
+  if (directionBadge) {
+    bodyContents.push({
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: directionBadge.bg,
+      cornerRadius: '4px',
+      paddingAll: '6px',
+      contents: [{ type: 'text', text: directionBadge.label, color: directionBadge.fg, size: 'xs', weight: 'bold' as const, align: 'center' as const }],
+    });
+  }
+
+  bodyContents.push(row('💵 ยอด', amount ? fmt(amount) : '-', true));
+  if (payment.bankName) bodyContents.push(row('🏦 ธนาคาร/แอป', payment.bankName));
+  bodyContents.push({ type: 'separator', margin: 'sm' });
+  bodyContents.push(row('📤 จาก', partyLine({ name: payment.fromName, account: payment.fromAccount })));
+  bodyContents.push(row('📥 ถึง',  partyLine({ name: payment.toName,   account: payment.toAccount })));
+  if (payment.paidAt) bodyContents.push(row('📅 วันเวลา', payment.paidAt));
+  if (payment.reference) bodyContents.push(row('🔢 เลขอ้างอิง', payment.reference));
+
+  if (status === 'matched' || status === 'saved') {
+    if (opts.matchedInvoiceNumber || opts.matchedCustomerName || opts.matchedSupplierName) {
+      bodyContents.push({ type: 'separator', margin: 'sm' });
+      if (opts.matchedInvoiceNumber) bodyContents.push(row('📄 เลขที่เอกสาร', opts.matchedInvoiceNumber));
+      if (opts.matchedCustomerName) bodyContents.push(row('👤 ลูกค้า', opts.matchedCustomerName));
+      if (opts.matchedSupplierName) bodyContents.push(row('🏢 ผู้ขาย', opts.matchedSupplierName));
+      if (typeof opts.matchScore === 'number') bodyContents.push(row('⭐ คะแนน', `${opts.matchScore}%`));
+    }
+  }
+
+  const footerButtons: object[] = [];
+  if (status === 'matched' || status === 'saved') {
+    if (opts.invoiceId) {
+      footerButtons.push({
+        type: 'button', style: 'link', flex: 1,
+        action: { type: 'postback', label: '📄 ดูใบแจ้งหนี้', data: `view_invoice:${opts.invoiceId}` },
+      });
+    } else if (opts.purchaseInvoiceId) {
+      footerButtons.push({
+        type: 'button', style: 'link', flex: 1,
+        action: { type: 'postback', label: '📄 ดูเอกสาร', data: `edit_purchase:${opts.purchaseInvoiceId}` },
+      });
+    }
+    if (opts.intakeId) {
+      footerButtons.push({
+        type: 'button', style: 'link', flex: 1,
+        action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
+      });
+    }
+  } else if (status === 'shortlist') {
+    if (opts.invoiceId) {
+      footerButtons.push({
+        type: 'button', style: 'primary', color: '#16a34a', flex: 1,
+        action: { type: 'postback', label: '✅ ใช่ใบนี้', data: `confirm_match:${opts.intakeId ?? ''}:${opts.invoiceId}` },
+      });
+    }
+    footerButtons.push({
+      type: 'button', style: 'secondary', flex: 1,
+      action: { type: 'postback', label: '❌ ไม่ใช่', data: `reject_match:${opts.intakeId ?? ''}` },
+    });
+  } else if (status === 'unmatched' && opts.intakeId) {
+    footerButtons.push({
+      type: 'button', style: 'primary', color: '#16a34a', flex: 1,
+      action: { type: 'postback', label: '🔗 จับคู่ด้วยมือ', data: `manual_match:${opts.intakeId}` },
+    });
+    footerButtons.push({
+      type: 'button', style: 'secondary', flex: 1,
+      action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
+    });
+  }
+
+  const headerCfg = headerByStatus[status];
+  return {
+    type: 'bubble',
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: headerCfg.color,
+      contents: [
+        { type: 'text', text: headerCfg.text, color: '#ffffff', size: 'md', weight: 'bold' as const },
+      ],
+    },
+    body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: bodyContents },
+    ...(footerButtons.length > 0
+      ? { footer: { type: 'box', layout: 'horizontal', spacing: 'sm', contents: footerButtons } }
+      : {}),
+  };
+}
+
 export function buildOcrConfirmFlexCard(result: OcrResult, tempId: string): object {
   const { header, body } = buildOcrFlexCardContents(result);
   return {

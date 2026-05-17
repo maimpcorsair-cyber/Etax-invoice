@@ -15,6 +15,7 @@ import {
   buildOcrConfirmFlexCard,
   buildIntakeConfirmFlexCard,
   buildIntakeSavedFlexCard,
+  buildPaymentSlipFlexCard,
   buildInvoiceFlexCard,
   verifyLineSignature,
   withLineReplyToken,
@@ -166,6 +167,8 @@ type PaymentMatchResult = {
   targetId?: string;
   targetType?: 'sales_invoice' | 'purchase_invoice';
   warnings?: string[];
+  flexCard?: object;
+  flexAlt?: string;
 };
 
 type DocumentTemplateField = {
@@ -605,9 +608,17 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
       error: field.key,
     },
   }));
+
+  // Show summary of what we DID read so the user has context for the missing field.
+  await sendLineFlexMessage(
+    lineUserId,
+    `📄 ${result.documentTypeLabel || 'เอกสาร'} (ยังขาด: ${field.label})`,
+    buildIntakeConfirmFlexCard(result, intakeId),
+  );
+
   await sendLineTextWithQuickReply(
     lineUserId,
-    `อ่านเอกสารได้บางส่วนครับ ต้องการข้อมูลเพิ่มเฉพาะช่องนี้:\n\n📌 ${field.label}\n💡 ${field.hint}`,
+    `ช่วยเพิ่มข้อมูลเฉพาะช่องนี้เพื่อให้ครบ:\n\n📌 ${field.label}\n💡 ${field.hint}`,
     [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
   );
 }
@@ -821,7 +832,15 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
         status: 'saved',
         targetId: match.invoiceId,
         targetType: 'sales_invoice',
-        message: `✅ บันทึกรับชำระจากสลิปแล้ว (match ${match.matchScore}%)\n📄 ${invoiceNumber}\n👤 ${buyerName}\n💵 ${amountFmt}${bankTransferDetails(result)}`,
+        message: `✅ บันทึกรับชำระจากสลิปแล้ว (match ${match.matchScore}%)`,
+        flexAlt: `รับชำระ ${invoiceNumber} ${amountFmt}`,
+        flexCard: buildPaymentSlipFlexCard(result, 'saved', {
+          matchedInvoiceNumber: invoiceNumber,
+          matchedCustomerName: buyerName,
+          matchScore: match.matchScore,
+          invoiceId: match.invoiceId,
+          intakeId,
+        }),
       };
     }
 
@@ -836,8 +855,16 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
         status: 'needs_review',
         targetType: 'sales_invoice',
         targetId: top.invoiceId,
-        message: `🟡 ใกล้เคียงแล้วแต่ยังไม่ชัวร์ (${top.score}%) ขอให้ยืนยันในหน้าเอกสาร/รับชำระเงิน\nยอด: ${amountFmt}\nผู้สมัครต้น 3 อันดับ:\n${list}${bankTransferDetails(result)}`,
+        message: `🟡 ใกล้เคียงแต่ยังไม่ชัวร์ — ขอให้ยืนยันใบที่ใช่\nผู้สมัครต้น 3 อันดับ:\n${list}`,
         warnings: ['shortlist:sales_invoice'],
+        flexAlt: `สลิปคล้าย ${top.invoiceNumber} ${amountFmt}`,
+        flexCard: buildPaymentSlipFlexCard(result, 'shortlist', {
+          matchedInvoiceNumber: top.invoiceNumber,
+          matchedCustomerName: top.buyerName,
+          matchScore: top.score,
+          invoiceId: top.invoiceId,
+          intakeId,
+        }),
       };
     }
 
@@ -845,8 +872,10 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
       ok: false,
       status: 'needs_review',
       targetType: 'sales_invoice',
-      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้\nยอด: ${amountFmt}${bankTransferDetails(result)}\nกรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
+      message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้ กรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
       warnings: ['unmatched:sales_invoice'],
+      flexAlt: `สลิปยังไม่จับคู่ ${amountFmt}`,
+      flexCard: buildPaymentSlipFlexCard(result, 'unmatched', { intakeId }),
     };
   }
 
@@ -876,21 +905,32 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
         ].filter(Boolean).join('\n'),
       },
     });
+    const outAmountFmt = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
     return {
       ok: true,
       status: 'saved',
       targetId: exactPurchase.id,
       targetType: 'purchase_invoice',
-      message: `✅ บันทึกจ่ายชำระเอกสารซื้อแล้ว\n📄 ${exactPurchase.invoiceNumber}\n🏢 ${exactPurchase.supplierName}\n💵 ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}`,
+      message: `✅ บันทึกจ่ายชำระเอกสารซื้อแล้ว`,
+      flexAlt: `จ่ายชำระ ${exactPurchase.invoiceNumber} ${outAmountFmt}`,
+      flexCard: buildPaymentSlipFlexCard(result, 'saved', {
+        matchedInvoiceNumber: exactPurchase.invoiceNumber,
+        matchedSupplierName: exactPurchase.supplierName,
+        purchaseInvoiceId: exactPurchase.id,
+        intakeId,
+      }),
     };
   }
 
+  const unmatchedAmountFmt = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
   return {
     ok: false,
     status: 'needs_review',
     targetType: 'purchase_invoice',
-    message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับเอกสารซื้อไม่ได้\nยอด: ${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount)}${bankTransferDetails(result)}\nกรุณาตรวจในหน้า Input VAT`,
+    message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับเอกสารซื้อไม่ได้ กรุณาตรวจในหน้า Input VAT`,
     warnings: ['unmatched:purchase_invoice'],
+    flexAlt: `สลิปจ่ายยังไม่จับคู่ ${unmatchedAmountFmt}`,
+    flexCard: buildPaymentSlipFlexCard(result, 'unmatched', { intakeId }),
   };
 }
 
@@ -2652,7 +2692,11 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         return;
       }
       const match = await handleBankTransferDocument(lineUserId, enrichedResult, companyId, resolved.userId);
-      await sendLineText(lineUserId, match.message);
+      if (match.flexCard) {
+        await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
+      } else {
+        await sendLineText(lineUserId, match.message);
+      }
       return;
     }
 
@@ -2783,7 +2827,11 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
           targetId: match.targetId,
           purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
         });
-        await sendLineText(lineUserId, match.message);
+        if (match.flexCard) {
+          await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
+        } else {
+          await sendLineText(lineUserId, match.message);
+        }
         if (match.ok) {
           void syncDocumentIntakeToProjectDrive(intake.id, {
             companyId: intake.companyId,
