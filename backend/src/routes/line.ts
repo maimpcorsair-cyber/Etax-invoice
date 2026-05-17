@@ -4524,3 +4524,84 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Stuck-intake recovery — periodic safety net for OCR jobs the BullMQ
+// worker missed or that lost their in-memory watchdog when the web dyno
+// restarted mid-deploy. Runs every 60s on every web dyno; a Redis lock
+// per-intake prevents the same row from being processed twice.
+//
+// Triggers when status is 'received' or 'processing' AND the row hasn't
+// been touched in 90s. Limited to 5 intakes per tick to bound load.
+// ---------------------------------------------------------------------------
+const RECOVERY_INTERVAL_MS = 60_000;
+const RECOVERY_STALE_THRESHOLD_MS = 90_000;
+const RECOVERY_BATCH_LIMIT = 5;
+const RECOVERY_LOCK_TTL_SECONDS = 180;
+
+async function scanStuckIntakes(): Promise<void> {
+  const cutoff = new Date(Date.now() - RECOVERY_STALE_THRESHOLD_MS);
+  let stuck: Array<{ id: string; lineUserId: string | null }>;
+  try {
+    stuck = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+      where: {
+        status: { in: ['received', 'processing'] },
+        updatedAt: { lt: cutoff },
+        lineUserId: { not: null },
+      },
+      orderBy: { updatedAt: 'asc' },
+      take: RECOVERY_BATCH_LIMIT,
+      select: { id: true, lineUserId: true },
+    }));
+  } catch (err) {
+    logger.error('[Line] stuck-intake scan query failed', { err });
+    return;
+  }
+  if (!stuck.length) return;
+
+  for (const row of stuck) {
+    if (!row.lineUserId) continue;
+    const lockKey = `intake:recovery:${row.id}`;
+    let acquired = false;
+    try {
+      const result = await redis.set(lockKey, '1', 'EX', RECOVERY_LOCK_TTL_SECONDS, 'NX');
+      acquired = result === 'OK';
+    } catch (err) {
+      logger.warn('[Line] recovery lock acquire failed', { err, intakeId: row.id });
+      continue;
+    }
+    if (!acquired) continue;
+
+    logger.warn('[Line] recovering stuck intake', { intakeId: row.id, lineUserId: row.lineUserId });
+    try {
+      await processIntakeOcrPipeline({
+        intakeId: row.id,
+        lineUserId: row.lineUserId,
+        pushTarget: row.lineUserId,
+      });
+    } catch (err) {
+      logger.error('[Line] stuck-intake recovery failed', { err, intakeId: row.id });
+      // Release lock early so the next tick can retry sooner if it was a
+      // transient failure (network blip, OCR provider 5xx, etc.).
+      try { await redis.del(lockKey); } catch { /* ignore */ }
+    }
+  }
+}
+
+let recoveryLoopHandle: NodeJS.Timeout | null = null;
+
+export function startIntakeRecoveryLoop(): void {
+  if (recoveryLoopHandle) return;
+  // First scan runs after one interval so we don't hammer the DB at boot
+  // (when stale intakes are unlikely to have accumulated yet anyway).
+  recoveryLoopHandle = setInterval(() => {
+    void scanStuckIntakes().catch((err) => {
+      logger.error('[Line] recovery loop tick threw', { err });
+    });
+  }, RECOVERY_INTERVAL_MS);
+  if (recoveryLoopHandle.unref) recoveryLoopHandle.unref();
+  logger.info('[Line] stuck-intake recovery loop started', {
+    intervalMs: RECOVERY_INTERVAL_MS,
+    staleThresholdMs: RECOVERY_STALE_THRESHOLD_MS,
+  });
+}

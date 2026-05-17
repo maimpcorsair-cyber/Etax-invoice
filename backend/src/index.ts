@@ -27,7 +27,7 @@ import { driveRouter } from './routes/drive';
 import { vatSummaryRouter } from './routes/vatSummary';
 import { pp30Router } from './routes/pp30';
 import { whtCertificatesRouter } from './routes/whtCertificates';
-import { lineRouter, lineWebhookHandler } from './routes/line';
+import { lineRouter, lineWebhookHandler, startIntakeRecoveryLoop } from './routes/line';
 import { aiChatRouter } from './routes/aiChat';
 import { projectsRouter } from './routes/projects';
 import { dbdRouter } from './routes/dbd';
@@ -115,6 +115,14 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`e-Tax Invoice API running on port ${PORT}`);
+
+  // Always start the stuck-intake recovery loop on the web dyno —
+  // it's the safety net for BullMQ jobs the worker dyno misses, so it
+  // must run independently of ENABLE_WORKERS. Redis lock prevents
+  // double-processing across multiple dynos.
+  if (process.env.DISABLE_INTAKE_RECOVERY !== 'true') {
+    startIntakeRecoveryLoop();
+  }
 
   const shouldLoadWorkers = process.env.ENABLE_WORKERS === 'true'
     || (process.env.NODE_ENV !== 'production' && process.env.ENABLE_WORKERS !== 'false');
