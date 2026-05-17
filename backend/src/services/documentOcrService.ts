@@ -163,6 +163,7 @@ async function analyzePdfDocument(
   if (needsRasterFallback) {
     stages.push('pdf_raster_fallback');
     const rasterPages = await rasterizePdfToPngPages(buffer);
+    const pageResults: OcrResult[] = [];
     for (const [index, png] of rasterPages.entries()) {
       stages.push(`pdf_raster_page_${index + 1}`);
       let pageResult = await ocrSupplierInvoice(png.toString('base64'), 'image/png', {
@@ -170,22 +171,109 @@ async function analyzePdfDocument(
         companyId,
         pageCount: rasterPages.length,
       });
-
       if (shouldTrySlipSpecialist(pageResult)) {
         const slipCandidate = await trySlipSpecialist(png, 'image/png', undefined, stages);
         if (slipCandidate) pageResult = slipCandidate;
       }
-
       if (hasUsefulDocumentData(pageResult)) {
-        result = mergeAnalysisWarning(pageResult, `อ่านจากภาพหน้า PDF หน้า ${index + 1}`);
-        result.extractionProvider = `${pageResult.extractionProvider ?? 'vision'}+pdf-raster-fallback`;
-        source = 'image';
-        break;
+        pageResults.push(pageResult);
       }
+    }
+    if (pageResults.length > 0) {
+      // Multi-page invoices put the header on page 1 and the total on the
+      // last page — aggregate across pages instead of stopping at the first
+      // useful one. mergeMultiPageResults picks the highest-confidence value
+      // for each field across all page results.
+      const merged = pageResults.length === 1
+        ? pageResults[0]
+        : mergeMultiPageResults(pageResults);
+      result = mergeAnalysisWarning(merged, rasterPages.length > 1
+        ? `อ่านจาก ${pageResults.length}/${rasterPages.length} หน้า PDF แล้วรวมข้อมูล`
+        : 'อ่านจากภาพหน้า PDF');
+      result.extractionProvider = `${merged.extractionProvider ?? 'vision'}+pdf-raster-fallback`;
+      source = 'image';
     }
   }
 
   return { result, pageCount, source };
+}
+
+/**
+ * Merge OCR results from multiple PDF pages. For each field, prefers the
+ * non-empty / higher-magnitude value (totals usually appear on the last
+ * page; supplier info usually appears on the first; we want the maximum
+ * useful information across all pages).
+ */
+function mergeMultiPageResults(pageResults: OcrResult[]): OcrResult {
+  if (pageResults.length === 0) {
+    throw new Error('mergeMultiPageResults called with empty array');
+  }
+  if (pageResults.length === 1) return pageResults[0];
+
+  const pickFirstNonEmpty = (getter: (r: OcrResult) => string | undefined): string => {
+    for (const r of pageResults) {
+      const v = getter(r);
+      if (v && String(v).trim()) return String(v);
+    }
+    return '';
+  };
+  const pickMax = (getter: (r: OcrResult) => number | undefined): number => {
+    let max = 0;
+    for (const r of pageResults) {
+      const v = Number(getter(r) ?? 0);
+      if (v > max) max = v;
+    }
+    return max;
+  };
+
+  // Pick a primary result whose total is non-zero — typically the last page
+  // of a multi-page invoice (where the grand total lives).
+  const primary = [...pageResults].reverse().find((r) => Number(r.total) > 0) ?? pageResults[0];
+
+  const merged: OcrResult = {
+    ...primary,
+    documentType: primary.documentType,
+    documentTypeLabel: primary.documentTypeLabel || pickFirstNonEmpty((r) => r.documentTypeLabel),
+    supplierName: pickFirstNonEmpty((r) => r.supplierName),
+    supplierTaxId: pickFirstNonEmpty((r) => r.supplierTaxId),
+    supplierBranch: pickFirstNonEmpty((r) => r.supplierBranch) || '00000',
+    invoiceNumber: pickFirstNonEmpty((r) => r.invoiceNumber),
+    invoiceDate: pickFirstNonEmpty((r) => r.invoiceDate),
+    subtotal: pickMax((r) => r.subtotal),
+    vatAmount: pickMax((r) => r.vatAmount),
+    total: pickMax((r) => r.total),
+    confidence: pageResults.some((r) => r.confidence === 'high') ? 'high'
+      : pageResults.some((r) => r.confidence === 'medium') ? 'medium' : 'low',
+    validationWarnings: Array.from(
+      new Set(pageResults.flatMap((r) => r.validationWarnings ?? [])),
+    ),
+  };
+
+  // Foreign-currency fields — keep them if any page reported them.
+  for (const r of pageResults) {
+    if (!merged.originalCurrency && r.originalCurrency && r.originalCurrency !== 'THB') {
+      merged.originalCurrency = r.originalCurrency;
+      merged.exchangeRate = r.exchangeRate;
+      merged.originalTotal = r.originalTotal;
+      merged.originalSubtotal = r.originalSubtotal;
+      merged.originalVatAmount = r.originalVatAmount;
+    }
+  }
+
+  // documentMetadata — concat unique fields across pages.
+  const mergedMeta: NonNullable<OcrResult['documentMetadata']> = { ...(primary.documentMetadata ?? {}) };
+  for (const r of pageResults) {
+    const meta = r.documentMetadata;
+    if (!meta) continue;
+    for (const [key, value] of Object.entries(meta)) {
+      const k = key as keyof typeof mergedMeta;
+      if (mergedMeta[k] === undefined || mergedMeta[k] === null || mergedMeta[k] === '' || mergedMeta[k] === 0) {
+        (mergedMeta as Record<string, unknown>)[k] = value;
+      }
+    }
+  }
+  merged.documentMetadata = mergedMeta;
+  return merged;
 }
 
 function mergeQrFieldsIntoResult(result: OcrResult, qr: ThaiSlipQrFields): OcrResult {
