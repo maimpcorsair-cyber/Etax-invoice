@@ -544,8 +544,19 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
   };
 }
 
-export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string): object {
+export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string, opts: { editUrl?: string } = {}): object {
   const { header, body } = buildOcrFlexCardContents(result);
+  const editButton = opts.editUrl
+    ? {
+        type: 'button',
+        style: 'secondary',
+        action: { type: 'uri', label: '✏️ แก้ไขในเว็บ', uri: opts.editUrl },
+      }
+    : {
+        type: 'button',
+        style: 'secondary',
+        action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${intakeId}` },
+      };
   return {
     type: 'bubble',
     header,
@@ -561,11 +572,7 @@ export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string):
           color: '#16a34a',
           action: { type: 'postback', label: '✅ บันทึก', data: `confirm_intake:${intakeId}` },
         },
-        {
-          type: 'button',
-          style: 'secondary',
-          action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${intakeId}` },
-        },
+        editButton,
         {
           type: 'button',
           style: 'secondary',

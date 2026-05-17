@@ -32,6 +32,7 @@ import { aiChatRouter } from './routes/aiChat';
 import { projectsRouter } from './routes/projects';
 import { dbdRouter } from './routes/dbd';
 import { projectPortalRouter } from './routes/projectPortal';
+import { intakeEditRouter } from './routes/intakeEdit';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -79,6 +80,7 @@ app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 app.use('/api/auth', authRouter);
 app.use('/api/project-portal', projectPortalRouter);
+app.use('/api/intake-edit', intakeEditRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/invoices', authenticate, invoicesRouter);
 app.use('/api/invoices/:invoiceId/payments', authenticate, paymentsRouter);

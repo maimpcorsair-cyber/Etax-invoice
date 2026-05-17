@@ -617,25 +617,44 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
     },
   }));
 
-  // Show summary of what we DID read so the user has context for the missing field.
+  // New UX: one Flex card with a summary of what we read + 2 options
+  //   - "✅ บันทึก" → save with placeholders for missing fields (skip path)
+  //   - "✏️ แก้ไขในเว็บ" → magic-link to a guest edit page (no login)
+  // The chat field-by-field flow becomes a fallback — user can still
+  // type the value directly and we'll handle it in handleDurableIntakeReply,
+  // but we no longer prompt for it explicitly.
+  let editUrl: string | undefined;
+  try {
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId },
+      select: { companyId: true },
+    }));
+    if (intake?.companyId) {
+      const { signIntakeEditToken, buildIntakeEditUrl } = await import('../services/intakeEditToken');
+      const token = signIntakeEditToken({ intakeId, lineUserId, companyId: intake.companyId });
+      editUrl = buildIntakeEditUrl(getFrontendBaseUrl(), token);
+    }
+  } catch (err) {
+    logger.warn('[Line] askForMissingField: edit URL build failed', { err, intakeId });
+  }
+
   await sendLineFlexMessage(
     lineUserId,
-    `📄 ${result.documentTypeLabel || 'เอกสาร'} (ยังขาด: ${field.label})`,
-    buildIntakeConfirmFlexCard(result, intakeId),
+    `📄 ${result.documentTypeLabel || 'เอกสาร'} — ตรวจข้อมูลก่อนบันทึก`,
+    buildIntakeConfirmFlexCard(result, intakeId, editUrl ? { editUrl } : undefined),
   );
 
-  // Some fields aren't always available (restaurant receipts often have no
-  // tax id) — let the user skip and save what we have.
-  const buttons: Array<{ label: string; text?: string; data?: string; displayText?: string }> = [
-    { label: '⏭ ข้าม (ไม่ใส่)', data: `skip_field:${intakeId}:${field.key}`, displayText: `ข้าม ${field.label}` },
-    { label: '❌ ยกเลิก', text: 'ยกเลิก' },
-  ];
-
-  await sendLineTextWithQuickReply(
-    lineUserId,
-    `ช่วยเพิ่มข้อมูลเฉพาะช่องนี้เพื่อให้ครบ:\n\n📌 ${field.label}\n💡 ${field.hint}\n\n(ถ้าเอกสารไม่มีฟิลด์นี้ กดปุ่ม "ข้าม" ได้เลย)`,
-    buttons,
-  );
+  if (editUrl) {
+    await sendLineText(
+      lineUserId,
+      `🤖 อ่านได้แต่ยังขาด: ${field.label}\n\nทางลัด 2 ทาง:\n✅ กด "บันทึก" ถ้าข้อมูลที่อ่านมาพอใช้ (ฟิลด์ที่ขาดจะถูกเว้นว่างไว้)\n✏️ กด "แก้ไขในเว็บ" เพื่อกรอกเพิ่มในหน้าเว็บ — ไม่ต้อง login\n\nLink หมดอายุใน 24 ชม`,
+    );
+  } else {
+    await sendLineText(
+      lineUserId,
+      `🤖 อ่านได้แต่ยังขาด: ${field.label}\nกด "บันทึก" ในการ์ดด้านบนถ้าพอใจกับข้อมูลที่อ่านมา หรือพิมพ์ค่า ${field.label} กลับมาเลยก็ได้`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -886,7 +905,7 @@ function buildBatchConfirmAllBubble(batchId: string, count: number): object {
   };
 }
 
-async function performConfirmedIntakeSave(
+export async function performConfirmedIntakeSave(
   lineUserId: string,
   intake: { id: string; companyId: string; userId: string; projectId: string | null; fileUrl: string | null },
   result: OcrResult,
