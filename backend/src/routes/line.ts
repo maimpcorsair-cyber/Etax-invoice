@@ -1056,19 +1056,21 @@ async function tryAutoMatchPendingBillWithSlip(
   }
   const slipAmount = Number(slipResult.payment?.amount ?? slipResult.total ?? 0);
   if (slipAmount <= 0) return false;
-  const delta = Math.abs(slipAmount - purchase.total);
-  const pct = delta / Math.max(purchase.total, 1);
-  if (delta > 1 && pct > 0.01) return false;
+  const matchInfo = analyzeAmountMatch(slipAmount, purchase.total);
+  if (!matchInfo.ok) return false;
 
   const paidAt = slipResult.payment?.paidAt ? new Date(slipResult.payment.paidAt) : new Date();
   const refSuffix = slipResult.payment?.reference ? ` ref: ${slipResult.payment.reference}` : '';
   const bankSuffix = slipResult.payment?.bankName ? ` (${slipResult.payment.bankName})` : '';
+  const whtNote = matchInfo.whtRate
+    ? ` (หัก ณ ที่จ่าย ${(matchInfo.whtRate * 100).toFixed(0)}% = ฿${(purchase.total * matchInfo.whtRate).toLocaleString('th-TH', { maximumFractionDigits: 2 })})`
+    : '';
   await prisma.purchaseInvoice.update({
     where: { id: purchase.id },
     data: {
       isPaid: true,
       paidAt,
-      notes: [purchase.notes, `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}`].filter(Boolean).join('\n'),
+      notes: [purchase.notes, `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}${whtNote}`].filter(Boolean).join('\n'),
     },
   });
   await updateDocumentIntake(slipIntakeId, {
@@ -1092,6 +1094,38 @@ async function tryAutoMatchPendingBillWithSlip(
   );
   await sendLineText(lineUserId, `🔗 พบบิลที่ค้างจับคู่อยู่ ระบบจับคู่ให้อัตโนมัติ (ยอดตรง ฿${purchase.total.toLocaleString('th-TH')})`);
   return true;
+}
+
+/**
+ * Decide whether a slip amount 'matches' a bill total. Returns ok=true when:
+ *   (a) absolute delta ≤ ฿1, OR
+ *   (b) relative delta ≤ 1%, OR
+ *   (c) the difference equals a common Thai WHT rate (1/2/3/5/10/15%) within
+ *       ±฿1 — strong signal that the slip is invoice_total - WHT
+ *
+ * Returns the inferred WHT rate so callers can stamp it on the saved record.
+ */
+function analyzeAmountMatch(slipAmount: number, billTotal: number): {
+  ok: boolean;
+  delta: number;
+  pct: number;
+  whtRate?: number;
+} {
+  if (slipAmount <= 0 || billTotal <= 0) return { ok: false, delta: 0, pct: 0 };
+  const delta = Math.abs(slipAmount - billTotal);
+  const pct = delta / Math.max(billTotal, 1);
+  if (delta <= 1 || pct <= 0.01) return { ok: true, delta, pct };
+  // Slip < bill → could be WHT-deducted payment
+  if (slipAmount < billTotal) {
+    const whtCandidates = [0.01, 0.02, 0.03, 0.05, 0.10, 0.15];
+    for (const rate of whtCandidates) {
+      const expectedSlip = billTotal * (1 - rate);
+      if (Math.abs(slipAmount - expectedSlip) <= 1) {
+        return { ok: true, delta, pct, whtRate: rate };
+      }
+    }
+  }
+  return { ok: false, delta, pct };
 }
 
 async function tryAutoMatchPendingSlipWithPurchase(
@@ -1119,12 +1153,14 @@ async function tryAutoMatchPendingSlipWithPurchase(
 
   const slipAmount = Number(slipResult.payment?.amount ?? slipResult.total ?? 0);
   if (slipAmount <= 0) return false;
-  // Accept the auto-match when amounts are within 1% (or ฿1 absolute).
-  const delta = Math.abs(slipAmount - savedPurchase.total);
-  const pct = delta / Math.max(savedPurchase.total, 1);
-  if (delta > 1 && pct > 0.01) {
+  // Accept the auto-match when amounts are within 1% (or ฿1 absolute), OR
+  // when the gap matches a common Thai withholding-tax rate (1/2/3/5%).
+  // Thai SMEs frequently pay invoice_total - WHT, so a 'mismatch' of exactly
+  // 3% is the SIGNAL it's a WHT payment, not a problem.
+  const matchInfo = analyzeAmountMatch(slipAmount, savedPurchase.total);
+  if (!matchInfo.ok) {
     logger.info('[Line] pending slip amount mismatch — not auto-matching', {
-      slipAmount, purchaseTotal: savedPurchase.total, delta, pct,
+      slipAmount, purchaseTotal: savedPurchase.total, delta: matchInfo.delta, pct: matchInfo.pct,
     });
     return false;
   }
@@ -1132,13 +1168,16 @@ async function tryAutoMatchPendingSlipWithPurchase(
   const paidAt = slipResult.payment?.paidAt ? new Date(slipResult.payment.paidAt) : new Date();
   const refSuffix = slipResult.payment?.reference ? ` ref: ${slipResult.payment.reference}` : '';
   const bankSuffix = slipResult.payment?.bankName ? ` (${slipResult.payment.bankName})` : '';
+  const whtNote = matchInfo.whtRate
+    ? ` (หัก ณ ที่จ่าย ${(matchInfo.whtRate * 100).toFixed(0)}% = ฿${(savedPurchase.total * matchInfo.whtRate).toLocaleString('th-TH', { maximumFractionDigits: 2 })})`
+    : '';
 
   await prisma.purchaseInvoice.update({
     where: { id: savedPurchase.id },
     data: {
       isPaid: true,
       paidAt,
-      notes: `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}`,
+      notes: `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}${whtNote}`,
     },
   });
   await updateDocumentIntake(slipIntake.id, {

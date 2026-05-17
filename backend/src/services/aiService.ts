@@ -230,6 +230,12 @@ export interface OcrResult {
     deliveryNoteNumber?: string;
     withholdingTaxAmount?: number;
     withholdingTaxRate?: number;
+    withholdingTaxIncomeType?: string;
+    withholdingTaxGrossAmount?: number;
+    withholdingTaxPayerName?: string;
+    withholdingTaxPayerTaxId?: string;
+    withholdingTaxRecipientName?: string;
+    withholdingTaxRecipientTaxId?: string;
     description?: string;
   };
   // Foreign currency support. When set, subtotal/vatAmount/total are the
@@ -1201,6 +1207,12 @@ Rules:
     "deliveryNoteNumber": "delivery note number",
     "withholdingTaxAmount": 0,
     "withholdingTaxRate": 0,
+    "withholdingTaxIncomeType": "Thai income type code printed on a 50ทวิ certificate — e.g. '40(2)' (commission), '40(3)' (royalty), '40(4)' (interest), '40(8)' (services). Empty string if not a WHT cert.",
+    "withholdingTaxGrossAmount": 0,
+    "withholdingTaxPayerName": "the entity that WITHHELD tax (the payer issuing the 50ทวิ cert). Empty if not applicable.",
+    "withholdingTaxPayerTaxId": "tax id of the payer (the company issuing the cert). 13 digits, no dashes.",
+    "withholdingTaxRecipientName": "the entity that RECEIVED payment (the recipient on the 50ทวิ cert). Often a supplier/consultant.",
+    "withholdingTaxRecipientTaxId": "tax id of the recipient. 13 digits, no dashes.",
     "description": "short extracted description"
   },
   "originalCurrency": "ISO-4217 currency code printed on the document — e.g. 'USD', 'EUR', 'JPY', 'CNY'. Set to 'THB' (or omit) when amounts are in Thai Baht.",
