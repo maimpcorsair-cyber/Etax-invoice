@@ -2979,6 +2979,29 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       stages: analysis.stages,
     });
 
+    // Fallback: if LLM OCR returned nothing useful but the image's QR clearly
+    // identifies a Thai bank slip, hydrate the result from QR so we can still
+    // show the user a useful Flex card (bank, transaction id, reference) and
+    // ask them for the amount.
+    if (qrText) {
+      const slipFields = parseThaiSlipQr(qrText);
+      if (slipFields && slipFields.confidence >= 0.5 && slipFields.bank) {
+        const existingPayment = result.payment ?? {};
+        result.documentType = 'bank_transfer';
+        result.documentTypeLabel = result.documentTypeLabel || `สลิปโอนเงิน (${slipFields.bank})`;
+        result.payment = {
+          ...existingPayment,
+          bankName: existingPayment.bankName || slipFields.bank,
+          reference: existingPayment.reference || slipFields.reference || slipFields.transactionId || undefined,
+          amount: existingPayment.amount ?? slipFields.amount ?? undefined,
+          paidAt: existingPayment.paidAt || slipFields.paidAt || undefined,
+        };
+        if (!result.invoiceNumber && slipFields.transactionId) {
+          result.invoiceNumber = slipFields.transactionId;
+        }
+      }
+    }
+
     const hasAnyData = hasUsefulDocumentData(result) || hasUsefulLineOcrData(result);
     if (!hasAnyData) {
       await updateDocumentIntake(intake?.id, {
