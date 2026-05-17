@@ -1162,24 +1162,19 @@ async function tryAutoMatchPendingSlipWithPurchase(
   return true;
 }
 
-async function sendCandidateCarouselForSlip(lineUserId: string, intakeId: string, result: OcrResult) {
-  const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
-    where: { id: intakeId },
-    select: { companyId: true },
-  }));
-  if (!intake) return;
+async function buildSlipCandidateBubbles(intakeId: string, result: OcrResult, companyId: string): Promise<object[]> {
   const amount = Number(result.payment?.amount ?? result.total ?? 0);
-  if (amount <= 0) return;
+  if (amount <= 0) {
+    return [buildMatchOptionsBubble(intakeId, { askDirection: false, allowUpload: true })];
+  }
   const paidAt = result.payment?.paidAt ? new Date(result.payment.paidAt) : new Date();
   const reference = result.payment?.reference || result.invoiceNumber || undefined;
   const counterparty = [result.payment?.fromName, result.payment?.toName, result.supplierName]
     .filter(Boolean)
     .join(' ');
-  const slip = { companyId: intake.companyId, amount, paidAt, reference, counterpartyName: counterparty };
+  const slip = { companyId, amount, paidAt, reference, counterpartyName: counterparty };
   const direction = result.payment?.direction ?? 'unknown';
 
-  // Query whichever side(s) are relevant — when direction is known we only
-  // search that side; otherwise we search both.
   const [salesCandidates, purchaseCandidates] = await Promise.all([
     direction === 'outgoing'
       ? Promise.resolve([])
@@ -1215,23 +1210,31 @@ async function sendCandidateCarouselForSlip(lineUserId: string, intakeId: string
     return Math.abs(a.amountDelta) - Math.abs(b.amountDelta);
   });
 
-  if (combined.length === 0) {
-    await sendLineFlexMessage(
-      lineUserId,
-      'ยังไม่พบบิลในระบบ — เลือกประเภท',
-      buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true }),
-    );
+  const top = combined.slice(0, 5);
+  const bubbles: object[] = top.map((c) => buildMatchCandidateBubble(c, intakeId));
+  bubbles.push(buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true }));
+  return bubbles;
+}
+
+async function sendCombinedSlipAndCandidates(
+  lineUserId: string,
+  intakeId: string,
+  result: OcrResult,
+  altText: string,
+): Promise<void> {
+  const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+    where: { id: intakeId },
+    select: { companyId: true },
+  }));
+  if (!intake) {
+    // No company context — fall back to just the slip card
+    await sendLineFlexMessage(lineUserId, altText, buildPaymentSlipFlexCard(result, 'pending', { intakeId }));
     return;
   }
-
-  const top = combined.slice(0, 5);
-  const bubbles = top.map((c) => buildMatchCandidateBubble(c, intakeId));
-  bubbles.push(buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true }));
-  await sendLineFlexCarousel(
-    lineUserId,
-    `พบบิลที่อาจคู่กับสลิป ${top.length} ใบ — เลือกได้เลย`,
-    bubbles,
-  );
+  const slipBubble = buildPaymentSlipFlexCard(result, 'pending', { intakeId });
+  const candidateBubbles = await buildSlipCandidateBubbles(intakeId, result, intake.companyId);
+  const allBubbles = [slipBubble, ...candidateBubbles].slice(0, 12);
+  await sendLineFlexCarousel(lineUserId, altText, allBubbles);
 }
 
 async function askForConfirmation(lineUserId: string, intakeId: string, result: OcrResult) {
@@ -1254,15 +1257,10 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
   const altText = `📄 ${result.documentTypeLabel || 'เอกสาร'} ${amountForAlt ? `฿${amountForAlt.toLocaleString('th-TH')}` : ''}`.trim();
 
   if (isBankSlip) {
-    await sendLineFlexMessage(
-      lineUserId,
-      altText,
-      buildPaymentSlipFlexCard(result, 'pending', { intakeId }),
-    );
-    // Auto-search for unpaid bills near this slip amount and show a carousel
-    // so the user can pick instead of typing. If nothing matches, fall back
-    // to asking direction.
-    await sendCandidateCarouselForSlip(lineUserId, intakeId, result);
+    // Send the slip card + candidate carousel as ONE push (LINE Free plan
+    // = 500 push/month — every saved push matters). The slip bubble is the
+    // first bubble in the carousel; candidates follow.
+    await sendCombinedSlipAndCandidates(lineUserId, intakeId, result, altText);
     return;
   }
 
@@ -3476,14 +3474,11 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     // few seconds (e.g. a slip + a bill together), we coalesce them into a
     // single combined summary card with auto-pairing.
     stage = 'enqueue_batch';
-    const { batchId, position } = await joinOrCreateUploadBatch(lineUserId, intake.id);
+    const { batchId } = await joinOrCreateUploadBatch(lineUserId, intake.id);
 
-    // Brief 'OCR done' ack per file (no Flex card yet — that comes when the
-    // batch settles).
-    const amt = Number(enrichedResult.payment?.amount ?? enrichedResult.total ?? 0);
-    const amtStr = amt ? ` ฿${amt.toLocaleString('th-TH')}` : '';
-    const typeLabel = enrichedResult.documentTypeLabel || enrichedResult.documentType;
-    await sendLineText(lineUserId, `✓ #${position} อ่านเสร็จ: ${typeLabel}${amtStr}`);
+    // No per-file 'OCR done' push — the user already saw '📥 กำลังอ่าน...'
+    // via reply-token. The full Flex card/carousel arrives at batch close,
+    // which conserves LINE's monthly push-message quota (Free plan = 500).
 
     // Schedule the batch close. Multiple files schedule multiple timers; only
     // the timer that sees the most recent lastFileAt actually triggers the
@@ -3666,7 +3661,7 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป กรุณาส่งใหม่');
       return;
     }
-    await sendCandidateCarouselForSlip(lineUserId, intakeId, result);
+    await sendCombinedSlipAndCandidates(lineUserId, intakeId, result, "บิลที่อาจคู่กับสลิป — เลือกได้เลย");
     return;
   }
 
@@ -3692,7 +3687,7 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       where: { id: intakeId },
       data: { ocrResult: updated as unknown as Prisma.InputJsonValue },
     }));
-    await sendCandidateCarouselForSlip(lineUserId, intakeId, updated);
+    await sendCombinedSlipAndCandidates(lineUserId, intakeId, updated, "บิลที่อาจคู่กับสลิป — เลือกได้เลย");
     return;
   }
 
