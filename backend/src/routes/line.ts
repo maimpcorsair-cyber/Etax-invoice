@@ -2891,7 +2891,7 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       buffer,
     });
     if (resolved.groupLink && messageContext.senderLineUserId) {
-      const member = await recordLineProjectMemberActivity({
+      await recordLineProjectMemberActivity({
         groupLink: resolved.groupLink,
         sourceType: messageContext.lineGroupId ? 'group' : 'room',
         senderLineUserId: messageContext.senderLineUserId,
@@ -2902,10 +2902,11 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         logger.warn('[Line] group document sender update failed', { err, lineGroupId: resolved.groupLink?.lineGroupId });
         return null;
       });
-      await sendProjectJoinInviteOnce(lineUserId, member, {
-        companyName: resolved.companyName,
-        projectName: resolved.project?.name,
-      });
+      // We deliberately do NOT send the verbose "รับไฟล์เข้าโปรเจคแล้วครับ"
+      // join-invite text here. The OCR + Flex slip/intake card that follows
+      // is a much better response — it shows what we extracted AND lets the
+      // user match with a bill right inside the group chat. The join invite
+      // still goes out once via the dedicated /join command if needed.
     }
     logger.info('[Line] file received', { contentType, isPdf, bufferSize: buffer.length, messageType });
 
@@ -3641,6 +3642,10 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       lineRoomId: event.source.roomId,
     };
     const replyOnly = lineGroupSilentModeEnabled() && isLineGroupConversation(context);
+    // When the conversation is a group/room, route push fallbacks to the
+    // group/room id (not the sender's private chat) so OCR responses appear
+    // where the user uploaded the file.
+    const pushTarget = context.lineGroupId ?? context.lineRoomId;
 
     // Idempotency: skip if this event was already processed (LINE retries on timeout)
     const eventId = (event as { webhookEventId?: string }).webhookEventId
@@ -3705,13 +3710,18 @@ export async function lineWebhookHandler(req: Request, res: Response): Promise<v
       } else if (event.type === 'message' && event.message) {
         const msg = event.message;
         if (msg.type === 'text') {
-          await withLineReplyToken(event.replyToken, () => handleTextMessage(replyTargetId, (msg as LineTextMessage).text, context), { replyOnly });
+          await withLineReplyToken(event.replyToken, () => handleTextMessage(replyTargetId, (msg as LineTextMessage).text, context), { replyOnly, pushTarget });
         } else if (msg.type === 'image' || msg.type === 'file') {
-          await withLineReplyToken(event.replyToken, () => handleImageMessage(replyTargetId, msg.id, msg.type, context), { replyOnly });
+          // The user explicitly uploaded a file — they expect a real response
+          // (OCR summary, slip Flex card, etc). Disable silent mode for this
+          // event so the smart flow can post follow-up messages via push.
+          await withLineReplyToken(event.replyToken, () => handleImageMessage(replyTargetId, msg.id, msg.type, context), { replyOnly: false, pushTarget });
         }
       } else if (event.type === 'postback' && event.postback) {
         const postbackData = event.postback.data;
-        await withLineReplyToken(event.replyToken, () => handlePostback(replyTargetId, postbackData), { replyOnly });
+        // Postbacks are explicit user actions — also disable silent mode so
+        // the action gets a proper response in the group.
+        await withLineReplyToken(event.replyToken, () => handlePostback(replyTargetId, postbackData), { replyOnly: false, pushTarget });
       }
     } catch (err) {
       lineWebhookDiagnostics.lastUnhandledError = {

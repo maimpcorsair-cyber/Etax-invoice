@@ -5,7 +5,7 @@ import { OcrResult } from './aiService';
 
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
 const channelSecret = process.env.LINE_CHANNEL_SECRET ?? '';
-const replyContext = new AsyncLocalStorage<{ replyToken: string; used: boolean; replyOnly?: boolean }>();
+const replyContext = new AsyncLocalStorage<{ replyToken: string; used: boolean; replyOnly?: boolean; pushTarget?: string }>();
 const lineDiagnostics: {
   lastPushOkAt?: string;
   lastReplyOkAt?: string;
@@ -41,8 +41,12 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
     logger.warn('[Line] reply-only mode skipped push fallback', { lineUserId });
     return false;
   }
+  // When the message originated from a group/room and the reply token is
+  // already used, push to the group/room (not the sender's private chat) so
+  // the rest of the conversation stays where the user expects.
+  const pushTo = ctx?.pushTarget ?? lineUserId;
   try {
-    const body = JSON.stringify({ to: lineUserId, messages });
+    const body = JSON.stringify({ to: pushTo, messages });
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: {
@@ -69,13 +73,18 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
 export async function withLineReplyToken<T>(
   replyToken: string | undefined,
   fn: () => Promise<T>,
-  options?: { replyOnly?: boolean },
+  options?: { replyOnly?: boolean; pushTarget?: string },
 ): Promise<T> {
   if (!replyToken) {
-    if (options?.replyOnly) return replyContext.run({ replyToken: '', used: true, replyOnly: true }, fn);
+    if (options?.replyOnly) {
+      return replyContext.run({ replyToken: '', used: true, replyOnly: true, pushTarget: options.pushTarget }, fn);
+    }
+    if (options?.pushTarget) {
+      return replyContext.run({ replyToken: '', used: true, pushTarget: options.pushTarget }, fn);
+    }
     return fn();
   }
-  return replyContext.run({ replyToken, used: false, replyOnly: options?.replyOnly }, fn);
+  return replyContext.run({ replyToken, used: false, replyOnly: options?.replyOnly, pushTarget: options?.pushTarget }, fn);
 }
 
 async function lineReply(replyToken: string, messages: object[]): Promise<boolean> {
