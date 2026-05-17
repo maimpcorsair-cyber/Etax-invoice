@@ -5,6 +5,8 @@ import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { verifyIntakeEditToken } from '../services/intakeEditToken';
 import { OcrResult } from '../services/aiService';
+import { downloadFromStorage, getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { supportedDocumentMimeType } from '../services/documentOcrService';
 
 /**
  * Guest-mode endpoints for editing a pending LINE document intake via a
@@ -69,28 +71,184 @@ intakeEditRouter.get('/:token', async (req, res) => {
     return;
   }
   try {
-    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
-      where: { id: claims.intakeId, companyId: claims.companyId },
-      select: {
-        id: true,
-        status: true,
-        fileName: true,
-        mimeType: true,
-        fileSize: true,
-        ocrResult: true,
-        warnings: true,
-        error: true,
-        createdAt: true,
-      },
-    }));
+    const [intake, suppliers] = await withSystemRlsContext(prisma, async (tx) => {
+      const intakeRow = await tx.documentIntake.findFirst({
+        where: { id: claims.intakeId, companyId: claims.companyId },
+        select: {
+          id: true,
+          status: true,
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          ocrResult: true,
+          warnings: true,
+          error: true,
+          createdAt: true,
+        },
+      });
+      // Load user-curated supplier contacts so the frontend can offer
+      // autocomplete + auto-fill name/branch when user types the taxId.
+      const supplierRows = await tx.customer.findMany({
+        where: {
+          companyId: claims.companyId,
+          isActive: true,
+          partyRole: { in: ['supplier', 'both'] },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 300,
+        select: { nameTh: true, nameEn: true, taxId: true, branchCode: true },
+      });
+      return [intakeRow, supplierRows] as const;
+    });
     if (!intake) {
       res.status(404).json({ error: 'ไม่พบเอกสาร' });
       return;
     }
-    res.json({ data: intake });
+    res.json({
+      data: intake,
+      suppliers: suppliers.map((s) => ({
+        name: s.nameTh || s.nameEn || '',
+        taxId: s.taxId,
+        branchCode: s.branchCode || '00000',
+      })),
+    });
   } catch (err) {
     logger.error('[intakeEdit] GET failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });
     res.status(500).json({ error: 'อ่านข้อมูลไม่สำเร็จ' });
+  }
+});
+
+intakeEditRouter.get('/:token/file', async (req, res) => {
+  const claims = verifyIntakeEditToken(req.params.token);
+  if (!claims) {
+    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
+    return;
+  }
+  try {
+    const item = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: claims.intakeId, companyId: claims.companyId },
+      select: { fileBase64: true, fileName: true, mimeType: true, fileUrl: true, storageKey: true },
+    }));
+    if (!item) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+    if (item.storageKey) {
+      res.redirect(await getPresignedUrl(item.storageKey, 900));
+      return;
+    }
+    if (item.fileUrl) {
+      res.redirect(item.fileUrl);
+      return;
+    }
+    if (!item.fileBase64) {
+      res.status(404).json({ error: 'Document file is not available' });
+      return;
+    }
+    const buffer = Buffer.from(item.fileBase64, 'base64');
+    res.setHeader('Content-Type', item.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${item.fileName || 'document'}"`);
+    res.send(buffer);
+  } catch (err) {
+    logger.error('[intakeEdit] file stream failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });
+    res.status(500).json({ error: 'เปิดไฟล์ไม่สำเร็จ' });
+  }
+});
+
+const attachmentUploadSchema = z.object({
+  fileName: z.string().min(1).max(200),
+  mimeType: z.string().min(1).max(100),
+  fileBase64: z.string().min(1),
+});
+
+intakeEditRouter.post('/:token/attachments', async (req, res) => {
+  const claims = verifyIntakeEditToken(req.params.token);
+  if (!claims) {
+    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
+    return;
+  }
+  const parsed = attachmentUploadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'ข้อมูลไฟล์ไม่ถูกต้อง', details: parsed.error.flatten() });
+    return;
+  }
+  if (!supportedDocumentMimeType(parsed.data.mimeType)) {
+    res.status(400).json({ error: 'รองรับเฉพาะ PDF, JPG, PNG, WebP' });
+    return;
+  }
+  const buffer = Buffer.from(parsed.data.fileBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+  if (buffer.length > 10 * 1024 * 1024) {
+    res.status(413).json({ error: 'ไฟล์ใหญ่เกิน 10MB' });
+    return;
+  }
+  try {
+    const parent = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: claims.intakeId, companyId: claims.companyId },
+      select: { projectId: true, userId: true, lineUserId: true },
+    }));
+    if (!parent) {
+      res.status(404).json({ error: 'ไม่พบเอกสารหลัก' });
+      return;
+    }
+
+    let storageKey: string | undefined;
+    let fileUrl: string | undefined;
+    if (isStorageConfigured()) {
+      const ext = (parsed.data.fileName.match(/\.[a-z0-9]{2,5}$/i)?.[0] ?? '.bin').toLowerCase();
+      storageKey = `companies/${claims.companyId}/document-intakes/line-attach/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      fileUrl = await uploadToStorage(storageKey, buffer, parsed.data.mimeType);
+    }
+
+    // Create a sibling intake row tagged as 'attachment' via the source
+    // field so the inbox can group it under the same conversation. We do
+    // NOT run OCR on these — they're supplementary docs the user is
+    // attaching to the main intake (e.g. invoice photo alongside slip).
+    const child = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.create({
+      data: {
+        companyId: claims.companyId,
+        projectId: parent.projectId,
+        userId: parent.userId,
+        lineUserId: parent.lineUserId,
+        source: 'line_attachment',
+        fileName: parsed.data.fileName,
+        mimeType: parsed.data.mimeType,
+        fileSize: buffer.length,
+        fileBase64: storageKey ? undefined : buffer.toString('base64'),
+        fileUrl,
+        storageKey,
+        status: 'received',
+        warnings: [`parent_intake:${claims.intakeId}`],
+      },
+      select: { id: true, fileName: true, mimeType: true, fileSize: true, createdAt: true },
+    }));
+
+    res.status(201).json({ data: child });
+  } catch (err) {
+    logger.error('[intakeEdit] attachment upload failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });
+    res.status(500).json({ error: 'อัปโหลดไม่สำเร็จ' });
+  }
+});
+
+intakeEditRouter.get('/:token/attachments', async (req, res) => {
+  const claims = verifyIntakeEditToken(req.params.token);
+  if (!claims) {
+    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
+    return;
+  }
+  try {
+    const rows = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+      where: {
+        companyId: claims.companyId,
+        source: 'line_attachment',
+        warnings: { array_contains: [`parent_intake:${claims.intakeId}`] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, fileName: true, mimeType: true, fileSize: true, createdAt: true },
+    }));
+    res.json({ data: rows });
+  } catch (err) {
+    logger.error('[intakeEdit] list attachments failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });
+    res.status(500).json({ error: 'อ่านรายการไฟล์แนบไม่สำเร็จ' });
   }
 });
 

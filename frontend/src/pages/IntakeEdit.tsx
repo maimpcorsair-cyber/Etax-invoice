@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Save } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Loader2, Paperclip, Save, Upload, X } from 'lucide-react';
 
 /**
  * Guest-mode page for editing a LINE document intake via magic-link.
@@ -45,6 +45,9 @@ type IntakeData = {
   error: string | null;
   createdAt: string;
 };
+
+type Supplier = { name: string; taxId: string; branchCode: string };
+type Attachment = { id: string; fileName: string | null; mimeType: string; fileSize: number; createdAt: string };
 
 type FormState = {
   supplierName: string;
@@ -122,11 +125,17 @@ function buildPatchPayload(f: FormState) {
 export default function IntakeEdit() {
   const { token } = useParams();
   const [intake, setIntake] = useState<IntakeData | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [form, setForm] = useState<FormState>(blankForm());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const fileUrl = useMemo(() => (token ? `/api/intake-edit/${token}/file` : ''), [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -136,12 +145,17 @@ export default function IntakeEdit() {
       setError(null);
       try {
         const res = await fetch(`/api/intake-edit/${token}`);
-        const json = await res.json() as { data?: IntakeData; error?: string };
+        const json = await res.json() as { data?: IntakeData; suppliers?: Supplier[]; error?: string };
         if (!res.ok || !json.data) throw new Error(json.error ?? 'เปิดเอกสารไม่สำเร็จ');
         if (cancelled) return;
         setIntake(json.data);
+        setSuppliers(json.suppliers ?? []);
         setForm(ocrToForm(json.data.ocrResult));
         if (json.data.status === 'saved') setConfirmed(true);
+
+        const ar = await fetch(`/api/intake-edit/${token}/attachments`);
+        const aj = await ar.json() as { data?: Attachment[] };
+        if (!cancelled && aj.data) setAttachments(aj.data);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'เปิดเอกสารไม่สำเร็จ');
       } finally {
@@ -150,6 +164,30 @@ export default function IntakeEdit() {
     })();
     return () => { cancelled = true; };
   }, [token]);
+
+  // Auto-fill supplier name + branch when user types/pastes a complete taxId
+  // that matches a known contact in the company.
+  useEffect(() => {
+    const tid = form.supplierTaxId.replace(/\D/g, '');
+    if (tid.length !== 13) return;
+    const match = suppliers.find((s) => s.taxId === tid);
+    if (!match) return;
+    setForm((prev) => {
+      if (prev.supplierName === match.name && prev.supplierBranch === match.branchCode) return prev;
+      return { ...prev, supplierName: match.name, supplierBranch: match.branchCode };
+    });
+  }, [form.supplierTaxId, suppliers]);
+
+  // Auto-fill taxId + branch when user picks a supplier name from the datalist
+  useEffect(() => {
+    if (!form.supplierName) return;
+    const match = suppliers.find((s) => s.name === form.supplierName);
+    if (!match) return;
+    setForm((prev) => {
+      if (prev.supplierTaxId === match.taxId) return prev;
+      return { ...prev, supplierTaxId: match.taxId, supplierBranch: match.branchCode };
+    });
+  }, [form.supplierName, suppliers]);
 
   async function handleConfirm() {
     if (!token) return;
@@ -168,6 +206,42 @@ export default function IntakeEdit() {
       setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAttachUpload(file: File | null) {
+    if (!file || !token) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setError('แนบได้เฉพาะ PDF, JPG, PNG, WebP');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('ไฟล์ใหญ่เกิน 10MB');
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(reader.error ?? new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`/api/intake-edit/${token}/attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64 }),
+      });
+      const json = await res.json() as { data?: Attachment; error?: string };
+      if (!res.ok || !json.data) throw new Error(json.error ?? 'อัปโหลดไม่สำเร็จ');
+      setAttachments((prev) => [json.data!, ...prev]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -201,82 +275,174 @@ export default function IntakeEdit() {
 
   const r = intake?.ocrResult;
   const isBankTransfer = r?.documentType === 'bank_transfer' || r?.documentType === 'payment_advice';
+  const isImage = intake?.mimeType?.startsWith('image/');
+  const isPdf = intake?.mimeType === 'application/pdf';
 
   return (
     <div className="min-h-screen bg-slate-50 pb-32">
-      <header className="bg-emerald-600 text-white px-4 py-5 shadow">
+      <header className="bg-emerald-600 text-white px-4 py-4 shadow sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <FileText className="w-6 h-6" />
-          <div>
-            <h1 className="font-semibold">แก้ไขเอกสาร</h1>
-            <p className="text-xs text-emerald-50">
+          <FileText className="w-6 h-6 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="font-semibold truncate">แก้ไขเอกสาร</h1>
+            <p className="text-xs text-emerald-50 truncate">
               {r?.documentTypeLabel || intake?.fileName || 'เอกสารจาก LINE'}
             </p>
           </div>
         </div>
       </header>
 
-      {r?.confidence && (
-        <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
-          🤖 AI อ่านมาแล้ว (ความมั่นใจ: {r.confidence}) — ตรวจให้ถูกแล้วกดบันทึก
-        </div>
-      )}
-
-      {r?.validationWarnings?.length ? (
-        <div className="px-4 py-3 bg-rose-50 border-b border-rose-200 text-sm text-rose-800 space-y-1">
-          {r.validationWarnings.slice(0, 3).map((w, i) => (
-            <div key={i}>⚠️ {w}</div>
-          ))}
-        </div>
-      ) : null}
-
-      <form
-        className="px-4 py-5 space-y-4"
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          void handleConfirm();
-        }}
-      >
-        {isBankTransfer ? (
-          <>
-            <Field label="ยอดโอน" value={form.paymentAmount} onChange={(v) => setForm({ ...form, paymentAmount: v })} type="number" />
-            <Field label="วันที่/เวลาโอน" value={form.paymentPaidAt} onChange={(v) => setForm({ ...form, paymentPaidAt: v })} />
-            <Field label="เลขอ้างอิง" value={form.paymentReference} onChange={(v) => setForm({ ...form, paymentReference: v })} />
-            <Field label="จาก (ผู้โอน)" value={form.paymentFromName} onChange={(v) => setForm({ ...form, paymentFromName: v })} />
-            <Field label="ถึง (ผู้รับ)" value={form.paymentToName} onChange={(v) => setForm({ ...form, paymentToName: v })} />
-          </>
-        ) : (
-          <>
-            <Field label="ชื่อผู้ขาย" value={form.supplierName} onChange={(v) => setForm({ ...form, supplierName: v })} />
-            <Field label="เลขผู้เสียภาษี (13 หลัก)" value={form.supplierTaxId} onChange={(v) => setForm({ ...form, supplierTaxId: v.replace(/\D/g, '').slice(0, 13) })} inputMode="numeric" />
-            <Field label="รหัสสาขา (5 หลัก)" value={form.supplierBranch} onChange={(v) => setForm({ ...form, supplierBranch: v.replace(/\D/g, '').slice(0, 5) })} inputMode="numeric" />
-            <Field label="เลขที่ใบกำกับ" value={form.invoiceNumber} onChange={(v) => setForm({ ...form, invoiceNumber: v })} />
-            <Field label="วันที่ใบกำกับ" type="date" value={form.invoiceDate} onChange={(v) => setForm({ ...form, invoiceDate: v })} />
-            <Field label="ยอดก่อน VAT" type="number" value={form.subtotal} onChange={(v) => setForm({ ...form, subtotal: v })} />
-            <Field label="ยอด VAT" type="number" value={form.vatAmount} onChange={(v) => setForm({ ...form, vatAmount: v })} />
-            <Field label="ยอดรวมทั้งสิ้น" type="number" value={form.total} onChange={(v) => setForm({ ...form, total: v })} />
-            <Field label="หมวดค่าใช้จ่าย" value={form.expenseCategory} onChange={(v) => setForm({ ...form, expenseCategory: v })} placeholder="เช่น ค่าสาธารณูปโภค" />
-          </>
-        )}
-
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg p-3">
-            {error}
+      <div className="md:grid md:grid-cols-2 md:gap-4 md:p-4 md:max-w-6xl md:mx-auto">
+        {/* File preview pane */}
+        <section className="bg-slate-900 md:rounded-lg md:shadow overflow-hidden">
+          <div className="px-3 py-2 text-xs text-slate-300 bg-slate-800">📄 ไฟล์ต้นฉบับ</div>
+          <div className="bg-slate-100 md:h-[70vh] h-64 flex items-center justify-center">
+            {isImage ? (
+              <img src={fileUrl} alt="document" className="max-w-full max-h-full object-contain" />
+            ) : isPdf ? (
+              <iframe
+                src={fileUrl}
+                title="document"
+                className="w-full h-full border-0 bg-white"
+              />
+            ) : (
+              <div className="text-slate-500 text-sm text-center px-4">
+                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                ไม่สามารถแสดงตัวอย่างไฟล์นี้ได้<br />
+                <a href={fileUrl} target="_blank" rel="noreferrer" className="text-emerald-600 underline mt-2 inline-block">
+                  เปิดไฟล์ในแท็บใหม่
+                </a>
+              </div>
+            )}
           </div>
-        )}
-      </form>
+        </section>
+
+        {/* Form pane */}
+        <section className="md:bg-white md:rounded-lg md:shadow md:overflow-hidden">
+          {r?.confidence && (
+            <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
+              🤖 AI อ่านมาแล้ว (ความมั่นใจ: {r.confidence}) — ตรวจให้ถูกแล้วกดบันทึก
+            </div>
+          )}
+
+          {r?.validationWarnings?.length ? (
+            <div className="px-4 py-3 bg-rose-50 border-b border-rose-200 text-sm text-rose-800 space-y-1">
+              {r.validationWarnings.slice(0, 3).map((w, i) => (
+                <div key={i}>⚠️ {w}</div>
+              ))}
+            </div>
+          ) : null}
+
+          <datalist id="supplier-names">
+            {suppliers.map((s) => (
+              <option key={`${s.taxId}-${s.branchCode}`} value={s.name}>
+                {s.taxId} ({s.branchCode})
+              </option>
+            ))}
+          </datalist>
+
+          <form
+            className="px-4 py-5 space-y-4"
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              void handleConfirm();
+            }}
+          >
+            {isBankTransfer ? (
+              <>
+                <Field label="ยอดโอน" value={form.paymentAmount} onChange={(v) => setForm({ ...form, paymentAmount: v })} type="number" />
+                <Field label="วันที่/เวลาโอน" value={form.paymentPaidAt} onChange={(v) => setForm({ ...form, paymentPaidAt: v })} />
+                <Field label="เลขอ้างอิง" value={form.paymentReference} onChange={(v) => setForm({ ...form, paymentReference: v })} />
+                <Field label="จาก (ผู้โอน)" value={form.paymentFromName} onChange={(v) => setForm({ ...form, paymentFromName: v })} />
+                <Field label="ถึง (ผู้รับ)" value={form.paymentToName} onChange={(v) => setForm({ ...form, paymentToName: v })} />
+              </>
+            ) : (
+              <>
+                <Field
+                  label="ชื่อผู้ขาย"
+                  value={form.supplierName}
+                  onChange={(v) => setForm({ ...form, supplierName: v })}
+                  list="supplier-names"
+                  hint={suppliers.length ? `มี ${suppliers.length} รายชื่อในระบบ — เริ่มพิมพ์เพื่อค้นหา` : undefined}
+                />
+                <Field
+                  label="เลขผู้เสียภาษี (13 หลัก)"
+                  value={form.supplierTaxId}
+                  onChange={(v) => setForm({ ...form, supplierTaxId: v.replace(/\D/g, '').slice(0, 13) })}
+                  inputMode="numeric"
+                  hint="พิมพ์ครบ 13 หลัก จะ auto-fill ชื่อจากรายชื่อในระบบ"
+                />
+                <Field label="รหัสสาขา (5 หลัก)" value={form.supplierBranch} onChange={(v) => setForm({ ...form, supplierBranch: v.replace(/\D/g, '').slice(0, 5) })} inputMode="numeric" />
+                <Field label="เลขที่ใบกำกับ" value={form.invoiceNumber} onChange={(v) => setForm({ ...form, invoiceNumber: v })} />
+                <Field label="วันที่ใบกำกับ" type="date" value={form.invoiceDate} onChange={(v) => setForm({ ...form, invoiceDate: v })} />
+                <Field label="ยอดก่อน VAT" type="number" value={form.subtotal} onChange={(v) => setForm({ ...form, subtotal: v })} />
+                <Field label="ยอด VAT" type="number" value={form.vatAmount} onChange={(v) => setForm({ ...form, vatAmount: v })} />
+                <Field label="ยอดรวมทั้งสิ้น" type="number" value={form.total} onChange={(v) => setForm({ ...form, total: v })} />
+                <Field label="หมวดค่าใช้จ่าย" value={form.expenseCategory} onChange={(v) => setForm({ ...form, expenseCategory: v })} placeholder="เช่น ค่าสาธารณูปโภค" />
+              </>
+            )}
+
+            {/* Attachments */}
+            <div className="pt-2 border-t border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                  <Paperclip className="w-4 h-4" /> ไฟล์แนบเพิ่มเติม ({attachments.length})
+                </span>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-sm text-emerald-600 hover:text-emerald-700 disabled:text-slate-400 flex items-center gap-1"
+                >
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  เพิ่มไฟล์
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(ev) => void handleAttachUpload(ev.target.files?.[0] ?? null)}
+                />
+              </div>
+              {attachments.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {attachments.map((a) => (
+                    <li key={a.id} className="bg-slate-50 border border-slate-200 rounded px-3 py-2 text-sm text-slate-700 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="truncate flex-1">{a.fileName || 'ไม่มีชื่อ'}</span>
+                      <span className="text-xs text-slate-400 shrink-0">{Math.round(a.fileSize / 1024)} KB</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500">เช่น แนบบิลคู่กับสลิป หรือ ใบเสร็จคู่กับ Invoice</p>
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg p-3 flex items-start gap-2">
+                <X className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+          </form>
+        </section>
+      </div>
 
       <div className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 px-4 py-3 shadow-lg">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void handleConfirm()}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium rounded-lg py-3 flex items-center justify-center gap-2"
-        >
-          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-          {saving ? 'กำลังบันทึก...' : 'บันทึกเอกสาร'}
-        </button>
-        <p className="text-xs text-slate-500 text-center mt-2">หลังบันทึก ระบบจะส่งยืนยันกลับไปใน LINE</p>
+        <div className="md:max-w-6xl md:mx-auto">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void handleConfirm()}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium rounded-lg py-3 flex items-center justify-center gap-2"
+          >
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            {saving ? 'กำลังบันทึก...' : 'บันทึกเอกสาร'}
+          </button>
+          <p className="text-xs text-slate-500 text-center mt-2">หลังบันทึก ระบบจะส่งยืนยันกลับไปใน LINE</p>
+        </div>
       </div>
     </div>
   );
@@ -289,6 +455,8 @@ function Field(props: {
   type?: string;
   inputMode?: 'numeric' | 'text';
   placeholder?: string;
+  hint?: string;
+  list?: string;
 }) {
   return (
     <label className="block">
@@ -299,8 +467,10 @@ function Field(props: {
         value={props.value}
         onChange={(ev) => props.onChange(ev.target.value)}
         placeholder={props.placeholder}
+        list={props.list}
         className="w-full rounded-lg border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 px-3 py-2 text-slate-900 bg-white"
       />
+      {props.hint && <span className="block text-xs text-slate-400 mt-1">{props.hint}</span>}
     </label>
   );
 }
