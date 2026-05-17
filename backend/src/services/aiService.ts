@@ -371,6 +371,47 @@ function validateOcrResult(result: OcrResult): string[] {
   return warnings;
 }
 
+/**
+ * Normalize a Thai/English supplier name for matching across slight
+ * variations like 'บริษัท XYZ จำกัด' vs 'XYZ Co.,Ltd.' vs 'XYZ จก.' vs
+ * '  XYZ  ' that all refer to the same vendor.
+ */
+function normalizeVendorName(name: string | null | undefined): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    // Strip common Thai business suffixes
+    .replace(/\bบริษัท\b/g, '')
+    .replace(/\b(จำกัด|จก\.?|มหาชน|หจก\.?|ห้างหุ้นส่วนจำกัด)\b/g, '')
+    // Strip common English business suffixes
+    .replace(/\b(co\.?,?\s*ltd\.?|company\s+limited|limited|inc\.?|ltd\.?|llc|gmbh)\b/g, '')
+    // Strip parenthesized content like "(สำนักงานใหญ่)" / "(head office)"
+    .replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, '')
+    // Collapse all whitespace + remove punctuation/symbols (Thai keeps its chars)
+    .replace(/[\.,;:!?'"`~@#$%^&*+=|\\\/<>_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Simple trigram-based similarity score 0..1 used for fuzzy vendor lookup. */
+function vendorSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.85;
+  const trigrams = (s: string) => {
+    const set = new Set<string>();
+    if (s.length < 3) { set.add(s); return set; }
+    for (let i = 0; i < s.length - 2; i++) set.add(s.slice(i, i + 3));
+    return set;
+  };
+  const ta = trigrams(a);
+  const tb = trigrams(b);
+  if (!ta.size || !tb.size) return 0;
+  let overlap = 0;
+  for (const g of ta) if (tb.has(g)) overlap += 1;
+  return overlap / Math.max(ta.size, tb.size);
+}
+
 async function buildOcrVendorMemoryContext(companyId?: string) {
   if (!companyId) return '';
   try {
@@ -402,12 +443,15 @@ async function buildOcrVendorMemoryContext(companyId?: string) {
       lastVatAmount: number;
     }>();
     for (const row of rows) {
-      const key = row.supplierTaxId && row.supplierTaxId !== '0000000000000'
+      const hasValidTaxId = row.supplierTaxId && row.supplierTaxId !== '0000000000000';
+      const key = hasValidTaxId
         ? row.supplierTaxId
-        : row.supplierName.trim().toLowerCase();
+        : (normalizeVendorName(row.supplierName) || row.supplierName.trim().toLowerCase());
       const existing = byVendor.get(key);
       if (existing) {
         existing.count += 1;
+        // Promote category if previously missing — recurring vendor convergence
+        if (!existing.category && row.category) existing.category = row.category;
         continue;
       }
       byVendor.set(key, {
@@ -430,6 +474,53 @@ async function buildOcrVendorMemoryContext(companyId?: string) {
   }
 }
 
+interface KnownVendor {
+  supplierName: string;
+  supplierTaxId: string;
+  supplierBranch: string | null;
+  category: string | null;
+  vatType: string;
+}
+
+/**
+ * Find a vendor in this company's PurchaseInvoice history using multiple
+ * lookup strategies, in priority order:
+ *   1. Exact tax-id (most reliable when present)
+ *   2. Normalized supplier name exact match
+ *   3. Trigram similarity ≥ 0.65 against any vendor seen in the last 200 docs
+ *
+ * Returns the most recent matching record so the latest user-confirmed
+ * category/vatType always wins over older entries.
+ */
+async function findKnownVendor(companyId: string, supplierTaxId: string, supplierName: string): Promise<KnownVendor | null> {
+  const hasTaxId = supplierTaxId && supplierTaxId !== '0000000000000';
+  if (hasTaxId) {
+    const byTaxId = await prisma.purchaseInvoice.findFirst({
+      where: { companyId, supplierTaxId },
+      orderBy: { createdAt: 'desc' },
+      select: { supplierName: true, supplierTaxId: true, supplierBranch: true, category: true, vatType: true },
+    });
+    if (byTaxId) return byTaxId;
+  }
+  const normalizedQuery = normalizeVendorName(supplierName);
+  if (!normalizedQuery) return null;
+  const recent = await prisma.purchaseInvoice.findMany({
+    where: { companyId },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+    select: { supplierName: true, supplierTaxId: true, supplierBranch: true, category: true, vatType: true },
+  });
+  let best: { row: KnownVendor; score: number } | null = null;
+  for (const row of recent) {
+    const score = vendorSimilarity(normalizedQuery, normalizeVendorName(row.supplierName));
+    if (score >= 0.65 && (!best || score > best.score)) {
+      best = { row, score };
+      if (score === 1) break; // perfect match — stop searching
+    }
+  }
+  return best?.row ?? null;
+}
+
 async function applyBusinessValidation(result: OcrResult, companyId?: string): Promise<OcrResult> {
   const warnings = new Set(result.validationWarnings ?? validateOcrResult(result));
   if (!companyId) {
@@ -449,23 +540,21 @@ async function applyBusinessValidation(result: OcrResult, companyId?: string): P
       if (duplicate) warnings.add('พบเลขที่เอกสารนี้ในภาษีซื้อแล้ว อาจเป็นเอกสารซ้ำ');
     }
 
-    const knownVendor = await prisma.purchaseInvoice.findFirst({
-      where: {
-        companyId,
-        OR: ([
-          result.supplierTaxId ? { supplierTaxId: result.supplierTaxId } : undefined,
-          result.supplierName ? { supplierName: { contains: result.supplierName, mode: 'insensitive' } } : undefined,
-        ].filter(Boolean) as any),
-      },
-      orderBy: { createdAt: 'desc' },
-      select: { supplierName: true, supplierTaxId: true, supplierBranch: true, category: true, vatType: true },
-    });
+    const knownVendor = await findKnownVendor(companyId, result.supplierTaxId, result.supplierName);
 
     if (knownVendor) {
       if (!result.supplierTaxId || result.supplierTaxId === '0000000000000') result.supplierTaxId = knownVendor.supplierTaxId;
       if (!result.supplierBranch) result.supplierBranch = knownVendor.supplierBranch || '00000';
       if (!result.postingSuggestion && knownVendor.category) result.postingSuggestion = knownVendor.category;
+      if (!result.expenseSubcategory && knownVendor.category) result.expenseSubcategory = knownVendor.category;
       if (!result.taxTreatment && knownVendor.vatType === 'vat7') result.taxTreatment = 'input_vat_claimable';
+      // Pin the canonical (DB-stored) supplier name when our OCR name fuzzily
+      // matches — avoids polluting the cache with new variants every upload.
+      const ocrName = normalizeVendorName(result.supplierName);
+      const dbName = normalizeVendorName(knownVendor.supplierName);
+      if (ocrName && dbName && ocrName !== dbName && vendorSimilarity(ocrName, dbName) >= 0.7) {
+        result.supplierName = knownVendor.supplierName;
+      }
       warnings.add(`พบ vendor เดิมในระบบ: ${knownVendor.supplierName}`);
     }
   } catch (err) {
