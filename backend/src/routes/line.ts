@@ -3448,12 +3448,11 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       }
     }
 
+    const pushTargetForJob = messageContext.lineGroupId ?? messageContext.lineRoomId;
+    let enqueued = false;
     try {
-      await enqueueLineOcrJob({
-        intakeId: intake.id,
-        lineUserId,
-        pushTarget: messageContext.lineGroupId ?? messageContext.lineRoomId,
-      });
+      await enqueueLineOcrJob({ intakeId: intake.id, lineUserId, pushTarget: pushTargetForJob });
+      enqueued = true;
     } catch (enqueueErr) {
       // Fall back to inline processing so the user still gets a response
       // even if Redis/BullMQ is down. This is the same path the system
@@ -3462,8 +3461,38 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       void processIntakeOcrPipeline({
         intakeId: intake.id,
         lineUserId,
-        pushTarget: messageContext.lineGroupId ?? messageContext.lineRoomId,
+        pushTarget: pushTargetForJob,
       }).catch((err) => logger.error('[Line] inline OCR fallback failed', { err }));
+    }
+
+    // Stale-job watchdog: if the BullMQ worker doesn't process this intake
+    // within 75 seconds (worker dyno asleep, queue stuck, etc.), fall back
+    // to inline processing on the web dyno. This is the difference between
+    // 'user sees a result eventually' and 'user waits forever'.
+    if (enqueued) {
+      const intakeIdForWatchdog = intake.id;
+      setTimeout(async () => {
+        try {
+          const fresh = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+            where: { id: intakeIdForWatchdog },
+            select: { status: true },
+          }));
+          // Only fall back if the intake is still in the initial states —
+          // 'processing' / 'received' / 'awaiting_*' all mean the worker
+          // hasn't finished. 'saved' / 'failed' / 'needs_review' mean it
+          // completed (success or graceful failure).
+          if (fresh && ['received', 'processing'].includes(fresh.status)) {
+            logger.warn('[Line] BullMQ OCR stalled — running inline fallback', { intakeId: intakeIdForWatchdog });
+            await processIntakeOcrPipeline({
+              intakeId: intakeIdForWatchdog,
+              lineUserId,
+              pushTarget: pushTargetForJob,
+            });
+          }
+        } catch (err) {
+          logger.error('[Line] watchdog inline fallback failed', { err, intakeId: intakeIdForWatchdog });
+        }
+      }, 75_000);
     }
     return;
   } catch (err) {
@@ -3769,8 +3798,13 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       // for confirmation a second time.
       await performConfirmedIntakeSave(lineUserId, intake, updatedResult);
     } catch (err) {
-      logger.error('[Line] set_category failed', { err, data });
-      await sendLineText(lineUserId, 'ขอโทษ เกิดข้อผิดพลาดในการบันทึกหมวด');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errCode = (err && typeof err === 'object' && 'code' in err) ? String((err as { code?: unknown }).code) : '';
+      const errMeta = (err && typeof err === 'object' && 'meta' in err) ? JSON.stringify((err as { meta?: unknown }).meta).slice(0, 200) : '';
+      logger.error('[Line] set_category failed', { err, data, errMsg, errCode, errMeta });
+      const errSnippet = errMsg.slice(0, 150).replace(/[\n\r]+/g, ' ');
+      const codeStr = errCode ? `[${errCode}] ` : '';
+      await sendLineText(lineUserId, `⚠️ บันทึกหมวดไม่สำเร็จ\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว ตรวจดูในหน้า Input VAT`);
     }
     return;
   }
