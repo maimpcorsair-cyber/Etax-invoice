@@ -44,6 +44,7 @@ import { setupRichMenu } from '../services/richMenuService';
 import { isStorageConfigured, uploadToStorage, downloadFromStorage } from '../services/storageService';
 import { enqueueLineOcrJob } from '../queues/lineOcrQueue';
 import { getOcrPolicyForCompany } from '../services/ocrPolicyService';
+import { auditLog } from '../config/auditLog';
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
@@ -1011,6 +1012,15 @@ async function performConfirmedIntakeSave(
     targetId: saved.id,
     purchaseInvoiceId: saved.id,
   });
+  auditLog({
+    event: 'intake_saved_as_purchase',
+    companyId: intake.companyId,
+    actorUserId: intake.userId,
+    actorLineUserId: lineUserId,
+    intakeId: intake.id,
+    purchaseInvoiceId: saved.id,
+    extra: { total: saved.total, supplier: saved.supplierName, invoiceNumber: saved.invoiceNumber },
+  });
 
   const matched = await tryAutoMatchPendingSlipWithPurchase(lineUserId, saved, intake.companyId);
   if (!matched) {
@@ -1079,6 +1089,14 @@ async function tryAutoMatchPendingBillWithSlip(
     targetType: 'purchase_invoice',
     targetId: purchase.id,
     purchaseInvoiceId: purchase.id,
+  });
+  auditLog({
+    event: 'purchase_paid_via_slip',
+    companyId: billIntake.companyId,
+    actorLineUserId: lineUserId,
+    intakeId: slipIntakeId,
+    purchaseInvoiceId: purchase.id,
+    extra: { matchType: 'pending_bill_out_of_order', whtRate: matchInfo.whtRate, slipAmount, billTotal: purchase.total },
   });
   try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
   await sendLineFlexMessage(
@@ -3392,6 +3410,14 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         docsUsedThisMonth: policy.docsUsedThisMonth,
         monthlyDocLimit: policy.monthlyDocLimit,
       });
+      auditLog({
+        event: 'intake_quota_blocked',
+        companyId,
+        actorUserId: resolved.userId,
+        actorLineUserId: lineUserId,
+        intakeId: intake.id,
+        extra: { docsUsedThisMonth: policy.docsUsedThisMonth, monthlyDocLimit: policy.monthlyDocLimit },
+      });
       await updateDocumentIntake(intake.id, {
         status: 'needs_review',
         error: `quota_exceeded:${policy.docsUsedThisMonth}/${policy.monthlyDocLimit}`,
@@ -3623,6 +3649,14 @@ async function runIntakeOcrPipelineInner(input: { intakeId: string; lineUserId: 
           ocrResult: enrichedResult,
           warnings: [...(enrichedResult.validationWarnings ?? []), `duplicate_slip:${dup.id}`],
           error: `duplicate_slip:${dup.id}`,
+        });
+        auditLog({
+          event: 'intake_duplicate_warned',
+          companyId,
+          actorUserId: intake.userId,
+          actorLineUserId: lineUserId,
+          intakeId: intake.id,
+          extra: { duplicateOfIntakeId: dup.id, reference: enrichedResult.payment?.reference },
         });
         await sendLineFlexMessage(
           lineUserId,
