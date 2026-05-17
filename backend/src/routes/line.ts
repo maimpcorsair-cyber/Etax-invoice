@@ -653,25 +653,17 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   }));
   const editUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, intakeRow?.companyId);
 
+  // Single Flex card carries everything: summary, "บันทึก" postback button,
+  // and "แก้ไขในเว็บ" URI button (when editUrl was built successfully).
+  // No follow-up text — user explicitly asked to keep the chat clean.
+  // If the URI button fails to render in LINE, the postback "บันทึก" is
+  // still tappable and the user can also just type the value in chat
+  // (handleDurableIntakeReply still processes it).
   await sendLineFlexMessage(
     lineUserId,
-    `📄 ${result.documentTypeLabel || 'เอกสาร'} — ตรวจข้อมูลก่อนบันทึก`,
+    `📄 ${result.documentTypeLabel || 'เอกสาร'} — กดปุ่มในการ์ดเพื่อบันทึกหรือแก้ไข`,
     buildIntakeConfirmFlexCard(result, intakeId, editUrl ? { editUrl } : undefined),
   );
-
-  if (editUrl) {
-    // Append the URL directly as plain text so the user has a tap-target
-    // even if the Flex card button doesn't render or scrolls offscreen.
-    await sendLineText(
-      lineUserId,
-      `🤖 อ่านได้แต่ยังขาด: ${field.label}\n\n✏️ แก้ไขในเว็บ (ไม่ต้อง login):\n${editUrl}\n\nหรือกด "บันทึก" ในการ์ดด้านบนถ้าข้อมูลที่อ่านมาพอใช้ (ฟิลด์ที่ขาดจะถูกเว้นว่างไว้)\n\nลิงก์หมดอายุใน 24 ชม`,
-    );
-  } else {
-    await sendLineText(
-      lineUserId,
-      `🤖 อ่านได้แต่ยังขาด: ${field.label}\nกด "บันทึก" ในการ์ดด้านบนถ้าพอใจกับข้อมูลที่อ่านมา หรือพิมพ์ค่า ${field.label} กลับมาเลยก็ได้`,
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,7 +1056,7 @@ export async function performConfirmedIntakeSave(
     // auto-match against it (out-of-order pairing).
     try { await redis.set(`line:pending_bill:${lineUserId}`, intake.id, 'EX', 1800); }
     catch (err) { logger.warn('[Line] redis set pending_bill failed', { err }); }
-    await replySavedPurchase(lineUserId, result, saved.id, undefined, intake.userId);
+    await replySavedPurchase(lineUserId, result, saved.id, undefined, intake.userId, intake.id, intake.companyId);
   }
 
   void syncDocumentIntakeToProjectDrive(intake.id, {
@@ -1483,7 +1475,7 @@ async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string
   });
 }
 
-async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกค่าใช้จ่ายสำเร็จ', submitterUserId?: string) {
+async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกค่าใช้จ่ายสำเร็จ', submitterUserId?: string, intakeId?: string, companyId?: string) {
   const totalLabel = result.total
     ? ` ฿${result.total.toLocaleString('th-TH')}`
     : '';
@@ -1501,10 +1493,53 @@ async function replySavedPurchase(lineUserId: string, result: OcrResult, purchas
       logger.warn('[Line] submitter lookup failed', { err, submitterUserId });
     }
   }
+
+  // Fetch Google Sheet + Drive folder URLs so the user can jump straight
+  // to their company workspace from the LINE bot — closes the loop user
+  // explicitly asked for ("พอบันทึกจะแสดง sheet google และ google drive
+  // location ของไฟล์"). Drive sync is async so driveFolderUrl may not be
+  // populated yet on first save — falls back to project / company folder.
+  let sheetUrl: string | undefined;
+  let driveFolderUrl: string | undefined;
+  if (companyId) {
+    try {
+      const company = await withSystemRlsContext(prisma, (tx) => tx.company.findUnique({
+        where: { id: companyId },
+        select: { googleWorkspaceSheetUrl: true },
+      }));
+      sheetUrl = company?.googleWorkspaceSheetUrl ?? undefined;
+    } catch (err) {
+      logger.warn('[Line] sheet URL lookup failed', { err, companyId });
+    }
+  }
+  if (intakeId) {
+    try {
+      const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+        where: { id: intakeId },
+        select: { driveFolderUrl: true, projectId: true },
+      }));
+      driveFolderUrl = intake?.driveFolderUrl ?? undefined;
+      if (!driveFolderUrl && intake?.projectId) {
+        const project = await withSystemRlsContext(prisma, (tx) => tx.project.findUnique({
+          where: { id: intake.projectId! },
+          select: { driveFolderUrl: true },
+        }));
+        driveFolderUrl = project?.driveFolderUrl ?? undefined;
+      }
+    } catch (err) {
+      logger.warn('[Line] drive URL lookup failed', { err, intakeId });
+    }
+  }
+
   await sendLineFlexMessage(
     lineUserId,
     `${prefix}${totalLabel}`,
-    buildIntakeSavedFlexCard(result, { editPostback: `edit_purchase:${purchaseId}`, submittedBy }),
+    buildIntakeSavedFlexCard(result, {
+      editPostback: `edit_purchase:${purchaseId}`,
+      submittedBy,
+      sheetUrl,
+      driveFolderUrl,
+    }),
   );
 }
 
@@ -3582,7 +3617,34 @@ export async function processIntakeOcrPipeline(input: {
   pushTarget?: string;
 }): Promise<void> {
   const { intakeId, lineUserId, pushTarget } = input;
-  await withLineReplyToken('', () => runIntakeOcrPipelineInner({ intakeId, lineUserId }), { pushTarget });
+
+  // Mutex per-intake so the BullMQ worker and the recovery loop can't
+  // double-process the same upload — they were racing in production and
+  // the user got both "❌ ยังอ่านไม่ได้" AND "🤖 อ่านได้แต่ยังขาด" for the
+  // same receipt. SET NX EX 300s; lock auto-expires so a crashed dyno
+  // doesn't pin the intake forever.
+  const lockKey = `intake:processing:${intakeId}`;
+  let acquired = false;
+  try {
+    const result = await redis.set(lockKey, '1', 'EX', 300, 'NX');
+    acquired = result === 'OK';
+  } catch (err) {
+    logger.warn('[Line] processing-lock acquire failed', { err, intakeId });
+    // Best-effort: fall through and process anyway so a Redis blip doesn't
+    // stall every upload. Worst case is the rare double-process we're
+    // already living with.
+    acquired = true;
+  }
+  if (!acquired) {
+    logger.info('[Line] skipping OCR pipeline — already in-flight', { intakeId });
+    return;
+  }
+
+  try {
+    await withLineReplyToken('', () => runIntakeOcrPipelineInner({ intakeId, lineUserId }), { pushTarget });
+  } finally {
+    try { await redis.del(lockKey); } catch { /* best-effort */ }
+  }
 }
 
 async function runIntakeOcrPipelineInner(input: { intakeId: string; lineUserId: string }): Promise<void> {
@@ -4255,7 +4317,7 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
         logger.warn('[Line] Redis lastedit save failed after saving purchase', { err: redisErr, purchaseId: saved.id });
       }
 
-      await replySavedPurchase(lineUserId, ocrData, saved.id);
+      await replySavedPurchase(lineUserId, ocrData, saved.id, undefined, undefined, undefined, companyId);
     } catch (err) {
       logger.error('[Line] confirm_purchase failed', { err, tempId });
       await sendLineText(lineUserId, 'ขอโทษ เกิดข้อผิดพลาดในการบันทึกข้อมูล');

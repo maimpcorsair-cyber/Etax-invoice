@@ -583,7 +583,17 @@ export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string, 
   };
 }
 
-export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: string; editPostback?: string; submittedBy?: string; approvedBy?: string } = {}): object {
+export function buildIntakeSavedFlexCard(
+  result: OcrResult,
+  opts: {
+    viewUrl?: string;
+    editPostback?: string;
+    submittedBy?: string;
+    approvedBy?: string;
+    sheetUrl?: string;
+    driveFolderUrl?: string;
+  } = {},
+): object {
   const { body: baseBody } = buildOcrFlexCardContents(result);
   // Append submitter/approver attribution rows to the existing body so the
   // saved card matches paypers UX ('ผู้ขออนุญาตเบิก: ...'). Both are
@@ -612,6 +622,22 @@ export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: st
       action: { type: 'uri', label: '🧾 ดูใบแทนใบเสร็จ', uri: opts.viewUrl },
     });
   }
+  if (opts.sheetUrl) {
+    footerButtons.push({
+      type: 'button',
+      style: 'link',
+      flex: 1,
+      action: { type: 'uri', label: '📊 เปิด Google Sheet', uri: opts.sheetUrl },
+    });
+  }
+  if (opts.driveFolderUrl) {
+    footerButtons.push({
+      type: 'button',
+      style: 'link',
+      flex: 1,
+      action: { type: 'uri', label: '📁 เปิด Drive folder', uri: opts.driveFolderUrl },
+    });
+  }
   if (opts.editPostback) {
     footerButtons.push({
       type: 'button',
@@ -620,6 +646,8 @@ export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: st
       action: { type: 'postback', label: '✏️ แก้ไข', data: opts.editPostback },
     });
   }
+  // 3+ buttons stack vertically so Thai labels don't truncate.
+  const footerLayout = footerButtons.length >= 3 ? 'vertical' : 'horizontal';
   return {
     type: 'bubble',
     header: {
@@ -641,7 +669,7 @@ export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: st
       ? {
           footer: {
             type: 'box',
-            layout: 'horizontal',
+            layout: footerLayout,
             spacing: 'sm',
             contents: footerButtons,
           },
