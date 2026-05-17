@@ -1,4 +1,7 @@
 import 'dotenv/config';
+// Initialize Sentry FIRST so it captures any worker load-time errors.
+import { initSentry } from './config/sentry';
+initSentry('worker');
 import { logger } from './config/logger';
 
 async function startWorkers() {

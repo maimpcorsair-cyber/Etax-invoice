@@ -1,4 +1,7 @@
 import 'dotenv/config';
+// Initialize Sentry BEFORE other imports so it captures any load-time errors.
+import { initSentry, Sentry } from './config/sentry';
+initSentry('web');
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -97,6 +100,10 @@ app.use('/api/pp30', pp30Router);
 app.use('/api/wht-certificates', authenticate, whtCertificatesRouter);
 app.use('/api/line', lineRouter);
 app.use('/api/ai-chat', authenticate, aiChatRouter);
+
+// Sentry error handler — must come BEFORE our own. It captures the error
+// but passes it through, so the response is still owned by our handler.
+Sentry.setupExpressErrorHandler(app);
 
 app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   void next;

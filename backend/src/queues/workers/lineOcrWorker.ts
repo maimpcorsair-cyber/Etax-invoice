@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import redis from '../../config/redis';
 import { logger } from '../../config/logger';
+import { captureException } from '../../config/sentry';
 import { LINE_OCR_QUEUE_NAME, type LineOcrJobData } from '../lineOcrQueue';
 
 const concurrency = Number(process.env.LINE_OCR_CONCURRENCY ?? '3');
@@ -38,6 +39,19 @@ lineOcrWorker.on('failed', (job, err) => {
     attempts: job?.attemptsMade,
     error: err.message,
   });
+  // Send to Sentry only on the FINAL attempt so transient retries don't
+  // spam the error dashboard.
+  const opts = job?.opts as { attempts?: number } | undefined;
+  const finalAttempt = !job || !opts?.attempts || (job.attemptsMade ?? 0) >= opts.attempts;
+  if (finalAttempt) {
+    captureException(err, {
+      queue: 'line-ocr',
+      jobId: job?.id,
+      intakeId: job?.data?.intakeId,
+      lineUserId: job?.data?.lineUserId,
+      attempts: job?.attemptsMade,
+    });
+  }
 });
 
 logger.info('[lineOcrWorker] started', { concurrency });

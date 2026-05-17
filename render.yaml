@@ -87,6 +87,8 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
+      - key: SENTRY_DSN
+        sync: false
 
   - type: worker
     name: etax-invoice-worker
@@ -143,6 +145,8 @@ services:
       - key: LINE_CHANNEL_ACCESS_TOKEN
         sync: false
       - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: SENTRY_DSN
         sync: false
 
 databases:
