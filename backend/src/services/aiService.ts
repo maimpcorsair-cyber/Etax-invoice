@@ -104,6 +104,15 @@ async function callGemini(
   const body = {
     contents: [{ parts }],
     generationConfig: { temperature: 0.1, maxOutputTokens: 2000, responseMimeType: 'application/json' },
+    // Defaults block financial / PII-containing images (e.g. bank slips with
+    // account numbers, ID-like numbers). For an OCR use case this is the
+    // wrong default — set every category to BLOCK_NONE so we get the text.
+    safetySettings: [
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    ],
   };
   const res = await fetchWithTimeout(url, {
     method: 'POST',
@@ -114,8 +123,32 @@ async function callGemini(
     const txt = await res.text();
     throw new Error(`Gemini ${res.status}: ${txt.slice(0, 200)}`);
   }
-  const data = await res.json() as { candidates?: Array<{ content: { parts: Array<{ text?: string }> } }> };
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  type GeminiResponse = {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      finishReason?: string;
+      safetyRatings?: Array<{ category: string; probability: string; blocked?: boolean }>;
+    }>;
+    promptFeedback?: { blockReason?: string; safetyRatings?: Array<{ category: string; probability: string }> };
+  };
+  const data = await res.json() as GeminiResponse;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  if (!text) {
+    // Empty response — surface why so we can fix the right thing.
+    const promptBlock = data.promptFeedback?.blockReason;
+    const candidateFinish = data.candidates?.[0]?.finishReason;
+    const blockedRatings = (data.candidates?.[0]?.safetyRatings ?? []).filter((r) => r.blocked);
+    logger.warn('[Gemini] empty response', {
+      model, mimeType,
+      promptBlockReason: promptBlock,
+      candidateFinishReason: candidateFinish,
+      blockedRatings: blockedRatings.map((r) => `${r.category}:${r.probability}`),
+    });
+    if (promptBlock || candidateFinish === 'SAFETY' || blockedRatings.length > 0) {
+      throw new Error(`Gemini blocked: ${promptBlock ?? candidateFinish ?? 'safety'}`);
+    }
+  }
+  return text;
 }
 
 export interface OcrResult {
