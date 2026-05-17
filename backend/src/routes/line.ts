@@ -621,10 +621,17 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
     buildIntakeConfirmFlexCard(result, intakeId),
   );
 
+  // Some fields aren't always available (restaurant receipts often have no
+  // tax id) — let the user skip and save what we have.
+  const buttons: Array<{ label: string; text?: string; data?: string; displayText?: string }> = [
+    { label: '⏭ ข้าม (ไม่ใส่)', data: `skip_field:${intakeId}:${field.key}`, displayText: `ข้าม ${field.label}` },
+    { label: '❌ ยกเลิก', text: 'ยกเลิก' },
+  ];
+
   await sendLineTextWithQuickReply(
     lineUserId,
-    `ช่วยเพิ่มข้อมูลเฉพาะช่องนี้เพื่อให้ครบ:\n\n📌 ${field.label}\n💡 ${field.hint}`,
-    [{ label: '❌ ยกเลิก', text: 'ยกเลิก' }],
+    `ช่วยเพิ่มข้อมูลเฉพาะช่องนี้เพื่อให้ครบ:\n\n📌 ${field.label}\n💡 ${field.hint}\n\n(ถ้าเอกสารไม่มีฟิลด์นี้ กดปุ่ม "ข้าม" ได้เลย)`,
+    buttons,
   );
 }
 
@@ -635,27 +642,44 @@ async function performConfirmedIntakeSave(
 ): Promise<void> {
   if (result.documentType === 'bank_transfer' || result.documentType === 'payment_advice') {
     const match = await handleBankTransferDocument(lineUserId, result, intake.companyId, intake.userId, intake.id);
+    // The user clicked '✅ บันทึก' on the slip card. Two outcomes:
+    // (a) auto-match succeeded → mark saved + matched + green Flex card
+    // (b) no match → still mark SAVED (the slip itself is recorded) and send
+    //     a friendly 'slip is in the system, you can match later in web or
+    //     by uploading a bill' message — NOT a red 'ยังไม่พบคู่' card.
+    const isAutoMatched = match.ok && match.status === 'saved';
     await updateDocumentIntake(intake.id, {
-      status: match.status,
+      status: isAutoMatched ? 'saved' : 'saved',
       ocrResult: result,
       warnings: [...(result.validationWarnings ?? []), ...(match.warnings ?? [])],
-      error: match.ok ? undefined : match.message,
+      error: isAutoMatched ? undefined : 'pending_manual_match',
       targetType: match.targetType,
       targetId: match.targetId,
       purchaseInvoiceId: match.targetType === 'purchase_invoice' ? match.targetId : undefined,
     });
-    if (match.flexCard) {
+    if (isAutoMatched && match.flexCard) {
       await sendLineFlexMessage(lineUserId, match.flexAlt ?? match.message, match.flexCard);
     } else {
-      await sendLineText(lineUserId, match.message);
+      // Slip saved, no match yet. Use the green 'saved' Flex header so the
+      // user knows their action succeeded — the absence of a match isn't an
+      // error, just a pending state.
+      const amt = Number(result.payment?.amount ?? result.total ?? 0);
+      const amtLabel = amt ? `฿${amt.toLocaleString('th-TH')}` : '';
+      await sendLineFlexMessage(
+        lineUserId,
+        `✅ บันทึกสลิปแล้ว ${amtLabel}`.trim(),
+        buildPaymentSlipFlexCard(result, 'saved', { intakeId: intake.id }),
+      );
+      await sendLineText(
+        lineUserId,
+        `บันทึกสลิปเข้าระบบแล้ว ✅\nยังไม่ได้จับคู่กับบิล — สามารถส่งบิลที่ตรงยอดมาในแชทเพื่อจับคู่อัตโนมัติ หรือเข้าจับคู่ในเว็บภายหลังได้`,
+      );
     }
-    if (match.ok) {
-      void syncDocumentIntakeToProjectDrive(intake.id, {
-        companyId: intake.companyId,
-        preferredUserId: intake.userId,
-        duplicatePolicy: 'skip',
-      });
-    }
+    void syncDocumentIntakeToProjectDrive(intake.id, {
+      companyId: intake.companyId,
+      preferredUserId: intake.userId,
+      duplicatePolicy: 'skip',
+    });
     return;
   }
 
@@ -998,6 +1022,28 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
     }
     throw err;
   }
+}
+
+async function findDuplicateSlipIntake(result: OcrResult, companyId: string, currentIntakeId?: string) {
+  const reference = result.payment?.reference;
+  if (!reference || reference.length < 6) return null;
+  const recent = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+    where: {
+      companyId,
+      id: currentIntakeId ? { not: currentIntakeId } : undefined,
+      createdAt: { gte: new Date(Date.now() - 90 * 86_400_000) },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+    select: { id: true, ocrResult: true, status: true, createdAt: true, targetType: true, targetId: true, purchaseInvoiceId: true },
+  }));
+  for (const c of recent) {
+    const r = c.ocrResult as unknown as OcrResult | null;
+    if (r?.payment?.reference && r.payment.reference === reference) {
+      return { id: c.id, status: c.status, createdAt: c.createdAt, ocrResult: r, targetType: c.targetType, targetId: c.targetId };
+    }
+  }
+  return null;
 }
 
 async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string, fallbackId: string) {
@@ -2320,6 +2366,17 @@ async function handleDurableIntakeReply(lineUserId: string, text: string): Promi
   }
   setTemplateValue(result, field.key, parsed);
 
+  // Persist the updated value immediately so even if the user closes the chat
+  // here, we've still captured what they typed.
+  await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
+    where: { id: active.id },
+    data: { ocrResult: result as unknown as Prisma.InputJsonValue, error: null },
+  }));
+
+  // Acknowledge the value before asking for the next thing, so the user
+  // knows their input was received (otherwise the chat looks silent).
+  await sendLineText(lineUserId, `✅ บันทึก ${field.label}: ${parsed} แล้ว`);
+
   const [nextField] = missingTemplateFields(result);
   if (nextField) {
     await askForMissingField(lineUserId, active.id, result, nextField);
@@ -3020,6 +3077,36 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
         ...result,
         qrText,
       } as OcrResult;
+
+      // Duplicate slip detection — same transaction reference seen recently.
+      // Don't silently re-save; warn the user with what we found and let
+      // them decide. (Common case: user keeps re-uploading to test, or
+      // accidentally re-shares the same slip.)
+      if (intake?.id) {
+        const dup = await findDuplicateSlipIntake(enrichedResult, companyId, intake.id);
+        if (dup) {
+          const ageDays = Math.round((Date.now() - new Date(dup.createdAt).getTime()) / 86_400_000);
+          const ageLabel = ageDays === 0 ? 'วันนี้' : `${ageDays} วันก่อน`;
+          const statusLabel = dup.status === 'saved' ? 'บันทึกแล้ว' : 'รอตรวจ';
+          await updateDocumentIntake(intake.id, {
+            status: 'needs_review',
+            ocrResult: enrichedResult,
+            warnings: [...(enrichedResult.validationWarnings ?? []), `duplicate_slip:${dup.id}`],
+            error: `duplicate_slip:${dup.id}`,
+          });
+          await sendLineFlexMessage(
+            lineUserId,
+            `⚠️ สลิปซ้ำ — เลขรายการเดียวกันเคยส่งแล้ว (${ageLabel})`,
+            buildPaymentSlipFlexCard(enrichedResult, 'unmatched', { intakeId: intake.id }),
+          );
+          await sendLineText(
+            lineUserId,
+            `⚠️ สลิปนี้เคยส่งมาแล้ว (${ageLabel}, ${statusLabel})\nเลขรายการ: ${enrichedResult.payment?.reference ?? '-'}\n\nถ้าต้องการบันทึกซ้ำให้กด "บันทึก" บนการ์ดด้านบน — มิฉะนั้นไฟล์จะค้างในคิวรอตรวจ`,
+          );
+          return;
+        }
+      }
+
       // For bank slips we ALWAYS go straight to the summary card so the user
       // sees who paid whom and how much. If amount is missing we ask for it
       // in a quick reply; we never ask for supplier tax-id on a slip.
@@ -3165,6 +3252,41 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
     return;
   }
 
+
+  if (data.startsWith('skip_field:')) {
+    const [, intakeId, fieldKey] = data.split(':');
+    if (!intakeId || !fieldKey) {
+      await sendLineText(lineUserId, 'คำสั่งไม่ถูกต้อง');
+      return;
+    }
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    }));
+    const result = intake?.ocrResult as unknown as OcrResult | null;
+    if (!intake || !result) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลเอกสาร');
+      return;
+    }
+    // Skip this field — set a placeholder value so missingTemplateFields
+    // stops returning it as missing, then move on to the next missing field
+    // or jump straight to confirmation.
+    if (fieldKey === 'supplierTaxId') {
+      setTemplateValue(result, fieldKey, '0000000000000');
+    } else if (fieldKey === 'supplierName') {
+      setTemplateValue(result, fieldKey, 'ไม่ระบุ');
+    } else if (fieldKey.startsWith('payment.') || ['invoiceDate', 'invoiceNumber'].includes(fieldKey)) {
+      setTemplateValue(result, fieldKey, '');
+    }
+    const [nextField] = missingTemplateFields(result);
+    if (nextField) {
+      await askForMissingField(lineUserId, intake.id, result, nextField);
+      return;
+    }
+    // All required fields satisfied (with skips where allowed) — go to
+    // confirmation card so user can review + tap '✅ บันทึก'.
+    await askForConfirmation(lineUserId, intake.id, result);
+    return;
+  }
 
   if (data.startsWith('cancel_intake:')) {
     const intakeId = data.slice('cancel_intake:'.length);
