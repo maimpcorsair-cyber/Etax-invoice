@@ -2743,22 +2743,39 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     const result = analysis.result;
     const qrText = analysis.qrText;
 
-    // QR-based reclassification: when QR clearly identifies a Thai bank slip
-    // (KBank/SCB/BBL/etc verify URL or PromptPay TLV), force documentType to
-    // bank_transfer regardless of LLM guess — slips don't have supplierTaxId
-    // and shouldn't go through the purchase-record missing-field flow.
-    if (result && qrText) {
-      const slipFields = parseThaiSlipQr(qrText);
-      if (slipFields && slipFields.confidence >= 0.6 && slipFields.bank) {
-        if (result.documentType !== 'bank_transfer' && result.documentType !== 'payment_advice') {
-          logger.info('[Line] QR-forced reclassification to bank_transfer', {
-            from: result.documentType,
-            bank: slipFields.bank,
-            confidence: slipFields.confidence,
-          });
-          result.documentType = 'bank_transfer';
-          result.documentTypeLabel = `สลิปโอนเงิน (${slipFields.bank})`;
-        }
+    // Reclassify as bank_transfer using multiple signals so we don't fall
+    // back to the purchase template (which asks for supplierTaxId — a field
+    // bank slips don't have).
+    //
+    // Signal A: QR text matches a Thai bank verify URL / PromptPay TLV.
+    // Signal B: OCR populated payment.fromName + payment.toName/toAccount
+    //           (or payment.bankName looks like a bank/app name).
+    // Signal C: OCR text contains slip-specific phrases (ชำระเงินสำเร็จ,
+    //           โอนเงินสำเร็จ, เลขที่รายการ).
+    if (result && result.documentType !== 'bank_transfer' && result.documentType !== 'payment_advice') {
+      const slipFields = qrText ? parseThaiSlipQr(qrText) : null;
+      const qrMatch = !!(slipFields && slipFields.confidence >= 0.6 && slipFields.bank);
+
+      const p = result.payment ?? {};
+      const hasFrom = !!(p.fromName || p.fromAccount);
+      const hasTo = !!(p.toName || p.toAccount);
+      const paymentFieldsMatch = hasFrom && hasTo;
+
+      const haystack = `${result.documentTypeLabel ?? ''} ${result.supplierName ?? ''} ${qrText ?? ''}`.toLowerCase();
+      const phraseMatch = /(ชำระเงินสำเร็จ|โอนเงินสำเร็จ|เลขที่รายการ|k\+|kplus|scb easy|ttb touch|prompt[\s-]?pay|พร้อมเพย์)/i.test(haystack);
+
+      if (qrMatch || paymentFieldsMatch || phraseMatch) {
+        logger.info('[Line] Reclassified to bank_transfer', {
+          from: result.documentType,
+          bank: slipFields?.bank,
+          qrMatch,
+          paymentFieldsMatch,
+          phraseMatch,
+        });
+        result.documentType = 'bank_transfer';
+        result.documentTypeLabel = slipFields?.bank
+          ? `สลิปโอนเงิน (${slipFields.bank})`
+          : (p.bankName ? `สลิปโอนเงิน (${p.bankName})` : 'สลิปโอนเงิน');
       }
     }
 
