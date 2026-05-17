@@ -3312,9 +3312,18 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
       await sendLineText(lineUserId, `📥 เพิ่มเอกสาร #${ackPosition} — กำลังอ่านพร้อมกัน ${ackPosition} ฉบับ...`);
     }
 
+    // ===== ASYNC BOUNDARY =====
+    // Webhook responds 200 to LINE NOW. The heavy OCR (10-20s) + routing
+    // continues in the background. At 1k+ concurrent users this is the
+    // difference between healthy and falling over (LINE webhook timeout
+    // is ~5s; sync OCR would also block one Node event-loop slot per user).
+    // Subsequent messages use push (reply token already consumed by ack).
+    void (async () => {
+      let asyncStage = 'document_ocr_pipeline';
+      try {
     await updateDocumentIntake(intake?.id, { status: 'processing' });
 
-    stage = 'document_ocr_pipeline';
+    asyncStage = 'document_ocr_pipeline';
     const analysis = await analyzeAccountingDocumentBuffer(buffer, contentType, companyId);
     const result = analysis.result;
     const qrText = analysis.qrText;
@@ -3485,6 +3494,33 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     // close (others bail out early). This gives us a debounce of ~6 seconds
     // after the LAST file in the batch.
     scheduleUploadBatchClose(lineUserId, batchId);
+      } catch (asyncErr) {
+        const errMsg = asyncErr instanceof Error ? asyncErr.message : String(asyncErr);
+        const errCode = (asyncErr && typeof asyncErr === 'object' && 'code' in asyncErr) ? String((asyncErr as { code?: unknown }).code) : '';
+        logger.error('[Line] async OCR pipeline failed', { err: asyncErr, asyncStage, errMsg, errCode, intakeId: intake?.id });
+        let userMessage: string;
+        if (/timeout|ETIMEDOUT|aborted|ECONNRESET/i.test(errMsg)) {
+          userMessage = '⚠️ ระบบ AI ตอบช้าผิดปกติ กรุณาส่งเอกสารใหม่อีกครั้งใน 1-2 นาที';
+        } else if (/decode|invalid jpeg|jpeg|png|unsupported.*format/i.test(errMsg)) {
+          userMessage = '⚠️ ไฟล์รูปอ่านไม่ออก ลองส่งเป็น PDF หรือถ่ายใหม่ในรูปแบบ JPEG/PNG ปกติ';
+        } else if (/api key|unauthorized|401|403|invalid_api_key/i.test(errMsg)) {
+          userMessage = '⚠️ ระบบ OCR มีปัญหา config ชั่วคราว ลองใหม่ในอีกสักครู่';
+        } else if (/quota|rate.?limit|429|insufficient_quota/i.test(errMsg)) {
+          userMessage = '⚠️ ใช้งานเยอะเกินโควต้าชั่วคราว ลองใหม่ใน 5 นาที';
+        } else if (/storage|s3|r2|upload/i.test(errMsg)) {
+          userMessage = '⚠️ เก็บไฟล์ลง storage ไม่สำเร็จ ลองส่งใหม่ในอีกสักครู่';
+        } else {
+          const errSnippet = errMsg.slice(0, 150).replace(/[\n\r]+/g, ' ');
+          const codeStr = errCode ? `[${errCode}] ` : '';
+          userMessage = `⚠️ อ่านเอกสารไม่สำเร็จ (${asyncStage})\n\n🔎 ${codeStr}${errSnippet}\n\nไฟล์ถูกเก็บในระบบแล้ว`;
+        }
+        try { await sendLineText(lineUserId, userMessage); } catch (sendErr) {
+          logger.error('[Line] async error notification failed', { sendErr });
+        }
+      }
+    })();
+    // Webhook returns now — async pipeline continues in background.
+    return;
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     const errCode = (err && typeof err === 'object' && 'code' in err) ? String((err as { code?: unknown }).code) : '';
