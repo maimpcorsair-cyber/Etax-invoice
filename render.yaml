@@ -31,6 +31,10 @@ services:
         value: 420889491125-p2pgamg2kb3574o213ep0om8pn94suar.apps.googleusercontent.com
       - key: GOOGLE_AI_API_KEY
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_OCR_MODEL
+        value: claude-haiku-4-5-20251001
       - key: RD_VAT_DATA_URLS
         sync: false
       - key: RD_VAT_DATA_URL
@@ -148,6 +152,10 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_OCR_MODEL
+        value: claude-haiku-4-5-20251001
 
 databases:
   - name: etax-postgres

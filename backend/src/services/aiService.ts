@@ -3,6 +3,7 @@ import { logger } from '../config/logger';
 import { analyzeAccountingDocumentWithAzure, isAzureDocumentIntelligenceConfigured } from './azureDocumentService';
 import { callTyphoonVision, estimateTyphoonCostUsd, isTyphoonConfigured } from './typhoonOcrService';
 import { callOpenAIVision, estimateOpenAICostUsd, isOpenAIVisionConfigured } from './openaiVisionService';
+import { callClaudeVision, estimateClaudeCostUsd, isClaudeVisionConfigured } from './claudeVisionService';
 import { recordOcrBenchmark } from './ocrBenchmarkService';
 import { getOcrPolicyForCompany } from './ocrPolicyService';
 
@@ -1435,6 +1436,12 @@ Currency rules:
     }
 
     if (shouldEscalateOcr(result, options)) {
+      // Provider priority for escalation:
+      //   1. Claude Haiku 4.5 — fastest (~3-5s), cheapest ($0.004/doc), Thai-capable
+      //   2. OpenAI GPT-4o    — slower (~8-15s), more expensive ($0.02/doc)
+      //   3. Gemini Pro       — legacy fallback
+      // Falls through to the next provider on failure of the previous.
+      const preferClaude = engineRouting !== 'legacy' && isClaudeVisionConfigured() && ocrPolicy.allowOpenAI;
       const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured() && ocrPolicy.allowOpenAI;
       if (ocrPolicy.overQuota) {
         logger.warn('[OCR] over monthly quota — silent fallback to standard tier', {
@@ -1443,7 +1450,50 @@ Currency rules:
           monthlyDocLimit: ocrPolicy.monthlyDocLimit,
         });
       }
-      if (preferOpenAI) {
+      if (preferClaude) {
+        try {
+          logger.info('[OCR] Escalating to Claude Haiku 4.5 vision', {
+            confidence: result.confidence,
+            warnings: result.validationWarnings?.length ?? 0,
+            documentType: result.documentType,
+          });
+          const claudeCall = await callClaudeVision(
+            mimeType,
+            imageBase64,
+            buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, result, true),
+          );
+          void recordOcrBenchmark({
+            companyId: options.companyId,
+            intakeId: options.intakeId,
+            documentType: result.documentType,
+            provider: 'claude-haiku',
+            model: claudeCall.model,
+            costUsd: estimateClaudeCostUsd(claudeCall),
+            latencyMs: claudeCall.latencyMs,
+            confidence: result.confidence,
+            stage: 'escalation',
+            inputTokens: claudeCall.promptTokens,
+            outputTokens: claudeCall.completionTokens,
+          });
+          if (claudeCall.ok) {
+            const claudeResult = parseOcrJson(claudeCall.text, result, azureResult?.content);
+            if (claudeResult && hasUsefulOcrData(claudeResult)) {
+              result = {
+                ...claudeResult,
+                extractionProvider: `claude-haiku-verify+${result.extractionProvider ?? ''}`,
+                verificationStage: 'pro',
+              };
+            }
+          }
+        } catch (claudeErr) {
+          logger.warn('[OCR] Claude escalation failed; falling through to next provider', { error: String(claudeErr) });
+        }
+      }
+      // Only fall through to GPT-4o when Claude was not configured (not on
+      // Claude success — we already updated `result` above). When Claude
+      // IS configured but the call failed, the GPT-4o branch acts as the
+      // fallback automatically because shouldEscalateOcr stays true.
+      if (!preferClaude && preferOpenAI) {
         try {
           logger.info('[OCR] Escalating to GPT-4o vision', {
             confidence: result.confidence,
