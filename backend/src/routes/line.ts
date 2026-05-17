@@ -16,6 +16,10 @@ import {
   buildIntakeConfirmFlexCard,
   buildIntakeSavedFlexCard,
   buildPaymentSlipFlexCard,
+  buildMatchCandidateBubble,
+  buildMatchOptionsBubble,
+  sendLineFlexCarousel,
+  type MatchCandidate,
   buildInvoiceFlexCard,
   verifyLineSignature,
   withLineReplyToken,
@@ -41,7 +45,7 @@ import { isStorageConfigured, uploadToStorage } from '../services/storageService
 import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
 import { enqueueMasterSheetSync } from '../queues';
 import { buildProjectLineMemberInviteUrl } from '../services/projectLineInviteService';
-import { attemptAutoMatchAndPay } from '../services/paymentMatchingService';
+import { attemptAutoMatchAndPay, findInvoiceCandidates, findPurchaseInvoiceCandidates } from '../services/paymentMatchingService';
 import { createProjectDocumentFromIntake, isSupportedProjectDocumentType } from '../services/projectDocumentIntakeService';
 import { parseThaiSlipQr } from '../services/thaiSlipQrParser';
 
@@ -624,6 +628,78 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   );
 }
 
+async function sendCandidateCarouselForSlip(lineUserId: string, intakeId: string, result: OcrResult) {
+  const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+    where: { id: intakeId },
+    select: { companyId: true },
+  }));
+  if (!intake) return;
+  const amount = Number(result.payment?.amount ?? result.total ?? 0);
+  if (amount <= 0) return;
+  const paidAt = result.payment?.paidAt ? new Date(result.payment.paidAt) : new Date();
+  const reference = result.payment?.reference || result.invoiceNumber || undefined;
+  const counterparty = [result.payment?.fromName, result.payment?.toName, result.supplierName]
+    .filter(Boolean)
+    .join(' ');
+  const slip = { companyId: intake.companyId, amount, paidAt, reference, counterpartyName: counterparty };
+  const direction = result.payment?.direction ?? 'unknown';
+
+  // Query whichever side(s) are relevant — when direction is known we only
+  // search that side; otherwise we search both.
+  const [salesCandidates, purchaseCandidates] = await Promise.all([
+    direction === 'outgoing'
+      ? Promise.resolve([])
+      : findInvoiceCandidates(slip).catch((err) => { logger.warn('[Line] sales candidates failed', { err }); return []; }),
+    direction === 'incoming'
+      ? Promise.resolve([])
+      : findPurchaseInvoiceCandidates(slip).catch((err) => { logger.warn('[Line] purchase candidates failed', { err }); return []; }),
+  ]);
+
+  const combined: MatchCandidate[] = [
+    ...salesCandidates.map((c) => ({
+      type: 'sales_invoice' as const,
+      id: c.invoiceId,
+      invoiceNumber: c.invoiceNumber,
+      partyName: c.buyerName,
+      total: c.total,
+      invoiceDate: c.invoiceDate.toISOString().slice(0, 10),
+      score: c.score,
+      amountDelta: c.total - amount,
+    })),
+    ...purchaseCandidates.map((c) => ({
+      type: 'purchase_invoice' as const,
+      id: c.purchaseInvoiceId,
+      invoiceNumber: c.invoiceNumber,
+      partyName: c.supplierName,
+      total: c.total,
+      invoiceDate: c.invoiceDate.toISOString().slice(0, 10),
+      score: c.score,
+      amountDelta: c.total - amount,
+    })),
+  ].sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    return Math.abs(a.amountDelta) - Math.abs(b.amountDelta);
+  });
+
+  if (combined.length === 0) {
+    await sendLineFlexMessage(
+      lineUserId,
+      'ยังไม่พบบิลในระบบ — เลือกประเภท',
+      buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true }),
+    );
+    return;
+  }
+
+  const top = combined.slice(0, 5);
+  const bubbles = top.map((c) => buildMatchCandidateBubble(c, intakeId));
+  bubbles.push(buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true }));
+  await sendLineFlexCarousel(
+    lineUserId,
+    `พบบิลที่อาจคู่กับสลิป ${top.length} ใบ — เลือกได้เลย`,
+    bubbles,
+  );
+}
+
 async function askForConfirmation(lineUserId: string, intakeId: string, result: OcrResult) {
   await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
     where: { id: intakeId },
@@ -649,8 +725,10 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
       altText,
       buildPaymentSlipFlexCard(result, 'pending', { intakeId }),
     );
-    // For bank slips we don't ask for category — confirm/edit buttons are
-    // on the Flex card and matching happens on confirm.
+    // Auto-search for unpaid bills near this slip amount and show a carousel
+    // so the user can pick instead of typing. If nothing matches, fall back
+    // to asking direction.
+    await sendCandidateCarouselForSlip(lineUserId, intakeId, result);
     return;
   }
 
@@ -2971,6 +3049,162 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       data: { status: 'needs_review', error: 'cancelled_by_user' },
     }));
     await sendLineText(lineUserId, 'ยกเลิกแล้ว เอกสารยังอยู่ในคิวรอตรวจ');
+    return;
+  }
+
+  if (data.startsWith('manual_match:')) {
+    const intakeId = data.slice('manual_match:'.length);
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    }));
+    const result = intake?.ocrResult as unknown as OcrResult | null;
+    if (!intake || !result) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป กรุณาส่งใหม่');
+      return;
+    }
+    await sendCandidateCarouselForSlip(lineUserId, intakeId, result);
+    return;
+  }
+
+  if (data.startsWith('match_direction:')) {
+    const [, intakeId, direction] = data.split(':');
+    if (!intakeId || (direction !== 'incoming' && direction !== 'outgoing')) {
+      await sendLineText(lineUserId, 'คำสั่งไม่ถูกต้อง');
+      return;
+    }
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    }));
+    const result = intake?.ocrResult as unknown as OcrResult | null;
+    if (!intake || !result) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป');
+      return;
+    }
+    const updated: OcrResult = {
+      ...result,
+      payment: { ...(result.payment ?? {}), direction: direction as 'incoming' | 'outgoing' },
+    };
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
+      where: { id: intakeId },
+      data: { ocrResult: updated as unknown as Prisma.InputJsonValue },
+    }));
+    await sendCandidateCarouselForSlip(lineUserId, intakeId, updated);
+    return;
+  }
+
+  if (data.startsWith('skip_match:')) {
+    const intakeId = data.slice('skip_match:'.length);
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.updateMany({
+      where: { id: intakeId, lineUserId },
+      data: { status: 'needs_review', error: 'pending_manual_match' },
+    }));
+    await sendLineText(lineUserId, '⏭ ข้ามไปก่อน — สลิปนี้ยังไม่ได้จับคู่ คุณสามารถเข้าไปจับคู่ในหน้า Input VAT ภายหลังได้');
+    return;
+  }
+
+  if (data.startsWith('select_match:')) {
+    const [, intakeId, type, targetId] = data.split(':');
+    if (!intakeId || (type !== 'sales_invoice' && type !== 'purchase_invoice') || !targetId) {
+      await sendLineText(lineUserId, 'คำสั่งไม่ถูกต้อง');
+      return;
+    }
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    }));
+    const result = intake?.ocrResult as unknown as OcrResult | null;
+    if (!intake || !result) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป');
+      return;
+    }
+    const amount = Number(result.payment?.amount ?? result.total ?? 0);
+    const paidAt = result.payment?.paidAt ? new Date(result.payment.paidAt) : new Date();
+    const reference = result.payment?.reference || undefined;
+    const noteSuffix = `นำเข้าจากสลิปโอนเงิน LINE${result.payment?.bankName ? ` (${result.payment.bankName})` : ''}${reference ? ` ref: ${reference}` : ''}`;
+
+    try {
+      if (type === 'sales_invoice') {
+        const invoice = await prisma.invoice.findFirst({
+          where: { id: targetId, companyId: intake.companyId },
+          include: { buyer: { select: { nameTh: true } } },
+        });
+        if (!invoice) {
+          await sendLineText(lineUserId, '⚠️ ไม่พบใบขายที่เลือก');
+          return;
+        }
+        await prisma.payment.create({
+          data: {
+            invoiceId: invoice.id,
+            amount,
+            method: 'transfer',
+            paidAt,
+            reference: reference ?? null,
+            note: noteSuffix,
+            createdBy: intake.userId,
+            evidenceIntakeId: intake.id,
+            matchScore: 100,
+            matchedBy: 'manual_line',
+          },
+        });
+        await prisma.invoice.update({
+          where: { id: invoice.id },
+          data: { isPaid: true, paidAmount: amount, paidAt },
+        });
+        await updateDocumentIntake(intake.id, {
+          status: 'saved',
+          ocrResult: result,
+          targetType: 'sales_invoice',
+          targetId: invoice.id,
+        });
+        await sendLineFlexMessage(
+          lineUserId,
+          `รับชำระ ${invoice.invoiceNumber} ฿${amount.toLocaleString('th-TH')}`,
+          buildPaymentSlipFlexCard(result, 'saved', {
+            matchedInvoiceNumber: invoice.invoiceNumber,
+            matchedCustomerName: invoice.buyer?.nameTh ?? '',
+            matchScore: 100,
+            invoiceId: invoice.id,
+            intakeId: intake.id,
+          }),
+        );
+      } else {
+        const purchase = await prisma.purchaseInvoice.findFirst({
+          where: { id: targetId, companyId: intake.companyId },
+        });
+        if (!purchase) {
+          await sendLineText(lineUserId, '⚠️ ไม่พบใบซื้อที่เลือก');
+          return;
+        }
+        await prisma.purchaseInvoice.update({
+          where: { id: purchase.id },
+          data: {
+            isPaid: true,
+            paidAt,
+            notes: [purchase.notes, noteSuffix].filter(Boolean).join('\n'),
+          },
+        });
+        await updateDocumentIntake(intake.id, {
+          status: 'saved',
+          ocrResult: result,
+          targetType: 'purchase_invoice',
+          targetId: purchase.id,
+          purchaseInvoiceId: purchase.id,
+        });
+        await sendLineFlexMessage(
+          lineUserId,
+          `จ่ายชำระ ${purchase.invoiceNumber} ฿${amount.toLocaleString('th-TH')}`,
+          buildPaymentSlipFlexCard(result, 'saved', {
+            matchedInvoiceNumber: purchase.invoiceNumber,
+            matchedSupplierName: purchase.supplierName,
+            matchScore: 100,
+            purchaseInvoiceId: purchase.id,
+            intakeId: intake.id,
+          }),
+        );
+      }
+    } catch (err) {
+      logger.error('[Line] select_match failed', { err, data });
+      await sendLineText(lineUserId, 'ขอโทษ จับคู่ไม่สำเร็จ กรุณาลองในหน้า Input VAT');
+    }
     return;
   }
 

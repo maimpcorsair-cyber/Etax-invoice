@@ -150,6 +150,100 @@ export async function findInvoiceCandidates(slip: SlipFingerprint): Promise<Paym
     .sort((a, b) => b.score - a.score);
 }
 
+export interface PurchaseMatchCandidate {
+  purchaseInvoiceId: string;
+  invoiceNumber: string;
+  supplierName: string;
+  total: number;
+  invoiceDate: Date;
+  score: number;
+  reasons: string[];
+}
+
+function scorePurchaseCandidate(
+  purchase: { total: number; invoiceDate: Date; invoiceNumber: string; supplierName: string },
+  slip: SlipFingerprint,
+): { score: number; reasons: string[] } {
+  const reasons: string[] = [];
+  let score = 0;
+
+  const amountDelta = Math.abs(purchase.total - slip.amount);
+  if (amountDelta <= 1) {
+    score += 40;
+    reasons.push('amount:exact');
+  } else if (amountDelta / Math.max(purchase.total, 1) <= 0.01) {
+    score += 30;
+    reasons.push('amount:within_1pct');
+  } else if (amountDelta / Math.max(purchase.total, 1) <= 0.05) {
+    score += 15;
+    reasons.push('amount:within_5pct');
+  }
+
+  const dDays = daysBetween(slip.paidAt, purchase.invoiceDate);
+  if (dDays <= 1) {
+    score += 20;
+    reasons.push('date:same_day');
+  } else if (dDays <= DATE_NEAR_DAYS) {
+    score += 14;
+    reasons.push('date:within_2_weeks');
+  } else if (dDays <= DATE_FAR_DAYS) {
+    score += 6;
+    reasons.push('date:within_2_months');
+  }
+
+  const supplierSim = similarityScore(purchase.supplierName, slip.counterpartyName ?? '');
+  if (supplierSim >= 0.85) {
+    score += 30;
+    reasons.push('supplier:strong_match');
+  } else if (supplierSim >= 0.5) {
+    score += 18;
+    reasons.push('supplier:partial_match');
+  }
+
+  if (slip.reference) {
+    const ref = normalize(slip.reference);
+    const inv = normalize(purchase.invoiceNumber);
+    if (ref && inv && (ref.includes(inv) || inv.includes(ref))) {
+      score += 10;
+      reasons.push('reference:matches_invoice_number');
+    }
+  }
+
+  return { score: Math.min(100, score), reasons };
+}
+
+export async function findPurchaseInvoiceCandidates(slip: SlipFingerprint): Promise<PurchaseMatchCandidate[]> {
+  const window = 90;
+  const from = new Date(slip.paidAt.getTime() - window * 86_400_000);
+  const to = new Date(slip.paidAt.getTime() + 7 * 86_400_000);
+
+  const purchases = await prisma.purchaseInvoice.findMany({
+    where: {
+      companyId: slip.companyId,
+      isPaid: false,
+      invoiceDate: { gte: from, lte: to },
+    },
+    orderBy: { invoiceDate: 'desc' },
+    take: 30,
+  });
+
+  return purchases
+    .map((p) => {
+      const { score, reasons } = scorePurchaseCandidate(p, slip);
+      return {
+        purchaseInvoiceId: p.id,
+        invoiceNumber: p.invoiceNumber,
+        supplierName: p.supplierName,
+        total: p.total,
+        invoiceDate: p.invoiceDate,
+        score,
+        reasons,
+      };
+    })
+    .filter((c) => c.score >= SCORE_SHORTLIST)
+    .sort((a, b) => b.score - a.score);
+}
+
 export interface AutoMatchResult {
   status: 'auto_matched' | 'shortlist' | 'unmatched';
   invoiceId?: string;

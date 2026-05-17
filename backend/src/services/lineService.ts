@@ -133,6 +133,24 @@ export async function sendLineFlexMessage(
   return linePush(lineUserId, [{ type: 'flex', altText, contents: flex }]);
 }
 
+export async function sendLineFlexCarousel(
+  lineUserId: string,
+  altText: string,
+  bubbles: object[],
+): Promise<boolean> {
+  if (bubbles.length === 0) return false;
+  if (bubbles.length === 1) {
+    return sendLineFlexMessage(lineUserId, altText, bubbles[0]);
+  }
+  // LINE allows up to 12 bubbles per carousel
+  const capped = bubbles.slice(0, 12);
+  return linePush(lineUserId, [{
+    type: 'flex',
+    altText,
+    contents: { type: 'carousel', contents: capped },
+  }]);
+}
+
 export async function sendLineTextWithQuickReply(
   lineUserId: string,
   text: string,
@@ -504,26 +522,23 @@ export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string):
     body,
     footer: {
       type: 'box',
-      layout: 'horizontal',
+      layout: 'vertical',
       spacing: 'sm',
       contents: [
         {
           type: 'button',
           style: 'primary',
           color: '#16a34a',
-          flex: 1,
           action: { type: 'postback', label: '✅ บันทึก', data: `confirm_intake:${intakeId}` },
         },
         {
           type: 'button',
           style: 'secondary',
-          flex: 1,
           action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${intakeId}` },
         },
         {
           type: 'button',
           style: 'secondary',
-          flex: 1,
           action: { type: 'postback', label: '❌ ยกเลิก', data: `cancel_intake:${intakeId}` },
         },
       ],
@@ -577,6 +592,127 @@ export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: st
           },
         }
       : {}),
+  };
+}
+
+export interface MatchCandidate {
+  type: 'sales_invoice' | 'purchase_invoice';
+  id: string;
+  invoiceNumber: string;
+  partyName: string;
+  total: number;
+  invoiceDate: string | null;
+  score: number;
+  amountDelta: number;
+}
+
+export function buildMatchCandidateBubble(
+  candidate: MatchCandidate,
+  intakeId: string,
+): object {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+  const typeBadge = candidate.type === 'sales_invoice'
+    ? { label: '📥 ใบขายเงินเข้า', bg: '#dcfce7', fg: '#166534' }
+    : { label: '📤 ใบซื้อต้องจ่าย', bg: '#dbeafe', fg: '#1e40af' };
+  const deltaLabel = candidate.amountDelta === 0
+    ? '🎯 ยอดตรงเป๊ะ'
+    : `±฿${Math.abs(candidate.amountDelta).toLocaleString('th-TH')}`;
+
+  const row = (label: string, value: string, bold = false) => ({
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'xs', color: '#888888', flex: 3 },
+      { type: 'text', text: value, size: bold ? 'md' : 'sm', color: '#111111', flex: 5, align: 'end' as const, wrap: true, weight: bold ? 'bold' as const : 'regular' as const },
+    ],
+  });
+
+  return {
+    type: 'bubble',
+    size: 'kilo',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: typeBadge.bg,
+          cornerRadius: '4px',
+          paddingAll: '6px',
+          contents: [{ type: 'text', text: typeBadge.label, color: typeBadge.fg, size: 'xs', weight: 'bold' as const, align: 'center' as const }],
+        },
+        row('💵 ยอด', fmt(candidate.total), true),
+        row('📄 เลขที่', candidate.invoiceNumber),
+        row(candidate.type === 'sales_invoice' ? '👤 ลูกค้า' : '🏢 ผู้ขาย', candidate.partyName || '-'),
+        row('📅 วันที่', candidate.invoiceDate ?? '-'),
+        { type: 'separator', margin: 'sm' },
+        row('ตรงกัน', `${deltaLabel} · ⭐ ${candidate.score}%`),
+      ],
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#16a34a',
+          action: {
+            type: 'postback',
+            label: '✅ เลือกใบนี้',
+            data: `select_match:${intakeId}:${candidate.type}:${candidate.id}`,
+          },
+        },
+      ],
+    },
+  };
+}
+
+export function buildMatchOptionsBubble(intakeId: string, options: { askDirection?: boolean; allowUpload?: boolean } = {}): object {
+  const buttons: object[] = [];
+  if (options.askDirection) {
+    buttons.push({
+      type: 'button', style: 'primary', color: '#16a34a',
+      action: { type: 'postback', label: '📥 รับเงินจากลูกค้า', data: `match_direction:${intakeId}:incoming` },
+    });
+    buttons.push({
+      type: 'button', style: 'primary', color: '#1e40af',
+      action: { type: 'postback', label: '📤 จ่ายให้ผู้ขาย', data: `match_direction:${intakeId}:outgoing` },
+    });
+  }
+  if (options.allowUpload) {
+    buttons.push({
+      type: 'button', style: 'secondary',
+      action: { type: 'message', label: '📤 อัพโหลดบิลเพิ่ม', text: 'อัพโหลดบิล' },
+    });
+  }
+  buttons.push({
+    type: 'button', style: 'secondary',
+    action: { type: 'postback', label: '⏭ ข้ามไปก่อน (ยังไม่จับคู่)', data: `skip_match:${intakeId}` },
+  });
+
+  return {
+    type: 'bubble',
+    size: 'kilo',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        { type: 'text', text: 'สลิปนี้คู่กับบิลไหน?', weight: 'bold' as const, size: 'md', align: 'center' as const },
+        { type: 'text', text: 'เลือกประเภท หรือข้ามไปก่อน', size: 'xs', color: '#888888', align: 'center' as const, wrap: true },
+      ],
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: buttons,
+    },
   };
 }
 
@@ -717,6 +853,9 @@ export function buildPaymentSlipFlexCard(
   }
 
   const headerCfg = headerByStatus[status];
+  // 3 buttons in a horizontal row makes LINE truncate Thai labels to "บั..." "แ..." "ย...".
+  // Switch to vertical (1 per row, full width) once we have 3+ buttons.
+  const footerLayout = footerButtons.length >= 3 ? 'vertical' : 'horizontal';
   return {
     type: 'bubble',
     header: {
@@ -729,7 +868,7 @@ export function buildPaymentSlipFlexCard(
     },
     body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: bodyContents },
     ...(footerButtons.length > 0
-      ? { footer: { type: 'box', layout: 'horizontal', spacing: 'sm', contents: footerButtons } }
+      ? { footer: { type: 'box', layout: footerLayout, spacing: 'sm', contents: footerButtons } }
       : {}),
   };
 }
