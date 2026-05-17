@@ -404,16 +404,30 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
     ? `****${result.supplierTaxId.slice(-4)}`
     : (result.supplierTaxId || '-');
 
+  const category = result.expenseCategory || result.postingSuggestion;
+  const subcategory = result.expenseSubcategory;
+
   const bodyContents: object[] = [
-    row('ผู้ขาย', result.supplierName || '-'),
-    row('เลขผู้เสียภาษี', taxIdDisplay),
-    row('เลขที่เอกสาร', result.invoiceNumber || '-'),
+    row('ยอดรวม', result.total ? fmt(result.total) : '-', true),
+    row('ประเภทเอกสาร', result.documentTypeLabel || '-'),
     row('วันที่', result.invoiceDate || '-'),
     { type: 'separator', margin: 'sm' },
-    row('ยอดก่อน VAT', result.subtotal ? fmt(result.subtotal) : '-'),
-    row('ภาษีมูลค่าเพิ่ม', result.vatAmount ? fmt(result.vatAmount) : '-'),
-    row('ยอดรวม', result.total ? fmt(result.total) : '-', true),
+    row('ผู้ขาย/ร้านค้า', result.supplierName || '-'),
+    row('เลขผู้เสียภาษี', taxIdDisplay),
+    row('เลขที่เอกสาร', result.invoiceNumber || '-'),
   ];
+
+  if (category || subcategory) {
+    bodyContents.push({ type: 'separator', margin: 'sm' });
+    if (category) bodyContents.push(row('หมวดหมู่', category));
+    if (subcategory) bodyContents.push(row('หมวดหมู่ย่อย', subcategory));
+  }
+
+  if (result.subtotal || result.vatAmount) {
+    bodyContents.push({ type: 'separator', margin: 'sm' });
+    bodyContents.push(row('ยอดก่อน VAT', result.subtotal ? fmt(result.subtotal) : '-'));
+    bodyContents.push(row('ภาษีมูลค่าเพิ่ม', result.vatAmount ? fmt(result.vatAmount) : '-'));
+  }
 
   if (result.validationWarnings?.length) {
     bodyContents.push({
@@ -514,6 +528,55 @@ export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string):
         },
       ],
     },
+  };
+}
+
+export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: string; editPostback?: string } = {}): object {
+  const { body } = buildOcrFlexCardContents(result);
+  const footerButtons: object[] = [];
+  if (opts.viewUrl) {
+    footerButtons.push({
+      type: 'button',
+      style: 'link',
+      flex: 1,
+      action: { type: 'uri', label: '🧾 ดูใบแทนใบเสร็จ', uri: opts.viewUrl },
+    });
+  }
+  if (opts.editPostback) {
+    footerButtons.push({
+      type: 'button',
+      style: 'link',
+      flex: 1,
+      action: { type: 'postback', label: '✏️ แก้ไข', data: opts.editPostback },
+    });
+  }
+  return {
+    type: 'bubble',
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: '#16a34a',
+      contents: [
+        {
+          type: 'text',
+          text: '✅ บันทึกค่าใช้จ่ายสำเร็จ',
+          color: '#ffffff',
+          size: 'md',
+          weight: 'bold' as const,
+        },
+      ],
+    },
+    body,
+    ...(footerButtons.length > 0
+      ? {
+          footer: {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: footerButtons,
+          },
+        }
+      : {}),
   };
 }
 

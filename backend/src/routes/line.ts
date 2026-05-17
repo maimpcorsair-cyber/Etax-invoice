@@ -14,6 +14,7 @@ import {
   buildOverdueFlexCard,
   buildOcrConfirmFlexCard,
   buildIntakeConfirmFlexCard,
+  buildIntakeSavedFlexCard,
   buildInvoiceFlexCard,
   verifyLineSignature,
   withLineReplyToken,
@@ -622,20 +623,20 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
     },
   }));
 
-  // Gap #1: Show category picker quick reply before the confirm Flex card
+  // Show paypers-style summary card so the user sees what we understood
+  // (document type, amount, date, seller, category) BEFORE we ask anything.
+  await sendLineFlexMessage(
+    lineUserId,
+    `📄 ${result.documentTypeLabel || 'เอกสาร'} ${result.total ? `฿${result.total.toLocaleString('th-TH')}` : ''}`.trim(),
+    buildIntakeConfirmFlexCard(result, intakeId),
+  );
+
+  // Only prompt for category when AI couldn't infer one — otherwise the
+  // confirm button on the Flex card is enough.
   const aiCategory = result.postingSuggestion || result.expenseSubcategory || result.expenseCategory || '';
-  const categoryButtons: Array<{ label: string; data: string; displayText: string }> = [];
+  if (aiCategory) return;
 
-  if (aiCategory) {
-    const shortLabel = aiCategory.length > 20 ? `${aiCategory.slice(0, 18)}…` : aiCategory;
-    categoryButtons.push({
-      label: `✅ ${shortLabel}`,
-      data: `set_category:${intakeId}:${aiCategory}`,
-      displayText: `ยืนยันหมวด: ${aiCategory}`,
-    });
-  }
-
-  categoryButtons.push(
+  const categoryButtons: Array<{ label: string; data: string; displayText: string }> = [
     { label: '🏢 ค่าบริการวิชาชีพ',   data: `set_category:${intakeId}:ค่าบริการวิชาชีพ`,   displayText: 'หมวด: ค่าบริการวิชาชีพ' },
     { label: '⛽ ค่าน้ำมัน/ขนส่ง',    data: `set_category:${intakeId}:ค่าน้ำมัน/ขนส่ง`,    displayText: 'หมวด: ค่าน้ำมัน/ขนส่ง' },
     { label: '🏬 วัสดุสำนักงาน',       data: `set_category:${intakeId}:วัสดุสำนักงาน`,       displayText: 'หมวด: วัสดุสำนักงาน' },
@@ -643,11 +644,11 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
     { label: '💡 ค่าสาธารณูปโภค',     data: `set_category:${intakeId}:ค่าสาธารณูปโภค`,     displayText: 'หมวด: ค่าสาธารณูปโภค' },
     { label: '📦 ค่าสินค้า/วัตถุดิบ',  data: `set_category:${intakeId}:ค่าสินค้า/วัตถุดิบ`,  displayText: 'หมวด: ค่าสินค้า/วัตถุดิบ' },
     { label: '📋 อื่นๆ',               data: `set_category:${intakeId}:อื่นๆ`,               displayText: 'หมวด: อื่นๆ' },
-  );
+  ];
 
   await sendLineTextWithQuickReply(
     lineUserId,
-    `📂 หมวดค่าใช้จ่าย: ${aiCategory || 'ยังไม่ระบุ'}\nกดยืนยันหมวดนี้ หรือเลือกใหม่:`,
+    '📂 ยังไม่รู้หมวดค่าใช้จ่าย ช่วยเลือกให้หน่อยครับ:',
     categoryButtons,
   );
 }
@@ -726,18 +727,14 @@ async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string
   });
 }
 
-async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกเอกสารเรียบร้อย!') {
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
-  const typeLine = result.documentTypeLabel ? `\n🧾 ประเภท: ${result.documentTypeLabel}` : '';
-  const vatLine = result.vatAmount > 0 ? `\n💰 ภาษีซื้อ ${fmt(result.vatAmount)}` : '';
-  await sendLineTextWithQuickReply(
+async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกค่าใช้จ่ายสำเร็จ') {
+  const totalLabel = result.total
+    ? ` ฿${result.total.toLocaleString('th-TH')}`
+    : '';
+  await sendLineFlexMessage(
     lineUserId,
-    `${prefix}${typeLine}\n📋 ${result.supplierName || '-'}${vatLine}\n💵 ยอดรวม ${fmt(result.total)}`,
-    [
-      { label: '✏️ แก้ไขข้อมูล', data: `edit_purchase:${purchaseId}`, displayText: 'แก้ไขข้อมูล' },
-      { label: '✅ เสร็จสิ้น', text: 'เสร็จสิ้น' },
-    ],
+    `${prefix}${totalLabel}`,
+    buildIntakeSavedFlexCard(result, { editPostback: `edit_purchase:${purchaseId}` }),
   );
 }
 
