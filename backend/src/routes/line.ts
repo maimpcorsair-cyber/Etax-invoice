@@ -93,11 +93,36 @@ async function loadWebhookDiagnostics(): Promise<WebhookDiagnostics> {
 }
 
 function getFrontendBaseUrl() {
-  const firstConfigured = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'https://etax-invoice.vercel.app')
+  const candidates = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? 'https://etax-invoice.vercel.app')
     .split(',')
     .map((value) => value.trim())
-    .find(Boolean);
-  return (firstConfigured ?? 'https://etax-invoice.vercel.app').replace(/\/+$/, '');
+    .filter(Boolean);
+  // LINE URI buttons require HTTPS — prefer the first HTTPS entry over
+  // any localhost / http fallback that may be listed first (which is the
+  // case in dev where FRONTEND_URLS includes 'http://localhost:3000').
+  const httpsFirst = candidates.find((url) => url.startsWith('https://'));
+  return (httpsFirst ?? candidates[0] ?? 'https://etax-invoice.vercel.app').replace(/\/+$/, '');
+}
+
+/**
+ * Build a magic-link URL for the guest intake-edit page, or return
+ * undefined if we can't (missing JWT secret, missing args, etc.). The
+ * URL goes into LINE Flex URI buttons + plain-text fallbacks so the user
+ * has a tap-target whether or not the Flex card renders.
+ */
+function buildIntakeEditUrlSafe(intakeId: string | undefined, lineUserId: string, companyId: string | undefined): string | undefined {
+  if (!intakeId || !companyId) return undefined;
+  try {
+    // Required imports are local to avoid a module-init cost when the
+    // function is never called (e.g. during webhook health pings).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    const { signIntakeEditToken, buildIntakeEditUrl } = require('../services/intakeEditToken') as typeof import('../services/intakeEditToken');
+    const token = signIntakeEditToken({ intakeId, lineUserId, companyId });
+    return buildIntakeEditUrl(getFrontendBaseUrl(), token);
+  } catch (err) {
+    logger.warn('[Line] buildIntakeEditUrlSafe failed', { err, intakeId });
+    return undefined;
+  }
 }
 
 function recordFromJson(value: Prisma.JsonValue | null | undefined): Record<string, unknown> | null {
@@ -621,22 +646,12 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   //   - "✅ บันทึก" → save with placeholders for missing fields (skip path)
   //   - "✏️ แก้ไขในเว็บ" → magic-link to a guest edit page (no login)
   // The chat field-by-field flow becomes a fallback — user can still
-  // type the value directly and we'll handle it in handleDurableIntakeReply,
-  // but we no longer prompt for it explicitly.
-  let editUrl: string | undefined;
-  try {
-    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
-      where: { id: intakeId },
-      select: { companyId: true },
-    }));
-    if (intake?.companyId) {
-      const { signIntakeEditToken, buildIntakeEditUrl } = await import('../services/intakeEditToken');
-      const token = signIntakeEditToken({ intakeId, lineUserId, companyId: intake.companyId });
-      editUrl = buildIntakeEditUrl(getFrontendBaseUrl(), token);
-    }
-  } catch (err) {
-    logger.warn('[Line] askForMissingField: edit URL build failed', { err, intakeId });
-  }
+  // type the value directly and we'll handle it in handleDurableIntakeReply.
+  const intakeRow = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+    where: { id: intakeId },
+    select: { companyId: true },
+  }));
+  const editUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, intakeRow?.companyId);
 
   await sendLineFlexMessage(
     lineUserId,
@@ -645,9 +660,11 @@ async function askForMissingField(lineUserId: string, intakeId: string, result: 
   );
 
   if (editUrl) {
+    // Append the URL directly as plain text so the user has a tap-target
+    // even if the Flex card button doesn't render or scrolls offscreen.
     await sendLineText(
       lineUserId,
-      `🤖 อ่านได้แต่ยังขาด: ${field.label}\n\nทางลัด 2 ทาง:\n✅ กด "บันทึก" ถ้าข้อมูลที่อ่านมาพอใช้ (ฟิลด์ที่ขาดจะถูกเว้นว่างไว้)\n✏️ กด "แก้ไขในเว็บ" เพื่อกรอกเพิ่มในหน้าเว็บ — ไม่ต้อง login\n\nLink หมดอายุใน 24 ชม`,
+      `🤖 อ่านได้แต่ยังขาด: ${field.label}\n\n✏️ แก้ไขในเว็บ (ไม่ต้อง login):\n${editUrl}\n\nหรือกด "บันทึก" ในการ์ดด้านบนถ้าข้อมูลที่อ่านมาพอใช้ (ฟิลด์ที่ขาดจะถูกเว้นว่างไว้)\n\nลิงก์หมดอายุใน 24 ชม`,
     );
   } else {
     await sendLineText(
@@ -1537,6 +1554,11 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
     };
   }
 
+  // Magic-link URL for the slip's edit page — passed to every Flex card
+  // so the "✏️ แก้ไข" button opens the guest web form instead of dragging
+  // the user back into the old field-by-field chat flow.
+  const editUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, companyId);
+
   const direction = result.payment?.direction ?? 'unknown';
   const paidAt = new Date(paymentDate(result));
   const reference = paymentReference(result) || undefined;
@@ -1582,6 +1604,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
           matchScore: match.matchScore,
           invoiceId: match.invoiceId,
           intakeId,
+          editUrl,
         }),
       };
     }
@@ -1606,6 +1629,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
           matchScore: top.score,
           invoiceId: top.invoiceId,
           intakeId,
+          editUrl,
         }),
       };
     }
@@ -1617,7 +1641,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
       message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับใบขายไม่ได้ กรุณาตรวจในหน้าเอกสาร/รับชำระเงิน`,
       warnings: ['unmatched:sales_invoice'],
       flexAlt: `สลิปยังไม่จับคู่ ${amountFmt}`,
-      flexCard: buildPaymentSlipFlexCard(result, 'unmatched', { intakeId }),
+      flexCard: buildPaymentSlipFlexCard(result, 'unmatched', { intakeId, editUrl }),
     };
   }
 
@@ -1660,6 +1684,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
         matchedSupplierName: exactPurchase.supplierName,
         purchaseInvoiceId: exactPurchase.id,
         intakeId,
+        editUrl,
       }),
     };
   }
@@ -1672,7 +1697,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
     message: `อ่านสลิปโอนได้ แต่ยังจับคู่กับเอกสารซื้อไม่ได้ กรุณาตรวจในหน้า Input VAT`,
     warnings: ['unmatched:purchase_invoice'],
     flexAlt: `สลิปจ่ายยังไม่จับคู่ ${unmatchedAmountFmt}`,
-    flexCard: buildPaymentSlipFlexCard(result, 'unmatched', { intakeId }),
+    flexCard: buildPaymentSlipFlexCard(result, 'unmatched', { intakeId, editUrl }),
   };
 }
 

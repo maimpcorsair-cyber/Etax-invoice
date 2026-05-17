@@ -784,8 +784,21 @@ export function buildPaymentSlipFlexCard(
     intakeId?: string;
     purchaseInvoiceId?: string;
     invoiceId?: string;
+    editUrl?: string;
   } = {},
 ): object {
+  // When the caller passes a magic-link URL, swap the postback-based
+  // "✏️ แก้ไข" button for a URI button that opens the guest edit page
+  // in the LINE in-app browser. Falls back to postback otherwise.
+  const editButton = (intakeId: string) => opts.editUrl
+    ? {
+        type: 'button', style: 'secondary', flex: 1,
+        action: { type: 'uri', label: '✏️ แก้ไขในเว็บ', uri: opts.editUrl },
+      }
+    : {
+        type: 'button', style: 'secondary', flex: 1,
+        action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${intakeId}` },
+      };
   const fmt = (n: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
 
@@ -867,10 +880,7 @@ export function buildPaymentSlipFlexCard(
       });
     }
     if (opts.intakeId) {
-      footerButtons.push({
-        type: 'button', style: 'link', flex: 1,
-        action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
-      });
+      footerButtons.push(editButton(opts.intakeId));
     }
   } else if (status === 'shortlist') {
     if (opts.invoiceId) {
@@ -888,19 +898,13 @@ export function buildPaymentSlipFlexCard(
       type: 'button', style: 'primary', color: '#16a34a', flex: 1,
       action: { type: 'postback', label: '🔗 จับคู่ด้วยมือ', data: `manual_match:${opts.intakeId}` },
     });
-    footerButtons.push({
-      type: 'button', style: 'secondary', flex: 1,
-      action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
-    });
+    footerButtons.push(editButton(opts.intakeId));
   } else if (status === 'pending' && opts.intakeId) {
     footerButtons.push({
       type: 'button', style: 'primary', color: '#16a34a', flex: 1,
       action: { type: 'postback', label: '✅ บันทึก', data: `confirm_intake:${opts.intakeId}` },
     });
-    footerButtons.push({
-      type: 'button', style: 'secondary', flex: 1,
-      action: { type: 'postback', label: '✏️ แก้ไข', data: `edit_intake:${opts.intakeId}` },
-    });
+    footerButtons.push(editButton(opts.intakeId));
     footerButtons.push({
       type: 'button', style: 'secondary', flex: 1,
       action: { type: 'postback', label: '❌ ยกเลิก', data: `cancel_intake:${opts.intakeId}` },
