@@ -497,6 +497,46 @@ interface KnownVendor {
   vatType: string;
 }
 
+interface VendorContact {
+  supplierName: string;
+  supplierTaxId: string;
+  supplierBranch: string;
+}
+
+/**
+ * Look up a vendor in the company's Customer (contacts) table by tax-id.
+ * This table is user-curated and authoritative — when the user types
+ * "GULF AGENCY COMPANY (THAILAND) LTD." in their contacts, that's the
+ * canonical name we should display, not whatever the LLM read off a
+ * messy PDF header ("Gac").
+ *
+ * Only suppliers (partyRole = supplier|both) and active rows are returned.
+ */
+async function findVendorContact(companyId: string, supplierTaxId: string): Promise<VendorContact | null> {
+  if (!supplierTaxId || supplierTaxId === '0000000000000') return null;
+  try {
+    const row = await prisma.customer.findFirst({
+      where: {
+        companyId,
+        taxId: supplierTaxId,
+        isActive: true,
+        partyRole: { in: ['supplier', 'both'] },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { nameTh: true, nameEn: true, taxId: true, branchCode: true },
+    });
+    if (!row) return null;
+    return {
+      supplierName: row.nameTh || row.nameEn || '',
+      supplierTaxId: row.taxId,
+      supplierBranch: row.branchCode || '00000',
+    };
+  } catch (err) {
+    logger.warn('[OCR] Vendor contact lookup failed', { error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
 /**
  * Find a vendor in this company's PurchaseInvoice history using multiple
  * lookup strategies, in priority order:
@@ -614,6 +654,19 @@ async function applyBusinessValidation(result: OcrResult, companyId?: string): P
         select: { id: true },
       });
       if (duplicate) warnings.add('พบเลขที่เอกสารนี้ในภาษีซื้อแล้ว อาจเป็นเอกสารซ้ำ');
+    }
+
+    // 1) Contacts table is authoritative — user typed the canonical
+    //    name. If taxId matches, use the contact name verbatim and skip
+    //    any fuzzy supplierName comparison.
+    const vendorContact = await findVendorContact(companyId, result.supplierTaxId);
+    if (vendorContact && vendorContact.supplierName) {
+      const prior = result.supplierName;
+      result.supplierName = vendorContact.supplierName;
+      result.supplierBranch = vendorContact.supplierBranch || result.supplierBranch || '00000';
+      if (prior && normalizeVendorName(prior) !== normalizeVendorName(vendorContact.supplierName)) {
+        warnings.add(`ใช้ชื่อจากรายชื่อในระบบ: ${vendorContact.supplierName}`);
+      }
     }
 
     const knownVendor = await findKnownVendor(companyId, result.supplierTaxId, result.supplierName);
