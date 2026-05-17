@@ -1018,7 +1018,7 @@ async function performConfirmedIntakeSave(
     // auto-match against it (out-of-order pairing).
     try { await redis.set(`line:pending_bill:${lineUserId}`, intake.id, 'EX', 1800); }
     catch (err) { logger.warn('[Line] redis set pending_bill failed', { err }); }
-    await replySavedPurchase(lineUserId, result, saved.id);
+    await replySavedPurchase(lineUserId, result, saved.id, undefined, intake.userId);
   }
 
   void syncDocumentIntakeToProjectDrive(intake.id, {
@@ -1429,14 +1429,28 @@ async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string
   });
 }
 
-async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกค่าใช้จ่ายสำเร็จ') {
+async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกค่าใช้จ่ายสำเร็จ', submitterUserId?: string) {
   const totalLabel = result.total
     ? ` ฿${result.total.toLocaleString('th-TH')}`
     : '';
+  // Look up the submitter's display name so the saved card matches
+  // paypers UX ('ผู้ขออนุญาตเบิก: <name>'). Silently skip if missing.
+  let submittedBy: string | undefined;
+  if (submitterUserId) {
+    try {
+      const submitter = await withSystemRlsContext(prisma, (tx) => tx.user.findUnique({
+        where: { id: submitterUserId },
+        select: { name: true, email: true },
+      }));
+      submittedBy = submitter?.name || submitter?.email || undefined;
+    } catch (err) {
+      logger.warn('[Line] submitter lookup failed', { err, submitterUserId });
+    }
+  }
   await sendLineFlexMessage(
     lineUserId,
     `${prefix}${totalLabel}`,
-    buildIntakeSavedFlexCard(result, { editPostback: `edit_purchase:${purchaseId}` }),
+    buildIntakeSavedFlexCard(result, { editPostback: `edit_purchase:${purchaseId}`, submittedBy }),
   );
 }
 

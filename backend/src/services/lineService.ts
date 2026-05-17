@@ -576,8 +576,26 @@ export function buildIntakeConfirmFlexCard(result: OcrResult, intakeId: string):
   };
 }
 
-export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: string; editPostback?: string } = {}): object {
-  const { body } = buildOcrFlexCardContents(result);
+export function buildIntakeSavedFlexCard(result: OcrResult, opts: { viewUrl?: string; editPostback?: string; submittedBy?: string; approvedBy?: string } = {}): object {
+  const { body: baseBody } = buildOcrFlexCardContents(result);
+  // Append submitter/approver attribution rows to the existing body so the
+  // saved card matches paypers UX ('ผู้ขออนุญาตเบิก: ...'). Both are
+  // optional — caller only passes them when LINE conversation context
+  // provides the sender's user.name.
+  type BoxObj = { type: string; layout: string; spacing?: string; contents: object[] };
+  const body = baseBody as BoxObj;
+  const attributionRow = (label: string, value: string) => ({
+    type: 'box', layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'xs', color: '#888888', flex: 3 },
+      { type: 'text', text: value, size: 'sm', color: '#111111', flex: 5, align: 'end' as const, wrap: true },
+    ],
+  });
+  if (opts.submittedBy || opts.approvedBy) {
+    body.contents.push({ type: 'separator', margin: 'sm' });
+    if (opts.submittedBy) body.contents.push(attributionRow('👤 ส่งโดย', opts.submittedBy));
+    if (opts.approvedBy) body.contents.push(attributionRow('✅ อนุมัติโดย', opts.approvedBy));
+  }
   const footerButtons: object[] = [];
   if (opts.viewUrl) {
     footerButtons.push({
