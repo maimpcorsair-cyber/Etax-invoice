@@ -23,8 +23,8 @@ export function initSentry(role: 'web' | 'worker'): void {
   try {
     Sentry.init({
       dsn,
-      environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
-      release: process.env.SENTRY_RELEASE,
+      environment: (process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development').trim(),
+      release: process.env.SENTRY_RELEASE?.trim(),
       // Sample rates conservative by default — performance traces and
       // session replay are paid features we don't need yet. Errors are
       // always captured at 100%.

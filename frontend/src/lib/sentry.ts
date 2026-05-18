@@ -5,12 +5,17 @@ import * as Sentry from '@sentry/react';
  * (e.g. local dev without a Sentry project) so the build still works.
  */
 export function initSentry(): void {
-  const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
+  // Trim DSN — Vercel/Render env-var textareas often paste a trailing
+  // newline that breaks Sentry's DSN regex validation (it returns init()
+  // silently, so window.__SENTRY__ shows {version} only, no hub). Trim
+  // every string env var defensively for the same reason.
+  const dsn = (import.meta.env.VITE_SENTRY_DSN as string | undefined)?.trim();
   if (!dsn) return;
+  const environment = ((import.meta.env.VITE_SENTRY_ENVIRONMENT as string | undefined)?.trim()) || import.meta.env.MODE;
   Sentry.init({
     dsn,
-    environment: (import.meta.env.VITE_SENTRY_ENVIRONMENT as string | undefined) ?? import.meta.env.MODE,
-    release: import.meta.env.VITE_SENTRY_RELEASE as string | undefined,
+    environment,
+    release: (import.meta.env.VITE_SENTRY_RELEASE as string | undefined)?.trim(),
     // Errors at 100%, traces sampled conservatively (paid feature anyway).
     tracesSampleRate: 0,
     // Replay & performance are paid features — disabled by default.
