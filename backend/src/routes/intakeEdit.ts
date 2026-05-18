@@ -4,7 +4,7 @@ import prisma from '../config/database';
 import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { verifyIntakeEditToken } from '../services/intakeEditToken';
-import { OcrResult } from '../services/aiService';
+import { OcrResult, ocrBankTransferSlip } from '../services/aiService';
 import { getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { supportedDocumentMimeType } from '../services/documentOcrService';
 
@@ -226,6 +226,117 @@ intakeEditRouter.post('/:token/attachments', async (req, res) => {
   } catch (err) {
     logger.error('[intakeEdit] attachment upload failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });
     res.status(500).json({ error: 'อัปโหลดไม่สำเร็จ' });
+  }
+});
+
+// Slip upload + OCR — user attaches a bank transfer slip to a bill intake,
+// we OCR it for the payment fields and merge those into the parent intake's
+// ocrResult so the save pipeline picks them up. The slip itself is stored
+// as a sibling attachment for audit (`slip_for:<parentId>` warning tag).
+intakeEditRouter.post('/:token/slip', async (req, res) => {
+  const claims = verifyIntakeEditToken(req.params.token);
+  if (!claims) {
+    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
+    return;
+  }
+  const parsed = attachmentUploadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'ข้อมูลไฟล์ไม่ถูกต้อง', details: parsed.error.flatten() });
+    return;
+  }
+  if (!supportedDocumentMimeType(parsed.data.mimeType)) {
+    res.status(400).json({ error: 'รองรับเฉพาะ PDF, JPG, PNG, WebP' });
+    return;
+  }
+  const buffer = Buffer.from(parsed.data.fileBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+  if (buffer.length > 10 * 1024 * 1024) {
+    res.status(413).json({ error: 'ไฟล์ใหญ่เกิน 10MB' });
+    return;
+  }
+
+  try {
+    const parent = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: claims.intakeId, companyId: claims.companyId },
+      select: { projectId: true, userId: true, lineUserId: true, ocrResult: true, status: true },
+    }));
+    if (!parent) {
+      res.status(404).json({ error: 'ไม่พบเอกสารหลัก' });
+      return;
+    }
+    if (parent.status === 'saved') {
+      res.status(409).json({ error: 'เอกสารถูกบันทึกไปแล้ว' });
+      return;
+    }
+
+    // OCR the slip — Gemini specialist + OpenRouter fallback inside service.
+    const slipResult = await ocrBankTransferSlip(buffer.toString('base64'), parsed.data.mimeType);
+
+    // Store slip as sibling intake for audit trail.
+    let storageKey: string | undefined;
+    let fileUrl: string | undefined;
+    if (isStorageConfigured()) {
+      const ext = (parsed.data.fileName.match(/\.[a-z0-9]{2,5}$/i)?.[0] ?? '.bin').toLowerCase();
+      storageKey = `companies/${claims.companyId}/document-intakes/line-slip/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      fileUrl = await uploadToStorage(storageKey, buffer, parsed.data.mimeType);
+    }
+    const child = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.create({
+      data: {
+        companyId: claims.companyId,
+        projectId: parent.projectId,
+        userId: parent.userId,
+        lineUserId: parent.lineUserId,
+        source: 'line_attachment',
+        fileName: parsed.data.fileName,
+        mimeType: parsed.data.mimeType,
+        fileSize: buffer.length,
+        fileBase64: storageKey ? undefined : buffer.toString('base64'),
+        fileUrl,
+        storageKey,
+        status: 'received',
+        ocrResult: slipResult as unknown as Parameters<typeof tx.documentIntake.create>[0]['data']['ocrResult'],
+        warnings: [`slip_for:${claims.intakeId}`, `parent_intake:${claims.intakeId}`],
+      },
+      select: { id: true, fileName: true, mimeType: true, fileSize: true, createdAt: true },
+    }));
+
+    // Merge slip payment fields into parent's ocrResult — these are what the
+    // save pipeline reads when generating the purchase invoice with paid status.
+    const current = (parent.ocrResult ?? {}) as unknown as OcrResult;
+    const merged: OcrResult = {
+      ...current,
+      payment: {
+        ...(current.payment ?? {}),
+        ...(slipResult.payment ?? {}),
+        // Prefer slip values when they exist (fresher signal).
+        amount: slipResult.payment?.amount ?? current.payment?.amount,
+        paidAt: slipResult.payment?.paidAt || current.payment?.paidAt,
+        reference: slipResult.payment?.reference || current.payment?.reference,
+        fromName: slipResult.payment?.fromName || current.payment?.fromName,
+        toName: slipResult.payment?.toName || current.payment?.toName,
+      },
+    };
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
+      where: { id: claims.intakeId },
+      data: { ocrResult: merged as unknown as Parameters<typeof tx.documentIntake.update>[0]['data']['ocrResult'] },
+    }));
+
+    res.status(201).json({
+      data: {
+        attachment: child,
+        ocrResult: merged,
+        slipOcr: {
+          amount: slipResult.payment?.amount,
+          paidAt: slipResult.payment?.paidAt,
+          reference: slipResult.payment?.reference,
+          fromName: slipResult.payment?.fromName,
+          toName: slipResult.payment?.toName,
+          confidence: slipResult.confidence,
+        },
+      },
+    });
+  } catch (err) {
+    logger.error('[intakeEdit] slip OCR failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });
+    res.status(500).json({ error: 'อ่านสลิปไม่สำเร็จ' });
   }
 });
 

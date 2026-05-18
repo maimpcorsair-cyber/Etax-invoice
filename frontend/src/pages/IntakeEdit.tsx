@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Paperclip, Save, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Loader2, Paperclip, Receipt, Save, Upload, X } from 'lucide-react';
 
 /**
  * Guest-mode page for editing a LINE document intake via magic-link.
@@ -131,9 +131,12 @@ export default function IntakeEdit() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [slipUploading, setSlipUploading] = useState(false);
+  const [slipSummary, setSlipSummary] = useState<{ amount?: number; paidAt?: string; reference?: string; fromName?: string; toName?: string; confidence?: string } | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const slipInputRef = useRef<HTMLInputElement | null>(null);
 
   const fileUrl = useMemo(() => (token ? `/api/intake-edit/${token}/file` : ''), [token]);
 
@@ -242,6 +245,61 @@ export default function IntakeEdit() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleSlipUpload(file: File | null) {
+    if (!file || !token) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setError('แนบได้เฉพาะ PDF, JPG, PNG, WebP');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('ไฟล์ใหญ่เกิน 10MB');
+      return;
+    }
+    setSlipUploading(true);
+    setError(null);
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(reader.error ?? new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`/api/intake-edit/${token}/slip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileBase64 }),
+      });
+      const json = await res.json() as {
+        data?: {
+          attachment: Attachment;
+          ocrResult: OcrResult;
+          slipOcr: { amount?: number; paidAt?: string; reference?: string; fromName?: string; toName?: string; confidence?: string };
+        };
+        error?: string;
+      };
+      if (!res.ok || !json.data) throw new Error(json.error ?? 'อ่านสลิปไม่สำเร็จ');
+      setAttachments((prev) => [json.data!.attachment, ...prev]);
+      setSlipSummary(json.data.slipOcr);
+      // Auto-fill payment fields from slip OCR — only overwrite empty
+      // values so the user's manual edits (if any) aren't clobbered.
+      const s = json.data.slipOcr;
+      setForm((prev) => ({
+        ...prev,
+        paymentAmount: prev.paymentAmount || (s.amount != null ? String(s.amount) : ''),
+        paymentPaidAt: prev.paymentPaidAt || (s.paidAt ?? ''),
+        paymentReference: prev.paymentReference || (s.reference ?? ''),
+        paymentFromName: prev.paymentFromName || (s.fromName ?? ''),
+        paymentToName: prev.paymentToName || (s.toName ?? ''),
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อ่านสลิปไม่สำเร็จ');
+    } finally {
+      setSlipUploading(false);
+      if (slipInputRef.current) slipInputRef.current.value = '';
     }
   }
 
@@ -380,6 +438,51 @@ export default function IntakeEdit() {
                 <Field label="ยอดรวมทั้งสิ้น" type="number" value={form.total} onChange={(v) => setForm({ ...form, total: v })} />
                 <Field label="หมวดค่าใช้จ่าย" value={form.expenseCategory} onChange={(v) => setForm({ ...form, expenseCategory: v })} placeholder="เช่น ค่าสาธารณูปโภค" />
               </>
+            )}
+
+            {/* Slip upload (only if main doc is a bill — not a slip itself) */}
+            {!isBankTransfer && (
+              <div className="pt-3 border-t border-slate-200">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-emerald-800 flex items-center gap-1.5">
+                      <Receipt className="w-4 h-4" /> หลักฐานการชำระเงิน
+                    </span>
+                    {slipSummary && (
+                      <span className="text-xs text-emerald-600 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> อ่านสลิปแล้ว
+                      </span>
+                    )}
+                  </div>
+                  {slipSummary ? (
+                    <div className="text-xs text-slate-700 space-y-0.5 mb-2">
+                      {slipSummary.amount != null && <div>ยอด: <strong>{slipSummary.amount.toLocaleString()}</strong> บาท</div>}
+                      {slipSummary.paidAt && <div>วันที่: {slipSummary.paidAt}</div>}
+                      {slipSummary.fromName && <div>จาก: {slipSummary.fromName}</div>}
+                      {slipSummary.toName && <div>ถึง: {slipSummary.toName}</div>}
+                      {slipSummary.reference && <div>อ้างอิง: {slipSummary.reference}</div>}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-emerald-700 mb-2">แนบสลิปโอนเงิน — AI จะอ่านยอด/วันที่/ผู้โอน ให้อัตโนมัติ</p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={slipUploading}
+                    onClick={() => slipInputRef.current?.click()}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-sm font-medium rounded-md py-2 flex items-center justify-center gap-1.5"
+                  >
+                    {slipUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {slipUploading ? 'กำลังอ่านสลิป...' : slipSummary ? 'แทนที่สลิป' : 'แนบสลิปโอนเงิน'}
+                  </button>
+                  <input
+                    ref={slipInputRef}
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(ev) => void handleSlipUpload(ev.target.files?.[0] ?? null)}
+                  />
+                </div>
+              </div>
             )}
 
             {/* Attachments */}
