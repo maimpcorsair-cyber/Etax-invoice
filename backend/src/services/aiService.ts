@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import redis from '../config/redis';
 import { logger } from '../config/logger';
 import { analyzeAccountingDocumentWithAzure, isAzureDocumentIntelligenceConfigured } from './azureDocumentService';
 import { callTyphoonVision, estimateTyphoonCostUsd, isTyphoonConfigured } from './typhoonOcrService';
@@ -84,6 +85,30 @@ function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Pr
 }
 
 // Call Google Gemini API directly — supports text, image/jpeg, image/png, and application/pdf inline
+// Free-tier Gemini quota resets daily but burns through fast under heavy
+// testing. When a model hits 429, skip subsequent calls for COOLDOWN_SECONDS
+// so we don't waste a network roundtrip per request waiting for the same
+// quota error. The flag auto-expires so the model is silently re-enabled
+// once Google's quota window rolls over.
+const GEMINI_QUOTA_COOLDOWN_SECONDS = Number(process.env.GEMINI_QUOTA_COOLDOWN_SECONDS ?? 600);
+
+async function isGeminiModelOnCooldown(model: string): Promise<boolean> {
+  try {
+    return (await redis.exists(`gemini:cooldown:${model}`)) > 0;
+  } catch {
+    return false; // redis down → fail open, attempt the call
+  }
+}
+
+async function markGeminiModelCooldown(model: string, reason: string): Promise<void> {
+  try {
+    await redis.set(`gemini:cooldown:${model}`, reason, 'EX', GEMINI_QUOTA_COOLDOWN_SECONDS);
+    logger.warn('[Gemini] model on cooldown', { model, seconds: GEMINI_QUOTA_COOLDOWN_SECONDS, reason });
+  } catch {
+    /* fail open */
+  }
+}
+
 async function callGemini(
   mimeType: string,
   base64Data: string,
@@ -91,6 +116,9 @@ async function callGemini(
   timeoutMs = ocrTimeoutMs,
   model = geminiScanModel,
 ): Promise<string> {
+  if (await isGeminiModelOnCooldown(model)) {
+    throw new Error(`Gemini ${model} on cooldown (recent 429) — skipping call`);
+  }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleAiKey}`;
   const parts = mimeType === 'text/plain'
     ? [
@@ -121,6 +149,11 @@ async function callGemini(
   }, timeoutMs);
   if (!res.ok) {
     const txt = await res.text();
+    if (res.status === 429) {
+      // Quota hit — mark this model on cooldown so subsequent OCR requests
+      // skip the network call entirely until the quota window resets.
+      await markGeminiModelCooldown(model, `429 quota`);
+    }
     throw new Error(`Gemini ${res.status}: ${txt.slice(0, 200)}`);
   }
   type GeminiResponse = {

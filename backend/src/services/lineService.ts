@@ -714,8 +714,11 @@ export function buildMatchCandidateBubble(
   });
 
   return {
+    // No explicit size — must default to mega so this bubble can coexist
+    // with the buildPaymentSlipFlexCard bubble in the same carousel. LINE
+    // returns 400 "not allowed to mix different bubble size in a carousel"
+    // when sizes differ. Affected the slip+candidates flow at 2026-05-18.
     type: 'bubble',
-    size: 'kilo',
     body: {
       type: 'box',
       layout: 'vertical',
@@ -781,8 +784,11 @@ export function buildMatchOptionsBubble(intakeId: string, options: { askDirectio
   });
 
   return {
+    // No explicit size — must default to mega so this bubble can coexist
+    // with the buildPaymentSlipFlexCard bubble in the same carousel. LINE
+    // returns 400 "not allowed to mix different bubble size in a carousel"
+    // when sizes differ. Affected the slip+candidates flow at 2026-05-18.
     type: 'bubble',
-    size: 'kilo',
     body: {
       type: 'box',
       layout: 'vertical',
