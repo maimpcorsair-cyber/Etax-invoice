@@ -78,6 +78,28 @@ type OwnerOverviewData = {
       status: string;
     } | null;
   }>;
+  operational?: {
+    intakeLast24h: {
+      total: number;
+      byStatus: Record<string, number>;
+      bySource: Record<string, number>;
+      failureRate: number;
+    };
+    activeUsersLast7d: number;
+    topIntakeUsageLast7d: Array<{
+      companyId: string;
+      nameTh: string;
+      taxId: string;
+      intakeCount: number;
+    }>;
+  };
+};
+
+type DeepHealthResult = {
+  status: 'ok' | 'degraded' | 'error';
+  checkedAt: string;
+  providers: Record<string, { ok: boolean; latencyMs: number; detail?: string }>;
+  notConfigured: string[];
 };
 
 type BillingSummary = {
@@ -135,12 +157,16 @@ export default function OwnerOverview() {
   const [error, setError] = useState<string | null>(null);
   const [overview, setOverview] = useState<OwnerOverviewData | null>(null);
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
+  const [health, setHealth] = useState<DeepHealthResult | null>(null);
   const [couponForm, setCouponForm] = useState(initialCouponForm);
 
   const loadOwnerData = useCallback(async () => {
-    const [overviewRes, billingRes] = await Promise.all([
+    const [overviewRes, billingRes, healthRes] = await Promise.all([
       fetch('/api/system/overview', { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/billing/owner/summary', { headers: { Authorization: `Bearer ${token}` } }),
+      // /api/health/deep is public; bearer header is harmless. Don't bail
+      // owner-data load if the deep probe fails — it's nice-to-have.
+      fetch('/api/health/deep').catch(() => null),
     ]);
 
     const overviewJson = await overviewRes.json() as { data?: OwnerOverviewData; error?: string };
@@ -151,6 +177,9 @@ export default function OwnerOverview() {
 
     setOverview(overviewJson.data ?? null);
     setBillingSummary(billingJson.data ?? null);
+    if (healthRes) {
+      try { setHealth(await healthRes.json() as DeepHealthResult); } catch { setHealth(null); }
+    }
   }, [token]);
 
   useEffect(() => {
@@ -277,6 +306,14 @@ export default function OwnerOverview() {
           </div>
         </div>
       </section>
+
+      {/* Operational health — surfaces "what's actually happening" in the
+          last 24h: provider liveness, intake volume, failure rate. Designed
+          so a glance answers "is the system healthy right now?". */}
+      <OperationalHealthSection
+        health={health}
+        operational={overview.operational}
+      />
 
       <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {topMetrics.map((metric) => (
@@ -508,5 +545,110 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
         </tbody>
       </table>
     </div>
+  );
+}
+
+function OperationalHealthSection({
+  health,
+  operational,
+}: {
+  health: DeepHealthResult | null;
+  operational: OwnerOverviewData['operational'];
+}) {
+  if (!health && !operational) return null;
+
+  const healthBadge = (() => {
+    if (!health) return { text: 'Unknown', cls: 'bg-slate-100 text-slate-700' };
+    if (health.status === 'ok') return { text: '🟢 All systems operational', cls: 'bg-emerald-100 text-emerald-800' };
+    if (health.status === 'degraded') return { text: '🟡 Degraded', cls: 'bg-amber-100 text-amber-800' };
+    return { text: '🔴 Critical', cls: 'bg-rose-100 text-rose-800' };
+  })();
+
+  const failurePct = operational ? (operational.intakeLast24h.failureRate * 100).toFixed(1) : '0';
+  const failureCls = !operational || operational.intakeLast24h.failureRate < 0.1
+    ? 'text-emerald-700'
+    : operational.intakeLast24h.failureRate < 0.3
+      ? 'text-amber-700'
+      : 'text-rose-700';
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold">Operational Health</h2>
+          <p className="text-sm text-slate-600">External providers + last 24h LINE/OCR activity.</p>
+        </div>
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${healthBadge.cls}`}>{healthBadge.text}</span>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">Provider Latency</div>
+          {health ? (
+            <div className="space-y-1.5 text-sm">
+              {Object.entries(health.providers).map(([name, p]) => (
+                <div key={name} className="flex items-center justify-between">
+                  <span className="font-medium capitalize">{p.ok ? '✓' : '✗'} {name}</span>
+                  <span className={p.ok ? 'text-slate-600' : 'text-rose-600'}>
+                    {p.ok ? `${p.latencyMs} ms` : (p.detail ?? 'failed').slice(0, 40)}
+                  </span>
+                </div>
+              ))}
+              {health.notConfigured.length > 0 && (
+                <div className="pt-2 text-xs text-slate-500">
+                  Not configured: {health.notConfigured.join(', ')}
+                </div>
+              )}
+              <div className="pt-2 text-xs text-slate-400">
+                checked {new Date(health.checkedAt).toLocaleTimeString()}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-400">Health probe unavailable</div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">LINE / OCR Activity (24h)</div>
+          {operational ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-700">Total intakes</span>
+                <span className="text-2xl font-semibold">{operational.intakeLast24h.total}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-700">Failure rate</span>
+                <span className={`font-semibold ${failureCls}`}>{failurePct}%</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-700">Active users (7d)</span>
+                <span className="font-semibold text-slate-900">{operational.activeUsersLast7d}</span>
+              </div>
+              {Object.keys(operational.intakeLast24h.byStatus).length > 0 && (
+                <div className="pt-2 text-xs text-slate-500">
+                  by status: {Object.entries(operational.intakeLast24h.byStatus).map(([s, n]) => `${s}=${n}`).join(' · ')}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-400">No activity data</div>
+          )}
+        </div>
+      </div>
+
+      {operational && operational.topIntakeUsageLast7d.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">Top Intake Volume (Last 7 Days)</div>
+          <div className="space-y-1.5 text-sm">
+            {operational.topIntakeUsageLast7d.slice(0, 10).map((row) => (
+              <div key={row.companyId} className="flex items-center justify-between gap-3">
+                <span className="truncate text-slate-700">{row.nameTh}</span>
+                <span className="font-medium text-slate-900 shrink-0">{row.intakeCount}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

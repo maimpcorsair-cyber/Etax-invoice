@@ -51,6 +51,10 @@ function serializeTenantUser(user: {
 
 systemRouter.get('/overview', async (_req, res) => {
   try {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
     const [
       companyCount,
       userCount,
@@ -61,6 +65,9 @@ systemRouter.get('/overview', async (_req, res) => {
       transactions,
       coupons,
       pendingSignups,
+      intakesLast24h,
+      activeUsersLast7d,
+      intakeByCompanyLast7d,
     ] = await Promise.all([
       prisma.company.count(),
       withSystemRlsContext(prisma, (tx) => tx.user.count()),
@@ -103,6 +110,22 @@ systemRouter.get('/overview', async (_req, res) => {
       withSystemRlsContext(prisma, (tx) => tx.pendingSignup.findMany({
         orderBy: { createdAt: 'desc' },
       })),
+      // Operational metrics for the owner dashboard
+      withSystemRlsContext(prisma, (tx) => tx.documentIntake.groupBy({
+        by: ['status', 'source'],
+        where: { createdAt: { gte: dayAgo } },
+        _count: { _all: true },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.user.count({
+        where: { lastLoginAt: { gte: weekAgo } },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.documentIntake.groupBy({
+        by: ['companyId'],
+        where: { createdAt: { gte: weekAgo } },
+        _count: { _all: true },
+        orderBy: { _count: { id: 'desc' } },
+        take: 10,
+      })),
     ]);
 
     const companyDetails = await Promise.all(
@@ -140,6 +163,38 @@ systemRouter.get('/overview', async (_req, res) => {
         };
       }),
     );
+
+    // Roll up intake stats: total + per-status + per-source for last 24h.
+    // Failure rate = (failed + error) / total — surfaces "OCR is silently
+    // breaking" before users complain on LINE.
+    const intakeStats24h = intakesLast24h.reduce(
+      (acc, row) => {
+        const c = row._count._all;
+        acc.total += c;
+        acc.byStatus[row.status] = (acc.byStatus[row.status] ?? 0) + c;
+        acc.bySource[row.source] = (acc.bySource[row.source] ?? 0) + c;
+        return acc;
+      },
+      { total: 0, byStatus: {} as Record<string, number>, bySource: {} as Record<string, number> },
+    );
+    const failedCount = (intakeStats24h.byStatus.failed ?? 0) + (intakeStats24h.byStatus.error ?? 0);
+    const intakeFailureRate24h = intakeStats24h.total > 0 ? failedCount / intakeStats24h.total : 0;
+
+    // Map top-10 intake counts to company name + tax ID for the table.
+    const topIntakeCompanyIds = intakeByCompanyLast7d.map((row) => row.companyId);
+    const topIntakeCompanies = topIntakeCompanyIds.length > 0
+      ? await withSystemRlsContext(prisma, (tx) => tx.company.findMany({
+          where: { id: { in: topIntakeCompanyIds } },
+          select: { id: true, nameTh: true, taxId: true },
+        }))
+      : [];
+    const topIntakeCompanyMap = new Map(topIntakeCompanies.map((c) => [c.id, c]));
+    const topIntakeUsage = intakeByCompanyLast7d.map((row) => ({
+      companyId: row.companyId,
+      nameTh: topIntakeCompanyMap.get(row.companyId)?.nameTh ?? '(unknown)',
+      taxId: topIntakeCompanyMap.get(row.companyId)?.taxId ?? '',
+      intakeCount: row._count._all,
+    }));
 
     const activeSubscriptions = subscriptions.filter((subscription) => subscription.status === 'active');
     const monthlyRecurringRevenue = activeSubscriptions.reduce((sum, subscription) => {
@@ -226,10 +281,23 @@ systemRouter.get('/overview', async (_req, res) => {
           active: coupon.active,
         })),
         companies: companyDetails,
+        operational: {
+          intakeLast24h: {
+            total: intakeStats24h.total,
+            byStatus: intakeStats24h.byStatus,
+            bySource: intakeStats24h.bySource,
+            failureRate: Number(intakeFailureRate24h.toFixed(4)),
+          },
+          activeUsersLast7d,
+          topIntakeUsageLast7d: topIntakeUsage,
+        },
       },
     });
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch system overview' });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Failed to fetch system overview',
+      detail: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+    });
   }
 });
 
