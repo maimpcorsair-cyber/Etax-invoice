@@ -445,6 +445,64 @@ systemRouter.get('/companies/:id', async (req, res) => {
   }
 });
 
+// Magic-link audit log query for the Owner Plane. Filterable by company,
+// intake, lineUserId, mutation-only. Paginated 50 rows at a time.
+systemRouter.get('/audit/intake-access', async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit ?? 50), 1), 200);
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const filters: Record<string, unknown> = {};
+    if (typeof req.query.companyId === 'string') filters.companyId = req.query.companyId;
+    if (typeof req.query.intakeId === 'string') filters.intakeId = req.query.intakeId;
+    if (typeof req.query.lineUserId === 'string') filters.lineUserId = req.query.lineUserId;
+    if (req.query.mutationsOnly === '1') filters.isMutation = true;
+
+    const rows = await withSystemRlsContext(prisma, (tx) => tx.intakeAccessLog.findMany({
+      where: filters,
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    }));
+    const hasMore = rows.length > limit;
+    const items = (hasMore ? rows.slice(0, limit) : rows).map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    // 24h summary alongside the page for quick "what's happening" read.
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [total24h, mutations24h, uniqueIntakes24h] = await Promise.all([
+      withSystemRlsContext(prisma, (tx) => tx.intakeAccessLog.count({
+        where: { ...filters, createdAt: { gte: dayAgo } },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.intakeAccessLog.count({
+        where: { ...filters, isMutation: true, createdAt: { gte: dayAgo } },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.intakeAccessLog.groupBy({
+        by: ['intakeId'],
+        where: { ...filters, createdAt: { gte: dayAgo } },
+      })),
+    ]);
+
+    res.json({
+      data: {
+        items,
+        nextCursor: hasMore ? items[items.length - 1]?.id : null,
+        summary24h: {
+          total: total24h,
+          mutations: mutations24h,
+          uniqueIntakes: uniqueIntakes24h.length,
+        },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Failed to fetch audit log',
+      detail: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+    });
+  }
+});
+
 systemRouter.get('/session', (req, res) => {
   res.json({
     data: {

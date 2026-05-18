@@ -636,6 +636,29 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// Audit log for magic-link guest access to /api/intake-edit/*. These users
+// don't have a `User` row (LINE-only identity), so they don't fit the
+// AuditLog model which requires a userId FK. Separate table keeps the
+// schema honest and lets us purge old rows on a different schedule.
+model IntakeAccessLog {
+  id         String   @id @default(cuid())
+  intakeId   String
+  companyId  String
+  lineUserId String
+  method     String   // GET, POST, PATCH
+  path       String
+  ip         String
+  userAgent  String?
+  isMutation Boolean  @default(false)
+  rlCount    Int?     // request count in the current rate-limit window
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([intakeId, createdAt])
+  @@index([lineUserId, createdAt])
+  @@map("intake_access_logs")
+}
+
 model Payment {
   id                String   @id @default(cuid())
   invoiceId         String

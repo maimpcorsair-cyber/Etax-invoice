@@ -89,6 +89,28 @@ async function authorizeIntakeEdit(
     rlCount: count,
   });
 
+  // Persist to DB for the Owner audit-log viewer. Fire-and-forget — never
+  // block the actual request on the log write, but capture failures so a
+  // broken table doesn't disappear silently. Render logs still get the
+  // structured event above as a redundant trail.
+  withSystemRlsContext(prisma, (tx) => tx.intakeAccessLog.create({
+    data: {
+      intakeId: claims.intakeId,
+      companyId: claims.companyId,
+      lineUserId: claims.lineUserId,
+      method: req.method,
+      path: req.path,
+      ip,
+      userAgent: ua || null,
+      isMutation,
+      rlCount: count || null,
+    },
+  })).catch((err) => {
+    logger.warn('[intakeEdit] access-log persist failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
+
   if (opts.requireMutable) {
     const row = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
       where: { id: claims.intakeId, companyId: claims.companyId },
