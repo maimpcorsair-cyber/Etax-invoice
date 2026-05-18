@@ -24,6 +24,7 @@ const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
 const ContactPage = React.lazy(() => import('./pages/ContactPage'));
 const OwnerOverview = React.lazy(() => import('./pages/OwnerOverview'));
 const OwnerTenants = React.lazy(() => import('./pages/OwnerTenants'));
+const OpsCompanyDetail = React.lazy(() => import('./pages/OpsCompanyDetail'));
 const OwnerTransactions = React.lazy(() => import('./pages/OwnerTransactions'));
 const OwnerCoupons = React.lazy(() => import('./pages/OwnerCoupons'));
 const OwnerRenewals = React.lazy(() => import('./pages/OwnerRenewals'));
@@ -203,6 +204,7 @@ export default function App() {
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<OwnerOverview />} />
             <Route path="tenants" element={<OwnerTenants />} />
+            <Route path="companies/:id" element={<OpsCompanyDetail />} />
             <Route path="transactions" element={<OwnerTransactions />} />
             <Route path="coupons" element={<OwnerCoupons />} />
             <Route path="renewals" element={<OwnerRenewals />} />

@@ -301,6 +301,150 @@ systemRouter.get('/overview', async (_req, res) => {
   }
 });
 
+// Per-company drill-down for the Owner Plane. Returns enough detail to
+// answer "what is going on with this tenant?" without needing to log in as
+// them. Reads through withSystemRlsContext so RLS is bypassed for the
+// super_admin scope (the requireRole guard on the router enforces that).
+systemRouter.get('/companies/:id', async (req, res) => {
+  const companyId = req.params.id;
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const company = await prisma.company.findFirst({
+      where: { id: companyId },
+      select: {
+        id: true, nameTh: true, nameEn: true, taxId: true, branchCode: true,
+        phone: true, email: true, createdAt: true,
+      },
+    });
+    if (!company) {
+      res.status(404).json({ error: 'Company not found' });
+      return;
+    }
+
+    const [
+      users,
+      subscription,
+      invoiceStats,
+      invoiceByStatus,
+      latestInvoice,
+      intakesByStatus,
+      intakesByDay,
+      recentTransactions,
+      certificateInfo,
+    ] = await Promise.all([
+      withSystemRlsContext(prisma, (tx) => tx.user.findMany({
+        where: { companyId },
+        select: {
+          id: true, email: true, name: true, role: true,
+          lastLoginAt: true, isActive: true, createdAt: true,
+        },
+        orderBy: { lastLoginAt: 'desc' },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.companySubscription.findFirst({
+        where: { companyId },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.invoice.aggregate({
+        where: { companyId, status: { not: 'cancelled' } },
+        _sum: { total: true },
+        _count: { _all: true },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.invoice.groupBy({
+        by: ['status'],
+        where: { companyId },
+        _count: { _all: true },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.invoice.findFirst({
+        where: { companyId },
+        orderBy: { invoiceDate: 'desc' },
+        select: { invoiceNumber: true, invoiceDate: true, total: true, status: true },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.documentIntake.groupBy({
+        by: ['status'],
+        where: { companyId, createdAt: { gte: thirtyDaysAgo } },
+        _count: { _all: true },
+      })),
+      withSystemRlsContext(prisma, (tx) => tx.$queryRaw<Array<{ day: Date; count: bigint }>>`
+        SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
+        FROM "document_intakes"
+        WHERE "companyId" = ${companyId} AND "createdAt" >= ${thirtyDaysAgo}
+        GROUP BY 1 ORDER BY 1 ASC
+      `),
+      withSystemRlsContext(prisma, (tx) => tx.billingTransaction.findMany({
+        where: { companyId },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+        select: {
+          id: true, channel: true, status: true, totalAmount: true,
+          couponCode: true, externalReference: true, createdAt: true,
+        },
+      })),
+      // Cert is encrypted at rest; just surface presence + filename hash so the
+      // owner sees "uploaded vs dev cert" without exposing key material.
+      prisma.company.findFirst({
+        where: { id: companyId },
+        select: { certificatePath: true },
+      }),
+    ]);
+
+    res.json({
+      data: {
+        company,
+        users: users.map((u) => ({
+          ...u,
+          lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+          createdAt: u.createdAt.toISOString(),
+        })),
+        subscription: subscription ? {
+          id: subscription.id,
+          plan: subscription.plan,
+          status: subscription.status,
+          billingInterval: subscription.billingInterval,
+          currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
+          stripeCustomerId: subscription.stripeCustomerId,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+        } : null,
+        invoices: {
+          totalRevenue: invoiceStats._sum.total ?? 0,
+          totalCount: invoiceStats._count._all,
+          byStatus: invoiceByStatus.reduce<Record<string, number>>((acc, row) => {
+            acc[row.status] = row._count._all;
+            return acc;
+          }, {}),
+          latest: latestInvoice ? {
+            ...latestInvoice,
+            invoiceDate: latestInvoice.invoiceDate.toISOString(),
+          } : null,
+        },
+        intakes30d: {
+          byStatus: intakesByStatus.reduce<Record<string, number>>((acc, row) => {
+            acc[row.status] = row._count._all;
+            return acc;
+          }, {}),
+          byDay: intakesByDay.map((row) => ({
+            day: row.day.toISOString().slice(0, 10),
+            count: Number(row.count),
+          })),
+        },
+        recentTransactions: recentTransactions.map((t) => ({
+          ...t,
+          createdAt: t.createdAt.toISOString(),
+        })),
+        certificate: {
+          configured: !!certificateInfo?.certificatePath,
+          isDev: certificateInfo?.certificatePath?.includes('test-company.p12') ?? false,
+        },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: 'Failed to fetch company detail',
+      detail: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+    });
+  }
+});
+
 systemRouter.get('/session', (req, res) => {
   res.json({
     data: {

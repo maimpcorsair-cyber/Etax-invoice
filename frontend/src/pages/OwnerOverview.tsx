@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
   BadgePercent,
   Banknote,
@@ -463,7 +464,7 @@ export default function OwnerOverview() {
           />
         </Panel>
 
-        <Panel title="Tenant Revenue Snapshot" subtitle="Compare tenant footprint and invoice-side revenue.">
+        <Panel title="Tenant Revenue Snapshot" subtitle="Compare tenant footprint and invoice-side revenue. Click a row to drill in.">
           <SimpleTable
             headers={['Company', 'Customers', 'Invoices', 'Users', 'Revenue']}
             rows={overview.companies.slice(0, 10).map((company) => [
@@ -473,6 +474,7 @@ export default function OwnerOverview() {
               `${company.userCount} / ${company.adminCount} admin`,
               currency(company.totalRevenue),
             ])}
+            rowHref={(i) => `/ops/companies/${overview.companies[i]?.id}`}
           />
         </Panel>
       </section>
@@ -521,7 +523,7 @@ function Panel({ title, subtitle, children }: { title: string; subtitle: string;
   );
 }
 
-function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+function SimpleTable({ headers, rows, rowHref }: { headers: string[]; rows: string[][]; rowHref?: (rowIndex: number) => string | null }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[620px] text-sm">
@@ -533,15 +535,22 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row[0]}-${index}`} className="border-b border-slate-100 text-slate-900">
-              {row.map((cell, cellIndex) => (
-                <td key={`${cellIndex}-${cell}`} className="whitespace-pre-line px-3 py-3 text-sm text-slate-700">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row, index) => {
+            const href = rowHref?.(index);
+            const trCls = `border-b border-slate-100 text-slate-900 ${href ? 'cursor-pointer hover:bg-slate-50' : ''}`;
+            const inner = row.map((cell, cellIndex) => (
+              <td key={`${cellIndex}-${cell}`} className="whitespace-pre-line px-3 py-3 text-sm text-slate-700">
+                {cell}
+              </td>
+            ));
+            return href ? (
+              <tr key={`${row[0]}-${index}`} className={trCls} onClick={() => { window.location.assign(href); }}>
+                {inner}
+              </tr>
+            ) : (
+              <tr key={`${row[0]}-${index}`} className={trCls}>{inner}</tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -641,10 +650,14 @@ function OperationalHealthSection({
           <div className="text-xs uppercase tracking-[0.14em] text-slate-500 mb-3">Top Intake Volume (Last 7 Days)</div>
           <div className="space-y-1.5 text-sm">
             {operational.topIntakeUsageLast7d.slice(0, 10).map((row) => (
-              <div key={row.companyId} className="flex items-center justify-between gap-3">
-                <span className="truncate text-slate-700">{row.nameTh}</span>
+              <Link
+                key={row.companyId}
+                to={`/ops/companies/${row.companyId}`}
+                className="flex items-center justify-between gap-3 hover:bg-white hover:shadow-sm rounded-lg px-2 py-1 -mx-2 transition"
+              >
+                <span className="truncate text-slate-700 hover:text-slate-900">{row.nameTh}</span>
                 <span className="font-medium text-slate-900 shrink-0">{row.intakeCount}</span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
