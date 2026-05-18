@@ -139,6 +139,45 @@ export default function Landing() {
     adminEmail: '',
     phone: '',
   });
+  const [juristicLookupState, setJuristicLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'error'>('idle');
+
+  // Auto-fetch DBD open-data when the user finishes typing a 13-digit tax ID.
+  // Pre-fills nameTh / nameEn / addressTh from the public juristic cache so
+  // the signup form is 90% complete before the user types anything else.
+  // We don't overwrite fields the user has already filled in manually.
+  useEffect(() => {
+    const taxId = form.taxId.replace(/\D/g, '');
+    if (taxId.length !== 13) {
+      if (juristicLookupState !== 'idle') setJuristicLookupState('idle');
+      return;
+    }
+    let cancelled = false;
+    setJuristicLookupState('loading');
+    (async () => {
+      try {
+        const res = await fetch(`/api/billing/signup/lookup-juristic?taxId=${taxId}`);
+        const json = await res.json() as { data?: { nameTh?: string | null; nameEn?: string | null; addressTh?: string | null } | null };
+        if (cancelled) return;
+        if (!res.ok || !json.data) {
+          setJuristicLookupState('not_found');
+          return;
+        }
+        setForm((prev) => ({
+          ...prev,
+          companyNameTh: prev.companyNameTh.trim() || json.data!.nameTh || prev.companyNameTh,
+          companyNameEn: prev.companyNameEn.trim() || json.data!.nameEn || prev.companyNameEn,
+          addressTh: prev.addressTh.trim() || json.data!.addressTh || prev.addressTh,
+        }));
+        setJuristicLookupState('found');
+      } catch {
+        if (!cancelled) setJuristicLookupState('error');
+      }
+    })();
+    return () => { cancelled = true; };
+  // Deliberately not depending on the form fields below — we only want to
+  // fire when the tax ID itself changes, not every keystroke elsewhere.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.taxId]);
 
   const planDetails = useMemo(() => ({
     free: [
@@ -353,7 +392,7 @@ export default function Landing() {
   const formErrors = {
     companyNameTh: form.companyNameTh.trim().length === 0
       ? (isThai ? 'กรุณากรอกชื่อบริษัทภาษาไทย' : 'Thai company name is required')
-      : formValidation.companyNameTh ? (isThai ? 'ใช้ตัวอักษรไทยเท่านั้น' : 'Thai characters only') : '',
+      : formValidation.companyNameTh ? (isThai ? 'ต้องมีอักษรไทยอย่างน้อย 1 ตัว' : 'Requires at least one Thai character') : '',
     taxId: form.taxId.length === 0
       ? (isThai ? 'กรุณากรอกเลขผู้เสียภาษี 13 หลัก' : '13-digit tax ID is required')
       : formValidation.taxId ? (isThai ? `ยังกรอกไม่ครบ (${form.taxId.length}/13 หลัก)` : `Incomplete (${form.taxId.length}/13 digits)`) : '',
@@ -1371,7 +1410,7 @@ export default function Landing() {
                       <input className={guardedInputClass(formValidation.companyNameTh)} value={form.companyNameTh} onChange={(e) => setForm((prev) => ({ ...prev, companyNameTh: thaiTextOnly(e.target.value) }))} required />
                       {formErrors.companyNameTh
                         ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.companyNameTh}</p>
-                        : <p className={inputGuide(formValidation.companyNameTh)}>{isThai ? 'ใช้ตัวอักษรไทย เช่น บริษัท ตัวอย่าง จำกัด' : 'Use Thai characters, e.g. บริษัท ตัวอย่าง จำกัด'}</p>
+                        : <p className={inputGuide(formValidation.companyNameTh)}>{isThai ? 'มีอักษรไทยอย่างน้อย 1 ตัว — แทรกอังกฤษได้ เช่น บริษัท K&K Logistics จำกัด' : 'At least one Thai character — English allowed, e.g. บริษัท K&K Logistics จำกัด'}</p>
                       }
                     </div>
                     <div>
@@ -1386,7 +1425,13 @@ export default function Landing() {
                       <input className={guardedInputClass(formValidation.taxId, 'font-mono')} value={form.taxId} onChange={(e) => setForm((prev) => ({ ...prev, taxId: digitsOnly(e.target.value, 13) }))} inputMode="numeric" maxLength={13} required />
                       {formErrors.taxId
                         ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.taxId}</p>
-                        : <p className={inputGuide(false)}>{isThai ? `กรอกตัวเลข ${form.taxId.length}/13 หลัก` : `Enter ${form.taxId.length}/13 digits`}</p>
+                        : juristicLookupState === 'loading'
+                          ? <p className="mt-1 text-xs text-slate-500">🔍 {isThai ? 'กำลังค้นข้อมูลจาก DBD...' : 'Looking up DBD records...'}</p>
+                          : juristicLookupState === 'found'
+                            ? <p className="mt-1 text-xs text-emerald-600">✓ {isThai ? 'เติมชื่อบริษัท/ที่อยู่จาก DBD ให้แล้ว — แก้ไขได้' : 'Pre-filled from DBD — editable'}</p>
+                            : juristicLookupState === 'not_found'
+                              ? <p className="mt-1 text-xs text-amber-600">{isThai ? 'ไม่พบในระบบ DBD — กรอกเองได้' : 'Not in DBD cache — fill in manually'}</p>
+                              : <p className={inputGuide(false)}>{isThai ? `กรอกตัวเลข ${form.taxId.length}/13 หลัก` : `Enter ${form.taxId.length}/13 digits`}</p>
                       }
                     </div>
                     <div>
@@ -1410,7 +1455,20 @@ export default function Landing() {
                           </div>
                         </div>
                       </div>
+                    ) : googleConfig?.enabled ? (
+                      // Google is available — don't ask for email/name manually;
+                      // the user should pick Google above. Show a gentle prompt
+                      // instead of two now-redundant input fields.
+                      <div className="sm:col-span-2 rounded-lg border border-dashed border-slate-300 bg-slate-50/50 px-4 py-3">
+                        <p className="text-sm text-slate-700">
+                          {isThai
+                            ? '👆 กดปุ่ม "Sign in with Google" ด้านบนเพื่อใช้บัญชี Google ของคุณ — ระบบจะดึงอีเมล+ชื่อให้อัตโนมัติ'
+                            : '👆 Click "Sign in with Google" above — your name and email will be filled automatically.'}
+                        </p>
+                      </div>
                     ) : (
+                      // Google sign-in unavailable (config missing). Fall back to
+                      // manual entry so signup still works end-to-end.
                       <>
                         <div>
                           <label className="label">{isThai ? 'ชื่อผู้ดูแลระบบ' : 'Admin Name'}</label>

@@ -1,4 +1,10 @@
-const THAI_TEXT_PATTERN = /^[\u0E00-\u0E7F0-9\s.,()/&+\-'"]*$/;
+// Real Thai company names often mix scripts: "\u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17 Mai's Workshop \u0E08\u0E33\u0E01\u0E31\u0E14",
+// "Apple Thailand Limited", "\u0E1A\u0E23\u0E34\u0E29\u0E31\u0E17 K&K Logistics \u0E08\u0E33\u0E01\u0E31\u0E14". Allow Latin chars
+// in the Thai pattern so users don't have to strip them; the
+// THAI_TEXT_REQUIRED_PATTERN below still ensures at least one Thai character
+// is present when the field is marked required (i.e. it IS a Thai-locale
+// company name with at most English brand-name fragments).
+const THAI_TEXT_PATTERN = /^[\u0E00-\u0E7FA-Za-z0-9\s.,()/&+\-'"]*$/;
 const ENGLISH_TEXT_PATTERN = /^[A-Za-z0-9\s.,()/&+\-'"]*$/;
 const THAI_TEXT_REQUIRED_PATTERN = /[\u0E00-\u0E7F]/;
 const ENGLISH_TEXT_REQUIRED_PATTERN = /[A-Za-z]/;

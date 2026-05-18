@@ -55,7 +55,14 @@ export default function Navbar() {
   const visibleAdminItems = adminNavItems.filter(
     (item) => !item.roles || item.roles.includes(user?.role ?? ''),
   );
-  const linePictureUrl = user?.line?.linked ? user.line.pictureUrl : null;
+  // Picture preference: when the user signed up/logged in via Google, the
+  // business identity is the Google account — don't surface LINE's avatar
+  // as the primary face. LINE picture only when Google isn't linked.
+  const linePictureUrl = user?.line?.linked && !user?.auth?.hasGoogle ? user.line.pictureUrl : null;
+  // Company name is the business identity that matters in this app — show
+  // it as the primary label in the top-right pill. User's personal name
+  // lives in the dropdown.
+  const companyDisplayName = user?.company?.nameTh || user?.company?.nameEn || user?.name || 'User';
 
   const handleLogout = () => {
     window.google?.accounts.id.disableAutoSelect();
@@ -132,11 +139,11 @@ export default function Navbar() {
                   />
                 ) : (
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#1e3a8a,#14b8a6)'}}>
-                    {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
+                    {companyDisplayName.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="text-sm font-medium text-slate-700 hidden sm:block max-w-24 truncate">
-                  {user?.name}
+                <span className="text-sm font-medium text-slate-700 hidden sm:block max-w-[160px] truncate" title={companyDisplayName}>
+                  {companyDisplayName}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
@@ -144,7 +151,10 @@ export default function Navbar() {
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white/95 py-1 shadow-xl backdrop-blur z-50">
                   <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate" title={companyDisplayName}>
+                      {companyDisplayName}
+                    </p>
+                    <p className="text-xs text-gray-600 truncate">{user?.name}</p>
                     <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                     {policy && (
                       <span

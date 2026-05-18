@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { z } from 'zod';
 import prisma from '../config/database';
+import { logger } from '../config/logger';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { authenticate, requireRole } from '../middleware/auth';
 import {
@@ -780,6 +781,47 @@ billingRouter.get('/config', (_req, res) => {
     plans: listBillingPlans(),
     paymentMethods: listPaymentMethods(),
   });
+});
+
+// Public juristic lookup for the signup form — given a 13-digit tax ID,
+// returns whatever the DBD/MOC open-data cache holds (name TH/EN, address,
+// status, juristic type). Public on purpose: the signup flow has no JWT
+// yet. Returns nothing for malformed tax IDs or unknown numbers so an
+// attacker cannot easily distinguish "exists vs not" beyond what DBD
+// already publishes openly. Rate-limit via the standard reverse proxy
+// rules; this endpoint reads from a Postgres cache and never hits the
+// upstream DBD API at request time.
+billingRouter.get('/signup/lookup-juristic', async (req, res) => {
+  const raw = typeof req.query.taxId === 'string' ? req.query.taxId : '';
+  const taxId = raw.replace(/\D/g, '');
+  if (taxId.length !== 13) {
+    res.status(400).json({ error: 'Tax ID must be 13 digits' });
+    return;
+  }
+  try {
+    const cache = await prisma.juristicOpenDataCache.findUnique({
+      where: { taxId },
+      select: {
+        taxId: true,
+        nameTh: true,
+        nameEn: true,
+        addressTh: true,
+        status: true,
+        juristicType: true,
+        vatRegistered: true,
+        vatName: true,
+        vatAddress: true,
+      },
+    });
+    if (!cache) {
+      res.json({ data: null });
+      return;
+    }
+    res.json({ data: cache });
+  } catch (err) {
+    logger.error('[billing] signup juristic lookup failed', { error: err instanceof Error ? err.message : String(err), taxId });
+    res.status(500).json({ error: 'Lookup failed' });
+  }
 });
 
 billingRouter.post('/free-signup', async (req, res) => {
