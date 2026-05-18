@@ -100,10 +100,7 @@ Done (อย่าทำซ้ำ):
 - ✅ Magic-link guest edit page (`/intake-edit/<jwt>`, 72h TTL, slip auto-OCR, rate-limit, audit log)
 
 ## Gotchas
-1. **Prisma client sync** — after `prisma generate` at root:
-   ```bash
-   cp -r node_modules/.prisma/client/. backend/node_modules/.prisma/client/
-   ```
+1. **Prisma lives in backend/** — single source of truth at `backend/prisma/schema.prisma`. Always `cd backend && npx prisma generate` (NOT root). Root no longer has a prisma/ dir as of 2026-05-18 cleanup.
 2. **Raw SQL casing** — Prisma camelCase columns need double-quotes: `SELECT "isActive" FROM users`
 3. **PKCS#12 on OpenSSL 3** — use `algorithm: 'aes256'` in `toPkcs12Asn1`, not `'3des'` (MAC verify fails)
 4. **JWT expiresIn** — jsonwebtoken v9 `StringValue` type, cast `as any` (see `routes/auth.ts`)
