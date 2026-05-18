@@ -25,6 +25,8 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
+      - key: INTAKE_EDIT_TTL_HOURS
+        value: "72"
       - key: FRONTEND_URLS
         sync: false
       - key: GOOGLE_CLIENT_ID

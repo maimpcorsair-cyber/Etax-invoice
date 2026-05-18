@@ -5,7 +5,11 @@ import { logger } from '../config/logger';
  * Magic-link token for guest LINE users to edit their pending document
  * intake on the web (no login required). The token is signed with the
  * server JWT secret, encodes the intakeId + lineUserId + companyId, and
- * expires after 24h so abandoned links eventually go cold.
+ * expires after a configurable TTL so abandoned links eventually go cold.
+ *
+ * TTL is controlled by `INTAKE_EDIT_TTL_HOURS` (default 72h = 3 days,
+ * which covers a weekend gap — "ส่งบิลศุกร์ เปิดจันทร์"). Clamped to
+ * [1, 168] hours so a misconfigured value can't make tokens immortal.
  *
  * The token is delivered as a URL param in a LINE Flex card button; the
  * link opens in the LINE in-app browser, which by design has no Google /
@@ -13,7 +17,18 @@ import { logger } from '../config/logger';
  */
 
 const INTAKE_EDIT_AUDIENCE = 'intake-edit';
-const DEFAULT_TTL_SECONDS = 60 * 60 * 24; // 24h
+
+function resolveDefaultTtlSeconds(): number {
+  const raw = Number(process.env.INTAKE_EDIT_TTL_HOURS ?? 72);
+  const hours = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 168) : 72;
+  return Math.round(hours * 3600);
+}
+
+const DEFAULT_TTL_SECONDS = resolveDefaultTtlSeconds();
+
+export function getIntakeEditTtlSeconds(): number {
+  return DEFAULT_TTL_SECONDS;
+}
 
 export interface IntakeEditTokenPayload {
   intakeId: string;
