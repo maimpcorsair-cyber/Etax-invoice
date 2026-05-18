@@ -413,6 +413,52 @@ function formatForeignAmount(currency: string, amount: number): string {
   }
 }
 
+// Per-type icon + fallback label. The OCR prompt sets documentTypeLabel in
+// Thai for most cases, but the icon is layout-driven and consistent here so
+// every entry point (intake confirm card, saved card, slip card) ends up
+// with the same visual language for the same type.
+function documentTypeIcon(type: OcrResult['documentType']): string {
+  switch (type) {
+    case 'tax_invoice':     return '📄';  // ใบกำกับภาษี
+    case 'invoice':         return '📃';  // ใบแจ้งหนี้ (no VAT line shown yet)
+    case 'receipt':         return '🧾';  // ใบเสร็จรับเงิน
+    case 'expense_receipt': return '🧾';
+    case 'billing_note':    return '📝';  // ใบวางบิล
+    case 'withholding_tax': return '📋';  // 50ทวิ
+    case 'bank_transfer':   return '💸';  // สลิปโอนเงิน
+    case 'payment_advice':  return '💸';
+    case 'bank_statement':  return '📊';  // statement
+    case 'credit_note':     return '⬇️';  // ใบลดหนี้
+    case 'debit_note':      return '⬆️';  // ใบเพิ่มหนี้
+    case 'quotation':       return '💬';  // ใบเสนอราคา
+    case 'purchase_order':  return '🛒';  // ใบสั่งซื้อ
+    case 'delivery_note':   return '📦';  // ใบส่งสินค้า
+    case 'contract':        return '📑';  // สัญญา
+    default:                return '📎';  // other / unknown
+  }
+}
+
+function documentTypeFallbackLabel(type: OcrResult['documentType']): string {
+  switch (type) {
+    case 'tax_invoice':     return 'ใบกำกับภาษี';
+    case 'invoice':         return 'ใบแจ้งหนี้';
+    case 'receipt':         return 'ใบเสร็จรับเงิน';
+    case 'expense_receipt': return 'ใบเสร็จค่าใช้จ่าย';
+    case 'billing_note':    return 'ใบวางบิล';
+    case 'withholding_tax': return 'หนังสือรับรองภาษีหัก ณ ที่จ่าย (50ทวิ)';
+    case 'bank_transfer':   return 'สลิปโอนเงิน';
+    case 'payment_advice':  return 'หนังสือแจ้งการชำระเงิน';
+    case 'bank_statement':  return 'รายการเดินบัญชี';
+    case 'credit_note':     return 'ใบลดหนี้';
+    case 'debit_note':      return 'ใบเพิ่มหนี้';
+    case 'quotation':       return 'ใบเสนอราคา';
+    case 'purchase_order':  return 'ใบสั่งซื้อ';
+    case 'delivery_note':   return 'ใบส่งสินค้า';
+    case 'contract':        return 'สัญญา';
+    default:                return 'เอกสาร';
+  }
+}
+
 function buildOcrFlexCardContents(result: OcrResult): { header: object; body: object } {
   const fmt = (n: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
@@ -509,7 +555,7 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
           contents: [
             {
               type: 'text',
-              text: `📄 ${result.documentTypeLabel || 'เอกสาร'}`,
+              text: `${documentTypeIcon(result.documentType)} ${result.documentTypeLabel || documentTypeFallbackLabel(result.documentType)}`,
               color: '#ffffff',
               size: 'md',
               weight: 'bold' as const,

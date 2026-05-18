@@ -1440,7 +1440,72 @@ Currency rules — read CAREFULLY (frequent misclassification source):
 - If the document explicitly states "Exchange Rate: THB @ 1.000000" (or any rate with THB as the base/quote currency = 1), the document IS in THB. The header is declaring "no conversion needed". Set originalCurrency='THB' (or omit) — do NOT mark as foreign.
 - Many Thai invoices include occasional line items priced in USD (e.g. ENS fee, freight surcharge) but the final total is reported in THB on the bottom. In that case the document is THB — do NOT use the line-item currency as originalCurrency.
 - Only mark a document as foreign when ALL THREE are true: (a) the bottom-line total is printed in a foreign currency, (b) there is a real FX rate (NOT 1.000000 between THB and a non-THB currency), and (c) the supplier or context confirms cross-border billing.
-- When document prints both currencies side-by-side ('USD 100.00 / THB 3,250.00') as the actual total, use the foreign as originalTotal and the THB as 'total'.`;
+- When document prints both currencies side-by-side ('USD 100.00 / THB 3,250.00') as the actual total, use the foreign as originalTotal and the THB as 'total'.
+
+Document-type-specific extraction rules — STEP 1: classify the document first using header keywords, layout, and footer, then apply the rules below for that type:
+
+【tax_invoice / ใบกำกับภาษี】
+- Header MUST say "ใบกำกับภาษี" or "TAX INVOICE" (sometimes combined "ใบกำกับภาษี/ใบเสร็จรับเงิน" — that's tax_invoice + receipt = type "tax_invoice")
+- supplierName = ผู้ขาย (top-left or letterhead). supplierTaxId = 13 digits without dashes. supplierBranch = "00000" for HQ or 5-digit branch.
+- subtotal = ยอดก่อน VAT, vatAmount = ภาษีมูลค่าเพิ่ม 7%, total = ยอดรวมทั้งสิ้น
+- Confidence high requires: invoiceNumber + invoiceDate + supplierTaxId(13) + total + (subtotal+vat≈total)
+- taxTreatment = input_vat_claimable when buyer is registered VAT, else needs_review
+
+【receipt / ใบเสร็จรับเงิน (no VAT line)】
+- Header says "ใบเสร็จรับเงิน" / "RECEIPT" / "ใบรับเงิน" only — NO "ใบกำกับภาษี"
+- vatAmount may be 0 if seller is non-VAT-registered. total = subtotal in that case.
+- Common for: 7-Eleven, taxi, parking, small vendors. expenseCategory often retail/utilities.
+
+【expense_receipt / ใบเสร็จค่าใช้จ่ายส่วนบุคคล】
+- Receipt for personal-ish expenses (meals, taxis, hotel one-night, supplies)
+- Lower default confidence; taxTreatment defaults to needs_review unless clearly business
+
+【withholding_tax / 50ทวิ หนังสือรับรองหักภาษี ณ ที่จ่าย】
+- Header says "หนังสือรับรองการหักภาษี ณ ที่จ่าย" or has "ภ.ง.ด." numbers (1/3/53/2/2ก)
+- documentMetadata.withholdingTaxAmount = ภาษีที่หัก. withholdingTaxGrossAmount = จำนวนเงินที่จ่าย (before withholding)
+- withholdingTaxPayerName = ผู้หัก (the company that withheld and is issuing this cert)
+- withholdingTaxPayerTaxId = ผู้หักTaxId
+- withholdingTaxRecipientName = ผู้ถูกหัก (the supplier/contractor receiving the payment)
+- withholdingTaxRecipientTaxId = ผู้ถูกหักTaxId
+- supplierName = withholdingTaxPayerName (issuer of the cert)
+- Common rates: 1% (transport/services), 3% (professional services), 5% (rent)
+
+【bank_transfer / สลิปโอนเงิน】
+- Mobile banking screenshot: KBank/SCB/Bangkok Bank/KTB/Krungsri/TTB/GSB/BAAC/CIMB/UOB/PromptPay
+- payment.fromName = ผู้โอน (top, near source bank logo). payment.toName = ผู้รับ (below the arrow/PromptPay logo)
+- payment.amount = transferred amount (NOT balance, NOT fee). payment.paidAt = transfer time.
+- payment.reference = เลขที่รายการ / transaction id
+- payment.direction: "outgoing" if "โอนเงิน" / "จ่าย" / "from us"; "incoming" if "รับ" / "เงินเข้า"
+- supplierName = the COUNTERPARTY (toName for outgoing, fromName for incoming)
+- subtotal/vatAmount = 0 (slips don't have VAT). total = payment.amount
+
+【credit_note / ใบลดหนี้】
+- Header says "ใบลดหนี้" / "CREDIT NOTE"
+- total and vatAmount should be NEGATIVE (or marked as a refund/return). It REVERSES a prior invoice.
+- invoiceNumber refers to the credit note number; the referenced original invoice goes in description if visible.
+- expenseCategory typically inherits from original
+
+【debit_note / ใบเพิ่มหนี้】
+- Header says "ใบเพิ่มหนี้" / "DEBIT NOTE"
+- ADDS to a prior invoice (extra charge). total/vat are positive add-ons.
+
+【quotation / ใบเสนอราคา】
+- Header says "ใบเสนอราคา" / "QUOTATION"
+- NOT a tax document — total is an estimate, supplierTaxId may be missing
+- taxTreatment = needs_review (don't post as expense until invoice issued)
+
+【purchase_order / ใบสั่งซื้อ】
+- Header says "ใบสั่งซื้อ" / "PURCHASE ORDER" / "PO"
+- The BUYER's document committing to purchase — supplierName is the seller, but supplierTaxId may be the buyer's. Confidence usually medium.
+
+【bank_statement / รายการเดินบัญชี】
+- Multi-row transaction list (NOT a single transfer slip). documentMetadata.transactions array if you can extract.
+- total = balance OR period sum (note which in description)
+
+【payment_advice / หนังสือแจ้งการชำระเงิน】
+- Letter/notification advising a payment will be / has been made. Treat like bank_transfer for amount fields but classification stays "payment_advice".
+
+If none of the above clearly matches, use "other" — better honest than wrong.`;
 
   try {
     let raw = '';
