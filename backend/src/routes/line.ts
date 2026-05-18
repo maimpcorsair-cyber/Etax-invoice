@@ -3389,8 +3389,46 @@ export async function processIntakeOcrPipeline(input: {
     return;
   }
 
+  // Hard 75s timeout on the whole pipeline. If any OCR provider hangs
+  // (Azure / Gemini / OpenAI flaky), this saves the user from waiting
+  // forever for a 'กำลังอ่าน → silence' result. Leaves ~15s headroom
+  // before the 90s Redis lock expires.
+  const PIPELINE_TIMEOUT_MS = 75_000;
+  let timedOut = false;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`pipeline timeout after ${PIPELINE_TIMEOUT_MS}ms`));
+    }, PIPELINE_TIMEOUT_MS);
+  });
+
   try {
-    await withLineReplyToken('', () => runIntakeOcrPipelineInner({ intakeId, lineUserId }), { pushTarget });
+    await Promise.race([
+      withLineReplyToken('', () => runIntakeOcrPipelineInner({ intakeId, lineUserId }), { pushTarget }),
+      timeoutPromise,
+    ]);
+  } catch (err) {
+    if (timedOut) {
+      logger.error('[Line] OCR pipeline exceeded hard timeout', { intakeId, lineUserId });
+      try {
+        await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
+          where: { id: intakeId },
+          data: { status: 'needs_review', error: 'pipeline_timeout' },
+        }));
+      } catch (updateErr) {
+        logger.warn('[Line] mark-timeout status update failed', { err: updateErr, intakeId });
+      }
+      try {
+        await sendLineText(
+          pushTarget ?? lineUserId,
+          '⚠️ ระบบใช้เวลาอ่านเอกสารนานผิดปกติ — ไฟล์ถูกเก็บในระบบแล้ว ตรวจดูใน Input VAT หรือลองส่งใหม่อีกครั้งใน 1-2 นาที',
+        );
+      } catch (sendErr) {
+        logger.warn('[Line] timeout notification send failed', { err: sendErr, intakeId });
+      }
+      return;
+    }
+    throw err;
   } finally {
     try { await redis.del(lockKey); } catch { /* best-effort */ }
   }

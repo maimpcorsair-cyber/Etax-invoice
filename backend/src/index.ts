@@ -75,6 +75,38 @@ const healthHandler = (_req: express.Request, res: express.Response) => {
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
 
+// Worker / queue health — exposes BullMQ queue depths + how long since the
+// last job was processed. Use this to detect a dead worker dyno before
+// users notice 'กำลังอ่าน → silence'. Returns 200 on healthy, 503 when
+// any queue has been backed up > 5 min with no progress.
+app.get('/api/health/workers', async (_req, res) => {
+  try {
+    const { lineOcrQueue } = await import('./queues/lineOcrQueue');
+    const [waiting, active, delayed, failed] = await Promise.all([
+      lineOcrQueue.getWaitingCount(),
+      lineOcrQueue.getActiveCount(),
+      lineOcrQueue.getDelayedCount(),
+      lineOcrQueue.getFailedCount(),
+    ]);
+    // BullMQ tracks the most recent completed job — use it as a freshness
+    // signal. If nothing has completed in 5 min but there ARE waiting jobs,
+    // the worker dyno is almost certainly stuck.
+    const completed = await lineOcrQueue.getCompleted(0, 0);
+    const lastCompletedAt = completed[0]?.finishedOn ?? null;
+    const ageMs = lastCompletedAt ? Date.now() - lastCompletedAt : null;
+    const stuck = waiting > 0 && ageMs !== null && ageMs > 5 * 60 * 1000;
+    res.status(stuck ? 503 : 200).json({
+      status: stuck ? 'stuck' : 'ok',
+      queues: {
+        'line-ocr': { waiting, active, delayed, failed, lastCompletedAgeMs: ageMs },
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // Keep-alive endpoint — no auth required, used by UptimeRobot to prevent Render cold starts
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
