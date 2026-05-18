@@ -103,7 +103,7 @@ async function callGemini(
       ];
   const body = {
     contents: [{ parts }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 4000, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.1, maxOutputTokens: 8000, responseMimeType: 'application/json' },
     // Defaults block financial / PII-containing images (e.g. bank slips with
     // account numbers, ID-like numbers). For an OCR use case this is the
     // wrong default — set every category to BLOCK_NONE so we get the text.
@@ -728,8 +728,47 @@ Verification mode:
 ${pro ? '- This is the escalation pass. Be stricter about multi-page documents, missing tax IDs, and mismatched totals.' : ''}${candidateBlock}`;
 }
 
+/**
+ * Recover a JSON string that was truncated mid-stream (e.g. when the LLM
+ * hit max_tokens). Strategy: walk the string forward keeping nesting
+ * depth, remember the position of the last completed top-level field
+ * (where the next char is `,` outside a string), then close all open
+ * braces / brackets at that point.
+ *
+ * Returns null when no completed field was found (truncation happened
+ * before even one key:value finished).
+ */
+function tryRecoverTruncatedJson(s: string): string | null {
+  let depth = 0;
+  const stack: Array<'{' | '['> = [];
+  let inString = false;
+  let escape = false;
+  let lastSafeCut = -1; // index of last `,` outside string at depth 1
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') { stack.push('{'); depth++; }
+    else if (ch === '[') { stack.push('['); depth++; }
+    else if (ch === '}' || ch === ']') { stack.pop(); depth--; }
+    else if (ch === ',' && depth === 1) { lastSafeCut = i; }
+  }
+  if (lastSafeCut < 0 || stack.length === 0) return null;
+  // Truncate before the trailing `,`, close all open containers in reverse.
+  const closers = stack.reverse().map((c) => c === '{' ? '}' : ']').join('');
+  return s.slice(0, lastSafeCut) + closers;
+}
+
 function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string): OcrResult | null {
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  // Strip markdown code fences the model occasionally adds despite a
+  // json-only prompt (` ```json ... ``` `).
+  const stripped = raw
+    .replace(/^[\s​]*```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     logger.warn('OCR: no JSON found in response', { raw: raw.slice(0, 200) });
     return null;
@@ -739,11 +778,28 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
   try {
     parsed = JSON.parse(jsonMatch[0]) as Partial<OcrResult>;
   } catch (err) {
-    logger.warn('OCR: invalid JSON response', {
-      error: err instanceof Error ? err.message : String(err),
-      raw: raw.slice(0, 500),
-    });
-    return null;
+    // LLM may have truncated mid-stream (max_tokens exhausted). Try to
+    // recover by trimming back to the last complete `,` field and
+    // closing braces. Better partial result than nothing.
+    const recovered = tryRecoverTruncatedJson(jsonMatch[0]);
+    if (recovered) {
+      try {
+        parsed = JSON.parse(recovered) as Partial<OcrResult>;
+        logger.warn('OCR: recovered from truncated JSON', { originalLen: jsonMatch[0].length, recoveredLen: recovered.length });
+      } catch {
+        logger.warn('OCR: invalid JSON response (recovery also failed)', {
+          error: err instanceof Error ? err.message : String(err),
+          raw: raw.slice(0, 500),
+        });
+        return null;
+      }
+    } else {
+      logger.warn('OCR: invalid JSON response', {
+        error: err instanceof Error ? err.message : String(err),
+        raw: raw.slice(0, 500),
+      });
+      return null;
+    }
   }
   const allowedTypes = new Set<OcrResult['documentType']>([
     'tax_invoice',
