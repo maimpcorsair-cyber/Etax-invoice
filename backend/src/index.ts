@@ -107,6 +107,22 @@ app.get('/api/health/workers', async (_req, res) => {
   }
 });
 
+// Deep health — pings each external dependency (PG, Redis, OpenAI, Gemini,
+// S3, LINE) in parallel and returns per-provider latency + status. Result is
+// cached for 60s so monitoring loops don't hammer the upstreams.
+// Returns 200 ok, 207 degraded (one or more non-critical providers down),
+// or 503 error (postgres or redis down — app is effectively dead).
+app.get('/api/health/deep', async (_req, res) => {
+  try {
+    const { runDeepHealthCheck } = await import('./services/healthCheck');
+    const result = await runDeepHealthCheck();
+    const code = result.status === 'ok' ? 200 : result.status === 'degraded' ? 207 : 503;
+    res.status(code).json(result);
+  } catch (err) {
+    res.status(500).json({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // PDF generation smoke test — confirms Puppeteer can launch headless Chrome
 // inside the deployed container. Returns 200 with size + duration on success,
 // or 500 with the launch/render error so a deploy failure is one curl away
