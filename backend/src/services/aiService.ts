@@ -1301,6 +1301,7 @@ Currency rules:
       ? `\n\nAzure Document Intelligence result:\nFields:\n${JSON.stringify(azureResult.fields, null, 2)}\n\nOCR text:\n${azureResult.content.slice(0, 6000)}`
       : '';
     const vendorMemoryContext = await buildOcrVendorMemoryContext(options.companyId);
+    let primaryProvider: 'openai' | 'gemini' | 'openrouter' | 'none' = 'none';
 
     // Provider priority: OpenAI primary → Gemini secondary → OpenRouter last resort.
     // Reasoning: OpenAI (gpt-4o-mini) has stable paid billing, low latency
@@ -1319,6 +1320,7 @@ Currency rules:
         );
         if (openaiCall.ok) {
           raw = openaiCall.text;
+          primaryProvider = 'openai';
           logger.info('[OCR] OpenAI vision responded', { chars: raw.length, model: openaiCall.model });
         } else {
           logger.warn('[OCR] OpenAI vision call failed, will try Gemini next', { error: openaiCall.error });
@@ -1335,6 +1337,7 @@ Currency rules:
         const fastModel = mimeType === 'text/plain' ? geminiFastModel : geminiScanModel;
         logger.info('[OCR] Trying Gemini API (fallback)', { mimeType, model: fastModel, source: options.source });
         raw = await callGemini(mimeType, imageBase64, buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`), ocrTimeoutMs, fastModel);
+        primaryProvider = 'gemini';
         logger.info('[OCR] Gemini responded', { chars: raw.length });
       } catch (geminiErr) {
         logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
@@ -1343,6 +1346,7 @@ Currency rules:
 
     // Fallback: OpenRouter free models (last resort)
     if (!raw) {
+      primaryProvider = 'openrouter';
       const isText = mimeType === 'text/plain';
       const userContent: OpenRouterMessage['content'] = isText
         ? `${ocrPrompt}${vendorMemoryContext}\n\nDocument text:\n${Buffer.from(imageBase64, 'base64').toString('utf-8')}`
@@ -1384,7 +1388,13 @@ Currency rules:
       }
       return emptyResult;
     }
-    result.extractionProvider = azureResult?.ok ? 'azure+gemini-verify' : googleAiKey ? 'gemini-verify' : 'openrouter';
+    // Label reflects which LLM actually parsed (helps debug + benchmark).
+    const providerLabel = primaryProvider === 'openai'
+      ? 'openai-verify'
+      : primaryProvider === 'gemini'
+        ? 'gemini-verify'
+        : 'openrouter';
+    result.extractionProvider = azureResult?.ok ? `azure+${providerLabel}` : providerLabel;
     result.verificationStage = 'fast';
     if (!hasUsefulOcrData(result) && azureResult?.ok) {
       result.rawText = azureResult.content;

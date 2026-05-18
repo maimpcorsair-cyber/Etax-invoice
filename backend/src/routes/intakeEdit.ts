@@ -5,7 +5,7 @@ import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { verifyIntakeEditToken } from '../services/intakeEditToken';
 import { OcrResult } from '../services/aiService';
-import { downloadFromStorage, getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { supportedDocumentMimeType } from '../services/documentOcrService';
 
 /**
