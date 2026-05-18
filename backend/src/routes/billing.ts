@@ -885,7 +885,7 @@ billingRouter.post('/free-signup', async (req, res) => {
         userId: result.user.id,
         plan: 'free',
         status: 'activated',
-        loginMethod: 'google',
+        loginMethod: googleAccount ? 'google' : 'none',
         token: googleAccount ? issueToken(result.user) : null,
         user: googleAccount
           ? {
@@ -902,7 +902,9 @@ billingRouter.post('/free-signup', async (req, res) => {
               },
             }
           : null,
-        nextStep: 'Login with the same Google email used during signup',
+        nextStep: googleAccount
+          ? 'You are signed in — use the token in this response or sign in again with Google.'
+          : 'Account created. Sign in with Google using the same email — manual password sign-in is not supported yet for free signups.',
       },
     });
   } catch (err) {
