@@ -809,10 +809,10 @@ export async function performConfirmedIntakeSave(
   }
 
   const saved = await savePurchaseFromLineOcr(lineUserId, result, intake.companyId, intake.id, intake.userId);
-  await prisma.purchaseInvoice.update({
+  await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
     where: { id: saved.id },
     data: { pdfUrl: documentIntakeFileUrl(intake.id, intake.fileUrl) },
-  });
+  }));
   await updateDocumentIntake(intake.id, {
     status: 'saved',
     ocrResult: result,
@@ -866,9 +866,13 @@ async function tryAutoMatchPendingBillWithSlip(
     try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
     return false;
   }
-  const purchase = await prisma.purchaseInvoice.findFirst({
-    where: { id: billIntake.purchaseInvoiceId, companyId: billIntake.companyId },
-  });
+  // Local non-null binding so the closure passed to withSystemRlsContext
+  // sees a narrowed `string` (TS doesn't propagate narrowing into the
+  // async closure otherwise).
+  const purchaseInvoiceId: string = billIntake.purchaseInvoiceId;
+  const purchase = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findFirst({
+    where: { id: purchaseInvoiceId, companyId: billIntake.companyId },
+  }));
   if (!purchase) {
     try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
     return false;
@@ -884,14 +888,14 @@ async function tryAutoMatchPendingBillWithSlip(
   const whtNote = matchInfo.whtRate
     ? ` (หัก ณ ที่จ่าย ${(matchInfo.whtRate * 100).toFixed(0)}% = ฿${(purchase.total * matchInfo.whtRate).toLocaleString('th-TH', { maximumFractionDigits: 2 })})`
     : '';
-  await prisma.purchaseInvoice.update({
+  await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
     where: { id: purchase.id },
     data: {
       isPaid: true,
       paidAt,
       notes: [purchase.notes, `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}${whtNote}`].filter(Boolean).join('\n'),
     },
-  });
+  }));
   await updateDocumentIntake(slipIntakeId, {
     status: 'saved',
     ocrResult: slipResult,
@@ -999,14 +1003,14 @@ async function tryAutoMatchPendingSlipWithPurchase(
     ? ` (หัก ณ ที่จ่าย ${(matchInfo.whtRate * 100).toFixed(0)}% = ฿${(savedPurchase.total * matchInfo.whtRate).toLocaleString('th-TH', { maximumFractionDigits: 2 })})`
     : '';
 
-  await prisma.purchaseInvoice.update({
+  await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
     where: { id: savedPurchase.id },
     data: {
       isPaid: true,
       paidAt,
       notes: `ชำระโดยสลิปโอนเงิน LINE${bankSuffix}${refSuffix}${whtNote}`,
     },
-  });
+  }));
   await updateDocumentIntake(slipIntake.id, {
     status: 'saved',
     ocrResult: slipResult,
@@ -1247,7 +1251,7 @@ async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string
   const supplierTaxId = result.supplierTaxId || '0000000000000';
   const invoiceNumber = result.invoiceNumber || `LINE-${fallbackId}`;
   if (!supplierTaxId || supplierTaxId === '0000000000000' || !invoiceNumber) return null;
-  return prisma.purchaseInvoice.findFirst({
+  return withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findFirst({
     where: { companyId, supplierTaxId, invoiceNumber },
     select: {
       id: true,
@@ -1256,7 +1260,7 @@ async function findDuplicatePurchaseFromOcr(result: OcrResult, companyId: string
       invoiceDate: true,
       total: true,
     },
-  });
+  }));
 }
 
 async function replySavedPurchase(lineUserId: string, result: OcrResult, purchaseId: string, prefix = '✅ บันทึกค่าใช้จ่ายสำเร็จ', submitterUserId?: string, intakeId?: string, companyId?: string) {
@@ -1464,7 +1468,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
     };
   }
 
-  const purchaseCandidates = await prisma.purchaseInvoice.findMany({
+  const purchaseCandidates = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findMany({
     where: {
       companyId,
       isPaid: false,
@@ -1476,10 +1480,10 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
     },
     orderBy: { invoiceDate: 'desc' },
     take: 5,
-  });
+  }));
   const exactPurchase = purchaseCandidates.find((purchase) => closeAmount(purchase.total, amount));
   if (exactPurchase) {
-    await prisma.purchaseInvoice.update({
+    await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
       where: { id: exactPurchase.id },
       data: {
         isPaid: true,
@@ -1489,7 +1493,7 @@ async function handleBankTransferDocument(lineUserId: string, result: OcrResult,
           `ชำระโดยสลิปโอนเงิน LINE OCR${reference ? ` ref: ${reference}` : ''}${result.payment?.bankName ? ` bank: ${result.payment.bankName}` : ''}`,
         ].filter(Boolean).join('\n'),
       },
-    });
+    }));
     const outAmountFmt = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
     return {
       ok: true,
@@ -2718,10 +2722,10 @@ async function handleEditReply(lineUserId: string, trimmed: string): Promise<boo
   }
 
   try {
-    await prisma.purchaseInvoice.update({
+    await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
       where: { id: session.purchaseInvoiceId },
       data: { [session.currentField]: parsedValue } as Record<string, unknown>,
-    });
+    }));
     await safeRedisDel(`line:editsession:${lineUserId}`);
     await sendLineTextWithQuickReply(
       lineUserId,
@@ -3069,7 +3073,7 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
   if (searchMatch) {
     const query = searchMatch[1].trim();
     try {
-      const results = await prisma.purchaseInvoice.findMany({
+      const results = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findMany({
         where: {
           companyId,
           supplierName: { contains: query, mode: 'insensitive' },
@@ -3077,7 +3081,7 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
         orderBy: { invoiceDate: 'desc' },
         take: 5,
         select: { id: true, supplierName: true, invoiceNumber: true, invoiceDate: true, total: true, vatAmount: true },
-      });
+      }));
       if (results.length === 0) {
         await sendLineText(lineUserId, `ไม่พบเอกสารที่มีชื่อผู้ขาย "${query}"`);
         return;
@@ -3096,12 +3100,12 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
 
   if (['ใบล่าสุด', 'เอกสารล่าสุด', 'ล่าสุด'].includes(lower)) {
     try {
-      const recent = await prisma.purchaseInvoice.findMany({
+      const recent = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findMany({
         where: { companyId },
         orderBy: { createdAt: 'desc' },
         take: 5,
         select: { supplierName: true, invoiceNumber: true, invoiceDate: true, total: true },
-      });
+      }));
       if (recent.length === 0) {
         await sendLineText(lineUserId, 'ยังไม่มีเอกสารในระบบ');
         return;
@@ -3121,12 +3125,12 @@ async function handleTextMessage(lineUserId: string, text: string, context?: Lin
   if (['ใบเดือนนี้', 'เอกสารเดือนนี้'].includes(lower)) {
     try {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthInvoices = await prisma.purchaseInvoice.findMany({
+      const monthInvoices = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findMany({
         where: { companyId, invoiceDate: { gte: monthStart } },
         orderBy: { invoiceDate: 'desc' },
         take: 10,
         select: { supplierName: true, invoiceNumber: true, total: true, vatAmount: true },
-      });
+      }));
       const fmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
       const totalVat = monthInvoices.reduce((s, r) => s + r.vatAmount, 0);
       const totalAmt = monthInvoices.reduce((s, r) => s + r.total, 0);
@@ -3913,21 +3917,21 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
           }),
         );
       } else {
-        const purchase = await prisma.purchaseInvoice.findFirst({
+        const purchase = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findFirst({
           where: { id: targetId, companyId: intake.companyId },
-        });
+        }));
         if (!purchase) {
           await sendLineText(lineUserId, '⚠️ ไม่พบใบซื้อที่เลือก');
           return;
         }
-        await prisma.purchaseInvoice.update({
+        await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
           where: { id: purchase.id },
           data: {
             isPaid: true,
             paidAt,
             notes: [purchase.notes, noteSuffix].filter(Boolean).join('\n'),
           },
-        });
+        }));
         await updateDocumentIntake(intake.id, {
           status: 'saved',
           ocrResult: result,
@@ -4140,10 +4144,10 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
     const fieldKey = parts[2];
     const value = parts.slice(3).join(':');
     try {
-      await prisma.purchaseInvoice.update({
+      await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
         where: { id: purchaseId },
         data: { [fieldKey]: value } as Record<string, unknown>,
-      });
+      }));
       await sendLineTextWithQuickReply(
         lineUserId,
         `✅ แก้ไข ${fieldKey} เรียบร้อยแล้ว`,

@@ -6,7 +6,10 @@ const baseUrl = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
 // with comparable accuracy on the structured fields we extract. Override
 // via OPENAI_OCR_MODEL=gpt-4o for documents needing full reasoning power.
 const defaultModel = process.env.OPENAI_OCR_MODEL ?? 'gpt-4o-mini';
-const timeoutMs = Number(process.env.OPENAI_OCR_TIMEOUT_MS ?? 30000);
+// 90s — must outlast complex multi-page PDF OCR but stay under the
+// 120s pipeline-level timeout so we still get a structured 'OpenAI
+// failed → fall back to Gemini' log instead of a hard abort.
+const timeoutMs = Number(process.env.OPENAI_OCR_TIMEOUT_MS ?? 90000);
 
 export function isOpenAIVisionConfigured(): boolean {
   return !!apiKey;
