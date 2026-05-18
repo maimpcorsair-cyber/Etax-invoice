@@ -591,6 +591,29 @@ async function convertForeignCurrencyToThb(result: OcrResult): Promise<OcrResult
   const declared = (result.originalCurrency ?? result.documentMetadata?.currency ?? '').toUpperCase();
   if (!declared || declared === 'THB') return result;
 
+  // Defensive sanity check — when the LLM says "USD with exchangeRate=1", it's
+  // almost always misreading "Exchange Rate: THB @ 1.000000" on a Thai-baht
+  // invoice that happens to have one foreign-priced line item. Real USD/THB
+  // hovers around 32-37, EUR/THB around 35-40 — a rate of 1.0 between THB
+  // and any non-THB currency is never legitimate. Strip the foreign tag and
+  // treat the doc as THB to avoid the "$780 ≈ ฿780" nonsense card.
+  if (result.exchangeRate === 1 || result.exchangeRate === 1.0) {
+    logger.warn('[OCR] foreign currency with rate=1 detected; treating as THB', {
+      declared,
+      total: result.total,
+      originalTotal: result.originalTotal,
+    });
+    return {
+      ...result,
+      originalCurrency: 'THB',
+      originalTotal: undefined,
+      originalSubtotal: undefined,
+      originalVatAmount: undefined,
+      exchangeRate: undefined,
+      exchangeRateSource: undefined,
+    };
+  }
+
   // Figure out which numeric field holds the foreign-currency amounts.
   // The LLM is instructed to populate originalTotal when currency != THB,
   // but older prompts populated 'total' with the foreign value — handle
@@ -1332,10 +1355,12 @@ Rules:
   "rawText": "all text found in document"
 }
 
-Currency rules:
-- Most Thai documents are THB — only set originalCurrency / originalTotal etc when the doc is clearly in a foreign currency (e.g. invoice from GAC, Lazada international, Stripe, AWS).
-- Some documents mix currencies per line item (e.g. some USD line + some THB duty). In that case use the top-level 'Total Amount' currency as originalCurrency and originalTotal. Don't try to split per-line.
-- When document prints both currencies side-by-side ('USD 100.00 / THB 3,250.00'), use the foreign as originalTotal and the THB as 'total'.`;
+Currency rules — read CAREFULLY (frequent misclassification source):
+- Most Thai documents are THB. Set originalCurrency / originalTotal / exchangeRate ONLY when the entire document's bottom-line "Total Amount" / "Amount to be paid" is in a foreign currency.
+- If the document explicitly states "Exchange Rate: THB @ 1.000000" (or any rate with THB as the base/quote currency = 1), the document IS in THB. The header is declaring "no conversion needed". Set originalCurrency='THB' (or omit) — do NOT mark as foreign.
+- Many Thai invoices include occasional line items priced in USD (e.g. ENS fee, freight surcharge) but the final total is reported in THB on the bottom. In that case the document is THB — do NOT use the line-item currency as originalCurrency.
+- Only mark a document as foreign when ALL THREE are true: (a) the bottom-line total is printed in a foreign currency, (b) there is a real FX rate (NOT 1.000000 between THB and a non-THB currency), and (c) the supplier or context confirms cross-border billing.
+- When document prints both currencies side-by-side ('USD 100.00 / THB 3,250.00') as the actual total, use the foreign as originalTotal and the THB as 'total'.`;
 
   try {
     let raw = '';

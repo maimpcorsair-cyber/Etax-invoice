@@ -1110,7 +1110,7 @@ async function sendCombinedSlipAndCandidates(
 }
 
 async function askForConfirmation(lineUserId: string, intakeId: string, result: OcrResult) {
-  await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
+  const updated = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
     where: { id: intakeId },
     data: {
       status: 'awaiting_confirmation',
@@ -1118,7 +1118,13 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
       warnings: result.validationWarnings as Prisma.InputJsonValue | undefined,
       error: null,
     },
+    select: { companyId: true },
   }));
+
+  // Build the magic-link edit URL — drives the "✏️ แก้ไขในเว็บ" URI button
+  // on the confirm card. Without this we fall back to a postback that opens
+  // an inline field picker, which loses photo context and is harder to use.
+  const editUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, updated.companyId);
 
   // Show paypers-style summary card so the user sees what we understood
   // (document type, amount, date, seller, category) BEFORE we ask anything.
@@ -1139,7 +1145,7 @@ async function askForConfirmation(lineUserId: string, intakeId: string, result: 
   await sendLineFlexMessage(
     lineUserId,
     altText,
-    buildIntakeConfirmFlexCard(result, intakeId),
+    buildIntakeConfirmFlexCard(result, intakeId, editUrl ? { editUrl } : undefined),
   );
 
   // Only prompt for category when AI couldn't infer one — otherwise the
@@ -2611,10 +2617,11 @@ async function handleDurableIntakeReply(lineUserId: string, text: string): Promi
         error: null,
       },
     }));
+    const editUrl = buildIntakeEditUrlSafe(active.id, lineUserId, active.companyId);
     await sendLineFlexMessage(
       lineUserId,
       'อัพเดตแล้ว — กรุณายืนยัน',
-      buildIntakeConfirmFlexCard(newResult, active.id),
+      buildIntakeConfirmFlexCard(newResult, active.id, editUrl ? { editUrl } : undefined),
     );
     return true;
   }
