@@ -1310,11 +1310,35 @@ Currency rules:
         raw = await callGemini(mimeType, imageBase64, buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`), ocrTimeoutMs, fastModel);
         logger.info('[OCR] Gemini responded', { chars: raw.length });
       } catch (geminiErr) {
-        logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
+        logger.warn('[OCR] Gemini failed, will try OpenAI direct next', { error: String(geminiErr) });
       }
     }
 
-    // Fallback: OpenRouter free models
+    // Direct OpenAI vision fallback — runs BEFORE the OpenRouter chain
+    // because OpenRouter has been flaky (wrong/unavailable model IDs) and
+    // we have a working OpenAI key. Cheap (gpt-4o-mini ~$0.003/doc) and
+    // fast (~1-3s). Skips when mime is text/plain since OpenAI text mode
+    // is handled later.
+    if (!raw && isOpenAIVisionConfigured() && mimeType !== 'text/plain') {
+      try {
+        logger.info('[OCR] Trying OpenAI vision (Gemini quota / unavailable)', { mimeType });
+        const openaiCall = await callOpenAIVision(
+          mimeType,
+          imageBase64,
+          buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, undefined, false),
+        );
+        if (openaiCall.ok) {
+          raw = openaiCall.text;
+          logger.info('[OCR] OpenAI vision responded', { chars: raw.length, model: openaiCall.model });
+        } else {
+          logger.warn('[OCR] OpenAI vision call failed', { error: openaiCall.error });
+        }
+      } catch (openaiErr) {
+        logger.warn('[OCR] OpenAI vision threw, falling back to OpenRouter', { error: String(openaiErr) });
+      }
+    }
+
+    // Fallback: OpenRouter free models (last resort)
     if (!raw) {
       const isText = mimeType === 'text/plain';
       const userContent: OpenRouterMessage['content'] = isText

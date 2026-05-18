@@ -29,7 +29,15 @@ export async function enqueueLineOcrJob(data: LineOcrJobData): Promise<void> {
       jobId: `line-ocr:${data.intakeId}`,
     });
   } catch (err) {
-    logger.error('[lineOcrQueue] Failed to enqueue OCR job', { err, intakeId: data.intakeId });
+    // BullMQ throws Error subclasses; serialize defensively so the log
+    // shows a useful message instead of an empty `{}`.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack?.split('\n').slice(0, 3).join(' | ') : undefined;
+    logger.error('[lineOcrQueue] Failed to enqueue OCR job', {
+      errMsg,
+      errStack,
+      intakeId: data.intakeId,
+    });
     throw err;
   }
 }
