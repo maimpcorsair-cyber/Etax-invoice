@@ -70,7 +70,19 @@ Last CI:
   - Fix #3 ✅ Manual email/name fields hidden when Google sign-in enabled: signup form shows only 4 inputs (companyNameTh, companyNameEn, taxId, phone, addressTh visible as fields; no adminEmail/adminName) — Google iframe present.
   - Fix #4 (navbar avatar) not tested — requires real Google login.
 - Production DB now has >0 users for the first time. Item #1 in CLAUDE.md "สิ่งที่ยังต้องทำ" (Signup/Onboarding E2E test) can be marked done.
-- Note: response field `loginMethod: "google"` is hardcoded even for manual signup (`billing.ts:888`) — cosmetic-only since `token` is correctly `null`, but worth tidying in a follow-up.
+- Note: response field `loginMethod: "google"` was hardcoded even for manual signup (`billing.ts:888`) — fixed in commit `8f8f7c8` so it reads `'google'` or `'none'` based on actual binding, and `nextStep` no longer mis-instructs manual-path users.
+
+## Open risk found while auditing item #1 (Real cert per company)
+
+**P0 multi-tenancy bug in [`backend/src/routes/admin.ts:431-434`](backend/src/routes/admin.ts):** the cert upload writes every company's `.p12` to the same file path `certs/company.p12`, and stores that same path in `Company.certificatePath`. When two companies upload certs, the second overwrites the first; signing then uses whichever cert was last written, regardless of `req.user.companyId`. Frontend UI (`AdminPanel.tsx:CertificateTab`) is ready and posts correctly, but the backend is fundamentally single-tenant on this path.
+
+Required for real prod-cert support (none of these are done yet):
+- Path must be company-scoped: e.g. `certs/<companyId>.p12`.
+- `clearCertCache()` is also global — needs to key by companyId, otherwise an upload by Company A still busts Company B's loaded-cert cache.
+- Render disks are ephemeral between deploys — local FS storage will lose all certs on the next push. Use S3 (or Render's persistent disk add-on) for cert blob storage; keep DB row pointing at the blob key.
+- `getCertificateInfo` / signing service call sites need to load by companyId, not from a process-wide cached singleton.
+
+This is the work behind the 🟡 "Real cert per company" priority — the UI is misleading because it looks done. Until this is fixed, every customer using the prod-cert flow is at risk of signing invoices with someone else's private key.
 
 ## Latest Completed Changes
 
