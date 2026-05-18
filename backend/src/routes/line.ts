@@ -3305,51 +3305,26 @@ async function handleImageMessage(lineUserId: string, messageId: string, message
     }
 
     const pushTargetForJob = messageContext.lineGroupId ?? messageContext.lineRoomId;
-    let enqueued = false;
+
+    // Best-effort enqueue to BullMQ — gives the worker dyno a chance to
+    // pick this up first. Doesn't matter much if it fails; the inline
+    // run below covers us.
     try {
       await enqueueLineOcrJob({ intakeId: intake.id, lineUserId, pushTarget: pushTargetForJob });
-      enqueued = true;
     } catch (enqueueErr) {
-      // Fall back to inline processing so the user still gets a response
-      // even if Redis/BullMQ is down. This is the same path the system
-      // ran on before we added the queue.
-      logger.error('[Line] BullMQ enqueue failed, falling back to inline OCR', { enqueueErr, intakeId: intake.id });
-      void processIntakeOcrPipeline({
-        intakeId: intake.id,
-        lineUserId,
-        pushTarget: pushTargetForJob,
-      }).catch((err) => logger.error('[Line] inline OCR fallback failed', { err }));
+      logger.warn('[Line] BullMQ enqueue failed, inline run will cover', { enqueueErr, intakeId: intake.id });
     }
 
-    // Stale-job watchdog: if the BullMQ worker doesn't process this intake
-    // within 75 seconds (worker dyno asleep, queue stuck, etc.), fall back
-    // to inline processing on the web dyno. This is the difference between
-    // 'user sees a result eventually' and 'user waits forever'.
-    if (enqueued) {
-      const intakeIdForWatchdog = intake.id;
-      setTimeout(async () => {
-        try {
-          const fresh = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
-            where: { id: intakeIdForWatchdog },
-            select: { status: true },
-          }));
-          // Only fall back if the intake is still in the initial states —
-          // 'processing' / 'received' / 'awaiting_*' all mean the worker
-          // hasn't finished. 'saved' / 'failed' / 'needs_review' mean it
-          // completed (success or graceful failure).
-          if (fresh && ['received', 'processing'].includes(fresh.status)) {
-            logger.warn('[Line] BullMQ OCR stalled — running inline fallback', { intakeId: intakeIdForWatchdog });
-            await processIntakeOcrPipeline({
-              intakeId: intakeIdForWatchdog,
-              lineUserId,
-              pushTarget: pushTargetForJob,
-            });
-          }
-        } catch (err) {
-          logger.error('[Line] watchdog inline fallback failed', { err, intakeId: intakeIdForWatchdog });
-        }
-      }, 75_000);
-    }
+    // ALWAYS also run inline on the web dyno. The processing-lock inside
+    // processIntakeOcrPipeline (SET NX EX 90s on `intake:processing:<id>`)
+    // ensures only one runner — worker or web — actually does the work.
+    // This kills the dependency on the worker dyno being alive: if it's
+    // dead or backed up, the web dyno just runs the pipeline itself.
+    void processIntakeOcrPipeline({
+      intakeId: intake.id,
+      lineUserId,
+      pushTarget: pushTargetForJob,
+    }).catch((err) => logger.error('[Line] inline OCR run failed', { err, intakeId: intake.id }));
     return;
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
