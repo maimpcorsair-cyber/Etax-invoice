@@ -1,5 +1,5 @@
-import puppeteer from 'puppeteer';
 import { logger } from '../config/logger';
+import { launchBrowser } from './browserService';
 
 const defaultMaxPages = Number(process.env.PDF_RASTER_FALLBACK_MAX_PAGES ?? 2);
 
@@ -9,10 +9,7 @@ export async function rasterizePdfToPngPages(
 ): Promise<Buffer[]> {
   if (!pdf.length || maxPages <= 0) return [];
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();

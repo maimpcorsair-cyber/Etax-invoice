@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import { launchBrowser } from './browserService';
 import type { WhtCertificate, Company } from '@prisma/client';
 import { amountInWordsThai } from './invoiceService';
 
@@ -544,10 +544,7 @@ function buildWhtHtml(data: WhtPdfData): string {
 export async function generateWhtCertificatePdf(cert: WhtPdfData): Promise<Buffer> {
   const html = buildWhtHtml(cert);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();

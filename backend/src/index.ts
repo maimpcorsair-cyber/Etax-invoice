@@ -107,6 +107,32 @@ app.get('/api/health/workers', async (_req, res) => {
   }
 });
 
+// PDF generation smoke test — confirms Puppeteer can launch headless Chrome
+// inside the deployed container. Returns 200 with size + duration on success,
+// or 500 with the launch/render error so a deploy failure is one curl away
+// from a clear diagnostic instead of "PDF endpoint silently 502s in prod".
+app.get('/api/health/pdf', async (_req, res) => {
+  const started = Date.now();
+  try {
+    const { generatePdfFromHtml } = await import('./services/pdfService');
+    const html = '<!doctype html><html><body><h1>health-check</h1><p>OK</p></body></html>';
+    const pdf = await generatePdfFromHtml(html);
+    res.json({
+      status: 'ok',
+      bytes: pdf.length,
+      durationMs: Date.now() - started,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? '(puppeteer default)',
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: Date.now() - started,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? '(puppeteer default)',
+    });
+  }
+});
+
 // Keep-alive endpoint — no auth required, used by UptimeRobot to prevent Render cold starts
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

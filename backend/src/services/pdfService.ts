@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import { launchBrowser } from './browserService';
 import QRCode from 'qrcode';
 import { amountInWordsThai, amountInWordsEnglish } from './invoiceService';
 import { logger } from '../config/logger';
@@ -1158,10 +1158,7 @@ async function resolveTemplateForDocument(
 }
 
 export async function generatePdfFromHtml(html: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();
@@ -3689,10 +3686,7 @@ function buildCustomerStatementHtml(data: CustomerStatementPdfData): string {
 }
 
 export async function generateCustomerStatementPdf(data: CustomerStatementPdfData): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();
