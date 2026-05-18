@@ -20,7 +20,11 @@ Backend:
 - URL: `https://etax-invoice-api.onrender.com`
 - Latest live deploy: commit `d505fc9` (2026-05-18 12:58 UTC, `dep-d85goleq1p3s73fpkr10`)
 - Pending: `56f4dad` (slip race + empty-OCR rejection fixes)
-- Health: `/api/health` OK; `/api/health/workers` exposes BullMQ queue stats
+- Health endpoints:
+  - `/api/health` — shallow process liveness (express responding)
+  - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
+  - `/api/health/pdf` — Puppeteer smoke test (generates a tiny PDF, returns bytes + duration)
+  - `/api/health/deep` — pings PG/Redis/OpenAI/Gemini/S3/LINE in parallel, 60s cache; 200/207/503
 - Error log since 11:00 UTC: clean (all earlier RLS/P2025 errors resolved by `b6322f6` + `ab3a300`)
 
 Worker:
