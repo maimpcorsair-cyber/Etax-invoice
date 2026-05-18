@@ -123,6 +123,40 @@ app.get('/api/health/deep', async (_req, res) => {
   }
 });
 
+// Sentry verifier — fires a real exception that Sentry should capture.
+// Used once to confirm SENTRY_DSN is wired correctly after setting it in
+// Render. Returns 200 with whether the SDK is initialized + the exception
+// id Sentry assigned. Safe to leave deployed: throwing in a controlled
+// endpoint is a feature here, not a bug. Hidden behind a query token so a
+// scraper can't burn Sentry quota — set SENTRY_VERIFY_TOKEN in env.
+app.get('/api/health/sentry-test', (req, res) => {
+  const token = process.env.SENTRY_VERIFY_TOKEN;
+  if (token && req.query.token !== token) {
+    res.status(401).json({ error: 'verifier token required' });
+    return;
+  }
+  const dsnConfigured = !!process.env.SENTRY_DSN?.trim();
+  if (!dsnConfigured) {
+    res.json({ status: 'skipped', dsnConfigured: false, hint: 'Set SENTRY_DSN in Render env to enable error tracking' });
+    return;
+  }
+  try {
+    throw new Error('[sentry-test] synthetic exception — please ignore if expected');
+  } catch (err) {
+    // captureException is no-op when DSN missing; we already gated above.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { captureException, Sentry } = require('./config/sentry') as typeof import('./config/sentry');
+    captureException(err, { source: 'sentry-test-endpoint' });
+    const eventId = Sentry.lastEventId();
+    res.json({
+      status: 'sent',
+      dsnConfigured: true,
+      eventId,
+      hint: 'Check Sentry dashboard for this event id within ~30 seconds',
+    });
+  }
+});
+
 // PDF generation smoke test — confirms Puppeteer can launch headless Chrome
 // inside the deployed container. Returns 200 with size + duration on success,
 // or 500 with the launch/render error so a deploy failure is one curl away
@@ -197,6 +231,11 @@ app.listen(Number(PORT), '0.0.0.0', () => {
   if (process.env.DISABLE_INTAKE_RECOVERY !== 'true') {
     startIntakeRecoveryLoop();
   }
+
+  // Daily retention purge — deletes intake_access_logs older than 90 days
+  // (configurable via AUDIT_LOG_RETENTION_DAYS). Redis lock prevents
+  // multi-dyno double-purge. Disable with DISABLE_RETENTION_LOOP=true.
+  void import('./services/retentionLoop').then((m) => m.startRetentionLoop());
 
   const shouldLoadWorkers = process.env.ENABLE_WORKERS === 'true'
     || (process.env.NODE_ENV !== 'production' && process.env.ENABLE_WORKERS !== 'false');
