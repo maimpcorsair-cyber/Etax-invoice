@@ -383,6 +383,77 @@ function hasUsefulOcrData(result: OcrResult) {
   return !!(result.supplierName || result.invoiceNumber || result.total || result.vatAmount || result.rawText);
 }
 
+/**
+ * Compare a primary OCR result against a verify-pass result on the
+ * accounting-critical fields. Returns Thai-language warnings for any
+ * disagreement big enough to matter — caller appends them to
+ * `validationWarnings` and sets `needsHumanReview=true`.
+ *
+ * Philosophy: the verify model (Gemini Pro / GPT-4o) is usually right
+ * when it disagrees with the primary, so we keep its values as canonical.
+ * But silently overwriting hides the divergence from the user — they
+ * might know the primary's reading was correct from context the OCR
+ * can't see. Surfacing the disagreement lets the human be the judge.
+ */
+function detectOcrDisagreement(primary: OcrResult, verify: OcrResult): string[] {
+  const warnings: string[] = [];
+
+  const norm = (s: string | undefined) => (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const digits = (s: string | undefined) => (s ?? '').replace(/\D/g, '');
+
+  if (primary.documentType !== verify.documentType) {
+    warnings.push(`ประเภทเอกสารต่างกัน: primary=${primary.documentType} vs verify=${verify.documentType}`);
+  }
+
+  const ptid = digits(primary.supplierTaxId);
+  const vtid = digits(verify.supplierTaxId);
+  if (ptid && vtid && ptid !== vtid) {
+    warnings.push(`เลขผู้เสียภาษีต่างกัน: ${ptid} vs ${vtid}`);
+  }
+
+  if (primary.invoiceNumber && verify.invoiceNumber && norm(primary.invoiceNumber) !== norm(verify.invoiceNumber)) {
+    warnings.push(`เลขที่เอกสารต่างกัน: ${primary.invoiceNumber} vs ${verify.invoiceNumber}`);
+  }
+
+  if (primary.invoiceDate && verify.invoiceDate && primary.invoiceDate !== verify.invoiceDate) {
+    warnings.push(`วันที่ต่างกัน: ${primary.invoiceDate} vs ${verify.invoiceDate}`);
+  }
+
+  // Supplier name: loose match — verify often expands abbreviations
+  // ("GAC" vs "GULF AGENCY COMPANY") which is not a real disagreement.
+  // Only flag when neither contains the other AND both are non-trivial.
+  const pn = norm(primary.supplierName);
+  const vn = norm(verify.supplierName);
+  if (pn && vn && pn.length > 3 && vn.length > 3 && !pn.includes(vn) && !vn.includes(pn)) {
+    warnings.push(`ชื่อผู้ขายต่างกัน: "${primary.supplierName}" vs "${verify.supplierName}"`);
+  }
+
+  // Numeric tolerance: 1% relative or 1 unit absolute. Real OCR drift on
+  // VAT calculations (rounding) is fine; a 10x difference is a problem.
+  const numbersDisagree = (a: number, b: number) => {
+    if (!a && !b) return false;
+    if (!a || !b) return true;
+    const diff = Math.abs(a - b);
+    const rel = diff / Math.max(a, b);
+    return diff > 1 && rel > 0.01;
+  };
+  if (numbersDisagree(primary.total, verify.total)) {
+    warnings.push(`ยอดรวมต่างกัน: ${primary.total.toLocaleString()} vs ${verify.total.toLocaleString()}`);
+  }
+  if (numbersDisagree(primary.vatAmount, verify.vatAmount)) {
+    warnings.push(`ยอด VAT ต่างกัน: ${primary.vatAmount.toLocaleString()} vs ${verify.vatAmount.toLocaleString()}`);
+  }
+
+  // Currency: distinct ISO codes are a hard disagreement.
+  const pc = (primary.originalCurrency ?? 'THB').toUpperCase();
+  const vc = (verify.originalCurrency ?? 'THB').toUpperCase();
+  if (pc !== vc) {
+    warnings.push(`สกุลเงินต่างกัน: ${pc} vs ${vc}`);
+  }
+
+  return warnings;
+}
+
 function paymentAmountFromOcr(result: OcrResult) {
   return Number(result.payment?.amount ?? result.total ?? 0);
 }
@@ -1734,10 +1805,19 @@ If none of the above clearly matches, use "other" — better honest than wrong.`
           if (openaiCall.ok) {
             const openaiResult = parseOcrJson(openaiCall.text, result, azureResult?.content);
             if (openaiResult && hasUsefulOcrData(openaiResult)) {
+              const disagreements = detectOcrDisagreement(result, openaiResult);
+              if (disagreements.length > 0) {
+                logger.warn('[OCR] verify disagreement (gpt4o)', { disagreements, prior: result.extractionProvider });
+              }
               result = {
                 ...openaiResult,
                 extractionProvider: `gpt4o-verify+${result.extractionProvider ?? ''}`,
                 verificationStage: 'pro',
+                validationWarnings: [
+                  ...(openaiResult.validationWarnings ?? []),
+                  ...disagreements.map((d) => `⚠️ ตรวจซ้ำพบความต่าง — ${d}`),
+                ],
+                needsHumanReview: openaiResult.needsHumanReview || disagreements.length > 0,
               };
             }
           }
@@ -1771,10 +1851,19 @@ If none of the above clearly matches, use "other" — better honest than wrong.`
             stage: 'escalation',
           });
           if (proResult && hasUsefulOcrData(proResult)) {
+            const disagreements = detectOcrDisagreement(result, proResult);
+            if (disagreements.length > 0) {
+              logger.warn('[OCR] verify disagreement (gemini-pro)', { disagreements, prior: result.extractionProvider });
+            }
             result = {
               ...proResult,
               extractionProvider: azureResult?.ok ? 'azure+gemini-pro-verify' : 'gemini-pro-verify',
               verificationStage: 'pro',
+              validationWarnings: [
+                ...(proResult.validationWarnings ?? []),
+                ...disagreements.map((d) => `⚠️ ตรวจซ้ำพบความต่าง — ${d}`),
+              ],
+              needsHumanReview: proResult.needsHumanReview || disagreements.length > 0,
             };
           }
         } catch (proErr) {
