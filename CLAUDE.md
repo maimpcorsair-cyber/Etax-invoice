@@ -86,13 +86,14 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 - `context7` ✅ — library docs
 - `playwright` ✅ — E2E browser testing
 
-## สิ่งที่ยังต้องทำ (priority — verified 2026-05-18)
-1. 🟡 **Signup/Onboarding E2E test** — `users = 0` ใน production DB ยังไม่มีใครสมัครจริง
-2. 🟡 **Real cert per company** — ทุก company ยังใช้ self-signed dev cert, ส่ง RD production จริงต้องอัพโหลด TDID/INET cert ผ่าน Admin Panel (UI พร้อมแล้ว: `frontend/src/pages/AdminPanel.tsx:1566`)
-3. 🟡 **Combined slip+bill Flex card** (paypers-style) — LINE bot polish, batching ถูกถอดใน `ae77fb6`
-4. 🟢 **Stripe billing live mode** — Backend wired (`routes/billing.ts`, `billingRenewalWorker`), `STRIPE_SECRET_KEY` ตั้งใน Render เรียบร้อย — ต้องทดสอบ checkout จริง
+## สิ่งที่ยังต้องทำ (priority — verified 2026-05-19)
+1. 🟡 **Real cert per company** — ทุก company ยังใช้ self-signed dev cert, ส่ง RD production จริงต้องอัพโหลด TDID/INET cert ผ่าน Admin Panel (UI พร้อมแล้ว: `frontend/src/pages/AdminPanel.tsx:1566`)
+2. 🟡 **Combined slip+bill Flex card** (paypers-style) — LINE bot polish, batching ถูกถอดใน `ae77fb6`
+3. 🟢 **Stripe billing live mode** — Backend wired (`routes/billing.ts`, `billingRenewalWorker`), `STRIPE_SECRET_KEY` ตั้งใน Render เรียบร้อย — ต้องทดสอบ checkout จริง
 
 Done (อย่าทำซ้ำ):
+- ✅ **Signup/Onboarding E2E test** — verified 2026-05-19 end-to-end on production (POST `/free-signup` → DB persist → 409 on dup probe); commit `840c755` UX fixes verified via Playwright. See `PROJECT_STATE.md`.
+- ✅ **Sentry verified end-to-end** — backend + frontend both shipping events to project `4511412901052416` (2026-05-19)
 - ✅ Puppeteer/PDF บน Render — Dockerfile install Chromium + Thai fonts, `/api/health/pdf` smoke test endpoint
 - ✅ Certificate upload UI — `AdminPanel.tsx:CertificateTab` มีครบ
 - ✅ Subscription tables + Stripe routes

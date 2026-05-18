@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-18 20:00 Asia/Bangkok
+Last updated: 2026-05-19 05:05 Asia/Bangkok
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -51,7 +51,26 @@ Last CI:
 ## Current Dirty State
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
-- No other tracked dirty files should remain after a clean docs commit.
+- `.serena/project.yml`, `LOCAL_DEPLOYMENT.md` modified locally — not part of any feature work.
+
+## Sentry verification status (verified 2026-05-19)
+
+- Commits `e34dc2c` (verifier endpoint + retention purge) and `04cae0e` (trim DSN/env defensively) shipped.
+- Active Sentry project: `etax-invoice-web`, org `billboyth`, org id `4511412824571904`, project id `4511412901052416` (NOT `4511412893974528` referenced in `04cae0e` commit message — that was an older project that the user replaced).
+- Backend (Render `etax-invoice-api` + `etax-invoice-worker`): env vars `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`, `SENTRY_VERIFY_TOKEN` set. `GET /api/health/sentry-test?token=...` returns `{status:"sent", dsnConfigured:true, eventId:...}` and the event appears in the Sentry dashboard. Verified end-to-end.
+- Frontend (Vercel `etax-invoice`): `VITE_SENTRY_DSN` updated to match Render DSN. Bundle `index-DJVy9dZB.js` (deployed 2026-05-18 22:29 UTC) contains the correct DSN. Verified via Playwright: triggered an unhandled error and observed `POST https://o4511412824571904.ingest.us.sentry.io/api/4511412901052416/envelope/ → 200`. Note: in Sentry SDK v10, `window.__SENTRY__` shows only `{version}` even when init succeeded — the legacy `hub` key was removed; do not use it as a probe.
+
+## Signup E2E verification (2026-05-19)
+
+- `POST /api/billing/free-signup` end-to-end against production: HTTP 201, returns `{companyId, userId, plan:"free", status:"activated"}`. Test data persisted: company `cmpbs60bx000f14m3pyqzm0ko` / user `cmpbs60c1000h14m3yue8hql0`, email `e2e-1779143605@billboy-test.local`, taxId `0001779143605`.
+- DB persistence proven via duplicate-signup probe: re-POST same email → 409 `"This admin email is already registered"`, re-POST same taxId → 409 `"This tax ID is already registered"`.
+- Commit `840c755` UX fixes verified on production via Playwright:
+  - Fix #1 ✅ Thai company-name field preserves English: typed `บริษัท K&K Logistics จำกัด` retained both scripts (was stripping Latin pre-fix).
+  - Fix #2 ✅ DBD auto-fill on 13-digit tax ID: frontend auto-fires `GET /api/billing/signup/lookup-juristic?taxId=...` → 200. Endpoint also rejects malformed taxIds with 400 `"Tax ID must be 13 digits"`. Cache is empty for unknown taxIds (returns `{data:null}`).
+  - Fix #3 ✅ Manual email/name fields hidden when Google sign-in enabled: signup form shows only 4 inputs (companyNameTh, companyNameEn, taxId, phone, addressTh visible as fields; no adminEmail/adminName) — Google iframe present.
+  - Fix #4 (navbar avatar) not tested — requires real Google login.
+- Production DB now has >0 users for the first time. Item #1 in CLAUDE.md "สิ่งที่ยังต้องทำ" (Signup/Onboarding E2E test) can be marked done.
+- Note: response field `loginMethod: "google"` is hardcoded even for manual signup (`billing.ts:888`) — cosmetic-only since `token` is correctly `null`, but worth tidying in a follow-up.
 
 ## Latest Completed Changes
 
