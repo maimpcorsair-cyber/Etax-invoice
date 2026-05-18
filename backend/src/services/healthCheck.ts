@@ -31,11 +31,11 @@ export interface DeepHealthResult {
 const CACHE_TTL_MS = 60_000;
 let cached: { at: number; result: DeepHealthResult } | null = null;
 
-async function timed<T>(fn: () => Promise<T>): Promise<{ ok: boolean; latencyMs: number; detail?: string; value?: T }> {
+async function timed(fn: () => Promise<unknown>): Promise<ProviderCheck> {
   const started = Date.now();
   try {
-    const value = await fn();
-    return { ok: true, latencyMs: Date.now() - started, value };
+    await fn();
+    return { ok: true, latencyMs: Date.now() - started };
   } catch (err) {
     return {
       ok: false,
