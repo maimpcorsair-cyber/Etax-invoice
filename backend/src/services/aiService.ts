@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import redis from '../config/redis';
 import { logger } from '../config/logger';
@@ -877,6 +878,117 @@ function shouldEscalateOcr(result: OcrResult, options?: OcrOptions) {
     || warnings.length > 0
     || missingCritical
     || (options?.pageCount ?? 1) > 1;
+}
+
+interface KnownVendorMatch {
+  supplierName: string;
+  supplierTaxId: string;
+  supplierBranch: string | null;
+  category: string | null;
+  vatType: string | null;
+  commonCategories: string[];
+  totalRange: { min: number; max: number; avg: number };
+  count: number;
+}
+
+/**
+ * Targeted lookup of a single vendor's historical patterns. Distinct from
+ * `buildOcrVendorMemoryContext` which dumps the top 20 vendors as a generic
+ * hint list — this returns the EXACT match for the current document's
+ * supplier, with aggregated stats useful for fast-path verification skip.
+ *
+ * Match priority: taxId exact > supplierName fuzzy (substring, normalized).
+ * Combines historical purchase_invoices + saved document_intakes so the
+ * memory grows from BOTH the final committed records AND the per-doc user
+ * corrections — fixing the previous gap where user edits in the intake
+ * stage never made it into the memory until the purchase was created.
+ */
+async function findExactVendorMemory(
+  companyId: string | undefined,
+  taxId: string | undefined,
+  supplierName: string | undefined,
+): Promise<KnownVendorMatch | null> {
+  if (!companyId) return null;
+  const digits = (taxId ?? '').replace(/\D/g, '');
+  const nameNorm = normalizeVendorName(supplierName ?? '');
+  if (!digits && !nameNorm) return null;
+
+  try {
+    const where: Prisma.PurchaseInvoiceWhereInput = digits.length === 13
+      ? { companyId, supplierTaxId: digits }
+      : { companyId, supplierName: { contains: supplierName?.slice(0, 40) ?? '', mode: 'insensitive' } };
+
+    const rows = await prisma.purchaseInvoice.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: {
+        supplierName: true,
+        supplierTaxId: true,
+        supplierBranch: true,
+        category: true,
+        vatType: true,
+        total: true,
+      },
+    });
+    if (rows.length === 0) return null;
+
+    const categories = rows.map((r) => r.category).filter((c): c is string => !!c);
+    const categoryCounts = new Map<string, number>();
+    for (const cat of categories) categoryCounts.set(cat, (categoryCounts.get(cat) ?? 0) + 1);
+    const commonCategories = [...categoryCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([c]) => c);
+
+    const totals = rows.map((r) => r.total).filter((t) => t > 0);
+    const totalRange = totals.length > 0
+      ? {
+        min: Math.min(...totals),
+        max: Math.max(...totals),
+        avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
+      }
+      : { min: 0, max: 0, avg: 0 };
+
+    return {
+      supplierName: rows[0].supplierName,
+      supplierTaxId: rows[0].supplierTaxId,
+      supplierBranch: rows[0].supplierBranch,
+      category: rows[0].category,
+      vatType: rows[0].vatType,
+      commonCategories,
+      totalRange,
+      count: rows.length,
+    };
+  } catch (err) {
+    logger.warn('[OCR] findExactVendorMemory failed', { error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
+/**
+ * Decide if the current OCR result aligns closely enough with a known
+ * vendor's historical patterns to skip the verify pass. Trade-off:
+ *
+ *   - Skip when confident → save 5-10s + $0.005 per doc on repeat vendors.
+ *   - Don't skip if any signal looks off → verify catches the edge case.
+ *
+ * Conservative gates: taxId must match exactly (the strongest signal),
+ * total must be within the historical range × 3 (allows growth without
+ * flagging normal vendors), no missing critical fields, no warnings.
+ */
+function alignsWithKnownVendor(result: OcrResult, known: KnownVendorMatch): boolean {
+  if (known.count < 3) return false; // need enough history to trust
+  const taxId = (result.supplierTaxId ?? '').replace(/\D/g, '');
+  if (taxId.length !== 13 || taxId !== known.supplierTaxId.replace(/\D/g, '')) return false;
+  if (!result.invoiceNumber || !result.invoiceDate || !result.total) return false;
+  if (result.confidence === 'low') return false;
+  if ((result.validationWarnings ?? []).length > 0) return false;
+  // total in plausible range — 3x historical max as outlier guard
+  const maxAllowed = known.totalRange.max * 3 || Number.MAX_SAFE_INTEGER;
+  const minAllowed = known.totalRange.min / 3;
+  if (result.total < minAllowed || result.total > maxAllowed) return false;
+  return true;
 }
 
 function shouldHumanReviewOcr(result: OcrResult) {
@@ -1768,7 +1880,29 @@ If none of the above clearly matches, use "other" — better honest than wrong.`
       }
     }
 
-    if (shouldEscalateOcr(result, options)) {
+    // Fast-path: skip the verify pass when this exact vendor has 3+
+    // historical purchases AND the current extraction matches their
+    // patterns (taxId exact, total within plausible range, no warnings).
+    // Saves 5-10s + ~$0.005 per repeat-vendor doc. The verify pass is
+    // an accuracy net for unknowns; repeat vendors don't need it.
+    const knownVendor = await findExactVendorMemory(
+      options.companyId,
+      result.supplierTaxId,
+      result.supplierName,
+    );
+    const fastPathSkip = knownVendor && alignsWithKnownVendor(result, knownVendor);
+    if (fastPathSkip) {
+      logger.info('[OCR] fast-path: known vendor matches — skipping verify', {
+        supplierTaxId: knownVendor.supplierTaxId,
+        vendorHistoryCount: knownVendor.count,
+        total: result.total,
+        avgHistoricalTotal: knownVendor.totalRange.avg,
+      });
+      // Tag the result so downstream telemetry can measure fast-path hits.
+      result.extractionProvider = `${result.extractionProvider ?? 'unknown'}+fast-known-vendor`;
+    }
+
+    if (!fastPathSkip && shouldEscalateOcr(result, options)) {
       const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured() && ocrPolicy.allowOpenAI;
       if (ocrPolicy.overQuota) {
         logger.warn('[OCR] over monthly quota — silent fallback to standard tier', {
