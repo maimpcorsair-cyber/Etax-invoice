@@ -103,7 +103,7 @@ async function callGemini(
       ];
   const body = {
     contents: [{ parts }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 2000, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.1, maxOutputTokens: 4000, responseMimeType: 'application/json' },
     // Defaults block financial / PII-containing images (e.g. bank slips with
     // account numbers, ID-like numbers). For an OCR use case this is the
     // wrong default — set every category to BLOCK_NONE so we get the text.

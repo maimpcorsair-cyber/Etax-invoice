@@ -64,7 +64,11 @@ export async function callOpenAIVision(
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: 2000,
+        // 4000 tokens (~3000 words) — complex multi-page invoices with
+        // Thai text + many line items were truncating at 2000, leaving
+        // an unparseable JSON. Mini's pricing makes the extra cost
+        // negligible (~$0.0006 per call max).
+        max_tokens: 4000,
         temperature: 0.1,
         response_format: { type: 'json_object' },
       }),

@@ -3373,15 +3373,13 @@ export async function processIntakeOcrPipeline(input: {
 }): Promise<void> {
   const { intakeId, lineUserId, pushTarget } = input;
 
-  // Short Redis lock so the BullMQ worker and the recovery loop don't
-  // race on the SAME tick. TTL is intentionally short (90s, matches the
-  // recovery loop's stale threshold) so a crashed dyno can't pin the
-  // intake — the worse failure mode is silent ghost uploads, and the
-  // user prefers duplicate messages over silence.
+  // Redis lock TTL must outlast the pipeline timeout (120s) so the lock
+  // is still valid for the whole run. 150s gives 30s headroom for the
+  // post-OCR work (DB update + LINE push + Drive sync trigger).
   const lockKey = `intake:processing:${intakeId}`;
   let acquired = false;
   try {
-    const result = await redis.set(lockKey, '1', 'EX', 90, 'NX');
+    const result = await redis.set(lockKey, '1', 'EX', 150, 'NX');
     acquired = result === 'OK';
   } catch (err) {
     logger.warn('[Line] processing-lock acquire failed', { err, intakeId });
@@ -3392,11 +3390,11 @@ export async function processIntakeOcrPipeline(input: {
     return;
   }
 
-  // Hard 75s timeout on the whole pipeline. If any OCR provider hangs
-  // (Azure / Gemini / OpenAI flaky), this saves the user from waiting
-  // forever for a 'กำลังอ่าน → silence' result. Leaves ~15s headroom
-  // before the 90s Redis lock expires.
-  const PIPELINE_TIMEOUT_MS = 75_000;
+  // Hard 120s timeout on the whole pipeline. Multi-page PDFs with Thai
+  // text take 30-60s on OpenAI vision; the previous 75s cap was firing
+  // before legitimate work could finish. Lock TTL is also bumped to
+  // 150s in sync (acquired below) so the lock outlasts the timeout.
+  const PIPELINE_TIMEOUT_MS = 120_000;
   let timedOut = false;
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
