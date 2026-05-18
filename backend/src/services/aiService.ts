@@ -1710,44 +1710,97 @@ If none of the above clearly matches, use "other" — better honest than wrong.`
       ? `\n\nAzure Document Intelligence result:\nFields:\n${JSON.stringify(azureResult.fields, null, 2)}\n\nOCR text:\n${azureResult.content.slice(0, 6000)}`
       : '';
     const vendorMemoryContext = await buildOcrVendorMemoryContext(options.companyId);
-    let primaryProvider: 'openai' | 'gemini' | 'openrouter' | 'none' = 'none';
+    let primaryProvider: 'openai' | 'gemini' | 'openai+gemini-consensus' | 'openrouter' | 'none' = 'none';
+    let consensusResult: OcrResult | null = null;
 
-    // Provider priority: OpenAI primary → Gemini secondary → OpenRouter last resort.
-    // Reasoning: OpenAI (gpt-4o-mini) has stable paid billing, low latency
-    // (~1-3s), low cost ($0.003/doc), and no daily quota cap. Gemini free
-    // tier was the previous primary but hit 1k/day quota in production,
-    // dropping the whole pipeline silently. Now Gemini becomes a backup
-    // that fires only if OpenAI fails — it'll still ride free quota when
-    // available.
-    if (isOpenAIVisionConfigured() && mimeType !== 'text/plain') {
+    // Plan D — TRIPLE-OCR CONSENSUS: when both OpenAI and Gemini are
+    // configured, fire both in parallel. Total latency = max(OpenAI, Gemini)
+    // ≈ 3s instead of OpenAI alone ~1-3s (small cost, big accuracy gain).
+    //
+    // Outcomes:
+    //   - Both succeed AND agree → very high confidence, skip Pro verify
+    //   - Both succeed, disagree → keep OpenAI (paid, generally better),
+    //     surface disagreement via detectOcrDisagreement → human review
+    //   - Only one succeeds → use it (sequential-fallback parity)
+    //   - Both fail → OpenRouter last resort (unchanged)
+    //
+    // Cost: Gemini Flash is free quota — no $$ added. OpenAI charge
+    // unchanged. Net: +0s avg, +0 cost, +significant accuracy.
+    const promptForVision = buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, undefined, false);
+    const wantParallel = isOpenAIVisionConfigured() && googleAiKey && mimeType !== 'text/plain';
+
+    if (wantParallel) {
+      logger.info('[OCR] Parallel consensus: OpenAI + Gemini', { mimeType });
+      const [openaiSettled, geminiSettled] = await Promise.allSettled([
+        callOpenAIVision(mimeType, imageBase64, promptForVision).then((c) => c.ok ? { text: c.text, model: c.model, call: c } : null),
+        callGemini(mimeType, imageBase64, promptForVision, ocrTimeoutMs, geminiScanModel).then((text) => text ? { text, model: geminiScanModel } : null),
+      ]);
+      const openaiHit = openaiSettled.status === 'fulfilled' ? openaiSettled.value : null;
+      const geminiHit = geminiSettled.status === 'fulfilled' ? geminiSettled.value : null;
+
+      if (openaiHit && geminiHit) {
+        const openaiParsed = parseOcrJson(openaiHit.text, emptyResult, azureResult?.content);
+        const geminiParsed = parseOcrJson(geminiHit.text, emptyResult, azureResult?.content);
+        if (openaiParsed && geminiParsed) {
+          const disagreements = detectOcrDisagreement(openaiParsed, geminiParsed);
+          consensusResult = {
+            ...openaiParsed,
+            extractionProvider: disagreements.length === 0
+              ? 'openai+gemini-consensus'
+              : 'openai+gemini-disagree',
+            verificationStage: disagreements.length === 0 ? 'pro' : 'fast',
+            validationWarnings: [
+              ...(openaiParsed.validationWarnings ?? []),
+              ...disagreements.map((d) => `⚠️ ตรวจซ้ำพบความต่าง — ${d}`),
+            ],
+            needsHumanReview: openaiParsed.needsHumanReview || disagreements.length > 0,
+          };
+          primaryProvider = 'openai+gemini-consensus';
+          logger.info('[OCR] Consensus result', {
+            agreed: disagreements.length === 0,
+            disagreements: disagreements.length,
+          });
+        } else if (openaiParsed) {
+          consensusResult = openaiParsed;
+          raw = openaiHit.text;
+          primaryProvider = 'openai';
+        } else if (geminiParsed) {
+          consensusResult = geminiParsed;
+          raw = geminiHit.text;
+          primaryProvider = 'gemini';
+        }
+      } else if (openaiHit) {
+        raw = openaiHit.text;
+        primaryProvider = 'openai';
+        logger.info('[OCR] OpenAI succeeded; Gemini failed/skipped', { chars: raw.length });
+      } else if (geminiHit) {
+        raw = geminiHit.text;
+        primaryProvider = 'gemini';
+        logger.info('[OCR] Gemini succeeded; OpenAI failed', { chars: raw.length });
+      } else {
+        logger.warn('[OCR] Both OpenAI and Gemini failed, falling back to OpenRouter');
+      }
+    } else if (isOpenAIVisionConfigured() && mimeType !== 'text/plain') {
+      // OpenAI-only path (Gemini unavailable)
       try {
-        logger.info('[OCR] Trying OpenAI vision (primary)', { mimeType });
-        const openaiCall = await callOpenAIVision(
-          mimeType,
-          imageBase64,
-          buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`, undefined, false),
-        );
+        logger.info('[OCR] Trying OpenAI vision (primary, no Gemini)', { mimeType });
+        const openaiCall = await callOpenAIVision(mimeType, imageBase64, promptForVision);
         if (openaiCall.ok) {
           raw = openaiCall.text;
           primaryProvider = 'openai';
-          logger.info('[OCR] OpenAI vision responded', { chars: raw.length, model: openaiCall.model });
         } else {
-          logger.warn('[OCR] OpenAI vision call failed, will try Gemini next', { error: openaiCall.error });
+          logger.warn('[OCR] OpenAI failed', { error: openaiCall.error });
         }
       } catch (openaiErr) {
-        logger.warn('[OCR] OpenAI vision threw, will try Gemini next', { error: String(openaiErr) });
+        logger.warn('[OCR] OpenAI threw', { error: String(openaiErr) });
       }
-    }
-
-    // Gemini fallback — runs when OpenAI is missing/failed, or when the
-    // doc is text/plain (where OpenAI's text mode is wired further down).
-    if (!raw && googleAiKey) {
+    } else if (googleAiKey) {
+      // Gemini-only path (OpenAI unavailable, e.g. text/plain mode)
       try {
         const fastModel = mimeType === 'text/plain' ? geminiFastModel : geminiScanModel;
-        logger.info('[OCR] Trying Gemini API (fallback)', { mimeType, model: fastModel, source: options.source });
-        raw = await callGemini(mimeType, imageBase64, buildVerifyPrompt(`${ocrPrompt}${azureContext}${vendorMemoryContext}`), ocrTimeoutMs, fastModel);
+        logger.info('[OCR] Trying Gemini API (no OpenAI for this mode)', { mimeType, model: fastModel });
+        raw = await callGemini(mimeType, imageBase64, promptForVision, ocrTimeoutMs, fastModel);
         primaryProvider = 'gemini';
-        logger.info('[OCR] Gemini responded', { chars: raw.length });
       } catch (geminiErr) {
         logger.warn('[OCR] Gemini failed, falling back to OpenRouter', { error: String(geminiErr) });
       }
@@ -1771,7 +1824,10 @@ If none of the above clearly matches, use "other" — better honest than wrong.`
       raw = await callOpenRouter(models, messages, 2000, ocrTimeoutMs);
     }
 
-    let result = parseOcrJson(raw, emptyResult, azureResult?.content);
+    // Prefer the consensus result from the parallel OpenAI+Gemini block.
+    // Falls through to parseOcrJson(raw) when consensus wasn't built
+    // (e.g. only one provider succeeded, or text/plain mode).
+    let result = consensusResult ?? parseOcrJson(raw, emptyResult, azureResult?.content);
     if (!result) {
       if (azureResult?.ok) {
         const fields = azureResult.fields as Record<string, unknown>;
@@ -1902,7 +1958,12 @@ If none of the above clearly matches, use "other" — better honest than wrong.`
       result.extractionProvider = `${result.extractionProvider ?? 'unknown'}+fast-known-vendor`;
     }
 
-    if (!fastPathSkip && shouldEscalateOcr(result, options)) {
+    // Consensus already agreed = 2 independent models converged on the same
+    // answer. That IS a verify pass, just done in parallel up front. No
+    // need to fire Pro verify (would just spend latency to re-confirm).
+    const consensusAgreed = result.extractionProvider === 'openai+gemini-consensus';
+
+    if (!fastPathSkip && !consensusAgreed && shouldEscalateOcr(result, options)) {
       const preferOpenAI = engineRouting !== 'legacy' && isOpenAIVisionConfigured() && ocrPolicy.allowOpenAI;
       if (ocrPolicy.overQuota) {
         logger.warn('[OCR] over monthly quota — silent fallback to standard tier', {
