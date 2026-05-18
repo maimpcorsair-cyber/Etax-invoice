@@ -86,12 +86,18 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 - `context7` ✅ — library docs
 - `playwright` ✅ — E2E browser testing
 
-## สิ่งที่ยังต้องทำ (priority)
-1. 🔴 **Subscription + Payment system** — `company_subscriptions`, `billing_transactions`, `coupons` tables มีแล้วแต่ยังไม่ implement — เก็บเงินไม่ได้
-2. 🔴 **Puppeteer บน Render** — ต้องเพิ่ม Chrome buildpack หรือใช้ Render paid tier (PDF ออกไม่ได้บน production)
-3. 🟡 **Signup/Onboarding flow** — ยังไม่ได้ทดสอบ end-to-end (users = 0 ใน DB)
-4. 🟡 **Certificate upload UI** — ทุก company ยังไม่มี cert, ส่ง RD production ไม่ได้
-5. 🟢 **Render/Vercel deploy visibility** — `gh`, `curl`, and `vercel` CLI are connected locally
+## สิ่งที่ยังต้องทำ (priority — verified 2026-05-18)
+1. 🟡 **Signup/Onboarding E2E test** — `users = 0` ใน production DB ยังไม่มีใครสมัครจริง
+2. 🟡 **Real cert per company** — ทุก company ยังใช้ self-signed dev cert, ส่ง RD production จริงต้องอัพโหลด TDID/INET cert ผ่าน Admin Panel (UI พร้อมแล้ว: `frontend/src/pages/AdminPanel.tsx:1566`)
+3. 🟡 **Combined slip+bill Flex card** (paypers-style) — LINE bot polish, batching ถูกถอดใน `ae77fb6`
+4. 🟢 **Stripe billing live mode** — Backend wired (`routes/billing.ts`, `billingRenewalWorker`), `STRIPE_SECRET_KEY` ตั้งใน Render เรียบร้อย — ต้องทดสอบ checkout จริง
+
+Done (อย่าทำซ้ำ):
+- ✅ Puppeteer/PDF บน Render — Dockerfile install Chromium + Thai fonts, `/api/health/pdf` smoke test endpoint
+- ✅ Certificate upload UI — `AdminPanel.tsx:CertificateTab` มีครบ
+- ✅ Subscription tables + Stripe routes
+- ✅ LINE bot OCR pipeline (gpt-4o-mini → Gemini → OpenRouter)
+- ✅ Magic-link guest edit page (`/intake-edit/<jwt>`, 72h TTL, slip auto-OCR, rate-limit, audit log)
 
 ## Gotchas
 1. **Prisma client sync** — after `prisma generate` at root:
