@@ -2,7 +2,10 @@ import { logger } from '../config/logger';
 
 const apiKey = process.env.OPENAI_API_KEY ?? '';
 const baseUrl = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
-const defaultModel = process.env.OPENAI_OCR_MODEL ?? 'gpt-4o';
+// GPT-4o-mini is the default: ~3x faster than gpt-4o for receipt-style OCR
+// with comparable accuracy on the structured fields we extract. Override
+// via OPENAI_OCR_MODEL=gpt-4o for documents needing full reasoning power.
+const defaultModel = process.env.OPENAI_OCR_MODEL ?? 'gpt-4o-mini';
 const timeoutMs = Number(process.env.OPENAI_OCR_TIMEOUT_MS ?? 30000);
 
 export function isOpenAIVisionConfigured(): boolean {
@@ -92,10 +95,12 @@ export async function callOpenAIVision(
   }
 }
 
-// GPT-4o pricing reference (2025): $2.50 per 1M input, $10 per 1M output.
-// GPT-4o-mini: $0.15 per 1M input, $0.60 per 1M output.
-const OPENAI_INPUT_COST_PER_1M = Number(process.env.OPENAI_INPUT_COST_PER_1M_USD ?? 2.5);
-const OPENAI_OUTPUT_COST_PER_1M = Number(process.env.OPENAI_OUTPUT_COST_PER_1M_USD ?? 10);
+// Pricing reference (2026):
+//   GPT-4o-mini: $0.15 per 1M input, $0.60 per 1M output  ← current default
+//   GPT-4o:      $2.50 per 1M input, $10   per 1M output
+// Defaults set for gpt-4o-mini; override if you flip OPENAI_OCR_MODEL.
+const OPENAI_INPUT_COST_PER_1M = Number(process.env.OPENAI_INPUT_COST_PER_1M_USD ?? 0.15);
+const OPENAI_OUTPUT_COST_PER_1M = Number(process.env.OPENAI_OUTPUT_COST_PER_1M_USD ?? 0.6);
 
 export function estimateOpenAICostUsd(result: OpenAIVisionCallResult): number {
   const inTok = result.promptTokens ?? 2000;
