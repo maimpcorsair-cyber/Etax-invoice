@@ -518,7 +518,9 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
             {
               type: 'box',
               layout: 'vertical',
-              backgroundColor: 'rgba(0,0,0,0.25)',
+              // LINE Flex only supports hex colors; rgba() silently fails
+              // validation and the whole message is rejected with 400.
+              backgroundColor: '#00000040',
               cornerRadius: '4px',
               paddingAll: '4px',
               contents: [
@@ -530,7 +532,7 @@ function buildOcrFlexCardContents(result: OcrResult): { header: object; body: ob
         ...(result.extractionProvider ? [{
           type: 'text',
           text: result.extractionProvider,
-          color: 'rgba(255,255,255,0.75)',
+          color: '#FFFFFFBF',
           size: 'xs',
         }] : []),
       ],
