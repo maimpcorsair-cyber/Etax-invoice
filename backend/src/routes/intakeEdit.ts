@@ -72,7 +72,13 @@ async function authorizeIntakeEdit(
     || req.socket.remoteAddress
     || 'unknown';
   const ua = (req.headers['user-agent'] ?? '').slice(0, 200);
-  logger.info('[intakeEdit] access', {
+  // Mutations are the audit-worthy events (someone CHANGED the intake).
+  // Reads are high-volume (page load fires ~3 GETs; PDF iframe re-fetches
+  // on scroll; React strict-mode double-mount) — keep them at debug so
+  // Render log search isn't drowned in iframe hits, but still capture them
+  // for forensic replay if debug level is enabled.
+  const isMutation = opts.requireMutable === true;
+  (isMutation ? logger.info : logger.debug)('[intakeEdit] access', {
     intakeId: claims.intakeId,
     lineUserId: claims.lineUserId,
     companyId: claims.companyId,
