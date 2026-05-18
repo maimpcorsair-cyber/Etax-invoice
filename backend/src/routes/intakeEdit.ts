@@ -1,9 +1,12 @@
+import crypto from 'crypto';
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../config/database';
+import redis from '../config/redis';
 import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
-import { verifyIntakeEditToken } from '../services/intakeEditToken';
+import { IntakeEditTokenPayload, verifyIntakeEditToken } from '../services/intakeEditToken';
 import { OcrResult, ocrBankTransferSlip } from '../services/aiService';
 import { getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { supportedDocumentMimeType } from '../services/documentOcrService';
@@ -18,6 +21,85 @@ import { supportedDocumentMimeType } from '../services/documentOcrService';
  */
 
 export const intakeEditRouter = Router();
+
+// Magic-link tokens are bearer credentials, so we add three guard rails
+// beyond the JWT signature check:
+//
+//   1. Rate-limit: ≤100 requests/hr per token (Redis INCR). A normal page
+//      load fires ~3 GETs; 100 absorbs reasonable retry/poll behavior but
+//      kills any brute-force or scraping loop.
+//   2. Audit log: every access is written to structured logger with
+//      intakeId, IP (X-Forwarded-For first hop), and trimmed UA. Render
+//      log search makes this queryable without a DB migration.
+//   3. Burn-after-save: callers passing `requireMutable: true` get a 409
+//      if intake.status === 'saved' — closes the window where a leaked
+//      token could append edits to an already-finalized intake.
+const RATE_LIMIT_PER_HOUR = 100;
+
+interface AuthorizeOptions {
+  requireMutable?: boolean;
+}
+
+async function authorizeIntakeEdit(
+  req: Request,
+  res: Response,
+  opts: AuthorizeOptions = {},
+): Promise<IntakeEditTokenPayload | null> {
+  const token = req.params.token;
+  const claims = verifyIntakeEditToken(token);
+  if (!claims) {
+    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง — กลับไปอัพโหลดใหม่ใน LINE ได้เลย' });
+    return null;
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex').slice(0, 32);
+  const rlKey = `intake-edit:rl:${tokenHash}`;
+  let count = 0;
+  try {
+    count = await redis.incr(rlKey);
+    if (count === 1) await redis.expire(rlKey, 3600);
+  } catch (err) {
+    // If Redis is down we degrade open (allow the request) rather than
+    // locking legitimate users out — the JWT signature is the real auth.
+    logger.warn('[intakeEdit] rate-limit redis error', { error: err instanceof Error ? err.message : String(err) });
+  }
+  if (count > RATE_LIMIT_PER_HOUR) {
+    res.status(429).json({ error: 'มีการเรียกถี่เกินไป ลองใหม่ในอีก 1 ชั่วโมง' });
+    return null;
+  }
+
+  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
+    || req.socket.remoteAddress
+    || 'unknown';
+  const ua = (req.headers['user-agent'] ?? '').slice(0, 200);
+  logger.info('[intakeEdit] access', {
+    intakeId: claims.intakeId,
+    lineUserId: claims.lineUserId,
+    companyId: claims.companyId,
+    method: req.method,
+    path: req.path,
+    ip,
+    ua,
+    rlCount: count,
+  });
+
+  if (opts.requireMutable) {
+    const row = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: claims.intakeId, companyId: claims.companyId },
+      select: { status: true },
+    }));
+    if (!row) {
+      res.status(404).json({ error: 'ไม่พบเอกสาร' });
+      return null;
+    }
+    if (row.status === 'saved') {
+      res.status(409).json({ error: 'เอกสารถูกบันทึกไปแล้ว — ลิงก์นี้ใช้ไม่ได้แล้ว' });
+      return null;
+    }
+  }
+
+  return claims;
+}
 
 const editableFieldsSchema = z.object({
   supplierName: z.string().trim().min(1).optional(),
@@ -65,11 +147,8 @@ function applyEdits(result: OcrResult, edits: EditableFields): OcrResult {
 }
 
 intakeEditRouter.get('/:token', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง — กลับไปอัพโหลดใหม่ใน LINE ได้เลย' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res);
+  if (!claims) return;
   try {
     const [intake, suppliers] = await withSystemRlsContext(prisma, async (tx) => {
       const intakeRow = await tx.documentIntake.findFirst({
@@ -120,11 +199,8 @@ intakeEditRouter.get('/:token', async (req, res) => {
 });
 
 intakeEditRouter.get('/:token/file', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res);
+  if (!claims) return;
   try {
     const item = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
       where: { id: claims.intakeId, companyId: claims.companyId },
@@ -163,11 +239,8 @@ const attachmentUploadSchema = z.object({
 });
 
 intakeEditRouter.post('/:token/attachments', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res, { requireMutable: true });
+  if (!claims) return;
   const parsed = attachmentUploadSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'ข้อมูลไฟล์ไม่ถูกต้อง', details: parsed.error.flatten() });
@@ -235,11 +308,8 @@ intakeEditRouter.post('/:token/attachments', async (req, res) => {
 // ocrResult so the save pipeline picks them up. The slip itself is stored
 // as a sibling attachment for audit (`slip_for:<parentId>` warning tag).
 intakeEditRouter.post('/:token/slip', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res, { requireMutable: true });
+  if (!claims) return;
   const parsed = attachmentUploadSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'ข้อมูลไฟล์ไม่ถูกต้อง', details: parsed.error.flatten() });
@@ -374,11 +444,8 @@ intakeEditRouter.post('/:token/slip', async (req, res) => {
 });
 
 intakeEditRouter.get('/:token/attachments', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res);
+  if (!claims) return;
   try {
     const rows = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
       where: {
@@ -397,11 +464,8 @@ intakeEditRouter.get('/:token/attachments', async (req, res) => {
 });
 
 intakeEditRouter.patch('/:token', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res, { requireMutable: true });
+  if (!claims) return;
   const parsed = editableFieldsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'ข้อมูลไม่ถูกต้อง', details: parsed.error.flatten() });
@@ -436,11 +500,8 @@ intakeEditRouter.patch('/:token', async (req, res) => {
 });
 
 intakeEditRouter.post('/:token/confirm', async (req, res) => {
-  const claims = verifyIntakeEditToken(req.params.token);
-  if (!claims) {
-    res.status(401).json({ error: 'Link หมดอายุหรือไม่ถูกต้อง' });
-    return;
-  }
+  const claims = await authorizeIntakeEdit(req, res, { requireMutable: true });
+  if (!claims) return;
   const parsed = editableFieldsSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: 'ข้อมูลไม่ถูกต้อง', details: parsed.error.flatten() });
