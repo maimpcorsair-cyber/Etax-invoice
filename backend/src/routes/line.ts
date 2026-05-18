@@ -1182,7 +1182,10 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
       : 'vatZero';
 
   try {
-    return await prisma.purchaseInvoice.create({
+    // RLS on purchase_invoices requires app.current_company_id to be set;
+    // LINE flow has no user JWT, so use the system context which bypasses
+    // the policy while still respecting the explicit companyId we pass.
+    return await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.create({
       data: {
         companyId,
         supplierName: result.supplierName || 'ไม่ระบุ',
@@ -1199,19 +1202,19 @@ async function savePurchaseFromLineOcr(lineUserId: string, result: OcrResult, co
         notes: [
           `AI confidence: ${result.confidence}`,
           result.expenseCategory ? `Expense category: ${result.expenseCategory}` : null,
-        result.taxTreatment ? `Tax treatment: ${result.taxTreatment}` : null,
-        result.validationWarnings?.some(w => w.includes('เอกสารซ้ำ')) ? 'Possible duplicate: true' : null,
-        result.extractionProvider ? `Provider: ${result.extractionProvider}` : null,
-        result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
-      ].filter(Boolean).join('\n'),
+          result.taxTreatment ? `Tax treatment: ${result.taxTreatment}` : null,
+          result.validationWarnings?.some(w => w.includes('เอกสารซ้ำ')) ? 'Possible duplicate: true' : null,
+          result.extractionProvider ? `Provider: ${result.extractionProvider}` : null,
+          result.validationWarnings?.length ? `Warnings: ${result.validationWarnings.join('; ')}` : null,
+        ].filter(Boolean).join('\n'),
         createdBy: link.userId,
       },
-    });
+    }));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      const existing = await prisma.purchaseInvoice.findFirst({
+      const existing = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findFirst({
         where: { companyId, supplierTaxId, invoiceNumber },
-      });
+      }));
       if (existing) return existing;
     }
     throw err;
