@@ -34,6 +34,8 @@ export interface IntakeEditTokenPayload {
   intakeId: string;
   lineUserId: string;
   companyId: string;
+  /** Expiry timestamp (epoch seconds), populated only on verify. */
+  exp?: number;
 }
 
 function getSecret(): string {
@@ -42,7 +44,7 @@ function getSecret(): string {
   return secret;
 }
 
-export function signIntakeEditToken(payload: IntakeEditTokenPayload, ttlSeconds = DEFAULT_TTL_SECONDS): string {
+export function signIntakeEditToken(payload: Omit<IntakeEditTokenPayload, 'exp'>, ttlSeconds = DEFAULT_TTL_SECONDS): string {
   return jwt.sign(payload, getSecret(), {
     audience: INTAKE_EDIT_AUDIENCE,
     expiresIn: ttlSeconds,
@@ -57,6 +59,7 @@ export function verifyIntakeEditToken(token: string): IntakeEditTokenPayload | n
       intakeId: decoded.intakeId,
       lineUserId: decoded.lineUserId,
       companyId: decoded.companyId,
+      exp: decoded.exp,
     };
   } catch (err) {
     logger.warn('[intakeEditToken] verify failed', { error: err instanceof Error ? err.message : String(err) });

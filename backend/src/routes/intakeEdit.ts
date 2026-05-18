@@ -111,6 +111,7 @@ intakeEditRouter.get('/:token', async (req, res) => {
         taxId: s.taxId,
         branchCode: s.branchCode || '00000',
       })),
+      expiresAt: claims.exp ? new Date(claims.exp * 1000).toISOString() : null,
     });
   } catch (err) {
     logger.error('[intakeEdit] GET failed', { error: err instanceof Error ? err.message : String(err), intakeId: claims.intakeId });

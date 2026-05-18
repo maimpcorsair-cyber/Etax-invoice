@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Paperclip, Receipt, Save, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, FileText, Loader2, Paperclip, Receipt, Save, Upload, X } from 'lucide-react';
 
 /**
  * Guest-mode page for editing a LINE document intake via magic-link.
@@ -66,6 +66,19 @@ type FormState = {
   paymentToName: string;
 };
 
+function formatExpiry(iso: string | null): { text: string; urgent: boolean } | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  if (ms <= 0) return { text: 'ลิงก์หมดอายุแล้ว', urgent: true };
+  const mins = Math.floor(ms / 60_000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  if (days >= 1) return { text: `ลิงก์หมดอายุใน ${days} วัน ${hours % 24} ชม.`, urgent: false };
+  if (hours >= 1) return { text: `ลิงก์หมดอายุใน ${hours} ชม. ${mins % 60} น.`, urgent: hours < 2 };
+  return { text: `ลิงก์หมดอายุใน ${mins} นาที`, urgent: true };
+}
+
 function blankForm(): FormState {
   return {
     supplierName: '', supplierTaxId: '', supplierBranch: '00000',
@@ -127,6 +140,7 @@ export default function IntakeEdit() {
   const [intake, setIntake] = useState<IntakeData | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(blankForm());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -148,11 +162,12 @@ export default function IntakeEdit() {
       setError(null);
       try {
         const res = await fetch(`/api/intake-edit/${token}`);
-        const json = await res.json() as { data?: IntakeData; suppliers?: Supplier[]; error?: string };
+        const json = await res.json() as { data?: IntakeData; suppliers?: Supplier[]; expiresAt?: string | null; error?: string };
         if (!res.ok || !json.data) throw new Error(json.error ?? 'เปิดเอกสารไม่สำเร็จ');
         if (cancelled) return;
         setIntake(json.data);
         setSuppliers(json.suppliers ?? []);
+        setExpiresAt(json.expiresAt ?? null);
         setForm(ocrToForm(json.data.ocrResult));
         if (json.data.status === 'saved') setConfirmed(true);
 
@@ -341,12 +356,26 @@ export default function IntakeEdit() {
       <header className="bg-emerald-600 text-white px-4 py-4 shadow sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <FileText className="w-6 h-6 shrink-0" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-semibold truncate">แก้ไขเอกสาร</h1>
             <p className="text-xs text-emerald-50 truncate">
               {r?.documentTypeLabel || intake?.fileName || 'เอกสารจาก LINE'}
             </p>
           </div>
+          {(() => {
+            const exp = formatExpiry(expiresAt);
+            if (!exp) return null;
+            return (
+              <span
+                className={`text-xs px-2 py-1 rounded-full whitespace-nowrap flex items-center gap-1 ${
+                  exp.urgent ? 'bg-rose-500 text-white' : 'bg-emerald-700/60 text-emerald-50'
+                }`}
+              >
+                <Clock className="w-3 h-3" />
+                {exp.text}
+              </span>
+            );
+          })()}
         </div>
       </header>
 
