@@ -25,8 +25,9 @@ export async function enqueueLineOcrJob(data: LineOcrJobData): Promise<void> {
   try {
     await lineOcrQueue.add('process', data, {
       // Dedup: if LINE retries the webhook (e.g. timeout on the api dyno),
-      // we won't OCR the same file twice.
-      jobId: `line-ocr:${data.intakeId}`,
+      // we won't OCR the same file twice. Use dash separator — BullMQ
+      // rejects ':' in custom jobId.
+      jobId: `line-ocr-${data.intakeId}`,
     });
   } catch (err) {
     // BullMQ throws Error subclasses; serialize defensively so the log
