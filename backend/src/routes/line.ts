@@ -735,10 +735,11 @@ export async function performConfirmedIntakeSave(
         }
         const amt = Number(result.payment?.amount ?? result.total ?? 0);
         const amtLabel = amt ? `฿${amt.toLocaleString('th-TH')}` : '';
+        const slipEditUrl = buildIntakeEditUrlSafe(intake.id, lineUserId, intake.companyId);
         await sendLineFlexMessage(
           lineUserId,
           `✅ บันทึกสลิปแล้ว ${amtLabel}`.trim(),
-          buildPaymentSlipFlexCard(result, 'saved', { intakeId: intake.id }),
+          buildPaymentSlipFlexCard(result, 'saved', { intakeId: intake.id, editUrl: slipEditUrl }),
         );
         await sendLineText(
           lineUserId,
@@ -912,6 +913,7 @@ async function tryAutoMatchPendingBillWithSlip(
     extra: { matchType: 'pending_bill_out_of_order', whtRate: matchInfo.whtRate, slipAmount, billTotal: purchase.total },
   });
   try { await redis.del(`line:pending_bill:${lineUserId}`); } catch { /* noop */ }
+  const pendingBillEditUrl = buildIntakeEditUrlSafe(slipIntakeId, lineUserId, billIntake.companyId);
   await sendLineFlexMessage(
     lineUserId,
     `✅ จับคู่อัตโนมัติ: สลิป ↔ ${purchase.invoiceNumber}`,
@@ -921,6 +923,7 @@ async function tryAutoMatchPendingBillWithSlip(
       matchScore: 100,
       purchaseInvoiceId: purchase.id,
       intakeId: slipIntakeId,
+      editUrl: pendingBillEditUrl,
     }),
   );
   await sendLineText(lineUserId, `🔗 พบบิลที่ค้างจับคู่อยู่ ระบบจับคู่ให้อัตโนมัติ (ยอดตรง ฿${purchase.total.toLocaleString('th-TH')})`);
@@ -1020,6 +1023,7 @@ async function tryAutoMatchPendingSlipWithPurchase(
   });
   try { await redis.del(`line:pending_slip:${lineUserId}`); } catch { /* noop */ }
 
+  const pairedSlipEditUrl = buildIntakeEditUrlSafe(slipIntake.id, lineUserId, slipIntake.companyId);
   await sendLineFlexMessage(
     lineUserId,
     `✅ บันทึก ${savedPurchase.invoiceNumber} ฿${savedPurchase.total.toLocaleString('th-TH')} + จับคู่สลิปอัตโนมัติ`,
@@ -1029,6 +1033,7 @@ async function tryAutoMatchPendingSlipWithPurchase(
       matchScore: 100,
       purchaseInvoiceId: savedPurchase.id,
       intakeId: slipIntake.id,
+      editUrl: pairedSlipEditUrl,
     }),
   );
   return true;
@@ -1103,7 +1108,8 @@ async function sendCombinedSlipAndCandidates(
     await sendLineFlexMessage(lineUserId, altText, buildPaymentSlipFlexCard(result, 'pending', { intakeId }));
     return;
   }
-  const slipBubble = buildPaymentSlipFlexCard(result, 'pending', { intakeId });
+  const combinedEditUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, intake.companyId);
+  const slipBubble = buildPaymentSlipFlexCard(result, 'pending', { intakeId, editUrl: combinedEditUrl });
   const candidateBubbles = await buildSlipCandidateBubbles(intakeId, result, intake.companyId);
   const allBubbles = [slipBubble, ...candidateBubbles].slice(0, 12);
   await sendLineFlexCarousel(lineUserId, altText, allBubbles);

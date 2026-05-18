@@ -587,7 +587,54 @@ async function findKnownVendor(companyId: string, supplierTaxId: string, supplie
  * - exchangeRate priority: rate printed on document > FX API > fallback
  * - subtotal/vatAmount/total are REPLACED with the THB-converted values
  */
+/**
+ * Defensive scan of rawText for currency markers the LLM may have missed.
+ * Real-world case: OpenRouter fallback returned originalCurrency='THB' on a
+ * GAC invoice that clearly says "Exchange Rate: USD / THB @ 32.589600" and
+ * lists every line item in USD with a footer "UNITED STATES OF AMERICA,
+ * DOLLARS...". The result was a Flex card showing "฿2,765.55" when the
+ * Thai equivalent should have been ฿90,116.93.
+ *
+ * If we find a rate like "USD / THB @ 32.5896" in rawText AND the LLM said
+ * the doc is THB, override — the document is unambiguously telling us
+ * otherwise. We trust the explicit FX line over the LLM's classification.
+ */
+function detectForeignCurrencyFromRawText(result: OcrResult): OcrResult {
+  const txt = result.rawText ?? '';
+  if (!txt) return result;
+  // Patterns: "USD / THB @ 32.589600" or "USD/THB@32.59" or "USD THB 32.5"
+  const rateMatch = txt.match(/([A-Z]{3})\s*\/\s*THB\s*@?\s*([\d,]+\.?\d*)/i)
+    ?? txt.match(/Exchange Rate\s*:?\s*([A-Z]{3})\s*\/\s*THB\s*@?\s*([\d,]+\.?\d*)/i);
+  if (!rateMatch) return result;
+  const detectedCurrency = rateMatch[1].toUpperCase();
+  const detectedRate = Number(rateMatch[2].replace(/,/g, ''));
+  if (detectedCurrency === 'THB' || !detectedRate || detectedRate <= 1) return result;
+  // Only override if LLM disagreed (said THB or didn't say). If LLM already
+  // got foreign currency right, leave it alone — preserves any line-item
+  // breakdown the LLM extracted.
+  const llmSays = (result.originalCurrency ?? '').toUpperCase();
+  if (llmSays === detectedCurrency) return result;
+  logger.warn('[OCR] rawText foreign-currency override', {
+    llmSaid: llmSays || '(empty)',
+    detected: detectedCurrency,
+    rate: detectedRate,
+    total: result.total,
+  });
+  return {
+    ...result,
+    originalCurrency: detectedCurrency,
+    originalTotal: result.total,
+    originalSubtotal: result.subtotal,
+    originalVatAmount: result.vatAmount,
+    exchangeRate: detectedRate,
+  };
+}
+
 async function convertForeignCurrencyToThb(result: OcrResult): Promise<OcrResult> {
+  // Defensive pre-pass: if the LLM missed an obvious foreign-currency marker
+  // in the raw text, recover before the actual conversion runs.
+  result = detectForeignCurrencyFromRawText(result);
+
   const declared = (result.originalCurrency ?? result.documentMetadata?.currency ?? '').toUpperCase();
   if (!declared || declared === 'THB') return result;
 
