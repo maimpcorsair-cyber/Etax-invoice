@@ -19,10 +19,17 @@ export const masterSheetQueue = new Queue(QUEUE_NAME, {
 });
 
 /**
- * Queue a master sheet sync for a company, debounced by 1 minute.
+ * Queue a master sheet sync for a company. Default is debounced by 1 minute
+ * (used for write-driven syncs — many invoice/expense changes coalesce into
+ * one rebuild). Pass `immediate: true` for user-initiated "sync now" clicks
+ * where the user is actively waiting on the result.
+ *
  * Uses BullMQ jobId dedup — only one job per company can be queued at a time.
  */
-export async function enqueueMasterSheetSync(companyId: string): Promise<void> {
+export async function enqueueMasterSheetSync(
+  companyId: string,
+  options: { immediate?: boolean } = {},
+): Promise<void> {
   if (!isSheetsConfigured()) return;
   try {
     await masterSheetQueue.add(
@@ -30,7 +37,7 @@ export async function enqueueMasterSheetSync(companyId: string): Promise<void> {
       { companyId },
       {
         jobId: `master-sheet-${companyId}`,
-        delay: SYNC_DELAY_MS,
+        delay: options.immediate ? 0 : SYNC_DELAY_MS,
       },
     );
   } catch (err) {

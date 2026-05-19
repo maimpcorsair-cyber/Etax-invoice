@@ -6,6 +6,7 @@ import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { rdComplianceQueue } from '../queues/rdComplianceQueue';
+import { enqueueMasterSheetSync, masterSheetQueue } from '../queues/workers/masterSheetWorker';
 import { ensureCompanyDriveFolder, isDriveConfigured, isUserDriveOAuthConfigured } from '../services/googleDriveService';
 
 export const dashboardRouter = Router();
@@ -729,6 +730,8 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
             email: true,
             googleDriveOwnerUserId: true,
             googleDriveOwnerLinkedAt: true,
+            googleWorkspaceSheetUrl: true,
+            googleWorkspaceSheetSyncedAt: true,
           },
         }),
         tx.user.findUnique({
@@ -800,6 +803,8 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
             }
           : null,
         driveMode: companyDriveOwner ? 'company_owner' : (driveConnected ? 'current_user' : (driveConfigured ? 'service_account' : 'not_configured')),
+        workspaceSheetUrl: company?.googleWorkspaceSheetUrl ?? null,
+        workspaceSheetSyncedAt: company?.googleWorkspaceSheetSyncedAt ?? null,
         projects: projects.map((p) => ({
           id: p.id,
           code: p.code,
@@ -870,6 +875,39 @@ dashboardRouter.post('/drive/folder', async (req, res) => {
   } catch (err) {
     logger.error('Failed to ensure company Drive folder', { error: err });
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create company Drive folder' });
+  }
+});
+
+/* ─── POST /api/dashboard/workspace-sheet/sync ───
+ * Trigger an immediate Master Sheet rebuild for the caller's company.
+ * Returns the existing sheet URL when available (the worker queue is
+ * debounced — synchronous "create new sheet on first call" would block
+ * the request 5–15s, so we expose a fast-path: if the row already has
+ * a sheet, return its URL; otherwise enqueue + tell the client to retry.
+ */
+dashboardRouter.post('/workspace-sheet/sync', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { googleWorkspaceSheetUrl: true },
+    });
+
+    // Bypass the worker queue's debounce by removing the existing
+    // scheduled job (if any) before re-enqueueing. The worker dedupes
+    // on jobId, so this guarantees a fresh run.
+    await masterSheetQueue.remove(`master-sheet-${companyId}`).catch(() => undefined);
+    await enqueueMasterSheetSync(companyId, { immediate: true });
+
+    res.json({
+      data: {
+        url: company?.googleWorkspaceSheetUrl ?? null,
+        status: company?.googleWorkspaceSheetUrl ? 'ready' : 'queued',
+      },
+    });
+  } catch (err) {
+    logger.error('workspace-sheet sync failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to trigger workspace sheet sync' });
   }
 });
 

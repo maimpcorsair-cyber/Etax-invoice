@@ -140,6 +140,8 @@ interface DriveSummary {
     linkedAt: string | null;
   } | null;
   driveMode: 'company_owner' | 'current_user' | 'service_account' | 'not_configured';
+  workspaceSheetUrl: string | null;
+  workspaceSheetSyncedAt: string | null;
   projects: DriveSummaryProject[];
   recentFiles: DriveSummaryFile[];
 }
@@ -197,6 +199,7 @@ export default function Dashboard() {
   const [driveSummaryError, setDriveSummaryError] = useState<string | null>(null);
   const [driveConnecting, setDriveConnecting] = useState(false);
   const [driveOpening, setDriveOpening] = useState(false);
+  const [sheetOpening, setSheetOpening] = useState(false);
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -455,7 +458,11 @@ export default function Dashboard() {
 
   async function handleOpenCompanyDrive() {
     if (!token) return;
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    // Opening the popup synchronously inside the click handler is required
+    // to bypass the browser's popup blocker. We can't pass `noopener` here
+    // because that flag makes window.open() return null — without the
+    // reference we can't update the popup's URL after the async fetch.
+    const popup = window.open('about:blank', '_blank');
     setDriveOpening(true);
     try {
       const res = await fetch('/api/dashboard/drive/folder', {
@@ -467,10 +474,14 @@ export default function Dashboard() {
         throw new Error(json.error || json.message || `HTTP ${res.status}`);
       }
       const json = await res.json() as { data: { folderUrl: string } };
-      if (popup) {
+      if (popup && !popup.closed) {
         popup.location.href = json.data.folderUrl;
       } else {
-        window.location.href = json.data.folderUrl;
+        // Popup blocked — fall back to opening on top of the user's gesture
+        // via a new tab triggered from a programmatic click. This still
+        // opens a new tab in most browsers if the popup blocker permitted
+        // it, otherwise the browser surfaces its blocked-popup indicator.
+        window.open(json.data.folderUrl, '_blank');
       }
       setDriveSummary((current) => current
         ? {
@@ -484,6 +495,53 @@ export default function Dashboard() {
       setDriveSummaryError((err as Error).message);
     } finally {
       setDriveOpening(false);
+    }
+  }
+
+  async function handleOpenMasterSheet() {
+    if (!token || sheetOpening) return;
+    // Same popup-then-navigate pattern as the Drive folder button — open a
+    // blank tab synchronously so the popup blocker is satisfied, then point
+    // it at the sheet URL (or trigger a sync first when it doesn't exist).
+    const popup = window.open('about:blank', '_blank');
+    setSheetOpening(true);
+    setDriveSummaryError(null);
+    try {
+      const existing = driveSummary?.workspaceSheetUrl ?? null;
+      if (existing) {
+        if (popup && !popup.closed) popup.location.href = existing;
+        else window.open(existing, '_blank');
+        return;
+      }
+      // No sheet yet — kick off a sync, poll briefly, then open.
+      const syncRes = await fetch('/api/dashboard/workspace-sheet/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!syncRes.ok) {
+        const j = await syncRes.json().catch(() => ({})) as { error?: string };
+        throw new Error(j.error ?? `HTTP ${syncRes.status}`);
+      }
+      const json = await syncRes.json() as { data: { url: string | null; status: 'queued' | 'ready' } };
+      if (json.data.url) {
+        if (popup && !popup.closed) popup.location.href = json.data.url;
+        else window.open(json.data.url, '_blank');
+        setDriveSummary((current) => current
+          ? { ...current, workspaceSheetUrl: json.data.url }
+          : current);
+      } else {
+        // Queued but not yet generated. Close the blank popup and tell the
+        // user; they can press the button again in ~1 min.
+        popup?.close();
+        setDriveSummaryError(isThai
+          ? 'กำลังสร้าง Master Sheet ครั้งแรก — กรุณากดปุ่มอีกครั้งใน 1-2 นาที'
+          : 'Master Sheet is being generated — try again in 1-2 minutes.');
+      }
+    } catch (err) {
+      popup?.close();
+      setDriveSummaryError((err as Error).message);
+    } finally {
+      setSheetOpening(false);
     }
   }
 
@@ -680,6 +738,19 @@ export default function Dashboard() {
             >
               <FolderOpen className="h-4 w-4" />
               {driveOpening ? (isThai ? 'กำลังเปิด...' : 'Opening...') : (isThai ? 'เปิด/สร้าง Drive บริษัท' : 'Open company Drive')}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenMasterSheet}
+              disabled={sheetOpening || driveSummary?.driveConfigured === false}
+              className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Table2 className="h-4 w-4" />
+              {sheetOpening
+                ? (isThai ? 'กำลังเปิด...' : 'Opening...')
+                : driveSummary?.workspaceSheetUrl
+                  ? (isThai ? 'เปิด Master Sheet' : 'Open Master Sheet')
+                  : (isThai ? 'สร้าง Master Sheet' : 'Create Master Sheet')}
             </button>
           </div>
         </div>
