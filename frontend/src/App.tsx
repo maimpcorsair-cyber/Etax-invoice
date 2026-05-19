@@ -51,7 +51,6 @@ import { useAuthStore } from './store/authStore';
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { buildPlaneUrl, detectSurface, getPlanePath } from './lib/platform';
-import { isNative } from './hooks/useNative';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, authReady, user } = useAuthStore();
@@ -129,20 +128,6 @@ export default function App() {
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
-  // ── Capacitor native init ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isNative()) return;
-    (async () => {
-      try {
-        // Set status bar style (blue brand colour)
-        const { StatusBar, Style } = await import('@capacitor/status-bar');
-        await StatusBar.setStyle({ style: Style.Dark });
-        await StatusBar.setBackgroundColor({ color: '#1d4ed8' });
-      } catch {
-        // StatusBar not available on all platforms — ignore
-      }
-    })();
-  }, []);
 
   return (
     <>

@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
-import { isNative } from '../hooks/useNative';
 
 // Mobile mirrors the desktop 5-section IA but only surfaces 4 primary
 // tabs to keep finger-targets comfortable. Projects always appears in the
@@ -39,7 +38,7 @@ export default function MobileBottomNav() {
 
   useEffect(() => {
     function check() {
-      setIsMobile(isNative() || window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 1024);
     }
     check();
     window.addEventListener('resize', check);
