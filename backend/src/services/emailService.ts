@@ -467,6 +467,65 @@ export async function sendBillingPaymentFailedEmail(
   }
 }
 
+// Team invite — sent when an admin invites someone to join the workspace.
+// Contains the signed accept-invite URL. Receiver clicks → lands on the
+// frontend AcceptInvite page → sets own password → joins workspace.
+export interface TeamInviteEmailData {
+  toEmail: string;
+  inviterName: string;
+  companyNameTh: string;
+  role: 'admin' | 'accountant' | 'viewer';
+  acceptUrl: string;
+  locale: 'th' | 'en';
+}
+
+export async function sendTeamInviteEmail(data: TeamInviteEmailData): Promise<void> {
+  if (!isEmailConfigured()) {
+    logger.warn('[team] SMTP not configured — invite email skipped', { toEmail: data.toEmail });
+    return;
+  }
+  const isThai = data.locale === 'th';
+  const roleLabel = {
+    admin: isThai ? 'ผู้ดูแล (Admin)' : 'Admin',
+    accountant: isThai ? 'นักบัญชี (Accountant)' : 'Accountant',
+    viewer: isThai ? 'ผู้ดู (Viewer)' : 'Viewer',
+  }[data.role];
+  const subject = isThai
+    ? `${data.inviterName} ขอเชิญคุณเข้าร่วม ${data.companyNameTh} ใน Billboy`
+    : `${data.inviterName} invited you to join ${data.companyNameTh} on Billboy`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:600px;line-height:1.6">
+      <h2 style="color:#0f172a">${isThai ? 'คำเชิญร่วมงาน' : "You're invited"}</h2>
+      <p>${isThai ? `เรียน,` : 'Hi,'}</p>
+      <p>${isThai
+        ? `<strong>${data.inviterName}</strong> ได้เชิญคุณให้เข้าใช้งานบริษัท <strong>${data.companyNameTh}</strong> ใน Billboy ในตำแหน่ง <strong>${roleLabel}</strong>`
+        : `<strong>${data.inviterName}</strong> invited you to join <strong>${data.companyNameTh}</strong> on Billboy as <strong>${roleLabel}</strong>.`}</p>
+      <div style="margin:24px 0">
+        <a href="${data.acceptUrl}"
+           style="display:inline-block;background:#059669;color:#fff;text-decoration:none;
+                  padding:12px 22px;border-radius:8px;font-weight:600">
+          ${isThai ? 'ยอมรับคำเชิญและตั้งรหัสผ่าน' : 'Accept invite & set password'}
+        </a>
+      </div>
+      <p style="color:#64748b;font-size:13px">${isThai
+        ? 'ลิงก์นี้หมดอายุภายใน 7 วัน หากไม่ได้คาดหวังการเชิญนี้ ละเลยอีเมลฉบับนี้ได้เลย'
+        : 'Link expires in 7 days. If you did not expect this invite, you can ignore this email.'}</p>
+    </div>
+  `;
+  try {
+    await transporter.sendMail({
+      from: `"Billboy Team" <${process.env.SMTP_USER}>`,
+      to: data.toEmail,
+      subject,
+      html,
+    });
+    logger.info('[team] invite email sent', { toEmail: data.toEmail, role: data.role });
+  } catch (err) {
+    logger.error('[team] failed to send invite email', { err: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+}
+
 // PDPA Section 33 — confirmation of erasure request. The user receives an
 // email with the cancellation deadline and how to undo within the grace
 // window. Tax invoices retained per Revenue Code are flagged in the body.

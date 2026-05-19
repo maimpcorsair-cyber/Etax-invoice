@@ -19,6 +19,8 @@ import {
   encryptConfigValue,
   resolveCompanyRuntimeConfig,
 } from '../services/companyConfigService';
+import { signInviteToken } from './account';
+import { sendTeamInviteEmail } from '../services/emailService';
 import { getOcrPolicyForCompany } from '../services/ocrPolicyService';
 import {
   getLimitErrorMessage,
@@ -148,6 +150,73 @@ const createUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).optional(),
   role: z.enum(['admin', 'accountant', 'viewer']),
+});
+
+// Invite-by-email — sends a signed accept-invite link. Receiver sets
+// their OWN password via the public /api/account/accept-invite route.
+// Existing POST /users (admin sets password directly) is kept for cases
+// where the admin wants to bootstrap an account without waiting on
+// email delivery.
+adminRouter.post('/team/invite', async (req, res) => {
+  try {
+    const policy = await resolveCompanyAccessPolicy(req.user!.companyId);
+    if (!hasFeatureAccess(policy, 'invite_users')) {
+      res.status(403).json({ error: 'Upgrade your plan to invite team members' });
+      return;
+    }
+    const body = z.object({
+      email: z.string().email().transform((v) => v.toLowerCase()),
+      role: z.enum(['admin', 'accountant', 'viewer']),
+      inviterName: z.string().trim().min(1).max(120).optional(),
+    }).parse(req.body);
+
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: { nameTh: true },
+    });
+    if (!company) {
+      res.status(404).json({ error: 'Company not found' });
+      return;
+    }
+
+    // Refuse if an active user with this email already lives in another
+    // workspace — we can't pull them across companies.
+    const conflict = await prisma.user.findUnique({
+      where: { email: body.email },
+      select: { companyId: true },
+    });
+    if (conflict && conflict.companyId !== req.user!.companyId) {
+      res.status(409).json({ error: 'This email is already linked to a different workspace' });
+      return;
+    }
+
+    const token = signInviteToken({ companyId: req.user!.companyId, email: body.email, role: body.role });
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const acceptUrl = `${frontendUrl}/accept-invite?token=${encodeURIComponent(token)}`;
+    const inviterName = body.inviterName ?? req.user!.email ?? 'Billboy admin';
+
+    // Email is fire-and-forget — if SMTP is down we still return the URL
+    // so the admin can copy-paste it themselves.
+    sendTeamInviteEmail({
+      toEmail: body.email,
+      inviterName,
+      companyNameTh: company.nameTh,
+      role: body.role,
+      acceptUrl,
+      locale: 'th',
+    }).catch((err) => logger.warn('[team] invite email dispatch failed', {
+      err: err instanceof Error ? err.message : String(err),
+    }));
+
+    res.json({ data: { status: 'sent', email: body.email, role: body.role, acceptUrl } });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid request', details: err.issues });
+      return;
+    }
+    logger.error('[team/invite] failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to send invite' });
+  }
 });
 
 adminRouter.post('/users', async (req, res) => {

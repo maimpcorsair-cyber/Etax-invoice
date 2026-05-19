@@ -68,6 +68,47 @@ function verifyCancelToken(token: string): { companyId: string; requestedAt: Dat
   return { companyId, requestedAt };
 }
 
+// ── Team invite token (HMAC, stateless) ──────────────────────────────
+// Issued by /api/admin/team/invite, redeemed by /api/account/accept-invite.
+// 7-day TTL. Payload encodes companyId, email, role, issuedAtMs.
+const INVITE_TTL_MS = 7 * 86400_000;
+
+type InviteRole = 'admin' | 'accountant' | 'viewer';
+function isInviteRole(value: string): value is InviteRole {
+  return value === 'admin' || value === 'accountant' || value === 'viewer';
+}
+
+export function signInviteToken(input: { companyId: string; email: string; role: InviteRole }): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET not configured');
+  const issuedAtMs = Date.now();
+  const payload = `invite|${input.companyId}|${input.email.toLowerCase()}|${input.role}|${issuedAtMs}`;
+  const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${Buffer.from(payload, 'utf8').toString('base64url')}.${sig}`;
+}
+
+function verifyInviteToken(token: string): { companyId: string; email: string; role: InviteRole; issuedAt: Date } | null {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
+  const [payloadB64, sig] = token.split('.');
+  if (!payloadB64 || !sig) return null;
+  let payload: string;
+  try {
+    payload = Buffer.from(payloadB64, 'base64url').toString('utf8');
+  } catch { return null; }
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  const a = Buffer.from(sig, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  const [marker, companyId, email, role, issuedAtMsStr] = payload.split('|');
+  if (marker !== 'invite' || !companyId || !email || !role || !issuedAtMsStr) return null;
+  if (!isInviteRole(role)) return null;
+  const issuedAtMs = parseInt(issuedAtMsStr, 10);
+  if (!Number.isFinite(issuedAtMs)) return null;
+  if (Date.now() - issuedAtMs > INVITE_TTL_MS) return null;
+  return { companyId, email, role, issuedAt: new Date(issuedAtMs) };
+}
+
 /* ─── Status (powers the in-app Privacy & Data tab) ──────────────────── */
 
 // Lightweight read-only summary used by the AccountPrivacy page so it can
@@ -580,6 +621,68 @@ accountPublicRouter.post('/delete/confirm-cancel', async (req, res) => {
     }
     logger.error('account public cancel failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Cancel failed' });
+  }
+});
+
+// ── Public: accept team invite ────────────────────────────────────────
+// Issued via /api/admin/team/invite (signed token sent by email). The
+// user sets their own password — invitee never receives plaintext.
+const acceptInviteSchema = z.object({
+  token: z.string().min(20),
+  name: z.string().trim().min(1).max(120),
+  password: z.string().min(8).max(200),
+});
+
+accountPublicRouter.post('/accept-invite', async (req, res) => {
+  try {
+    const body = acceptInviteSchema.parse(req.body);
+    const parsed = verifyInviteToken(body.token);
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid or expired invite token' });
+      return;
+    }
+    const existing = await prisma.user.findUnique({ where: { email: parsed.email } });
+    if (existing) {
+      // If they're already in the same company, just reactivate + update role
+      // (admin clicked "Invite again"). If they belong to a different company,
+      // refuse — a user can only belong to one workspace today.
+      if (existing.companyId !== parsed.companyId) {
+        res.status(409).json({ error: 'This email is already linked to a different workspace' });
+        return;
+      }
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: body.name,
+          role: parsed.role,
+          isActive: true,
+          passwordHash: await bcrypt.hash(body.password, 12),
+        },
+      });
+      res.json({ data: { status: 'updated', userId: existing.id } });
+      return;
+    }
+
+    const created = await prisma.user.create({
+      data: {
+        companyId: parsed.companyId,
+        email: parsed.email,
+        name: body.name,
+        role: parsed.role,
+        isActive: true,
+        passwordHash: await bcrypt.hash(body.password, 12),
+        legalAcceptedAt: new Date(),
+        legalAcceptedVersion: CURRENT_LEGAL_VERSION,
+      },
+    });
+    res.json({ data: { status: 'created', userId: created.id } });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid request', details: err.issues });
+      return;
+    }
+    logger.error('accept-invite failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to accept invite' });
   }
 });
 

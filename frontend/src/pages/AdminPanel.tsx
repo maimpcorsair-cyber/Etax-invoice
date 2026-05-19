@@ -657,9 +657,47 @@ function UsersTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) 
               placeholder={isThai ? 'ปล่อยว่างเพื่อใช้ Google อย่างเดียว' : 'Leave blank for Google-only access'}
             />
           </div>
-          <div className="md:col-span-2 xl:col-span-4 flex justify-end">
+          <div className="md:col-span-2 xl:col-span-4 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={creating || !form.email.trim()}
+              onClick={async () => {
+                setCreating(true);
+                setMsg(null);
+                try {
+                  const res = await fetch('/api/admin/team/invite', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      email: form.email.trim(),
+                      role: form.role,
+                      inviterName: currentUser?.name,
+                    }),
+                  });
+                  const json = await res.json() as { data?: { acceptUrl?: string }; error?: string };
+                  if (!res.ok) throw new Error(json.error ?? 'Failed to send invite');
+                  setMsg({
+                    type: 'ok',
+                    text: isThai
+                      ? `ส่งคำเชิญไปยัง ${form.email} แล้ว (ลิงก์อายุ 7 วัน)`
+                      : `Invite sent to ${form.email} (7-day link)`,
+                  });
+                  setForm((prev) => ({ ...prev, email: '', name: '', password: '' }));
+                } catch (e) {
+                  setMsg({ type: 'err', text: (e as Error).message });
+                } finally {
+                  setCreating(false);
+                }
+              }}
+            >
+              {isThai ? '✉️ ส่งคำเชิญทางอีเมล' : '✉️ Send email invite'}
+            </button>
             <button type="submit" className="btn-primary" disabled={creating}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : (isThai ? '+ เพิ่มผู้ใช้' : '+ Add user')}
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : (isThai ? '+ เพิ่มทันที' : '+ Add directly')}
             </button>
           </div>
         </form>
