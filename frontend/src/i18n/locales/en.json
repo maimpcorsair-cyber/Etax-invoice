@@ -411,11 +411,11 @@
           ]
         },
         {
-          "title": "11. Cookies and Tracking",
+          "title": "11. Cookies and Monitoring",
           "body": [
             "We use strictly necessary cookies for login, session, and security.",
-            "We use analytics cookies (e.g., Sentry session replay — only on errored sessions with PII auto-masked) only with your consent.",
-            "You can manage cookies via the Cookie Banner or browser settings."
+            "We use Sentry for error monitoring — only stack traces with PII scrubbed (tax IDs, emails, phone numbers, and bearer tokens redacted) are uploaded. Session replay is not enabled.",
+            "You can manage non-essential cookies via the Cookie Banner shown on first visit or via your browser settings."
           ]
         },
         {

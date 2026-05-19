@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react';
+import { scrubSentryEvent } from './sentryScrub';
 
 /**
  * Initialize Sentry for the frontend. No-op when VITE_SENTRY_DSN isn't set
@@ -29,6 +30,12 @@ export function initSentry(): void {
       'Failed to fetch',
       'Load failed',
     ],
+    // PII scrubber — strip tax IDs, emails, phones, bearer tokens out of
+    // every event before it ships. Privacy Policy commits to this; without
+    // it, an unhandled exception's message could carry the exact PII we
+    // promised never to send to monitoring.
+    beforeSend: (event) => scrubSentryEvent(event as unknown as Record<string, unknown>) as unknown as typeof event,
+    beforeBreadcrumb: (breadcrumb) => scrubSentryEvent(breadcrumb as unknown as Record<string, unknown>) as unknown as typeof breadcrumb,
   });
 }
 

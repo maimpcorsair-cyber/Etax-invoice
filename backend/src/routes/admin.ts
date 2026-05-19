@@ -896,3 +896,175 @@ adminRouter.get('/ocr-stats', async (req, res) => {
     res.status(500).json({ error: 'Failed to load OCR stats', message: err instanceof Error ? err.message : String(err) });
   }
 });
+
+/* ─── Demo data seed ─────────────────────────────────────────────────── */
+
+// One-shot seeder for prospective users to evaluate the system without
+// typing in real customer/product data. Only fires on an empty workspace
+// (zero existing customers + products + invoices) so it can't pollute a
+// tenant that has already started using the product. Entities are name-
+// prefixed `[ตัวอย่าง]` so admins can recognise and bulk-delete later.
+adminRouter.post('/seed-demo-data', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const [customerCount, productCount, invoiceCount] = await Promise.all([
+      prisma.customer.count({ where: { companyId } }),
+      prisma.product.count({ where: { companyId } }),
+      prisma.invoice.count({ where: { companyId } }),
+    ]);
+    if (customerCount + productCount + invoiceCount > 0) {
+      res.status(409).json({
+        error: 'Workspace already contains data — demo seed only runs on an empty workspace to avoid polluting real records',
+      });
+      return;
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        nameTh: true, nameEn: true, taxId: true, branchCode: true,
+        addressTh: true, addressEn: true, phone: true, email: true,
+      },
+    });
+    if (!company) {
+      res.status(404).json({ error: 'Company not found' });
+      return;
+    }
+
+    const sellerSnapshot = {
+      nameTh: company.nameTh,
+      nameEn: company.nameEn,
+      taxId: company.taxId,
+      branchCode: company.branchCode,
+      addressTh: company.addressTh,
+      addressEn: company.addressEn,
+      phone: company.phone,
+      email: company.email,
+    };
+
+    const customers = await prisma.$transaction([
+      prisma.customer.create({ data: {
+        companyId,
+        nameTh: '[ตัวอย่าง] บริษัท ลูกค้าสาธิต จำกัด', nameEn: '[DEMO] Sample Customer Co., Ltd.',
+        taxId: '0105561200001', branchCode: '00000',
+        addressTh: '99 ถนนสุขุมวิท แขวงคลองตัน เขตคลองเตย กรุงเทพฯ 10110',
+        addressEn: '99 Sukhumvit Rd, Khlong Toei, Bangkok 10110',
+        email: 'demo-customer@example.com', phone: '021234567',
+        partyRole: 'customer', customerKind: 'company',
+      } }),
+      prisma.customer.create({ data: {
+        companyId,
+        nameTh: '[ตัวอย่าง] คุณสมชาย ใจดี', nameEn: '[DEMO] Mr. Somchai Jaidee',
+        taxId: '1100800123456', branchCode: '00000',
+        addressTh: '12/3 ซอยพหลโยธิน 5 แขวงสามเสนใน เขตพญาไท กรุงเทพฯ 10400',
+        email: 'somchai.demo@example.com', phone: '0891234567',
+        partyRole: 'customer', customerKind: 'individual',
+        personalId: '1100800123456',
+      } }),
+      prisma.customer.create({ data: {
+        companyId,
+        nameTh: '[ตัวอย่าง] ห้างหุ้นส่วน สมมุติเทรดดิ้ง', nameEn: '[DEMO] Imaginary Trading Ltd. Part.',
+        taxId: '0103564003001', branchCode: '00000',
+        addressTh: '88/9 หมู่ 4 ตำบลบางกระเจ้า อำเภอเมือง จังหวัดสมุทรสาคร 74000',
+        email: 'demo-trading@example.com', phone: '034987654',
+        partyRole: 'customer', customerKind: 'company',
+      } }),
+    ]);
+
+    const products = await prisma.$transaction([
+      prisma.product.create({ data: {
+        companyId, code: 'DEMO-SVC-01',
+        nameTh: '[ตัวอย่าง] บริการที่ปรึกษาธุรกิจ', nameEn: '[DEMO] Business Consulting',
+        unit: 'ชั่วโมง', unitPrice: 2500, vatType: 'vat7', productType: 'service',
+      } }),
+      prisma.product.create({ data: {
+        companyId, code: 'DEMO-SW-01',
+        nameTh: '[ตัวอย่าง] ใบอนุญาตซอฟต์แวร์ (รายปี)', nameEn: '[DEMO] Software Licence (Annual)',
+        unit: 'ใบอนุญาต', unitPrice: 12000, vatType: 'vat7', productType: 'service',
+      } }),
+      prisma.product.create({ data: {
+        companyId, code: 'DEMO-GOOD-01',
+        nameTh: '[ตัวอย่าง] เครื่องเขียน', nameEn: '[DEMO] Stationery Set',
+        unit: 'ชุด', unitPrice: 350, vatType: 'vat7', productType: 'product',
+      } }),
+      prisma.product.create({ data: {
+        companyId, code: 'DEMO-SHIP-01',
+        nameTh: '[ตัวอย่าง] ค่าจัดส่ง', nameEn: '[DEMO] Shipping Fee',
+        unit: 'ครั้ง', unitPrice: 80, vatType: 'vatZero', productType: 'service',
+      } }),
+    ]);
+
+    const today = new Date();
+    const lastMonth = new Date(today.getTime() - 30 * 86400_000);
+    const fifteenDaysAgo = new Date(today.getTime() - 15 * 86400_000);
+
+    const yearShort = today.getFullYear().toString().slice(-2);
+
+    // Demo invoice 1: T02 (credit sale to a company)
+    const inv1Subtotal = 2500 * 4; // 4 hours of consulting
+    const inv1Vat = inv1Subtotal * 0.07;
+    const inv1Total = inv1Subtotal + inv1Vat;
+    const inv1 = await prisma.invoice.create({
+      data: {
+        companyId,
+        invoiceNumber: `DEMO${yearShort}-0001`,
+        type: 'tax_invoice',
+        status: 'draft',
+        language: 'th',
+        invoiceDate: lastMonth,
+        dueDate: new Date(lastMonth.getTime() + 30 * 86400_000),
+        buyerId: customers[0].id,
+        seller: sellerSnapshot,
+        createdBy: req.user!.userId,
+        subtotal: inv1Subtotal,
+        vatAmount: inv1Vat,
+        discountAmount: 0,
+        total: inv1Total,
+        items: { create: [
+          { productId: products[0].id, nameTh: products[0].nameTh, nameEn: products[0].nameEn, quantity: 4, unit: products[0].unit, unitPrice: products[0].unitPrice, amount: inv1Subtotal, vatAmount: inv1Vat, totalAmount: inv1Total, vatType: 'vat7' },
+        ] },
+      },
+    });
+
+    // Demo invoice 2: T01 (cash sale to an individual — uses tax_invoice_receipt)
+    const inv2Subtotal = 12000 + 350 * 2;
+    const inv2Vat = inv2Subtotal * 0.07;
+    const inv2Total = inv2Subtotal + inv2Vat;
+    const inv2 = await prisma.invoice.create({
+      data: {
+        companyId,
+        invoiceNumber: `DEMO${yearShort}-0002`,
+        type: 'tax_invoice_receipt',
+        status: 'draft',
+        language: 'th',
+        invoiceDate: fifteenDaysAgo,
+        buyerId: customers[1].id,
+        seller: sellerSnapshot,
+        createdBy: req.user!.userId,
+        subtotal: inv2Subtotal,
+        vatAmount: inv2Vat,
+        discountAmount: 0,
+        total: inv2Total,
+        items: { create: [
+          { productId: products[1].id, nameTh: products[1].nameTh, nameEn: products[1].nameEn, quantity: 1, unit: products[1].unit, unitPrice: products[1].unitPrice, amount: 12000, vatAmount: 12000 * 0.07, totalAmount: 12000 * 1.07, vatType: 'vat7' },
+          { productId: products[2].id, nameTh: products[2].nameTh, nameEn: products[2].nameEn, quantity: 2, unit: products[2].unit, unitPrice: products[2].unitPrice, amount: 700, vatAmount: 700 * 0.07, totalAmount: 700 * 1.07, vatType: 'vat7' },
+        ] },
+      },
+    });
+
+    res.json({
+      data: {
+        seeded: {
+          customers: customers.length,
+          products: products.length,
+          invoices: 2,
+        },
+        invoiceIds: [inv1.id, inv2.id],
+        note: 'Demo entities are prefixed [ตัวอย่าง]. Delete them individually when you start working with real data.',
+      },
+    });
+  } catch (err) {
+    logger.error('[admin/seed-demo-data] failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to seed demo data' });
+  }
+});

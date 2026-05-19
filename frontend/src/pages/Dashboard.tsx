@@ -200,6 +200,31 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [seedingDemo, setSeedingDemo] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
+
+  async function handleSeedDemoData() {
+    if (!token || seedingDemo) return;
+    setSeedingDemo(true);
+    setSeedError(null);
+    try {
+      const res = await fetch('/api/admin/seed-demo-data', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      // Reload dashboard so the seeded data is visible immediately. Full
+      // reload is the simplest way to refresh every panel (stats, recent
+      // invoices, integrations) without rewiring each fetch.
+      window.location.reload();
+    } catch (err) {
+      setSeedError(err instanceof Error ? err.message : 'Failed to seed demo data');
+      setSeedingDemo(false);
+    }
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -486,6 +511,34 @@ export default function Dashboard() {
           </>
         )}
       />
+
+      {stats?.totalInvoices === 0 && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm leading-6 text-emerald-900">
+              <p className="font-semibold">
+                {isThai ? 'ยังไม่มีเอกสาร — อยากทดลองด้วยข้อมูลตัวอย่างไหม?' : 'No documents yet — want to explore with sample data?'}
+              </p>
+              <p className="mt-0.5 text-emerald-800">
+                {isThai
+                  ? 'ระบบจะสร้างลูกค้า สินค้า และใบกำกับตัวอย่าง 2 ใบ ให้ดู (ลบทิ้งภายหลังได้)'
+                  : 'We will create demo customers, products, and 2 sample invoices you can delete later.'}
+              </p>
+              {seedError && <p className="mt-1 text-rose-600">{seedError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={handleSeedDemoData}
+              disabled={seedingDemo}
+              className="btn-secondary whitespace-nowrap"
+            >
+              {seedingDemo
+                ? (isThai ? 'กำลังสร้าง…' : 'Creating…')
+                : (isThai ? 'ลองด้วยข้อมูลตัวอย่าง' : 'Try with sample data')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {commandItems.map((item) => {

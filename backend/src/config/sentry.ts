@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/node';
 import { logger } from './logger';
+import { scrubSentryEvent } from './sentryScrub';
 
 let initialized = false;
 
@@ -46,6 +47,11 @@ export function initSentry(role: 'web' | 'worker'): void {
           service: role === 'web' ? 'etax-invoice-api' : 'etax-invoice-worker',
         },
       },
+      // PII scrubber — last-line defence so tax IDs, emails, and phone
+      // numbers don't end up in the Sentry dashboard even when an error
+      // message or request body accidentally contains them.
+      beforeSend: (event) => scrubSentryEvent(event as unknown as Record<string, unknown>) as unknown as typeof event,
+      beforeBreadcrumb: (breadcrumb) => scrubSentryEvent(breadcrumb as unknown as Record<string, unknown>) as unknown as typeof breadcrumb,
     });
     logger.info('[Sentry] initialized', { role, environment: process.env.NODE_ENV });
   } catch (err) {
