@@ -2,10 +2,18 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
+import { logger } from '../config/logger';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { getCertificateInfo, clearCertCache, signXml } from '../services/signatureService';
 import { requestTimestamp } from '../services/tsaService';
+import {
+  createResendDomain,
+  deleteResendDomain,
+  getResendDomain,
+  verifyResendDomain,
+  ResendNotConfiguredError,
+} from '../services/resendDomainService';
 import {
   encryptConfigValue,
   resolveCompanyRuntimeConfig,
@@ -532,6 +540,186 @@ adminRouter.put('/rd-config', async (req, res) => {
     res.json({ message: 'RD config updated' });
   } catch {
     res.status(500).json({ error: 'Failed to update RD config' });
+  }
+});
+
+/* ─── Brand email domain (send-as) ─────────────────────────────────────
+ *
+ * Lets an SME route their invoice emails through a domain THEY own —
+ * recipients see "From: noreply@theirdomain.com" instead of the platform
+ * default. Verification round-trips through Resend's Domains API; we
+ * cache the Resend domain id so re-checks don't recreate.
+ *
+ * When the customer hasn't opted in (brandDomain is null), emailService
+ * falls back to SMTP_FROM_DEFAULT — every account starts on the shared
+ * platform sender and upgrades when they're ready.
+ */
+
+const brandDomainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?:\.(?!-)[A-Za-z0-9-]{1,63})+$/;
+
+adminRouter.get('/email-domain', async (req, res) => {
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: {
+        brandDomain: true,
+        brandDomainProviderId: true,
+        brandDomainStatus: true,
+        brandDomainVerifiedAt: true,
+      },
+    });
+    if (!company?.brandDomain) {
+      res.json({ data: { configured: false } });
+      return;
+    }
+    // Best-effort fresh status from Resend; if Resend is down or the
+    // domain id has gone missing, fall back to whatever we last saved.
+    let liveStatus = company.brandDomainStatus;
+    let records: unknown[] = [];
+    if (company.brandDomainProviderId) {
+      try {
+        const live = await getResendDomain(company.brandDomainProviderId);
+        liveStatus = live.status;
+        records = live.records;
+        // Persist a state change so subsequent reads don't depend on Resend.
+        if (live.status !== company.brandDomainStatus) {
+          await prisma.company.update({
+            where: { id: req.user!.companyId },
+            data: {
+              brandDomainStatus: live.status,
+              brandDomainVerifiedAt: live.status === 'verified' ? new Date() : null,
+            },
+          });
+        }
+      } catch (err) {
+        logger.warn('[admin/email-domain] live status fetch failed; returning cached', { err: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    res.json({
+      data: {
+        configured: true,
+        domain: company.brandDomain,
+        status: liveStatus,
+        verifiedAt: company.brandDomainVerifiedAt?.toISOString() ?? null,
+        dnsRecords: records,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to fetch email domain: ${(err as Error).message}` });
+  }
+});
+
+adminRouter.post('/email-domain', async (req, res) => {
+  try {
+    const { domain } = req.body as { domain?: string };
+    const normalized = (domain ?? '').trim().toLowerCase();
+    if (!normalized || !brandDomainRegex.test(normalized)) {
+      res.status(400).json({ error: 'Provide a valid domain like "yourcompany.com"' });
+      return;
+    }
+
+    const existing = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: { brandDomain: true, brandDomainProviderId: true },
+    });
+    // If they already added a domain and want to switch, delete the old
+    // one on Resend so we don't accrue abandoned domains under their quota.
+    if (existing?.brandDomainProviderId && existing.brandDomain && existing.brandDomain !== normalized) {
+      try {
+        await deleteResendDomain(existing.brandDomainProviderId);
+      } catch (err) {
+        logger.warn('[admin/email-domain] failed to delete previous domain', { err: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    const created = await createResendDomain(normalized);
+    const updated = await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data: {
+        brandDomain: normalized,
+        brandDomainProviderId: created.id,
+        brandDomainStatus: created.status,
+        brandDomainVerifiedAt: created.status === 'verified' ? new Date() : null,
+      },
+      select: { brandDomain: true, brandDomainStatus: true },
+    });
+    res.status(201).json({
+      data: {
+        configured: true,
+        domain: updated.brandDomain,
+        status: updated.brandDomainStatus,
+        verifiedAt: null,
+        dnsRecords: created.records,
+        message: 'Add the DNS records above at your domain registrar, then click Verify.',
+      },
+    });
+  } catch (err) {
+    if (err instanceof ResendNotConfiguredError) {
+      res.status(503).json({ error: err.message, code: err.code });
+      return;
+    }
+    res.status(500).json({ error: `Failed to add email domain: ${(err as Error).message}` });
+  }
+});
+
+adminRouter.post('/email-domain/verify', async (req, res) => {
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: { brandDomainProviderId: true },
+    });
+    if (!company?.brandDomainProviderId) {
+      res.status(404).json({ error: 'No brand domain configured to verify' });
+      return;
+    }
+    const result = await verifyResendDomain(company.brandDomainProviderId);
+    await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data: {
+        brandDomainStatus: result.status,
+        brandDomainVerifiedAt: result.status === 'verified' ? new Date() : null,
+      },
+    });
+    res.json({
+      data: {
+        status: result.status,
+        verifiedAt: result.status === 'verified' ? new Date().toISOString() : null,
+        dnsRecords: result.records,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ResendNotConfiguredError) {
+      res.status(503).json({ error: err.message, code: err.code });
+      return;
+    }
+    res.status(500).json({ error: `Verify failed: ${(err as Error).message}` });
+  }
+});
+
+adminRouter.delete('/email-domain', async (req, res) => {
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: { brandDomainProviderId: true },
+    });
+    if (company?.brandDomainProviderId) {
+      // Best-effort cleanup on Resend; even if it fails we still detach
+      // locally so the user isn't stuck with a dead domain in their UI.
+      try { await deleteResendDomain(company.brandDomainProviderId); }
+      catch (err) { logger.warn('[admin/email-domain] resend delete failed', { err: err instanceof Error ? err.message : String(err) }); }
+    }
+    await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data: {
+        brandDomain: null,
+        brandDomainProviderId: null,
+        brandDomainStatus: null,
+        brandDomainVerifiedAt: null,
+      },
+    });
+    res.json({ data: { configured: false } });
+  } catch (err) {
+    res.status(500).json({ error: `Disconnect failed: ${(err as Error).message}` });
   }
 });
 

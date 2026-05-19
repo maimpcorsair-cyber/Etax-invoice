@@ -132,6 +132,17 @@ model Company {
   certificatePath       String?
   certificatePassword   String?
 
+  // Per-company "send-as" email domain. When verified, outbound emails
+  // (POST /api/invoices/:id/send-email) use `noreply@<brandDomain>` as the
+  // From address instead of the global SMTP_FROM_DEFAULT. Customer must
+  // own the domain and add SPF/DKIM DNS records pointing at our SMTP
+  // provider (Resend). brandDomainProviderId stores the provider-side
+  // record id so we can re-check verification status without re-creating.
+  brandDomain            String?
+  brandDomainProviderId  String?
+  brandDomainStatus      String?   // 'pending' | 'verified' | 'failed'
+  brandDomainVerifiedAt  DateTime?
+
   // RD Config
   rdClientId     String?
   rdClientSecret String?

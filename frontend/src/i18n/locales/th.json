@@ -266,6 +266,7 @@
     "company": "ข้อมูลบริษัท",
     "certificate": "ใบรับรองดิจิตอล",
     "rdConfig": "ตั้งค่า RD API",
+    "emailDomain": "Domain อีเมล",
     "billing": "ใบเสร็จและแพ็กเกจ",
     "line": "LINE Billboy",
     "appSettings": "การตั้งค่า"

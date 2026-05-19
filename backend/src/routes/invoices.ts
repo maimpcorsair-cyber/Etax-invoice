@@ -1097,6 +1097,12 @@ invoicesRouter.post('/:id/send-email', requireRole('admin', 'accountant'), async
     if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
     if (!invoice.buyer.email) { res.status(400).json({ error: 'Customer has no email address' }); return; }
 
+    // Only pass brandDomain when it's actually verified — otherwise we'd
+    // be claiming SPF/DKIM alignment we don't have and the mail would
+    // bounce / land in spam.
+    const brandDomain = invoice.company.brandDomainStatus === 'verified' && invoice.company.brandDomainVerifiedAt
+      ? invoice.company.brandDomain
+      : null;
     await sendInvoiceToCustomer({
       invoiceNumber: invoice.invoiceNumber,
       total: invoice.total,
@@ -1106,6 +1112,7 @@ invoicesRouter.post('/:id/send-email', requireRole('admin', 'accountant'), async
       sellerNameTh: invoice.company.nameTh,
       language: invoice.language,
       pdfUrl: invoice.pdfUrl,
+      brandDomain,
     });
 
     await auditLog({

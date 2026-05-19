@@ -267,6 +267,7 @@
     "company": "公司信息",
     "certificate": "数字证书",
     "rdConfig": "税务局 API 配置",
+    "emailDomain": "邮件域名",
     "billing": "账单与套餐",
     "line": "LINE AI 助手",
     "appSettings": "系统设置"

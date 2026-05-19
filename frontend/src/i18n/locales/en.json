@@ -266,6 +266,7 @@
     "company": "Company Information",
     "certificate": "Digital Certificate",
     "rdConfig": "RD API Configuration",
+    "emailDomain": "Email Domain",
     "billing": "Billing & Plans",
     "line": "Line AI Assistant",
     "appSettings": "Settings"

@@ -42,6 +42,10 @@ interface InvoiceEmailData {
   language: string;
   pdfUrl?: string | null;
   rdDocId?: string | null;
+  /** Verified send-as domain for this company. When present, From becomes
+   *  `"<sellerNameTh>" <noreply@brandDomain>` so recipients see the
+   *  customer's brand instead of the platform default. */
+  brandDomain?: string | null;
 }
 
 interface StatementEmailData {
@@ -372,13 +376,20 @@ export async function sendInvoiceToCustomer(
   if (!isEmailConfigured()) throw new EmailNotConfiguredError();
   if (!data.buyerEmail) throw new Error('Customer has no email address');
   const isTh = data.language === 'th' || data.language === 'both';
+  // When the company has a verified send-as domain, route the From through
+  // it so the recipient sees the customer's brand (noreply@theirdomain.com)
+  // instead of the platform sender. Falls back to SMTP_USER otherwise so
+  // companies without a custom domain still send successfully.
+  const fromAddress = data.brandDomain
+    ? `noreply@${data.brandDomain}`
+    : process.env.SMTP_USER;
   await transporter.sendMail({
-    from: `"${data.sellerNameTh}" <${process.env.SMTP_USER}>`,
+    from: `"${data.sellerNameTh}" <${fromAddress}>`,
     to: data.buyerEmail,
     subject: `${isTh ? 'ใบกำกับภาษี' : 'Tax Invoice'} ${data.invoiceNumber}`,
     html: buildInvoiceForCustomerHtml(data),
   });
-  logger.info(`Invoice email sent to ${data.buyerEmail} for ${data.invoiceNumber}`);
+  logger.info(`Invoice email sent to ${data.buyerEmail} for ${data.invoiceNumber}`, { from: fromAddress });
 }
 
 export async function sendStatementToCustomer(
