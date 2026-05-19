@@ -215,6 +215,10 @@ export interface CompanyWorkspaceSheetData {
   sharedWithEmails?: Array<string | null | undefined>;
   userRefreshToken?: string | null;
   existingSheetId?: string | null;
+  // Drive folder ID of the company's Billboy workspace. When provided,
+  // a freshly-created sheet is moved out of My Drive root and into this
+  // folder so users can browse to it alongside project files.
+  companyFolderId?: string | null;
   tabs: Record<string, Array<Record<string, unknown>>>;
 }
 
@@ -416,6 +420,27 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: sheet.rows },
       })));
+
+      // Backfill: existing tenants whose sheet was created before the
+      // "move into company folder" change. Check current parents; if root
+      // and we have a folder ID, move it. Idempotent — re-runs are no-ops.
+      if (data.companyFolderId) {
+        try {
+          const meta = await drive.files.get({ fileId: spreadsheetId, fields: 'parents' });
+          const parents = meta.data.parents ?? [];
+          if (!parents.includes(data.companyFolderId)) {
+            await drive.files.update({
+              fileId: spreadsheetId,
+              addParents: data.companyFolderId,
+              removeParents: parents.join(','),
+              fields: 'id, parents',
+            });
+            logger.info('[sheets] moved existing workspace sheet into company folder', { spreadsheetId });
+          }
+        } catch (err) {
+          logger.warn('Failed to relocate existing workspace sheet', { error: err, spreadsheetId });
+        }
+      }
     } catch (err) {
       logger.warn('Existing workspace sheet not accessible, creating new one', { error: err, existingSheetId: data.existingSheetId });
       data.existingSheetId = null;
@@ -438,6 +463,23 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: sheet.rows },
     })));
+
+    // Move the brand-new sheet out of My Drive root into the company's
+    // Billboy folder so users can find it next to project files. Without
+    // this the spreadsheet sits at root and the only way to reach it is
+    // via direct URL (i.e., our "Open Master Sheet" button).
+    if (data.companyFolderId) {
+      try {
+        await drive.files.update({
+          fileId: spreadsheetId,
+          addParents: data.companyFolderId,
+          removeParents: 'root',
+          fields: 'id, parents',
+        });
+      } catch (err) {
+        logger.warn('Failed to move workspace sheet into company folder', { error: err, spreadsheetId, companyFolderId: data.companyFolderId });
+      }
+    }
   }
 
   // Refresh sheet metadata to get actual numeric sheetIds for formatting

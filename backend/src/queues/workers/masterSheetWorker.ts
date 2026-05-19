@@ -4,6 +4,7 @@ import prisma from '../../config/database';
 import { withSystemRlsContext } from '../../config/rls';
 import { logger } from '../../config/logger';
 import { exportCompanyWorkspaceToSheets, isSheetsConfigured, linkCell } from '../../services/googleSheetsService';
+import { ensureCompanyDriveFolder } from '../../services/googleDriveService';
 
 const QUEUE_NAME = 'master-sheet-sync';
 const SYNC_DELAY_MS = 60_000; // 1 minute debounce
@@ -300,9 +301,30 @@ export const masterSheetWorker = new Worker<{ companyId: string }>(
     }
 
     const today = new Date().toISOString().slice(0, 10);
+
+    // Resolve the company's Billboy folder so the fresh sheet gets moved
+    // into it. ensureCompanyDriveFolder is idempotent — repeat calls return
+    // the same folder ID. Best-effort: any failure here means the sheet
+    // stays at My Drive root, still usable via the "Open Master Sheet"
+    // button, just not discoverable through folder browsing.
+    let companyFolderId: string | null = null;
+    try {
+      const folder = await ensureCompanyDriveFolder({
+        companyName: workspaceData.companyName,
+        userRefreshToken: workspaceData.userRefreshToken,
+      });
+      companyFolderId = folder.folderId;
+    } catch (err) {
+      logger.warn('[masterSheet] could not resolve company folder, sheet will land in root', {
+        error: err instanceof Error ? err.message : String(err),
+        companyId,
+      });
+    }
+
     const result = await exportCompanyWorkspaceToSheets({
       period: today,
       ...workspaceData,
+      companyFolderId,
     });
 
     await withSystemRlsContext(prisma, (tx) => tx.company.update({
