@@ -2,6 +2,12 @@ import crypto from 'crypto';
 
 const ENCRYPTED_PREFIX = 'enc:v1:';
 
+// Magic header for AES-256-GCM encrypted BYTEA blobs. 8 bytes so it never
+// collides with a real .p12 (ASN.1 DER `0x30 0x82 ...`). Layout on disk:
+//   [magic 8B][iv 12B][authTag 16B][ciphertext ...]
+const BLOB_MAGIC = Buffer.from('ENCB1\x00\x00\x00', 'binary');
+const BLOB_HEADER_LEN = BLOB_MAGIC.length + 12 + 16;
+
 type NullableString = string | null | undefined;
 
 export interface CompanyRuntimeConfigSource {
@@ -63,10 +69,37 @@ export function decryptConfigValue(value: NullableString): string | null {
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
 }
 
+export function isBlobEncrypted(blob: Buffer | Uint8Array): boolean {
+  const buf = Buffer.isBuffer(blob) ? blob : Buffer.from(blob);
+  return buf.length >= BLOB_HEADER_LEN && buf.subarray(0, BLOB_MAGIC.length).equals(BLOB_MAGIC);
+}
+
+export function encryptBlob(plain: Buffer | Uint8Array): Buffer {
+  const buf = Buffer.isBuffer(plain) ? plain : Buffer.from(plain);
+  if (isBlobEncrypted(buf)) return buf;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', deriveKey(), iv);
+  const ciphertext = Buffer.concat([cipher.update(buf), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([BLOB_MAGIC, iv, authTag, ciphertext]);
+}
+
+export function decryptBlob(stored: Buffer | Uint8Array): Buffer {
+  const buf = Buffer.isBuffer(stored) ? stored : Buffer.from(stored);
+  if (!isBlobEncrypted(buf)) return buf; // legacy plain row
+  const iv = buf.subarray(BLOB_MAGIC.length, BLOB_MAGIC.length + 12);
+  const authTag = buf.subarray(BLOB_MAGIC.length + 12, BLOB_HEADER_LEN);
+  const ciphertext = buf.subarray(BLOB_HEADER_LEN);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', deriveKey(), iv);
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
 export function resolveCompanyRuntimeConfig(source?: CompanyRuntimeConfigSource | null): ResolvedCompanyRuntimeConfig {
-  const blob = source?.certificateBlob
+  const rawBlob = source?.certificateBlob
     ? (Buffer.isBuffer(source.certificateBlob) ? source.certificateBlob : Buffer.from(source.certificateBlob))
     : undefined;
+  const blob = rawBlob ? decryptBlob(rawBlob) : undefined;
   return {
     certBlob: blob,
     certPath: source?.certificatePath ?? (blob ? undefined : process.env.CERT_PATH ?? undefined),

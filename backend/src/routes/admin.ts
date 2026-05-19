@@ -15,6 +15,7 @@ import {
   ResendNotConfiguredError,
 } from '../services/resendDomainService';
 import {
+  encryptBlob,
   encryptConfigValue,
   resolveCompanyRuntimeConfig,
 } from '../services/companyConfigService';
@@ -462,7 +463,7 @@ adminRouter.post('/certificate', async (req, res) => {
     await prisma.company.update({
       where: { id: req.user!.companyId },
       data: {
-        certificateBlob: certBlob,
+        certificateBlob: encryptBlob(certBlob),
         certificateUploadedAt: new Date(),
         certificatePassword: encryptConfigValue(password),
         // Clear legacy path — DB blob is the source of truth now.

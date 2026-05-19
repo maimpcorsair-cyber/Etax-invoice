@@ -309,42 +309,120 @@
     "privacy": {
       "eyebrow": "Privacy Policy",
       "title": "Privacy Policy",
-      "description": "Maidomdom explains how we collect, use, and protect customer data for our e-Tax Invoice SaaS and recurring subscription service.",
-      "summary": "We collect only the information needed to provide the service, activate subscriptions, generate electronic tax documents, and support our customers, while applying appropriate safeguards to that data.",
+      "description": "Maidomdom explains how we collect, use, and protect personal data of users of our e-Tax Invoice SaaS, and your rights under Thailand's Personal Data Protection Act B.E. 2562 (PDPA).",
+      "summary": "We collect only data necessary to operate the service, issue e-Tax invoices, transmit data to the Revenue Department, and provide support — in accordance with PDPA and ETDA ขมธอ.3-2560.",
       "sections": [
         {
-          "title": "1. Information We Collect",
+          "title": "1. Who We Are and How to Contact Us",
           "body": [
-            "Maidomdom collects information you provide directly to us, such as company name, tax ID, company address, administrator name, email address, phone number, and the details required to subscribe to the platform.",
-            "When you use the e-Tax Invoice system, we may also process document data, invoice records, customer information, product details, company settings, and usage data required to deliver the service, maintain auditability, and troubleshoot technical issues."
+            "Maidomdom acts as “Data Controller” for account data and data related to operating the service, and as “Data Processor” for data that Subscribers (business customers) upload to the service in order to issue invoices to third parties.",
+            "Data Protection Officer (DPO): dpo@maidomdom.com · General contact: support@maidomdom.com"
           ]
         },
         {
-          "title": "2. How We Use Information",
+          "title": "2. Personal Data We Collect",
           "body": [
-            "We use your information to create and maintain user accounts, activate subscriptions, manage payments, deliver e-Tax Invoice workflows, and respond to support or billing requests.",
-            "Some information may also be used to improve the service, detect misuse, protect platform security, and comply with legal obligations or lawful requests from relevant authorities."
+            "Account data: full name, email, phone, company name, tax ID, address, job title, and authentication data (Google account ID or password hash).",
+            "Tax document data: invoice/receipt/credit-note/debit-note details, line items, prices, VAT, buyer and seller details, customer tax IDs, branch codes, and other fields required by ETDA ขมธอ.3-2560.",
+            "Sensitive data that may be present: 13-digit Thai national ID number (when buyer is a natural person), which is treated as sensitive personal data under PDPA Section 26.",
+            "Digital certificates (.p12) and passwords, stored with AES-256-GCM encryption in our database for XAdES-BES digital signing.",
+            "Usage and technical data: IP address, User-Agent, access logs, system errors, and audit logs of critical actions.",
+            "Payment data: we do not store payment card numbers directly — Stripe is our payment processor."
           ]
         },
         {
-          "title": "3. Sharing With Third Parties",
+          "title": "3. Legal Basis for Processing (PDPA Section 24)",
           "body": [
-            "We may share limited information with service providers involved in platform operations, such as payment processors, hosting providers, identity services, and email or infrastructure partners, strictly to the extent necessary to deliver the service.",
-            "We do not sell customer personal data to third parties and will not disclose data outside the purposes described in this policy unless there is a lawful basis to do so."
+            "Performance of contract (Section 24(3)): to provide the service you subscribed to, including issuing invoices, submitting data to the Revenue Department, and billing.",
+            "Legal obligation (Section 24(6)): submitting invoice data to the Revenue Department under the Revenue Code, and retaining tax records for at least 5 years.",
+            "Legitimate interest (Section 24(5)): fraud prevention, system security, service quality improvement, and audit.",
+            "Consent (Section 19): for marketing, product emails, non-essential cookies, and processing of sensitive data. You may withdraw consent at any time."
           ]
         },
         {
-          "title": "4. Data Protection and Retention",
+          "title": "4. Purposes of Processing",
           "body": [
-            "We apply reasonable technical and organizational safeguards to protect data against unauthorized access, use, disclosure, loss, or alteration, including access controls and logging for important system events.",
-            "Information is retained only as long as necessary for service delivery, legal obligations, audit requirements, and reasonable dispute resolution needs."
+            "Operate the e-Tax Invoice service: document creation, XAdES-BES digital signing, RFC 3161 time-stamping, and submission to the Revenue Department.",
+            "Manage user accounts, billing, identity verification, issuing receipts and invoices to you, and automatic subscription renewals.",
+            "Respond to support requests, complaints, PDPA data-subject requests, and disputes.",
+            "Analyse usage to improve performance and security, preferring anonymised data where possible."
           ]
         },
         {
-          "title": "5. Your Rights and Contact",
+          "title": "5. Disclosure to Third Parties (Sub-Processors)",
           "body": [
-            "You may contact us to request access to, correction of, or clarification about personal data related to your use of the service via support@maidomdom.com or by phone at 02-123-4567.",
-            "If this policy changes materially, we will update this page so you can review the latest version at any time."
+            "We use the following third-party services to operate. Each has security and data-protection commitments with us:",
+            "Hosting and databases: Render (Postgres, Redis, web service, worker), AWS S3 or Cloudflare R2 (PDF/XML files).",
+            "Payments: Stripe.",
+            "Email: Resend or SMTP providers (SendGrid, AWS SES, etc.).",
+            "AI/OCR: OpenAI, Google Gemini, OpenRouter (used for slip OCR and user-initiated processing).",
+            "Monitoring: Sentry (error tracking).",
+            "DNS/CDN: Cloudflare, Vercel.",
+            "Government bodies: Revenue Department (RD), ETDA, time-stamp authorities (TDID, freetsa)."
+          ]
+        },
+        {
+          "title": "6. Cross-Border Data Transfers (PDPA Section 28)",
+          "body": [
+            "Some sub-processors have data centres outside Thailand — for example, Render (Singapore/US), Stripe (US/EU), OpenAI (US), Sentry (US/EU).",
+            "We use safeguards required by PDPA and the Personal Data Protection Committee, such as Standard Contractual Clauses or publicly published provider commitments."
+          ]
+        },
+        {
+          "title": "7. Data Retention",
+          "body": [
+            "Account and invoice data: at least 5 years from invoice date, as required by the Revenue Code; may be extended by statute of limitations.",
+            "Audit logs: 365 days (full) and summary 90 days.",
+            "OCR benchmark logs: 60 days.",
+            "Abandoned pending signups: 7 days.",
+            "Rejected intake: 30 days.",
+            "OTPs and tokens: deleted on expiry.",
+            "Data is automatically deleted or anonymised when the retention period ends."
+          ]
+        },
+        {
+          "title": "8. Security Measures",
+          "body": [
+            "Encryption: digital certificates (.p12) encrypted with AES-256-GCM before storage; user passwords use bcrypt; data in transit uses TLS 1.2+; database and S3 have encryption at rest.",
+            "Access control: Role-Based Access Control (RBAC), PostgreSQL Row-Level Security (RLS) to isolate tenants, and multi-factor authentication for administrators.",
+            "Monitoring: audit logging, Sentry, rate limiting, and brute-force protection.",
+            "Backup and recovery: daily backups by our database provider, DR runbook (RTO 4h, RPO 24h)."
+          ]
+        },
+        {
+          "title": "9. Data Breach Notification",
+          "body": [
+            "If a personal data breach occurs that may impact your rights or freedoms, we will notify you without undue delay and report to the Personal Data Protection Committee (PDPC) within 72 hours as required by law."
+          ]
+        },
+        {
+          "title": "10. Your Rights as Data Subject (PDPA Sections 30–37)",
+          "body": [
+            "You have the following rights and may exercise them free of charge:",
+            "Right of access (Section 30): download your data via the Account page or /api/account/export.",
+            "Right to data portability (Section 31): receive data in a commonly used format (JSON).",
+            "Right to object (Section 32).",
+            "Right to erasure (Section 33): delete your account and data via /api/account/delete (except data we are legally required to retain).",
+            "Right to restrict processing (Section 34).",
+            "Right to rectification (Sections 35–36).",
+            "Right to withdraw consent (Section 19, paragraph 5).",
+            "Right to lodge a complaint with the PDPC (Section 73).",
+            "To exercise your rights, contact dpo@maidomdom.com or use in-app controls. We will respond within 30 days."
+          ]
+        },
+        {
+          "title": "11. Cookies and Tracking",
+          "body": [
+            "We use strictly necessary cookies for login, session, and security.",
+            "We use analytics cookies (e.g., Sentry session replay — only on errored sessions with PII auto-masked) only with your consent.",
+            "You can manage cookies via the Cookie Banner or browser settings."
+          ]
+        },
+        {
+          "title": "12. Changes to This Policy",
+          "body": [
+            "We may update this policy from time to time. For material changes, we will notify you by email or in-app at least 7 days in advance.",
+            "Current version: 2026-05-19."
           ]
         }
       ]
@@ -352,78 +430,201 @@
     "terms": {
       "eyebrow": "Terms of Service",
       "title": "Terms of Service",
-      "description": "Terms governing subscription, usage, and billing for Maidomdom as a monthly SaaS e-Tax Invoice platform.",
-      "summary": "By subscribing to or using Maidomdom, you agree to these Terms of Service, including our 7-day refund policy for monthly subscription plans.",
+      "description": "Terms for subscribing to, using, and paying for Maidomdom as a SaaS e-Tax Invoice service.",
+      "summary": "By subscribing to and using Maidomdom, you accept these Terms of Service, our Privacy Policy, and the referenced Data Processing Agreement (DPA).",
       "sections": [
         {
-          "title": "1. Nature of the Service",
+          "title": "1. Definitions",
           "body": [
-            "Maidomdom is a subscription-based software service that helps businesses manage e-Tax Invoice workflows, company settings, customer records, and related electronic document operations online.",
-            "We may improve features, security, integrations, and performance over time as part of normal service operations, provided that doing so does not unreasonably remove the core service customers subscribed to."
+            "“Service” means the Maidomdom e-Tax Invoice SaaS provided via our website, including invoice issuance, digital signing, RD submission, and related features.",
+            "“User” or “you” means the individual or legal entity that subscribes to and uses the Service.",
+            "“We” means the provider of the Service."
           ]
         },
         {
-          "title": "2. Signup and User Accounts",
+          "title": "2. Nature of the Service and Changes",
           "body": [
-            "Users must provide accurate and complete company and administrator information during signup, including an email address capable of receiving support and billing communications.",
-            "Customers are responsible for maintaining account security, assigning appropriate user permissions, and managing usage by people inside their organization."
+            "The Service is a subscription software that manages e-Tax invoice documents under ETDA ขมธอ.3-2560 and submits data to the Revenue Department via API.",
+            "We may improve features, performance, security, or integrations from time to time. We will give at least 30 days' notice for material changes affecting the package you subscribed to."
           ]
         },
         {
-          "title": "3. Billing and Recurring Charges",
+          "title": "3. Registration and Accounts",
           "body": [
-            "Maidomdom subscription fees are charged according to the plan selected on the Pricing page and are processed through the payment provider we use, such as Stripe, with recurring billing that may renew automatically on a monthly basis.",
-            "You authorize us and our payment provider to charge the applicable subscription fees, taxes, and related charges associated with the selected plan."
+            "You must provide accurate company and administrator information and use an email reachable for support and billing.",
+            "You must be at least 20 years old and have authority to bind the legal entity you represent.",
+            "You are responsible for the security of your account, passwords, and the actions of users within your organisation."
           ]
         },
         {
-          "title": "4. Cancellation and Access",
+          "title": "4. Payments and Renewals",
           "body": [
-            "Customers may cancel future renewals using the subscription management tools provided, and cancellation will take effect according to the current billing period rules enforced by the platform or payment provider.",
-            "If payment fails, usage violates these terms, or behavior threatens platform security, we may suspend access until the issue is resolved."
+            "Fees follow the package shown on our Pricing page, paid via Stripe or another processor we choose.",
+            "Subscriptions renew automatically each billing cycle. You authorise us to charge fees, taxes, and applicable charges.",
+            "If payment fails, we may temporarily suspend access until payment is made."
           ]
         },
         {
           "title": "5. 7-Day Refund Policy",
           "body": [
-            "Customers may request a refund for a monthly plan within 7 days of the initial payment if the service is materially unavailable as described on the website or if a significant technical issue cannot be resolved by us within a reasonable timeframe.",
-            "After the 7-day period, subscription fees are generally non-refundable except where required by law or when we choose to make an exception at our discretion."
+            "For first-time subscriptions, you may request a full refund within 7 days of payment if you have not used real e-Tax issuance (sandbox excluded).",
+            "Refunds are processed via the original payment channel within 14 business days."
           ]
         },
         {
-          "title": "6. Support and Billing Contact",
+          "title": "6. Prohibited Use",
           "body": [
-            "For questions about plans, payments, refunds, invoices, or service access, you may contact us at support@maidomdom.com or by phone at 02-123-4567.",
-            "These terms may be updated from time to time, and the latest version will always be published on our public website."
+            "Do not use the Service to issue fraudulent documents, evade taxes, launder money, or commit any unlawful act.",
+            "Do not reverse engineer, decompile, or attempt to penetrate the system.",
+            "Do not use bots or automation that imposes undue burden on the system.",
+            "Do not use the Service to infringe rights of others, including personal data rights."
+          ]
+        },
+        {
+          "title": "7. Intellectual Property",
+          "body": [
+            "Software, logos, content, and trademarks of Maidomdom are owned by us or our licensors. You receive a non-exclusive, non-transferable right to use the Service per your subscription.",
+            "Data you upload remains yours. We receive a limited licence to use it as necessary to provide the Service."
+          ]
+        },
+        {
+          "title": "8. Personal Data Processing",
+          "body": [
+            "Processing of personal data of third parties that Subscribers upload to issue invoices is governed by the Data Processing Agreement (DPA) at /legal/dpa.",
+            "As Subscriber, you represent that you have consent or another lawful basis to process the third-party data you upload."
+          ]
+        },
+        {
+          "title": "9. Service Level (SLA)",
+          "body": [
+            "We target 99.5% monthly availability (excluding announced maintenance).",
+            "If availability falls below 99% in a month due to our fault, you may request a pro-rata service credit not exceeding that month's fee."
+          ]
+        },
+        {
+          "title": "10. Limitation of Liability",
+          "body": [
+            "To the extent permitted by law, our maximum liability arising out of or related to the Service is limited to the fees you paid to us in the 12 months before the event giving rise to the claim.",
+            "We are not liable for indirect, consequential, exemplary, or unforeseeable damages, including lost profits.",
+            "The above does not apply where the law prohibits limitation — such as wilful misconduct, gross negligence, or personal data violations."
+          ]
+        },
+        {
+          "title": "11. Indemnification",
+          "body": [
+            "You will indemnify us for damages arising from your unlawful use, use of data you do not have rights to, or harm to third parties caused by your acts."
+          ]
+        },
+        {
+          "title": "12. Termination and Post-Termination Data Access",
+          "body": [
+            "You may cancel renewal from your Account page, effective next billing cycle.",
+            "We may suspend or terminate the Service for material breach or unlawful use, with reasonable opportunity to cure where possible.",
+            "After termination, we retain invoice data for at least 5 years as required by tax law before deletion. You may export data via /api/account/export within 30 days after termination."
+          ]
+        },
+        {
+          "title": "13. Governing Law and Disputes",
+          "body": [
+            "These Terms are governed by the laws of Thailand.",
+            "Disputes shall first be resolved by negotiation. If unsuccessful, they shall be subject to the jurisdiction of the courts of Thailand."
+          ]
+        },
+        {
+          "title": "14. Changes to These Terms",
+          "body": [
+            "We may update these Terms from time to time. For material changes, we will notify you by email or in-app at least 30 days in advance. Current version: 2026-05-19."
           ]
         }
       ]
     },
-    "contact": {
-      "eyebrow": "Contact",
-      "title": "Contact Maidomdom",
-      "description": "Reach our team directly for questions about plans, billing, invoices, refunds, and support for the e-Tax Invoice platform.",
-      "supportTitle": "Support Team",
-      "supportDescription": "Our team can help with onboarding, company setup, sign-in issues, administrator access, and technical problems related to documents or account permissions.",
-      "billingTitle": "What We Can Help With",
-      "supportTopics": [
-        "Subscription signup and recurring billing",
-        "Receipts and billing status questions",
-        "Refund requests within 7 days",
-        "Access issues and administrator account setup"
-      ],
-      "channels": [
+    "dpa": {
+      "eyebrow": "Data Processing Agreement",
+      "title": "Data Processing Agreement",
+      "description": "Agreement between Maidomdom as Data Processor and the Subscriber as Data Controller regarding personal data of third parties uploaded to the service.",
+      "summary": "By subscribing to and using the Service, you accept this DPA, which sets out each party's duties for protecting your customers' personal data under PDPA Section 40.",
+      "sections": [
         {
-          "icon": "mail",
-          "label": "Support and billing email",
-          "value": "support@maidomdom.com",
-          "href": "mailto:support@maidomdom.com"
+          "title": "1. Definitions and Roles",
+          "body": [
+            "“Controller” = Subscriber who decides the purposes and means of processing personal data of its customers.",
+            "“Processor” = Maidomdom, which processes data on the Controller's instructions.",
+            "“Controller-uploaded data” = data of the Controller's customers/counterparties uploaded into the Service to issue tax documents — for example, names, addresses, tax IDs, and line items."
+          ]
         },
         {
-          "icon": "phone",
-          "label": "Phone number",
-          "value": "02-123-4567",
-          "href": "tel:021234567"
+          "title": "2. Scope and Purposes",
+          "body": [
+            "The Processor processes data solely to provide the Service: creating tax documents, digital signing, time-stamping, submitting to the RD, retaining records, and giving Controller access.",
+            "The Processor will not use the data for any purpose beyond Controller instructions."
+          ]
+        },
+        {
+          "title": "3. Controller Duties",
+          "body": [
+            "Confirm a lawful basis for processing uploaded data (consent or another basis under PDPA Section 24).",
+            "Provide a Privacy Notice to its own data subjects.",
+            "Be primarily responsible for responding to Data Subject Requests (DSRs); the Processor will provide reasonable technical assistance."
+          ]
+        },
+        {
+          "title": "4. Processor Duties",
+          "body": [
+            "Process data only on Controller's instructions.",
+            "Maintain confidentiality and limit access to personnel on a need-to-know basis.",
+            "Maintain appropriate security: encryption, access control, logging, and backups.",
+            "Assist Controller in responding to DSRs.",
+            "Assist Controller with security, DPIA, and breach notification obligations."
+          ]
+        },
+        {
+          "title": "5. Data Breach Notification",
+          "body": [
+            "The Processor will notify the Controller without undue delay upon becoming aware of a breach, and no later than 48 hours from awareness.",
+            "Notification will include: nature of the incident, categories and approximate number of records affected, likely consequences, mitigation measures, and DPO contact."
+          ]
+        },
+        {
+          "title": "6. Sub-Processors",
+          "body": [
+            "Controller gives general consent for the Processor to use the sub-processors listed in the Privacy Policy.",
+            "The Processor will provide prior notice before adding or changing sub-processors. Controller may reasonably object within 30 days.",
+            "The Processor is liable for the acts of its sub-processors as if for its own."
+          ]
+        },
+        {
+          "title": "7. Cross-Border Data Transfers",
+          "body": [
+            "Transfers abroad will comply with PDPA Section 28 with appropriate safeguards."
+          ]
+        },
+        {
+          "title": "8. Audit and Reporting",
+          "body": [
+            "Controller may request information reasonably necessary to demonstrate Processor's compliance.",
+            "Where necessary, Controller may request an audit, no more than once per year, at Controller's expense, with at least 30 days' prior notice."
+          ]
+        },
+        {
+          "title": "9. Retention and Return/Deletion on Termination",
+          "body": [
+            "On termination, the Processor will delete or return Controller data at Controller's choice within 90 days.",
+            "Except where the Processor must retain data by law, e.g., tax invoices under the Revenue Code."
+          ]
+        },
+        {
+          "title": "10. Liability and Indemnity",
+          "body": [
+            "Each party is responsible for its own DPA breaches.",
+            "The liability cap in the Terms of Service applies to this DPA, except where the law prohibits limitation."
+          ]
+        },
+        {
+          "title": "11. Term and Termination",
+          "body": [
+            "This DPA takes effect when the Controller subscribes to the Service and ends when the Service contract ends and data is returned/deleted under Section 9.",
+            "Current version: 2026-05-19."
+          ]
         }
       ]
     }
@@ -484,5 +685,14 @@
     "of": "of",
     "entries": "entries",
     "perPage": "per page"
+  },
+  "signup": {
+    "consent": {
+      "legal": "I have read and accept the",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "dpa": "Data Processing Agreement (DPA)",
+      "marketing": "Send me product updates, tips, and promotions (you can unsubscribe at any time)"
+    }
   }
 }

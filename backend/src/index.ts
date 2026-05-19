@@ -33,6 +33,7 @@ import { projectsRouter } from './routes/projects';
 import { dbdRouter } from './routes/dbd';
 import { projectPortalRouter } from './routes/projectPortal';
 import { intakeEditRouter } from './routes/intakeEdit';
+import { accountRouter } from './routes/account';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -197,6 +198,7 @@ app.use('/api/products', authenticate, productsRouter);
 app.use('/api/audit', authenticate, auditRouter);
 app.use('/api/admin', authenticate, adminRouter);
 app.use('/api/system', authenticate, systemRouter);
+app.use('/api/account', authenticate, accountRouter);
 app.use('/api/dashboard', authenticate, dashboardRouter);
 app.use('/api/company', authenticate, dashboardRouter);
 app.use('/api/notifications', authenticate, notificationsRouter);

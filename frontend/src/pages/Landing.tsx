@@ -143,6 +143,8 @@ export default function Landing() {
     // Google path.
     adminPassword: '',
     phone: '',
+    acceptedLegal: false,
+    marketingOptIn: false,
   });
   const [juristicLookupState, setJuristicLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'error'>('idle');
 
@@ -413,6 +415,11 @@ export default function Landing() {
     // anyway) or when the user has signed in with Google.
     adminPassword: !isGoogleBoundSignup && !googleConfig?.enabled && form.adminPassword.trim().length < 8
       ? (isThai ? 'รหัสผ่านอย่างน้อย 8 ตัวอักษร' : 'Password must be at least 8 characters') : '',
+    // PDPA Section 19 — without explicit consent we have no lawful basis to
+    // process the data the user is about to upload. Refuse submission until
+    // the checkbox is ticked; pure UX-side guard (backend re-enforces).
+    acceptedLegal: !form.acceptedLegal
+      ? (isThai ? 'กรุณายอมรับข้อกำหนดและนโยบายความเป็นส่วนตัวก่อนสมัคร' : 'You must accept the terms before signing up') : '',
   };
   const hasFormErrors = Object.values(formErrors).some(Boolean) || Object.values(formValidation).some(Boolean);
 
@@ -433,6 +440,9 @@ export default function Landing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          // Pin the version the user actually saw — backend records it so we
+          // know which doc revision their consent attaches to.
+          acceptedLegalVersion: '2026-05-19',
           ...(isFreeSignup ? { googleCredential: googleCredential || undefined } : { plan: selectedPlan, paymentMethod, couponCode }),
           locale: isThai ? 'th' : 'en',
         }),
@@ -1575,6 +1585,42 @@ export default function Landing() {
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <label className="flex items-start gap-3 text-sm text-slate-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.acceptedLegal}
+                        onChange={(e) => setForm((prev) => ({ ...prev, acceptedLegal: e.target.checked }))}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        required
+                      />
+                      <span>
+                        {t('signup.consent.legal', { defaultValue: isThai
+                          ? 'ฉันได้อ่านและยอมรับ'
+                          : 'I have read and accept the' })}{' '}
+                        <a href="/terms" target="_blank" rel="noopener" className="text-emerald-700 underline">{t('signup.consent.terms', { defaultValue: isThai ? 'ข้อกำหนดการใช้บริการ' : 'Terms of Service' })}</a>
+                        {', '}
+                        <a href="/privacy" target="_blank" rel="noopener" className="text-emerald-700 underline">{t('signup.consent.privacy', { defaultValue: isThai ? 'นโยบายความเป็นส่วนตัว' : 'Privacy Policy' })}</a>
+                        {' '}{isThai ? 'และ' : 'and'}{' '}
+                        <a href="/legal/dpa" target="_blank" rel="noopener" className="text-emerald-700 underline">{t('signup.consent.dpa', { defaultValue: isThai ? 'ข้อตกลงการประมวลผลข้อมูล (DPA)' : 'Data Processing Agreement (DPA)' })}</a>
+                      </span>
+                    </label>
+                    {formErrors.acceptedLegal && (
+                      <p className="text-xs text-rose-600">{formErrors.acceptedLegal}</p>
+                    )}
+                    <label className="flex items-start gap-3 text-sm text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.marketingOptIn}
+                        onChange={(e) => setForm((prev) => ({ ...prev, marketingOptIn: e.target.checked }))}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>{t('signup.consent.marketing', { defaultValue: isThai
+                        ? 'ยินดีรับข่าวสาร โปรโมชั่น และอัปเดตฟีเจอร์ใหม่ทางอีเมล (ยกเลิกได้ตลอดเวลา)'
+                        : 'Send me product updates, tips, and promotions (you can unsubscribe at any time)' })}</span>
+                    </label>
+                  </div>
 
                   <button
                     type="submit"

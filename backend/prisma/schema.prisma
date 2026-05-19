@@ -174,6 +174,13 @@ model Company {
   documentBankAccounts     Json?
   documentSignatureProfile Json?
 
+  // PDPA Section 33 — erasure. Owner can request account deletion; we keep
+  // tax records 5 years per Revenue Code but PII gets anonymised immediately.
+  // hardDeletedAt = scheduled time the retentionLoop will purge everything.
+  deletionRequestedAt   DateTime?
+  deletionRequestedBy   String?
+  hardDeleteScheduledAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -206,6 +213,12 @@ model User {
   lastLoginAt         DateTime?
   googleRefreshToken  String?
   googleDriveLinkedAt DateTime?
+
+  // PDPA consent — captured at signup. Stores the legal-document version the
+  // user accepted so we can show a re-consent prompt when terms change.
+  legalAcceptedAt      DateTime?
+  legalAcceptedVersion String?
+  marketingOptInAt     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

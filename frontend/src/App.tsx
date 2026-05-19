@@ -21,6 +21,7 @@ const BillingSuccess = React.lazy(() => import('./pages/BillingSuccess'));
 const BillingCancel = React.lazy(() => import('./pages/BillingCancel'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
+const DataProcessingAgreement = React.lazy(() => import('./pages/DataProcessingAgreement'));
 const ContactPage = React.lazy(() => import('./pages/ContactPage'));
 const OwnerOverview = React.lazy(() => import('./pages/OwnerOverview'));
 const OwnerTenants = React.lazy(() => import('./pages/OwnerTenants'));
@@ -159,6 +160,8 @@ export default function App() {
           <Route path="/ops/login" element={<Login />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/legal/dpa" element={<DataProcessingAgreement />} />
+          <Route path="/dpa" element={<DataProcessingAgreement />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/billing/success" element={<BillingSuccess />} />
           <Route path="/billing/cancel" element={<BillingCancel />} />

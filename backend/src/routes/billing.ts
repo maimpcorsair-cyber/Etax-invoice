@@ -186,7 +186,17 @@ const freeSignupSchema = z.object({
   phone: z.string().trim().max(30).optional().or(z.literal('')),
   locale: z.enum(['th', 'en']).default('th'),
   googleCredential: z.string().min(1).optional(),
+  // PDPA consent. `acceptedLegal` is required; user must tick the box
+  // confirming they've read ToS, Privacy Policy, and DPA. Version pins the
+  // doc revision so we can re-prompt when terms change. `marketingOptIn` is
+  // a separate opt-in (PDPA Section 19 — explicit consent for marketing).
+  acceptedLegal: z.boolean(),
+  acceptedLegalVersion: z.string().trim().min(4).max(40).optional(),
+  marketingOptIn: z.boolean().optional(),
 });
+
+// Pin in code so we can reject stale-versioned acceptances if needed.
+export const CURRENT_LEGAL_VERSION = '2026-05-19';
 
 const couponSchema = z.object({
   code: z.string().trim().min(3).max(50),
@@ -850,6 +860,14 @@ billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
       res.status(400).json({ error: 'A password is required when Google Sign-In is not used' });
       return;
     }
+    // PDPA Section 19 — explicit consent is the lawful basis for any
+    // processing not strictly necessary for the contract. Refuse signups
+    // that didn't tick the legal-acceptance box so we have a clean record.
+    if (!body.acceptedLegal) {
+      res.status(400).json({ error: 'You must accept the Terms of Service, Privacy Policy, and Data Processing Agreement to continue' });
+      return;
+    }
+    const acceptedVersion = body.acceptedLegalVersion || CURRENT_LEGAL_VERSION;
 
     const email = googleAccount?.email ?? manualEmail!;
     const adminName = googleAccount?.name || manualAdminName || email.split('@')[0];
@@ -890,6 +908,9 @@ billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
           passwordHash,
           role: 'admin',
           isActive: true,
+          legalAcceptedAt: new Date(),
+          legalAcceptedVersion: acceptedVersion,
+          marketingOptInAt: body.marketingOptIn ? new Date() : null,
         },
       });
 
