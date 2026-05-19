@@ -240,19 +240,16 @@ accountRouter.get('/export', async (req, res) => {
       auditLog: result.auditLog,
     }, exportReplacer, 2));
   } catch (err) {
-    // Diagnostic mode while we chase a production 500. Echoes the message
-    // (NOT the stack) back to the caller so debugging doesn't require
-    // Render log access. The audit-log row + Sentry capture still log
-    // the full stack on the server side. Remove after the underlying bug
-    // is fixed and verified.
-    const msg = err instanceof Error ? err.message : String(err);
+    // Stack + tenant ids to logs; generic message to client so future
+    // 500s don't leak internals to the user (Sentry + Render logs are
+    // the place to read the cause).
     logger.error('account export failed', {
-      err: msg,
+      err: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack?.split('\n').slice(0, 6).join('\n') : undefined,
       userId: req.user?.userId,
       companyId: req.user?.companyId,
     });
-    res.status(500).json({ error: 'Export failed', debugMessage: msg });
+    res.status(500).json({ error: 'Export failed' });
   }
 });
 

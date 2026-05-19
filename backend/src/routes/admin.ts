@@ -1073,14 +1073,11 @@ adminRouter.post('/seed-demo-data', async (req, res) => {
       },
     });
   } catch (err) {
-    // Same diagnostic mode as /account/export — echo the message in the
-    // response while we chase the runtime cause. Remove once verified.
-    const msg = err instanceof Error ? err.message : String(err);
     logger.error('[admin/seed-demo-data] failed', {
-      err: msg,
+      err: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack?.split('\n').slice(0, 8).join('\n') : undefined,
       companyId: req.user?.companyId,
     });
-    res.status(500).json({ error: 'Failed to seed demo data', debugMessage: msg });
+    res.status(500).json({ error: 'Failed to seed demo data' });
   }
 });
