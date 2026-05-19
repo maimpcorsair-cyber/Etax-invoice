@@ -155,4 +155,9 @@ databases:
   - name: etax-postgres
     databaseName: etax_invoice
     user: etax_invoice
-    plan: free
+    # 'free' Render Postgres expires after 30 days AND has no backups —
+    # data-loss risk for a paying-customer SaaS. 'starter' ($7/mo) is the
+    # minimum tier that gets automatic daily backups + 7-day PITR.
+    # Note: changing this YAML field does NOT auto-upgrade an existing
+    # Postgres instance — confirm + upgrade in the Render dashboard.
+    plan: starter

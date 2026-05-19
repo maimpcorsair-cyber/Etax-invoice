@@ -7,6 +7,7 @@ import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { authenticate, requireRole } from '../middleware/auth';
+import { freeSignupRateLimit } from '../middleware/rateLimit';
 import {
   getBillingPlanConfig,
   getCancelUrl,
@@ -824,7 +825,7 @@ billingRouter.get('/signup/lookup-juristic', async (req, res) => {
   }
 });
 
-billingRouter.post('/free-signup', async (req, res) => {
+billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
   try {
     const body = freeSignupSchema.parse(req.body);
     const googleAccount = await verifySignupGoogleCredential(body.googleCredential);

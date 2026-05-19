@@ -12,6 +12,7 @@ import {
 } from '../services/projectLineInviteService';
 import { getLineUserProfile } from '../services/lineService';
 import { logger } from '../config/logger';
+import { loginRateLimit } from '../middleware/rateLimit';
 
 export const authRouter = Router();
 
@@ -140,7 +141,7 @@ authRouter.get('/google/config', (_req, res) => {
   });
 });
 
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', loginRateLimit, async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 

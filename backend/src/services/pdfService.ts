@@ -347,17 +347,20 @@ function buildHtml(data: PdfInvoiceData): string {
   const theme = resolveDocumentTheme(data.templateId);
 
   const itemRows = data.items.map((item, idx) => {
+    const nameThEsc = escapeHtml(item.nameTh ?? '');
+    const nameEnEsc = item.nameEn ? escapeHtml(item.nameEn) : '';
+    const unitEsc = escapeHtml(item.unit ?? '');
     const nameLine = isBoth
-      ? `<span class="item-name">${item.nameTh}</span>${item.nameEn ? `<span class="item-subname">${item.nameEn}</span>` : ''}`
+      ? `<span class="item-name">${nameThEsc}</span>${nameEnEsc ? `<span class="item-subname">${nameEnEsc}</span>` : ''}`
       : isTh
-        ? `<span class="item-name">${item.nameTh}</span>`
-        : `<span class="item-name">${item.nameEn ?? item.nameTh}</span>`;
+        ? `<span class="item-name">${nameThEsc}</span>`
+        : `<span class="item-name">${nameEnEsc || nameThEsc}</span>`;
     return `
       <tr>
         <td style="text-align:center">${idx + 1}</td>
         <td>${nameLine}</td>
         <td style="text-align:center">${item.quantity}</td>
-        <td style="text-align:center">${item.unit}</td>
+        <td style="text-align:center">${unitEsc}</td>
         <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
         <td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : '-'}</td>
         <td style="text-align:center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>
@@ -402,16 +405,35 @@ function buildHtml(data: PdfInvoiceData): string {
     bankPayment: isTh ? 'ข้อมูลบัญชีสำหรับโอนเงิน' : isEn ? 'Bank transfer information' : 'ข้อมูลบัญชีสำหรับโอนเงิน / Bank transfer information',
   };
 
-  const sellerName = isTh ? data.seller.nameTh : isEn ? (data.seller.nameEn ?? data.seller.nameTh) : `${data.seller.nameTh} / ${data.seller.nameEn ?? data.seller.nameTh}`;
-  const buyerName = isTh ? data.buyer.nameTh : isEn ? (data.buyer.nameEn ?? data.buyer.nameTh) : `${data.buyer.nameTh} / ${data.buyer.nameEn ?? data.buyer.nameTh}`;
-  const sellerAddr = isTh ? data.seller.addressTh : isEn ? (data.seller.addressEn ?? data.seller.addressTh) : `${data.seller.addressTh}${data.seller.addressEn ? `<br/><span class="muted-inline">${data.seller.addressEn}</span>` : ''}`;
-  const buyerAddr = isTh ? data.buyer.addressTh : isEn ? (data.buyer.addressEn ?? data.buyer.addressTh) : `${data.buyer.addressTh}${data.buyer.addressEn ? `<br/><span class="muted-inline">${data.buyer.addressEn}</span>` : ''}`;
+  // Pre-escape every user-controlled field that gets interpolated into the
+  // HTML below. Puppeteer renders this in a real Chromium, so unescaped <
+  // turns into live DOM — historic XSS / SSRF surface (the headless
+  // browser could fetch attacker URLs with our session token). Escape
+  // ONCE at the source, retain any literal markup (<br/>, span wrappers)
+  // around the escaped values, and never re-interpolate raw data.* below.
+  const sellerNameTh = escapeHtml(data.seller.nameTh ?? '');
+  const sellerNameEn = data.seller.nameEn ? escapeHtml(data.seller.nameEn) : '';
+  const sellerAddrTh = escapeHtml(data.seller.addressTh ?? '');
+  const sellerAddrEn = data.seller.addressEn ? escapeHtml(data.seller.addressEn) : '';
+  const buyerNameTh = escapeHtml(data.buyer.nameTh ?? '');
+  const buyerNameEn = data.buyer.nameEn ? escapeHtml(data.buyer.nameEn) : '';
+  const buyerAddrTh = escapeHtml(data.buyer.addressTh ?? '');
+  const buyerAddrEn = data.buyer.addressEn ? escapeHtml(data.buyer.addressEn) : '';
+  const buyerTaxIdEsc = escapeHtml(data.buyer.taxId ?? '');
+  const buyerBranchCodeEsc = data.buyer.branchCode ? escapeHtml(data.buyer.branchCode) : '';
+
+  const sellerName = isTh ? sellerNameTh : isEn ? (sellerNameEn || sellerNameTh) : `${sellerNameTh} / ${sellerNameEn || sellerNameTh}`;
+  const buyerName = isTh ? buyerNameTh : isEn ? (buyerNameEn || buyerNameTh) : `${buyerNameTh} / ${buyerNameEn || buyerNameTh}`;
+  const sellerAddr = isTh ? sellerAddrTh : isEn ? (sellerAddrEn || sellerAddrTh) : `${sellerAddrTh}${sellerAddrEn ? `<br/><span class="muted-inline">${sellerAddrEn}</span>` : ''}`;
+  const buyerAddr = isTh ? buyerAddrTh : isEn ? (buyerAddrEn || buyerAddrTh) : `${buyerAddrTh}${buyerAddrEn ? `<br/><span class="muted-inline">${buyerAddrEn}</span>` : ''}`;
+  const sellerBranchNameThEsc = data.seller.branchNameTh ? escapeHtml(data.seller.branchNameTh) : '';
+  const sellerBranchCodeEsc = data.seller.branchCode ? escapeHtml(data.seller.branchCode) : '';
   const sellerBranch = data.seller.branchCode === '00000'
     ? labels.branchHeadOffice
-    : `${data.seller.branchCode}${data.seller.branchNameTh ? ` ${data.seller.branchNameTh}` : ''}`;
+    : `${sellerBranchCodeEsc}${sellerBranchNameThEsc ? ` ${sellerBranchNameThEsc}` : ''}`;
   const buyerBranch = data.buyer.branchCode === '00000'
     ? labels.branchHeadOffice
-    : data.buyer.branchCode;
+    : buyerBranchCodeEsc;
   const customTemplateBlock = data.templateHtml
     ? compileTemplateHtml(data.templateHtml, {
         documentTitle: escapeHtml(docTitle),
@@ -1004,7 +1026,7 @@ function buildHtml(data: PdfInvoiceData): string {
             <div class="party-column">
               <div class="party-name">${buyerName}</div>
               <div class="party-detail">
-                <div>${labels.taxId}: <strong>${data.buyer.taxId}</strong></div>
+                <div>${labels.taxId}: <strong>${buyerTaxIdEsc}</strong></div>
                 <div>${labels.branch}: <strong>${buyerBranch}</strong></div>
                 <div>${buyerAddr}</div>
               </div>
@@ -1059,8 +1081,8 @@ function buildHtml(data: PdfInvoiceData): string {
             <div class="notes-card">
               <div class="section-label">${labels.notes}</div>
               <div class="notes-text">
-                ${data.notes ? `<div>${data.notes}</div>` : ''}
-                ${data.templateNote ? `<div style="margin-top:${data.notes ? '8px' : '0'}; color:#64748b;">${data.templateNote}</div>` : ''}
+                ${data.notes ? `<div>${escapeHtml(data.notes)}</div>` : ''}
+                ${data.templateNote ? `<div style="margin-top:${data.notes ? '8px' : '0'}; color:#64748b;">${escapeHtml(data.templateNote)}</div>` : ''}
               </div>
             </div>
           ` : ''}
