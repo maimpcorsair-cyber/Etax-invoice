@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import Layout from './components/Layout';
 import OwnerLayout from './components/OwnerLayout';
 import HardcodedChineseBridge from './components/HardcodedChineseBridge';
+import CookieBanner from './components/CookieBanner';
+import ReConsentModal from './components/ReConsentModal';
 // All pages are lazy-loaded so each becomes its own JS chunk
 const Landing = React.lazy(() => import('./pages/Landing'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -142,6 +144,8 @@ export default function App() {
   return (
     <>
       <HardcodedChineseBridge />
+      <CookieBanner />
+      <ReConsentModal />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route

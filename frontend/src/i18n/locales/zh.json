@@ -695,5 +695,12 @@
       "dpa": "数据处理协议(DPA)",
       "marketing": "向我发送产品更新、技巧与促销邮件(可随时取消订阅)"
     }
+  },
+  "cookieBanner": {
+    "title": "我们使用 Cookie",
+    "body": "我们使用必要 Cookie 以保证系统运行,并仅在您同意后使用用于分析和错误报告的 Cookie。",
+    "learnMore": "查看政策",
+    "accept": "接受",
+    "reject": "全部拒绝"
   }
 }

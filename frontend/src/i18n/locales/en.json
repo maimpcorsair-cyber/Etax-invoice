@@ -694,5 +694,12 @@
       "dpa": "Data Processing Agreement (DPA)",
       "marketing": "Send me product updates, tips, and promotions (you can unsubscribe at any time)"
     }
+  },
+  "cookieBanner": {
+    "title": "We use cookies",
+    "body": "We use cookies that are strictly necessary, and analytics/error-reporting cookies only with your consent.",
+    "learnMore": "Learn more",
+    "accept": "Accept",
+    "reject": "Reject all"
   }
 }

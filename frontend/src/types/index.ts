@@ -22,6 +22,11 @@ export interface User {
     displayName?: string | null;
     pictureUrl?: string | null;
   };
+  legal?: {
+    acceptedVersion: string | null;
+    currentVersion: string;
+    reConsentRequired: boolean;
+  };
 }
 
 export interface BankAccountProfile {

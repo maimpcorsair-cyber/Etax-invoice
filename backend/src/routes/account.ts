@@ -5,6 +5,7 @@ import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { withRlsContext, tenantRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
+import { CURRENT_LEGAL_VERSION } from '../config/legalVersion';
 
 // PDPA data-subject endpoints. Mounted under /api/account (authenticated).
 //
@@ -75,6 +76,51 @@ accountRouter.get('/export', async (req, res) => {
   } catch (err) {
     logger.error('account export failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Export failed' });
+  }
+});
+
+/* ─── Re-consent (legal version bump) ────────────────────────────────── */
+
+// Front-end shows the modal when /auth/me returns legal.reConsentRequired.
+// User clicks accept → POST here → row updates → next /auth/me clears the
+// flag and unblocks the app. Body just confirms the version they're
+// accepting so backend can refuse a stale POST that races a doc bump.
+accountRouter.post('/accept-legal', async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const body = z.object({
+      version: z.string().trim().min(4).max(40),
+      marketingOptIn: z.boolean().optional(),
+    }).parse(req.body);
+
+    if (body.version !== CURRENT_LEGAL_VERSION) {
+      res.status(409).json({
+        error: 'Stale legal version',
+        currentVersion: CURRENT_LEGAL_VERSION,
+      });
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        legalAcceptedAt: new Date(),
+        legalAcceptedVersion: body.version,
+        // Marketing opt-in is independent — only touch when explicitly set
+        // so a re-consent doesn't silently flip an existing preference.
+        ...(typeof body.marketingOptIn === 'boolean'
+          ? { marketingOptInAt: body.marketingOptIn ? new Date() : null }
+          : {}),
+      },
+    });
+    res.json({ data: { acceptedVersion: body.version, currentVersion: CURRENT_LEGAL_VERSION } });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid request', details: err.issues });
+      return;
+    }
+    logger.error('accept-legal failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Accept failed' });
   }
 });
 

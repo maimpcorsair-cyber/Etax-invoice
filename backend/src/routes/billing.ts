@@ -195,8 +195,8 @@ const freeSignupSchema = z.object({
   marketingOptIn: z.boolean().optional(),
 });
 
-// Pin in code so we can reject stale-versioned acceptances if needed.
-export const CURRENT_LEGAL_VERSION = '2026-05-19';
+import { CURRENT_LEGAL_VERSION } from '../config/legalVersion';
+export { CURRENT_LEGAL_VERSION };
 
 const couponSchema = z.object({
   code: z.string().trim().min(3).max(50),

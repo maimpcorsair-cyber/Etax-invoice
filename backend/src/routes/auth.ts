@@ -11,6 +11,7 @@ import {
   ProjectLineInviteError,
 } from '../services/projectLineInviteService';
 import { getLineUserProfile } from '../services/lineService';
+import { CURRENT_LEGAL_VERSION } from '../config/legalVersion';
 import { logger } from '../config/logger';
 import { loginRateLimit } from '../middleware/rateLimit';
 
@@ -46,6 +47,7 @@ function serializeUser(user: {
   companyId: string;
   passwordHash?: string | null;
   googleSub?: string | null;
+  legalAcceptedVersion?: string | null;
   company: {
     nameTh: string;
     nameEn: string | null;
@@ -72,6 +74,13 @@ function serializeUser(user: {
       nameTh: user.company.nameTh,
       nameEn: user.company.nameEn,
       taxId: user.company.taxId,
+    },
+    // PDPA — frontend blocks the app behind a re-consent modal when the
+    // legal bundle has been bumped past the version this user accepted.
+    legal: {
+      acceptedVersion: user.legalAcceptedVersion ?? null,
+      currentVersion: CURRENT_LEGAL_VERSION,
+      reConsentRequired: !user.legalAcceptedVersion || user.legalAcceptedVersion !== CURRENT_LEGAL_VERSION,
     },
     line: user.lineUserLink
       ? {

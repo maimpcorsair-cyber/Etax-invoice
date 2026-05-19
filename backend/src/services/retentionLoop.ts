@@ -102,6 +102,32 @@ async function runRetentionTick(): Promise<void> {
       status: 'rejected',
     } }),
     { retentionDays: REJECTED_INTAKE_DAYS });
+
+  // PDPA Section 33 — companies whose owner requested deletion and whose
+  // tax-retention window has elapsed get fully purged. We resolve IDs first
+  // so the log captures which tenants were dropped (deleteMany returns
+  // count only). Cascade on Company drops dependent tables; if any FK
+  // refuses to cascade the safeDelete wrapper will log + continue.
+  try {
+    const dueCompanies = await prisma.company.findMany({
+      where: { hardDeleteScheduledAt: { lte: new Date() } },
+      select: { id: true, taxId: true, hardDeleteScheduledAt: true },
+      take: 50,
+    });
+    if (dueCompanies.length > 0) {
+      const ids = dueCompanies.map((c) => c.id);
+      await safeDelete('companies_hard_delete',
+        () => prisma.company.deleteMany({ where: { id: { in: ids } } }),
+        {
+          ids,
+          taxIds: dueCompanies.map((c) => c.taxId),
+        });
+    }
+  } catch (err) {
+    logger.error('[retention] companies_hard_delete lookup failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 let loopHandle: NodeJS.Timeout | null = null;
