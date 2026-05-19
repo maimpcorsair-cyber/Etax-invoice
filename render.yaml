@@ -5,9 +5,12 @@ services:
     rootDir: backend
     plan: free
     healthCheckPath: /health
-    # Let Render deploy after GitHub Typecheck passes. The GitHub deploy
-    # workflow is manual-only to avoid a circular "deploy check is pending" race.
-    autoDeployTrigger: checksPass
+    # Deploy on every push to main. Sentry catches any runtime regressions
+    # the Typecheck CI didn't (typecheck still runs on every push and surfaces
+    # in GitHub Actions independently). `checksPass` was deadlocking: Render
+    # waited on the "Deploy to Render" workflow, which only ran via manual
+    # dispatch — so nothing ever auto-deployed.
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_ENV
         value: production
@@ -98,9 +101,12 @@ services:
     rootDir: backend
     plan: starter
     dockerCommand: node dist/worker.js
-    # Let Render deploy after GitHub Typecheck passes. The GitHub deploy
-    # workflow is manual-only to avoid a circular "deploy check is pending" race.
-    autoDeployTrigger: checksPass
+    # Deploy on every push to main. Sentry catches any runtime regressions
+    # the Typecheck CI didn't (typecheck still runs on every push and surfaces
+    # in GitHub Actions independently). `checksPass` was deadlocking: Render
+    # waited on the "Deploy to Render" workflow, which only ran via manual
+    # dispatch — so nothing ever auto-deployed.
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_ENV
         value: production
