@@ -34,6 +34,7 @@ const AccountPrivacy = React.lazy(() => import('./pages/AccountPrivacy'));
 const CancelDelete = React.lazy(() => import('./pages/CancelDelete'));
 const Financials = React.lazy(() => import('./pages/Financials'));
 const AcceptInvite = React.lazy(() => import('./pages/AcceptInvite'));
+const Reconciliation = React.lazy(() => import('./pages/Reconciliation'));
 const OwnerTransactions = React.lazy(() => import('./pages/OwnerTransactions'));
 const OwnerCoupons = React.lazy(() => import('./pages/OwnerCoupons'));
 const OwnerRenewals = React.lazy(() => import('./pages/OwnerRenewals'));
@@ -194,6 +195,7 @@ export default function App() {
             <Route path="plan" element={<PlanPage />} />
             <Route path="account/privacy" element={<AccountPrivacy />} />
             <Route path="reports/financials" element={<Financials />} />
+            <Route path="reports/reconciliation" element={<Reconciliation />} />
           </Route>
           <Route
             path="/ops"

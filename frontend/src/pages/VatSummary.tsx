@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator, TrendingUp, TrendingDown, FileSpreadsheet, Loader2,
-  ArrowRight, Calendar, FolderOpen, FileText, Receipt,
+  ArrowRight, Calendar, FolderOpen, FileText, Receipt, Link2,
 } from 'lucide-react';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import SectionSubNav from '../components/SectionSubNav';
@@ -146,6 +146,7 @@ export default function VatSummary() {
           { key: 'vat', to: '/app/vat-summary', label: isThai ? 'สรุปภาษีมูลค่าเพิ่ม' : 'VAT Summary', icon: Calculator },
           { key: 'pp30', to: '/app/pp30', label: isThai ? 'ภพ.30' : 'PP30 Filing', icon: FileText },
           { key: 'wht', to: '/app/wht-certificates', label: isThai ? 'ภงด.3/53 (หัก ณ ที่จ่าย)' : 'WHT Certificates', icon: Receipt },
+          { key: 'reconciliation', to: '/app/reports/reconciliation', label: isThai ? 'กระทบยอดธนาคาร' : 'Bank Reconciliation', icon: Link2 },
         ]}
       />
       {/* Header */}
