@@ -14,6 +14,12 @@ backend/dist/
 .env.local
 .env.*.local
 
+# MCP config — may contain raw API keys when users paste them in by mistake.
+# History was scrubbed once; keep the door shut so the next paste doesn't
+# slip into a commit. If you need to share it across machines, push only
+# the env-var-reference variant ("${VAR_NAME}").
+.mcp.json
+
 # Logs
 *.log
 backend.log
