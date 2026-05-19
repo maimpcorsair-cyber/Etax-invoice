@@ -11,6 +11,27 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+/**
+ * Returns true when SMTP is actually configured (host + user + pass set).
+ * Use this from route handlers BEFORE calling user-initiated send* functions
+ * so you can surface a 503 instead of a silent 200.
+ *
+ * Worker-initiated emails (RD success notifications, billing alerts) keep
+ * their existing soft-skip behaviour because a missing SMTP shouldn't fail
+ * an RD submission or invoice issue. Only user-clicked actions need to fail
+ * loudly — the user is staring at the spinner and deserves a real answer.
+ */
+export function isEmailConfigured(): boolean {
+  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+export class EmailNotConfiguredError extends Error {
+  readonly code = 'EMAIL_NOT_CONFIGURED';
+  constructor() {
+    super('SMTP is not configured on this deployment — set SMTP_HOST, SMTP_USER, SMTP_PASS in env.');
+  }
+}
+
 interface InvoiceEmailData {
   invoiceNumber: string;
   total: number;
@@ -344,20 +365,20 @@ export async function sendRdFailedEmail(
 export async function sendInvoiceToCustomer(
   data: InvoiceEmailData,
 ): Promise<void> {
-  if (!process.env.SMTP_HOST) { logger.warn('SMTP not configured, skipping email'); return; }
-  if (!data.buyerEmail) { logger.warn(`No email for buyer, skipping send for ${data.invoiceNumber}`); return; }
+  // User-initiated send (vs the worker-initiated *RdSuccess/*RdFailed
+  // calls) — fail loudly so the route can return 503 instead of silently
+  // pretending it sent. The button in InvoiceList / IssuedSuccessModal is
+  // waiting on this promise to surface real feedback.
+  if (!isEmailConfigured()) throw new EmailNotConfiguredError();
+  if (!data.buyerEmail) throw new Error('Customer has no email address');
   const isTh = data.language === 'th' || data.language === 'both';
-  try {
-    await transporter.sendMail({
-      from: `"${data.sellerNameTh}" <${process.env.SMTP_USER}>`,
-      to: data.buyerEmail,
-      subject: `${isTh ? 'ใบกำกับภาษี' : 'Tax Invoice'} ${data.invoiceNumber}`,
-      html: buildInvoiceForCustomerHtml(data),
-    });
-    logger.info(`Invoice email sent to ${data.buyerEmail} for ${data.invoiceNumber}`);
-  } catch (err) {
-    logger.error('Failed to send invoice email', err);
-  }
+  await transporter.sendMail({
+    from: `"${data.sellerNameTh}" <${process.env.SMTP_USER}>`,
+    to: data.buyerEmail,
+    subject: `${isTh ? 'ใบกำกับภาษี' : 'Tax Invoice'} ${data.invoiceNumber}`,
+    html: buildInvoiceForCustomerHtml(data),
+  });
+  logger.info(`Invoice email sent to ${data.buyerEmail} for ${data.invoiceNumber}`);
 }
 
 export async function sendStatementToCustomer(

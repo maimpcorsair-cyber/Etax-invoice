@@ -1,4 +1,5 @@
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import nodemailer from 'nodemailer';
 import prisma from '../config/database';
 import redis from '../config/redis';
 import { logger } from '../config/logger';
@@ -105,6 +106,28 @@ async function checkS3(): Promise<ProviderCheck | null> {
   });
 }
 
+async function checkSmtp(): Promise<ProviderCheck | null> {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  return timed(async () => {
+    // verify() does an unauthenticated greet (HELO/EHLO) then issues AUTH —
+    // catches bad host, wrong port, invalid creds, and TLS handshake errors
+    // without actually sending mail. ~200ms typical on a healthy SMTP.
+    const transport = nodemailer.createTransport({
+      host,
+      port: parseInt(process.env.SMTP_PORT ?? '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: { user, pass },
+      connectionTimeout: 5_000,
+      greetingTimeout: 5_000,
+      socketTimeout: 5_000,
+    });
+    await transport.verify();
+  });
+}
+
 async function checkLine(): Promise<ProviderCheck | null> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token) return null;
@@ -128,13 +151,14 @@ export async function runDeepHealthCheck(): Promise<DeepHealthResult> {
   }
 
   // Run all checks in parallel — total latency = max(individual), not sum.
-  const [pg, rds, oai, gem, s3, line] = await Promise.all([
+  const [pg, rds, oai, gem, s3, line, smtp] = await Promise.all([
     checkPostgres(),
     checkRedis(),
     checkOpenAI(),
     checkGemini(),
     checkS3(),
     checkLine(),
+    checkSmtp(),
   ]);
 
   const providers: Record<string, ProviderCheck> = {
@@ -146,6 +170,7 @@ export async function runDeepHealthCheck(): Promise<DeepHealthResult> {
   if (gem) providers.gemini = gem; else notConfigured.push('gemini');
   if (s3) providers.s3 = s3; else notConfigured.push('s3');
   if (line) providers.line = line; else notConfigured.push('line');
+  if (smtp) providers.smtp = smtp; else notConfigured.push('smtp');
 
   // Critical = postgres + redis. Their failure makes the app unusable.
   // Everything else degrades capability without taking the app down.

@@ -8,7 +8,7 @@ import { requireRole } from '../middleware/auth';
 import { generateInvoiceNumber } from '../services/invoiceService';
 import { generateInvoiceExcel } from '../services/exportService';
 import { exportInvoicesToSheets } from '../services/googleSheetsService';
-import { sendInvoiceToCustomer } from '../services/emailService';
+import { sendInvoiceToCustomer, EmailNotConfiguredError } from '../services/emailService';
 import { cancelDocumentRD } from '../services/rdApiService';
 import { sendInvoiceIssuedNotification, sendInvoiceIssuedLineNotification } from '../services/notificationService';
 import { generatePdfFromHtml, buildHtmlForCompany } from '../services/pdfService';
@@ -1122,8 +1122,15 @@ invoicesRouter.post('/:id/send-email', requireRole('admin', 'accountant'), async
     });
 
     res.json({ message: 'Email sent', to: invoice.buyer.email });
-  } catch {
-    res.status(500).json({ error: 'Failed to send email' });
+  } catch (err) {
+    if (err instanceof EmailNotConfiguredError) {
+      // 503 lets the UI distinguish "config gap on the deployment" from
+      // generic transient failures — surfaces a clearer message to the SME.
+      res.status(503).json({ error: err.message, code: err.code });
+      return;
+    }
+    const message = err instanceof Error ? err.message : 'Failed to send email';
+    res.status(500).json({ error: message });
   }
 });
 
