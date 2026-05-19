@@ -38,6 +38,46 @@ becomes optional.
 | **On-call rotation + Sentry alert routing** | 2 h | When 2+ humans need to share pager duty | Single-founder right now; pager fatigue isn't a problem yet. |
 | **Customer-facing data-rights UI inside app** (currently API-only) | 4 h | Before first paying customer | `/account/export`, `/account/delete`, `/account/delete/cancel` exist as endpoints; need an in-app "Account → Privacy" tab. |
 
+## Payroll module — IN PROGRESS (Phase 3)
+
+Schema landed on disk in this session but **not yet shipped** as code.
+Commit on disk includes the Prisma model + migration only; routes,
+services, and UI still to build.
+
+| Layer | Status | Notes |
+|---|---|---|
+| Schema (Employee + PayrollRun + Payslip + PayrollRunStatus enum) | ✅ on disk | `backend/prisma/schema.prisma` |
+| Migration `20260520_payroll_module` | ✅ on disk | Not yet applied to production |
+| Backend services (Thai income tax calc + SSO calc + payroll runner) | ❌ TODO | Will live under `backend/src/services/payroll/` |
+| Backend routes (employees CRUD + payroll run + payslips + ภงด.1 / สปส. exports) | ❌ TODO | Suggested: new `backend/src/routes/payroll.ts` |
+| Frontend (Employees list/form, PayrollRun page, Payslip viewer) | ❌ TODO | Suggested: `frontend/src/pages/Employees.tsx`, `Payroll.tsx`, `Payslip.tsx` |
+| Sidebar IA (Payroll as a new top-level section OR under Purchases) | ❌ TODO | Probably its own top item: payroll touches monthly cadence + government filings |
+| Production migration | ❌ TODO | Run `gh workflow run "Deploy to Render"` after the schema + routes ship (migration won't auto-apply via the commit auto-deploy path — see deploy gotcha section above) |
+
+Thai income tax rates to encode (2026):
+- 0 – 150,000 → 0 %
+- 150,001 – 300,000 → 5 %
+- 300,001 – 500,000 → 10 %
+- 500,001 – 750,000 → 15 %
+- 750,001 – 1,000,000 → 20 %
+- 1,000,001 – 2,000,000 → 25 %
+- 2,000,001 – 5,000,000 → 30 %
+- > 5,000,000 → 35 %
+
+Allowances per employee (pulled from Employee row):
+- Personal: 60,000 baht/year
+- Spouse: 60,000 (if `hasSpouse`)
+- Children: 30,000 × `numChildren` (max 3)
+- Parents: 30,000 × `numParents` (max 2)
+- Employment-income standard expense: min(50 % of income, 100,000)
+
+SSO formula: 5 % of `baseSalary` capped at salary of 15,000 → max
+750 baht/month employee + 750 baht/month employer.
+
+When the next agent picks this up: start with
+`backend/src/services/payroll/thaiTaxCalculator.ts` (pure functions,
+no DB), then the runner, then routes, then UI.
+
 ## Google OAuth verification — defer until public launch
 
 **Status (2026-05-20):** Drive + Sheets integration works for the project

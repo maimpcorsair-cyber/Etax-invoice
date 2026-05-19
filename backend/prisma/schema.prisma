@@ -197,6 +197,8 @@ model Company {
   pettyCash             PettyCash?
   lineGroupLinks        LineGroupLink[]
   whtCertificates       WhtCertificate[]
+  employees             Employee[]
+  payrollRuns           PayrollRun[]
 
   @@map("companies")
 }
@@ -1230,4 +1232,110 @@ model WhtCertificate {
   @@index([companyId])
   @@index([companyId, paymentDate])
   @@map("wht_certificates")
+}
+
+// ───────────────────────── Payroll ─────────────────────────
+// SME payroll: monthly Thai income tax (ภงด.1) + social security
+// (สปส.) deductions, payslip generation, and the .txt / .csv exports
+// the government wants. Keeps the model thin — bonuses / OT are not
+// first-class in v1 (they go in via the manual `adjustments` JSON on
+// each Payslip row).
+
+enum PayrollRunStatus {
+  draft
+  finalized
+  paid
+}
+
+model Employee {
+  id                  String   @id @default(cuid())
+  companyId           String   @map("company_id")
+  employeeCode        String   @map("employee_code") // internal HR code
+  fullName            String   @map("full_name")
+  position            String?
+  email               String?
+  phone               String?
+  nationalId          String?  @map("national_id") // 13-digit, used on ภงด.1 / 50 ทวิ
+  ssoNumber           String?  @map("sso_number") // 13-digit social security ID
+  baseSalary          Float    @map("base_salary") // monthly
+  bankAccount         String?  @map("bank_account")
+  bankName            String?  @map("bank_name")
+  startDate           DateTime @map("start_date")
+  endDate             DateTime? @map("end_date") // if resigned
+  // Tax allowance inputs (used by income-tax calculator)
+  hasSpouse           Boolean  @default(false) @map("has_spouse")
+  numChildren         Int      @default(0) @map("num_children")
+  numParents          Int      @default(0) @map("num_parents")
+  pvdPercent          Float    @default(0) @map("pvd_percent") // 0-15 %, contributes to PVD
+  ssoMember           Boolean  @default(true) @map("sso_member") // SSO opt-out is rare
+
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payslips Payslip[]
+
+  @@unique([companyId, employeeCode])
+  @@index([companyId])
+  @@index([companyId, isActive])
+  @@map("employees")
+}
+
+model PayrollRun {
+  id           String           @id @default(cuid())
+  companyId    String           @map("company_id")
+  // Period — month covered by this run. We key uniquely on (company,
+  // year, month) so re-running for the same month idempotently
+  // replaces existing payslips.
+  year         Int
+  month        Int               // 1-12
+  status       PayrollRunStatus  @default(draft)
+  payDate      DateTime          @map("pay_date")
+  totalGross   Float             @default(0) @map("total_gross")
+  totalNet     Float             @default(0) @map("total_net")
+  totalWht     Float             @default(0) @map("total_wht") // ภงด.1
+  totalSso     Float             @default(0) @map("total_sso") // employee side
+  notes        String?
+  createdBy    String            @map("created_by")
+  finalizedAt  DateTime?         @map("finalized_at")
+  paidAt       DateTime?         @map("paid_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payslips Payslip[]
+
+  @@unique([companyId, year, month])
+  @@index([companyId, year])
+  @@map("payroll_runs")
+}
+
+model Payslip {
+  id              String   @id @default(cuid())
+  payrollRunId    String   @map("payroll_run_id")
+  employeeId      String   @map("employee_id")
+  // Snapshot of employee identity at run time so historical payslips
+  // don't change if the employee row is later edited.
+  employeeName    String   @map("employee_name")
+  employeeCode    String   @map("employee_code")
+  position        String?
+  baseSalary      Float    @map("base_salary")
+  adjustments     Json?   // [{ label, amount, type: 'addition' | 'deduction' }]
+  gross           Float
+  whtAmount       Float    @map("wht_amount")     // ภงด.1
+  ssoEmployee     Float    @map("sso_employee")   // 5% (capped)
+  ssoEmployer     Float    @map("sso_employer")   // 5% (capped)
+  pvdAmount       Float    @default(0) @map("pvd_amount")
+  net             Float
+  pdfUrl          String?  @map("pdf_url")
+  emailedAt       DateTime? @map("emailed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+
+  @@index([payrollRunId])
+  @@index([employeeId])
+  @@map("payslips")
 }
