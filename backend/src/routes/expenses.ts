@@ -9,6 +9,7 @@ import { auditLog } from '../services/auditService';
 import { hasFeatureAccess, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 import { generateVoucherNumber, getExpenseLimit } from '../services/expenseService';
 import { uploadToDrive, isDriveConfigured, DriveDocumentFolder } from '../services/googleDriveService';
+import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { exportExpensesToSheets, isSheetsConfigured } from '../services/googleSheetsService';
 import { enqueueMasterSheetSync } from '../queues';
 import { logger } from '../config/logger';
@@ -729,18 +730,24 @@ expensesRouter.delete('/:id/items/:itemId/attachments/:attachmentId', requireRol
   }
 });
 
-/* ─── Google Drive: upload file ─── */
+/* ─── Expense attachment upload (S3 primary + Drive mirror) ─── */
+// Route name kept as /drive/upload for backward compatibility with the
+// frontend, but the contract changed: S3 is the system of record. Drive
+// is an optional mirror that fires only when configured AND succeeds.
+// Response always carries `url` (S3) and adds `driveUrl` when mirror was
+// written. Failure of the Drive write is logged but does not fail the
+// request — losing a Drive mirror is recoverable; losing S3 is not.
 expensesRouter.post(
   '/drive/upload',
   requireRole('admin', 'super_admin', 'accountant'),
   upload.single('file'),
   async (req, res) => {
-    if (!isDriveConfigured()) {
-      res.status(503).json({ error: 'Google Drive is not configured on this server' });
-      return;
-    }
     if (!req.file) {
       res.status(400).json({ error: 'No file provided' });
+      return;
+    }
+    if (!isStorageConfigured()) {
+      res.status(503).json({ error: 'File storage is not configured' });
       return;
     }
 
@@ -765,23 +772,48 @@ expensesRouter.post(
         return;
       }
 
-      const result = await uploadToDrive(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-        companyName,
-        userRecord?.googleRefreshToken,
-        {
-          projectCode: project?.code,
-          projectName: project?.name,
-          documentFolder,
-        },
-      );
+      // 1. S3 first — always. This is what the app reads back later.
+      const s3Key = `companies/${req.user!.companyId}/expenses/${Date.now()}-${req.file!.originalname}`;
+      const s3Url = await uploadToStorage(s3Key, req.file!.buffer, req.file!.mimetype);
 
-      res.json({ data: result });
+      // 2. Optional Drive mirror for collaboration. Best-effort.
+      let driveResult: Awaited<ReturnType<typeof uploadToDrive>> | null = null;
+      if (isDriveConfigured()) {
+        try {
+          driveResult = await uploadToDrive(
+            req.file!.buffer,
+            req.file!.originalname,
+            req.file!.mimetype,
+            companyName,
+            userRecord?.googleRefreshToken,
+            {
+              projectCode: project?.code,
+              projectName: project?.name,
+              documentFolder,
+            },
+          );
+        } catch (err) {
+          logger.warn('[expenses] drive mirror failed, S3 copy is authoritative', {
+            err: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      res.json({
+        data: {
+          url: s3Url,
+          s3Key,
+          driveUrl: driveResult?.url ?? null,
+          fileName: driveResult?.fileName ?? req.file!.originalname,
+          fileId: driveResult?.fileId ?? null,
+          folderId: driveResult?.folderId ?? null,
+          folderUrl: driveResult?.folderUrl ?? null,
+          userDrive: driveResult?.userDrive ?? false,
+        },
+      });
     } catch (err) {
-      logger.error('Google Drive upload failed', { error: err });
-      res.status(500).json({ error: 'Failed to upload file to Google Drive' });
+      logger.error('Attachment upload failed', { error: err });
+      res.status(500).json({ error: 'Failed to upload attachment' });
     }
   },
 );

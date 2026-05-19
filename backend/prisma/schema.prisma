@@ -315,6 +315,11 @@ model CustomerDocument {
   fileName        String
   mimeType        String
   fileSize        Int
+  // S3 is the system of record. Drive is an optional mirror so customers
+  // who connect Google Drive can collaborate on their own files. If they
+  // ever revoke OAuth or delete the Drive folder, S3 still has the file.
+  s3Key           String?
+  s3Url           String?
   driveFileId     String?
   driveUrl        String?
   driveFolderId   String?
@@ -1183,7 +1188,12 @@ model ExpenseAttachment {
   expenseItemId String
   fileName      String?
   fileType      AttachmentFileType @default(image)
+  // `url` is the canonical URL for preview/download — used to be Drive,
+  // now points at S3 (system of record). `driveUrl` keeps the optional
+  // Drive copy for collaboration. `s3Key` lets us regenerate signed URLs.
   url           String
+  s3Key         String?
+  driveUrl      String?
   evidenceType  EvidenceType       @default(receipt)
 
   createdAt DateTime @default(now())

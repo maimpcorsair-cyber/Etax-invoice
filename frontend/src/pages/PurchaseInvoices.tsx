@@ -4,13 +4,14 @@ import {
   Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, AlertTriangle, FileCheck2,
   Upload, Image as ImageIcon, FileText, ExternalLink, Eye,
-  Bot, ShieldCheck, ArrowRight, Inbox,
+  Bot, ShieldCheck, ArrowRight, Inbox, Wallet,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { Customer, DocumentIntake, Invoice, PurchaseInvoice } from '../types';
 import { EmptyState } from '../components/ui/AppChrome';
+import SectionSubNav from '../components/SectionSubNav';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
 type DocumentStatusFilter = 'action' | 'all' | 'saved' | 'failed';
@@ -866,6 +867,12 @@ export default function PurchaseInvoices() {
 
   return (
     <div className="space-y-4">
+      <SectionSubNav
+        items={[
+          { key: 'bills', to: '/app/purchase-invoices', label: isThai ? 'บันทึกซื้อ' : 'Bills', icon: ShoppingCart },
+          { key: 'pettyCash', to: '/app/expenses', label: isThai ? 'เงินสดย่อย' : 'Petty Cash', icon: Wallet },
+        ]}
+      />
       {/* AI Inbox Hero */}
       <section className="premium-hero premium-hero-dark overflow-hidden text-white">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">

@@ -15,6 +15,8 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { useDriveStatus } from '../hooks/useDriveStatus';
 import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash, ApprovalLog } from '../types';
 import { EmptyState, MetricCard, PageHeader } from '../components/ui/AppChrome';
+import SectionSubNav from '../components/SectionSubNav';
+import { ShoppingCart } from 'lucide-react';
 
 const CATEGORY_KEYS = [
   'transportation', 'office_supplies', 'meals', 'postage',
@@ -493,6 +495,12 @@ export default function Expenses() {
 
   return (
     <div className="space-y-5">
+      <SectionSubNav
+        items={[
+          { key: 'bills', to: '/app/purchase-invoices', label: isThai ? 'บันทึกซื้อ' : 'Bills', icon: ShoppingCart },
+          { key: 'pettyCash', to: '/app/expenses', label: isThai ? 'เงินสดย่อย' : 'Petty Cash', icon: Wallet },
+        ]}
+      />
       {/* Header */}
       <PageHeader
         eyebrow={isThai ? 'Approval workflow' : 'Approval workflow'}

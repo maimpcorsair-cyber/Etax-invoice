@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent, FileSpreadsheet, Users } from 'lucide-react';
+import SectionSubNav from '../components/SectionSubNav';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Product } from '../types';
@@ -204,6 +205,12 @@ export default function Products() {
 
   return (
     <div className="space-y-4">
+      <SectionSubNav
+        items={[
+          { key: 'customers', to: '/app/customers', label: isThai ? 'ลูกค้า' : 'Customers', icon: Users },
+          { key: 'products', to: '/app/products', label: isThai ? 'สินค้า/บริการ' : 'Products & Services', icon: Package },
+        ]}
+      />
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

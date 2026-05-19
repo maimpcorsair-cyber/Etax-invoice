@@ -12,6 +12,7 @@ import { auditLog } from '../services/auditService';
 import { logger } from '../config/logger';
 import { uploadToDrive, isDriveConfigured } from '../services/googleDriveService';
 import type { DriveCustomerDocumentFolder } from '../services/googleDriveService';
+import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import {
   buildCustomerReadiness,
   normalizeCustomerKind,
@@ -298,8 +299,11 @@ customersRouter.post(
         res.status(400).json({ error: 'Only PDF, JPG, PNG, and WebP customer documents are supported' });
         return;
       }
-      if (!isDriveConfigured()) {
-        res.status(503).json({ error: 'Google Drive is not configured' });
+      // S3 is the system of record — refuse the request if S3 isn't even
+      // configured, because that's the storage we depend on. Drive is now
+      // optional, so we no longer fail the request when Drive is offline.
+      if (!isStorageConfigured()) {
+        res.status(503).json({ error: 'File storage is not configured' });
         return;
       }
 
@@ -310,21 +314,37 @@ customersRouter.post(
         return;
       }
 
-      const driveContext = await getDriveUploadContext(req.user!.companyId, req.user!.userId);
-      const driveResult = await uploadToDrive(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-        driveContext.companyName,
-        driveContext.refreshToken,
-        {
-          customerCode: customer.taxId,
-          customerName: customer.nameTh,
-          customerDocumentFolder: customerDriveFolder(body.documentType),
-          shareWithEmails: driveContext.shareWithEmails,
-          duplicatePolicy: 'rename',
-        },
-      );
+      // 1. ALWAYS write to S3 first. Even if Drive sync fails, we have the file.
+      const s3Key = `companies/${req.user!.companyId}/customers/${customer.id}/${Date.now()}-${req.file!.originalname}`;
+      const s3Url = await uploadToStorage(s3Key, req.file!.buffer, req.file!.mimetype);
+
+      // 2. Optionally mirror to the customer's Drive. Failure here is logged
+      //    but doesn't fail the request — S3 copy is authoritative.
+      let driveResult: Awaited<ReturnType<typeof uploadToDrive>> | null = null;
+      if (isDriveConfigured()) {
+        try {
+          const driveContext = await getDriveUploadContext(req.user!.companyId, req.user!.userId);
+          driveResult = await uploadToDrive(
+            req.file!.buffer,
+            req.file!.originalname,
+            req.file!.mimetype,
+            driveContext.companyName,
+            driveContext.refreshToken,
+            {
+              customerCode: customer.taxId,
+              customerName: customer.nameTh,
+              customerDocumentFolder: customerDriveFolder(body.documentType),
+              shareWithEmails: driveContext.shareWithEmails,
+              duplicatePolicy: 'rename',
+            },
+          );
+        } catch (err) {
+          logger.warn('[customers] drive mirror failed, S3 copy is authoritative', {
+            err: err instanceof Error ? err.message : String(err),
+            customerId: customer.id,
+          });
+        }
+      }
 
       const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
         await tx.customerDocument.create({
@@ -335,14 +355,16 @@ customersRouter.post(
             documentType: body.documentType,
             requiredFor: body.requiredFor ?? (customer.useCase as CustomerUseCase) ?? 'general',
             status: 'uploaded',
-            fileName: driveResult.fileName,
+            fileName: driveResult?.fileName ?? req.file!.originalname,
             mimeType: req.file!.mimetype,
             fileSize: req.file!.size,
-            driveFileId: driveResult.fileId,
-            driveUrl: driveResult.url,
-            driveFolderId: driveResult.folderId,
-            driveFolderUrl: driveResult.folderUrl,
-            driveUserDrive: driveResult.userDrive,
+            s3Key,
+            s3Url,
+            driveFileId: driveResult?.fileId ?? null,
+            driveUrl: driveResult?.url ?? null,
+            driveFolderId: driveResult?.folderId ?? null,
+            driveFolderUrl: driveResult?.folderUrl ?? null,
+            driveUserDrive: driveResult?.userDrive ?? false,
             sensitive: sensitiveDocumentType(body.documentType),
             notes: body.notes ?? null,
           },
