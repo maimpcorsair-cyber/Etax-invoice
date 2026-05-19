@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-19 05:05 Asia/Bangkok
+Last updated: 2026-05-19 (PDPA launch-readiness landed)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -85,6 +85,26 @@ Commit `bdff724` closed the P0 multi-tenant leak in the cert upload path. What c
 Why DB BYTEA over S3 (the obvious alternative): cert files are ~5KB each, atomic with the encrypted password row, Render Postgres backups cover them for free, and both web + worker services already share that DB. S3 added a network hop, a moving part, and IAM overhead with no payoff at this size.
 
 Verified: typecheck clean, migration applied successfully on production. Functional verification (upload a real .p12 via Admin Panel → `/signing-test`) still depends on a real production admin login.
+
+## PDPA launch-readiness landed 2026-05-19 (commit `c40dbbf`)
+
+Six-piece bundle aimed at unblocking the first paying customer. All items
+typecheck clean (`backend && frontend` `tsc --noEmit`). Two new migrations
+not yet applied to production:
+
+- `20260519_user_pdpa_consent` — `users.legalAcceptedAt` + version + `marketingOptInAt` (PDPA Section 19 consent capture at signup).
+- `20260519_company_deletion_request` — `companies.deletionRequestedAt` / `hardDeleteScheduledAt` / `deletionRequestedBy` (Section 33 right-to-erasure with grace + tax-record retention).
+
+Code changes:
+- `services/companyConfigService.ts` — `encryptBlob` / `decryptBlob` (AES-256-GCM, 8-byte magic header) wrap the cert .p12 BYTEA. Legacy plain rows still decrypt transparently. Upload path in `routes/admin.ts` POST `/certificate` now encrypts before write.
+- `routes/account.ts` (new) — `GET /export` returns JSON dump (user/company/invoices/customers/products/auditLog, BigInt-safe); `POST /delete` requires password re-auth (or typed `confirm: "DELETE"` for Google-only accounts); `POST /delete/cancel` within 30d grace.
+- `routes/billing.ts` `/free-signup` — refuses signup without `acceptedLegal` and records `acceptedLegalVersion` (pinned `2026-05-19`).
+- Legal i18n in TH+EN+ZH expanded to PDPA coverage: Privacy 12 sections (Sections 24, 26, 28, 30–37, 73), ToS 14 sections (SLA 99.5%, liability cap = 12-month fees), DPA 11 sections (Controller/Processor split, 48h breach notice, 90d return-or-delete on termination). `frontend/src/pages/DataProcessingAgreement.tsx` + `/legal/dpa` route added.
+- Signup form `Landing.tsx`: consent checkbox (Terms + Privacy + DPA bundle) is required, marketing opt-in is separate. `signup.consent.*` keys in all 3 locales.
+
+To finish on production:
+1. Run the `Manual Prisma DB Migration` GitHub Action to apply both new migrations.
+2. (When a real cert exists in DB) — admins should re-upload to convert legacy plain-blob row to encrypted form. New uploads encrypt automatically.
 
 ## Latest Completed Changes
 
