@@ -130,6 +130,21 @@ accountRouter.get('/status', async (req, res) => {
 
 /* ─── Export (right of access + portability) ─────────────────────────── */
 
+// Replacer that handles every non-JSON-native type Prisma may return:
+//   - BigInt → string (JSON.stringify would otherwise throw)
+//   - Buffer / Uint8Array → "[BINARY n bytes]" placeholder (raw cert blobs
+//     etc. don't belong in a user-facing export anyway; this prevents
+//     accidental leaks even when a future select clause adds them back)
+//   - Date → ISO string (already handled natively, kept explicit)
+function exportReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Uint8Array || Buffer.isBuffer(value as unknown as Buffer)) {
+    return `[BINARY ${(value as Uint8Array).byteLength} bytes]`;
+  }
+  return value;
+}
+
 accountRouter.get('/export', async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -145,6 +160,10 @@ accountRouter.get('/export', async (req, res) => {
             legalAcceptedAt: true, legalAcceptedVersion: true, marketingOptInAt: true,
           },
         }),
+        // Explicit select on company — DON'T fetch `certificateBlob` (Bytes)
+        // because (a) it's the customer's private key, (b) the JSON
+        // serializer would have to encode the buffer and (c) it's already
+        // available to the customer outside this export.
         tx.company.findUnique({
           where: { id: companyId },
           select: {
@@ -153,17 +172,54 @@ accountRouter.get('/export', async (req, res) => {
             createdAt: true, updatedAt: true,
           },
         }),
-        // Drop the `take` caps — PDPA Section 30 grants the right to a
-        // COMPLETE copy of personal data. Tables are already bounded by
-        // retention policy (audit_logs 365d, others bounded by tenancy)
-        // so the export size is roughly the live tenant footprint. If a
-        // tenant ever exceeds memory, switch this to a streaming response.
-        tx.invoice.findMany({ where: { companyId } }),
-        tx.customer.findMany({ where: { companyId } }),
-        tx.product.findMany({ where: { companyId } }),
+        // Explicit selects on the transactional tables so we never accidentally
+        // include a binary blob or huge derived column. PDPA Section 30
+        // requires "personal data" — every selected field qualifies.
+        tx.invoice.findMany({
+          where: { companyId },
+          select: {
+            id: true, invoiceNumber: true, type: true, status: true, language: true,
+            invoiceDate: true, dueDate: true, buyerId: true, projectId: true,
+            subtotal: true, vatAmount: true, discountAmount: true, total: true,
+            whtRate: true, whtAmount: true,
+            seller: true, notes: true,
+            cancelledAt: true, cancelReason: true,
+            pdfUrl: true,
+            createdAt: true, updatedAt: true,
+          },
+        }),
+        tx.customer.findMany({
+          where: { companyId },
+          select: {
+            id: true, nameTh: true, nameEn: true, taxId: true, branchCode: true,
+            branchNameTh: true, branchNameEn: true,
+            addressTh: true, addressEn: true,
+            email: true, phone: true, contactPerson: true,
+            personalId: true, partyRole: true, customerKind: true, useCase: true,
+            verificationStatus: true, vatEvidenceStatus: true,
+            creditLimit: true, creditDays: true,
+            isActive: true, createdAt: true, updatedAt: true,
+          },
+        }),
+        tx.product.findMany({
+          where: { companyId },
+          select: {
+            id: true, code: true, nameTh: true, nameEn: true,
+            descriptionTh: true, descriptionEn: true,
+            unit: true, unitPrice: true, vatType: true, productType: true,
+            category: true, accountCode: true, unitCost: true,
+            defaultWhtRate: true, isActive: true,
+            createdAt: true, updatedAt: true,
+          },
+        }),
         tx.auditLog.findMany({
           where: { userId },
           orderBy: { createdAt: 'desc' },
+          select: {
+            id: true, action: true, resourceType: true, resourceId: true,
+            details: true, ipAddress: true, userAgent: true, language: true,
+            createdAt: true,
+          },
         }),
       ]);
 
@@ -182,9 +238,17 @@ accountRouter.get('/export', async (req, res) => {
       customers: result.customers,
       products: result.products,
       auditLog: result.auditLog,
-    }, (_k, v) => typeof v === 'bigint' ? v.toString() : v, 2));
+    }, exportReplacer, 2));
   } catch (err) {
-    logger.error('account export failed', { err: err instanceof Error ? err.message : String(err) });
+    // Surface stack to logs so the next 500 doesn't take another smoke
+    // test to diagnose. Privacy Policy already promises the export
+    // works; if it's failing the team needs to see why ASAP.
+    logger.error('account export failed', {
+      err: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack?.split('\n').slice(0, 6).join('\n') : undefined,
+      userId: req.user?.userId,
+      companyId: req.user?.companyId,
+    });
     res.status(500).json({ error: 'Export failed' });
   }
 });
