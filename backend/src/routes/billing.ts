@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { z } from 'zod';
@@ -177,6 +178,11 @@ const freeSignupSchema = z.object({
   addressTh: z.string().trim().min(10).max(500),
   adminName: z.string().trim().min(2).max(120).optional().or(z.literal('')),
   adminEmail: z.string().trim().email().optional().or(z.literal('')),
+  // Required when the manual fallback path is used (no Google credential).
+  // Without this, prior manual signups were unreachable — passwordHash
+  // never got set and the user couldn't log back in via /api/auth/login.
+  // Plain string min(8) here; bcrypt happens at storage in the route below.
+  adminPassword: z.string().min(8).max(200).optional().or(z.literal('')),
   phone: z.string().trim().max(30).optional().or(z.literal('')),
   locale: z.enum(['th', 'en']).default('th'),
   googleCredential: z.string().min(1).optional(),
@@ -831,14 +837,23 @@ billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
     const googleAccount = await verifySignupGoogleCredential(body.googleCredential);
     const manualEmail = body.adminEmail?.trim().toLowerCase();
     const manualAdminName = body.adminName?.trim();
+    const manualPassword = body.adminPassword?.trim();
 
     if (!googleAccount && (!manualEmail || !manualAdminName)) {
       res.status(400).json({ error: 'Admin name and email are required when Google Sign-In is not used' });
       return;
     }
+    // Manual signups MUST set a password so the user can log in later via
+    // /api/auth/login. Without one the account is unreachable (no Google
+    // binding, no passwordHash, no magic-link flow yet).
+    if (!googleAccount && !manualPassword) {
+      res.status(400).json({ error: 'A password is required when Google Sign-In is not used' });
+      return;
+    }
 
     const email = googleAccount?.email ?? manualEmail!;
     const adminName = googleAccount?.name || manualAdminName || email.split('@')[0];
+    const passwordHash = manualPassword ? await bcrypt.hash(manualPassword, 10) : null;
 
     const [existingUser, existingCompany] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
@@ -872,6 +887,7 @@ billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
           email,
           name: adminName,
           googleSub: googleAccount?.sub ?? null,
+          passwordHash,
           role: 'admin',
           isActive: true,
         },
@@ -880,22 +896,27 @@ billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
       return { company, user };
     }, { role: 'free-signup' });
 
+    // After signup we can issue a JWT immediately for either auth path —
+    // googleAccount means we already verified the ID token, manualPassword
+    // means we just hashed a fresh password the user typed. Either way
+    // the user shouldn't have to sign in again right after signup.
+    const canAuthNow = !!(googleAccount || manualPassword);
     res.status(201).json({
       data: {
         companyId: result.company.id,
         userId: result.user.id,
         plan: 'free',
         status: 'activated',
-        loginMethod: googleAccount ? 'google' : 'none',
-        token: googleAccount ? issueToken(result.user) : null,
-        user: googleAccount
+        loginMethod: googleAccount ? 'google' : manualPassword ? 'password' : 'none',
+        token: canAuthNow ? issueToken(result.user) : null,
+        user: canAuthNow
           ? {
               id: result.user.id,
               email: result.user.email,
               name: result.user.name,
               role: result.user.role,
               companyId: result.user.companyId,
-              auth: { hasPassword: false, hasGoogle: true },
+              auth: { hasPassword: !!manualPassword, hasGoogle: !!googleAccount },
               company: {
                 nameTh: result.company.nameTh,
                 nameEn: result.company.nameEn,
@@ -905,7 +926,9 @@ billingRouter.post('/free-signup', freeSignupRateLimit, async (req, res) => {
           : null,
         nextStep: googleAccount
           ? 'You are signed in — use the token in this response or sign in again with Google.'
-          : 'Account created. Sign in with Google using the same email — manual password sign-in is not supported yet for free signups.',
+          : manualPassword
+            ? 'You are signed in — use the token in this response or sign in again with email + password.'
+            : 'Account created. Set up a password or link Google Sign-In to log in.',
       },
     });
   } catch (err) {

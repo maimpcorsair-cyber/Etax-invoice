@@ -137,6 +137,11 @@ export default function Landing() {
     addressTh: '',
     adminName: '',
     adminEmail: '',
+    // adminPassword is sent only when the user is going through the manual
+    // fallback path (Google not configured / not used). Keep the field
+    // empty until the user actually types — backend skips it on the
+    // Google path.
+    adminPassword: '',
     phone: '',
   });
   const [juristicLookupState, setJuristicLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'error'>('idle');
@@ -401,7 +406,13 @@ export default function Landing() {
       : form.addressTh.trim().length < 10 ? (isThai ? 'ที่อยู่สั้นเกินไป กรอกให้ครบถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Address too short — include street, district, province, postcode')
       : formValidation.addressTh ? (isThai ? 'ใช้ตัวอักษรไทยเท่านั้น' : 'Thai characters only') : '',
     adminEmail: !isGoogleBoundSignup && form.adminEmail.trim().length === 0
-      ? (isThai ? 'กรุณากรอกอีเมล Google' : 'Google email is required') : '',
+      ? (isThai ? 'กรุณากรอกอีเมล' : 'Email is required') : '',
+    // Manual fallback (no Google) needs a password — backend requires it
+    // so the freshly-created user can log back in via /api/auth/login.
+    // Skip the check when Google is configured (password field is hidden
+    // anyway) or when the user has signed in with Google.
+    adminPassword: !isGoogleBoundSignup && !googleConfig?.enabled && form.adminPassword.trim().length < 8
+      ? (isThai ? 'รหัสผ่านอย่างน้อย 8 ตัวอักษร' : 'Password must be at least 8 characters') : '',
   };
   const hasFormErrors = Object.values(formErrors).some(Boolean) || Object.values(formValidation).some(Boolean);
 
@@ -1480,7 +1491,7 @@ export default function Landing() {
                           />
                         </div>
                         <div>
-                          <label className="label">{isThai ? 'อีเมล Google ของผู้ดูแล' : 'Admin Google Email'}</label>
+                          <label className="label">{isThai ? 'อีเมลผู้ดูแล' : 'Admin Email'}</label>
                           <input
                             className="input-field"
                             type="email"
@@ -1488,6 +1499,23 @@ export default function Landing() {
                             onChange={(e) => setForm((prev) => ({ ...prev, adminEmail: e.target.value }))}
                             required={selectedPlan === 'free'}
                           />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="label">{isThai ? 'รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)' : 'Password (min 8 characters)'}</label>
+                          <input
+                            className="input-field"
+                            type="password"
+                            value={form.adminPassword}
+                            onChange={(e) => setForm((prev) => ({ ...prev, adminPassword: e.target.value }))}
+                            minLength={8}
+                            required={selectedPlan === 'free'}
+                            autoComplete="new-password"
+                          />
+                          <p className={inputGuide(false)}>
+                            {isThai
+                              ? 'ใช้สำหรับลงชื่อเข้าใช้ครั้งต่อไป — สามารถเปลี่ยนได้ภายหลัง'
+                              : 'You will use this to sign in next time — changeable later.'}
+                          </p>
                         </div>
                       </>
                     )}
@@ -1512,8 +1540,8 @@ export default function Landing() {
                   {signupComplete && (
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                       {isThai
-                        ? `สร้างบัญชี Free ให้ ${signupComplete.adminEmail} แล้ว สามารถเข้าสู่ระบบด้วย Google ได้ทันที`
-                        : `Free account created for ${signupComplete.adminEmail}. You can now sign in with Google.`}
+                        ? `สร้างบัญชี Free ให้ ${signupComplete.adminEmail} แล้ว เข้าสู่ระบบด้วย Google หรืออีเมล/รหัสผ่านได้`
+                        : `Free account created for ${signupComplete.adminEmail}. Sign in with Google or with your email + password.`}
                     </div>
                   )}
 
