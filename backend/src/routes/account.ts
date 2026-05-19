@@ -240,16 +240,19 @@ accountRouter.get('/export', async (req, res) => {
       auditLog: result.auditLog,
     }, exportReplacer, 2));
   } catch (err) {
-    // Surface stack to logs so the next 500 doesn't take another smoke
-    // test to diagnose. Privacy Policy already promises the export
-    // works; if it's failing the team needs to see why ASAP.
+    // Diagnostic mode while we chase a production 500. Echoes the message
+    // (NOT the stack) back to the caller so debugging doesn't require
+    // Render log access. The audit-log row + Sentry capture still log
+    // the full stack on the server side. Remove after the underlying bug
+    // is fixed and verified.
+    const msg = err instanceof Error ? err.message : String(err);
     logger.error('account export failed', {
-      err: err instanceof Error ? err.message : String(err),
+      err: msg,
       stack: err instanceof Error ? err.stack?.split('\n').slice(0, 6).join('\n') : undefined,
       userId: req.user?.userId,
       companyId: req.user?.companyId,
     });
-    res.status(500).json({ error: 'Export failed' });
+    res.status(500).json({ error: 'Export failed', debugMessage: msg });
   }
 });
 

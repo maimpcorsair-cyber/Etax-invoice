@@ -1073,14 +1073,14 @@ adminRouter.post('/seed-demo-data', async (req, res) => {
       },
     });
   } catch (err) {
-    // Stack + first failing operation in logs so the next 500 doesn't
-    // require another smoke test to identify the cause. This route is
-    // first-time-user critical; silent failures here drive churn.
+    // Same diagnostic mode as /account/export — echo the message in the
+    // response while we chase the runtime cause. Remove once verified.
+    const msg = err instanceof Error ? err.message : String(err);
     logger.error('[admin/seed-demo-data] failed', {
-      err: err instanceof Error ? err.message : String(err),
+      err: msg,
       stack: err instanceof Error ? err.stack?.split('\n').slice(0, 8).join('\n') : undefined,
       companyId: req.user?.companyId,
     });
-    res.status(500).json({ error: 'Failed to seed demo data' });
+    res.status(500).json({ error: 'Failed to seed demo data', debugMessage: msg });
   }
 });
