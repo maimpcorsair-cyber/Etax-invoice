@@ -24,6 +24,29 @@ Pick these up when the right trigger fires (column "When to revisit").
 | **On-call rotation + Sentry alert routing** | 2 h | When 2+ humans need to share pager duty | Single-founder right now; pager fatigue isn't a problem yet. |
 | **Customer-facing data-rights UI inside app** (currently API-only) | 4 h | Before first paying customer | `/account/export`, `/account/delete`, `/account/delete/cancel` exist as endpoints; need an in-app "Account → Privacy" tab. |
 
+## Google OAuth verification — defer until public launch
+
+**Status (2026-05-20):** Drive + Sheets integration works for the project
+owner and any Google account added as a Test User in the OAuth consent
+screen. Other users see a "Google hasn't verified this app" warning page
+they must click through. Acceptable for closed beta; not acceptable for
+public launch.
+
+When to revisit:
+
+| Trigger | Action |
+|---------|--------|
+| First beta customer wants Drive sync | Add their email as Test User (Cloud Console → OAuth consent screen → Test users → + ADD USERS). 1 minute per email. Limit 100. |
+| About to open public signup | Fill the OAuth consent screen and submit for Google verification. Privacy/ToS pages are ready at `/privacy` and `/terms`; just need to plug the URLs and authorized domains (`etax-invoice.vercel.app`, `etax-invoice-api.onrender.com`) into the form. Click "Publish App" to trigger review. Google typically responds in 2–6 weeks. |
+| Hit 100 test users | Same as above — verification becomes mandatory. |
+
+Scopes we'll need to justify in the verification request:
+- `https://www.googleapis.com/auth/drive.file` — store generated e-Tax
+  PDFs in the customer's own Drive so they retain ownership and can
+  audit independently. We never read files we didn't create.
+- `https://www.googleapis.com/auth/spreadsheets` — export the
+  per-tenant Master Workspace Sheet (tax / sales / purchases summary).
+
 ## User-side action items (out of scope for code agent)
 
 | Item | Owner | Trigger to start |
