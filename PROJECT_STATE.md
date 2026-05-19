@@ -72,17 +72,19 @@ Last CI:
 - Production DB now has >0 users for the first time. Item #1 in CLAUDE.md "สิ่งที่ยังต้องทำ" (Signup/Onboarding E2E test) can be marked done.
 - Note: response field `loginMethod: "google"` was hardcoded even for manual signup (`billing.ts:888`) — fixed in commit `8f8f7c8` so it reads `'google'` or `'none'` based on actual binding, and `nextStep` no longer mis-instructs manual-path users.
 
-## Open risk found while auditing item #1 (Real cert per company)
+## Cert multi-tenancy fix shipped 2026-05-19
 
-**P0 multi-tenancy bug in [`backend/src/routes/admin.ts:431-434`](backend/src/routes/admin.ts):** the cert upload writes every company's `.p12` to the same file path `certs/company.p12`, and stores that same path in `Company.certificatePath`. When two companies upload certs, the second overwrites the first; signing then uses whichever cert was last written, regardless of `req.user.companyId`. Frontend UI (`AdminPanel.tsx:CertificateTab`) is ready and posts correctly, but the backend is fundamentally single-tenant on this path.
+Commit `bdff724` closed the P0 multi-tenant leak in the cert upload path. What changed:
 
-Required for real prod-cert support (none of these are done yet):
-- Path must be company-scoped: e.g. `certs/<companyId>.p12`.
-- `clearCertCache()` is also global — needs to key by companyId, otherwise an upload by Company A still busts Company B's loaded-cert cache.
-- Render disks are ephemeral between deploys — local FS storage will lose all certs on the next push. Use S3 (or Render's persistent disk add-on) for cert blob storage; keep DB row pointing at the blob key.
-- `getCertificateInfo` / signing service call sites need to load by companyId, not from a process-wide cached singleton.
+- `companies` table gained `certificateBlob` (BYTEA) + `certificateUploadedAt`. The .p12 now lives per-row in DB, not on the web service's ephemeral disk. Migration `20260519_company_cert_blob` applied via the `Manual Prisma DB Migration` workflow (run `26074078407`, 31s, all steps green).
+- `signatureService.ts` cache became `Map<cacheKey, …>` (was a single global slot). Every signing call site — `routes/admin.ts` GET/POST/`/signing-test`, `routes/system.ts`, `queues/workers/rdSubmitWorker.ts` — now passes `cacheKey: companyId` so per-company entries don't evict each other.
+- `routes/admin.ts` POST `/certificate` writes the blob + encrypted password to DB and nulls out the legacy `certificatePath`. The previous FS-write to `certs/company.p12` is gone entirely. Size-validates the payload (~5KB expected, capped at 1MB).
+- `companyConfigService.resolveCompanyRuntimeConfig` now surfaces `certBlob` alongside the legacy `certPath` fallback (dev `process.env.CERT_PATH` still works for local).
+- `routes/system.ts` company-detail endpoint distinguishes "configured" (real uploaded blob) from "isDev" (still using the dev cert).
 
-This is the work behind the 🟡 "Real cert per company" priority — the UI is misleading because it looks done. Until this is fixed, every customer using the prod-cert flow is at risk of signing invoices with someone else's private key.
+Why DB BYTEA over S3 (the obvious alternative): cert files are ~5KB each, atomic with the encrypted password row, Render Postgres backups cover them for free, and both web + worker services already share that DB. S3 added a network hop, a moving part, and IAM overhead with no payoff at this size.
+
+Verified: typecheck clean, migration applied successfully on production. Functional verification (upload a real .p12 via Admin Panel → `/signing-test`) still depends on a real production admin login.
 
 ## Latest Completed Changes
 
