@@ -123,8 +123,14 @@ model Company {
   logoUrl      String?
 
   // Serialized certificate (encrypted)
-  certificatePath     String?
-  certificatePassword String?
+  // certificateBlob: raw .p12 bytes — primary storage (per-company, survives deploys).
+  // certificatePath: legacy file-path fallback — read only for the dev/global cert
+  //                  loaded from process.env.CERT_PATH; never written by uploads anymore.
+  // certificatePassword: encrypted via encryptConfigValue (see configEncryption.ts).
+  certificateBlob       Bytes?
+  certificateUploadedAt DateTime?
+  certificatePath       String?
+  certificatePassword   String?
 
   // RD Config
   rdClientId     String?

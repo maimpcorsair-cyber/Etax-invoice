@@ -105,8 +105,10 @@ export const rdSubmitWorker = new Worker<RDJobData>(
     // ─── 3. Digital Signature (XAdES-BES) ──────────────────────────────────
     logger.info(`[RD Worker] Signing XML with XAdES-BES`);
     const sigResult = signXml(rawXml, {
+      certBlob: runtimeConfig.certBlob,
       certPath: runtimeConfig.certPath,
       certPassword: runtimeConfig.certPassword,
+      cacheKey: invoice.companyId,
     });
 
     // ─── 4. Timestamp (RFC 3161 TSA) ────────────────────────────────────────

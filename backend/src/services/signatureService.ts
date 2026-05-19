@@ -26,8 +26,15 @@ export interface SignedXmlResult {
 }
 
 export interface CertificateCredentials {
+  // Per-company .p12 bytes — primary path (companies upload via admin UI).
+  certBlob?: Buffer | Uint8Array | null;
+  // Legacy file-path fallback — only used for the global dev cert pointed
+  // at by process.env.CERT_PATH when no blob is available.
   certPath?: string | null;
   certPassword?: string | null;
+  // Stable cache key — pass companyId for per-company isolation, or omit
+  // to use the env-based dev cert (cache key derived from path).
+  cacheKey?: string;
 }
 
 interface CertInfo {
@@ -39,30 +46,47 @@ interface CertInfo {
   issuerSerial: string;
 }
 
-let _certCache: CertInfo | null = null;
-let _certCacheKey: string | null = null;
+// Per-company cache: prior implementation kept a single global slot, which
+// meant Company A uploading a cert would silently swap Company B's loaded
+// signing key in worker memory. Key by cacheKey (companyId in prod, the
+// resolved path for the env-based dev cert).
+const _certCache = new Map<string, { info: CertInfo; fingerprint: string }>();
 
-/** โหลด .p12 certificate จาก path ใน .env */
+function makeFingerprint(certBytes: Buffer, certPass: string): string {
+  return crypto.createHash('sha256').update(certBytes).update('\0').update(certPass, 'utf8').digest('hex');
+}
+
+/** โหลด .p12 certificate — รับ blob (per-company) หรือ file path (dev) */
 function loadCertificate(credentials?: CertificateCredentials): CertInfo {
-  const certPath = credentials?.certPath ?? process.env.CERT_PATH;
   const certPass = credentials?.certPassword ?? process.env.CERT_PASSWORD ?? '';
 
-  if (!certPath) {
-    throw new Error('CERT_PATH not configured in .env');
+  // Source bytes: prefer blob, fall back to file path.
+  let certBytes: Buffer;
+  let resolvedKey: string;
+
+  if (credentials?.certBlob) {
+    certBytes = Buffer.isBuffer(credentials.certBlob)
+      ? credentials.certBlob
+      : Buffer.from(credentials.certBlob);
+    resolvedKey = credentials.cacheKey ?? `blob:${crypto.createHash('sha256').update(certBytes).digest('hex').slice(0, 16)}`;
+  } else {
+    const certPath = credentials?.certPath ?? process.env.CERT_PATH;
+    if (!certPath) {
+      throw new Error('No certificate available — upload a .p12 via /api/admin/certificate or set CERT_PATH for dev');
+    }
+    const resolvedPath = path.isAbsolute(certPath) ? certPath : path.join(process.cwd(), certPath);
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(`Certificate file not found: ${resolvedPath}`);
+    }
+    certBytes = fs.readFileSync(resolvedPath);
+    resolvedKey = credentials?.cacheKey ?? `path:${resolvedPath}`;
   }
 
-  const resolvedPath = path.isAbsolute(certPath)
-    ? certPath
-    : path.join(process.cwd(), certPath);
+  const fingerprint = makeFingerprint(certBytes, certPass);
+  const cached = _certCache.get(resolvedKey);
+  if (cached && cached.fingerprint === fingerprint) return cached.info;
 
-  if (!fs.existsSync(resolvedPath)) {
-    throw new Error(`Certificate file not found: ${resolvedPath}`);
-  }
-
-  const cacheKey = `${resolvedPath}:${crypto.createHash('sha256').update(certPass, 'utf8').digest('hex')}`;
-  if (_certCache && _certCacheKey === cacheKey) return _certCache;
-
-  const p12Der = fs.readFileSync(resolvedPath).toString('binary');
+  const p12Der = certBytes.toString('binary');
   const p12Asn1 = forge.asn1.fromDer(p12Der);
   // Password-only call (strict=true by default). Do NOT pass `false` here —
   // it silently disables MAC verification and causes confusing errors.
@@ -104,10 +128,10 @@ function loadCertificate(credentials?: CertificateCredentials): CertInfo {
   const serialHex = certificate.serialNumber;
   const issuerSerial = Buffer.from(`${issuerCN}/${serialHex}`, 'utf8').toString('base64');
 
-  _certCache = { certificate, privateKey, certDer, certPemRaw, thumbprintSha256: thumbprint, issuerSerial };
-  _certCacheKey = cacheKey;
-  logger.info(`Certificate loaded: ${certificate.subject.getField('CN')?.value} (valid until ${certificate.validity.notAfter.toISOString()})`);
-  return _certCache;
+  const info: CertInfo = { certificate, privateKey, certDer, certPemRaw, thumbprintSha256: thumbprint, issuerSerial };
+  _certCache.set(resolvedKey, { info, fingerprint });
+  logger.info(`Certificate loaded: ${certificate.subject.getField('CN')?.value} (valid until ${certificate.validity.notAfter.toISOString()})`, { cacheKey: resolvedKey });
+  return info;
 }
 
 /** SHA-256 digest → base64 */
@@ -254,8 +278,8 @@ export function getCertificateInfo(credentials?: CertificateCredentials): {
   error?: string;
 } {
   try {
-    const certPath = credentials?.certPath ?? process.env.CERT_PATH;
-    if (!certPath) return { loaded: false, error: 'CERT_PATH not set' };
+    const hasSource = !!credentials?.certBlob || !!credentials?.certPath || !!process.env.CERT_PATH;
+    if (!hasSource) return { loaded: false, error: 'No certificate configured' };
 
     const cert = loadCertificate(credentials);
     const now = new Date();
@@ -274,8 +298,12 @@ export function getCertificateInfo(credentials?: CertificateCredentials): {
   }
 }
 
-/** Clear cert cache (after uploading new cert) */
-export function clearCertCache(): void {
-  _certCache = null;
-  _certCacheKey = null;
+/**
+ * Clear cert cache. Pass a cacheKey (companyId) to drop just that company's
+ * entry — important after re-uploading a cert. Omit to flush everything,
+ * which is only useful in tests or admin one-shot operations.
+ */
+export function clearCertCache(cacheKey?: string): void {
+  if (cacheKey) _certCache.delete(cacheKey);
+  else _certCache.clear();
 }

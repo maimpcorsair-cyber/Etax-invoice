@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import fs from 'fs';
-import path from 'path';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
@@ -397,12 +395,14 @@ adminRouter.get('/certificate', async (req, res) => {
 
     const company = await prisma.company.findUnique({
       where: { id: req.user!.companyId },
-      select: { certificatePath: true, certificatePassword: true },
+      select: { certificateBlob: true, certificatePath: true, certificatePassword: true },
     });
     const runtimeConfig = resolveCompanyRuntimeConfig(company);
     const info = getCertificateInfo({
+      certBlob: runtimeConfig.certBlob,
       certPath: runtimeConfig.certPath,
       certPassword: runtimeConfig.certPassword,
+      cacheKey: req.user!.companyId,
     });
     res.json({ data: info });
   } catch {
@@ -412,7 +412,9 @@ adminRouter.get('/certificate', async (req, res) => {
 
 /** POST /api/admin/certificate — อัพโหลด .p12 certificate ใหม่
  *  Body (JSON): { p12Base64: string, password: string }
- *  (production: ใช้ multipart/form-data + multer แทน)
+ *  เก็บเป็น BYTEA ใน DB เพื่อให้ต่อ company; ของเดิมที่เคย write ไป
+ *  certs/company.p12 บน FS ถูกถอด เพราะ Render web disk ephemeral และ
+ *  ใช้ path เดียวกันทุก tenant (multi-tenancy leak).
  */
 adminRouter.post('/certificate', async (req, res) => {
   try {
@@ -427,16 +429,21 @@ adminRouter.post('/certificate', async (req, res) => {
       res.status(400).json({ error: 'p12Base64 and password are required' }); return;
     }
 
-    // Save to certs directory
-    const certsDir = path.join(process.cwd(), 'certs');
-    fs.mkdirSync(certsDir, { recursive: true });
-    const certPath = path.join(certsDir, 'company.p12');
-    fs.writeFileSync(certPath, Buffer.from(p12Base64, 'base64'));
+    const certBlob = Buffer.from(p12Base64, 'base64');
+    if (certBlob.length < 100 || certBlob.length > 1024 * 1024) {
+      res.status(400).json({ error: 'Certificate payload size out of range (expected ~5KB .p12)' });
+      return;
+    }
 
-    clearCertCache();
+    // Bust any cached cert for this company before re-validating with the
+    // new bytes; otherwise we'd validate against the stale in-memory copy.
+    clearCertCache(req.user!.companyId);
 
-    // Validate the new cert
-    const info = getCertificateInfo({ certPath, certPassword: password });
+    const info = getCertificateInfo({
+      certBlob,
+      certPassword: password,
+      cacheKey: req.user!.companyId,
+    });
     if (!info.loaded) {
       res.status(400).json({ error: `Invalid certificate: ${info.error}` }); return;
     }
@@ -444,10 +451,15 @@ adminRouter.post('/certificate', async (req, res) => {
       res.status(400).json({ error: 'Certificate is expired' }); return;
     }
 
-    // Also save to DB (encrypted in real prod — here store path reference)
     await prisma.company.update({
       where: { id: req.user!.companyId },
-      data: { certificatePath: certPath, certificatePassword: encryptConfigValue(password) },
+      data: {
+        certificateBlob: certBlob,
+        certificateUploadedAt: new Date(),
+        certificatePassword: encryptConfigValue(password),
+        // Clear legacy path — DB blob is the source of truth now.
+        certificatePath: null,
+      },
     });
 
     res.json({ data: info, message: 'Certificate uploaded and validated successfully' });
@@ -468,6 +480,7 @@ adminRouter.get('/rd-config', async (req, res) => {
     const company = await prisma.company.findUnique({
       where: { id: req.user!.companyId },
       select: {
+        certificateBlob: true,
         certificatePath: true,
         certificatePassword: true,
         rdClientId: true,
@@ -482,8 +495,10 @@ adminRouter.get('/rd-config', async (req, res) => {
         clientId: runtimeConfig.rdClientId ? '***configured***' : null,
         hasSecret: !!runtimeConfig.rdClientSecret,
         certStatus: getCertificateInfo({
+          certBlob: runtimeConfig.certBlob,
           certPath: runtimeConfig.certPath,
           certPassword: runtimeConfig.certPassword,
+          cacheKey: req.user!.companyId,
         }),
       },
     });
@@ -534,14 +549,16 @@ adminRouter.post('/signing-test', async (req, res) => {
 
     const company = await prisma.company.findUnique({
       where: { id: req.user!.companyId },
-      select: { certificatePath: true, certificatePassword: true, rdEnvironment: true },
+      select: { certificateBlob: true, certificatePath: true, certificatePassword: true, rdEnvironment: true },
     });
     const runtimeConfig = resolveCompanyRuntimeConfig(company);
 
     // Step 1: Check certificate
     const certInfo = getCertificateInfo({
+      certBlob: runtimeConfig.certBlob,
       certPath: runtimeConfig.certPath,
       certPassword: runtimeConfig.certPassword,
+      cacheKey: req.user!.companyId,
     });
     steps.push({
       step: '① Load Certificate',
@@ -565,8 +582,10 @@ adminRouter.post('/signing-test', async (req, res) => {
     let sigResult: Awaited<ReturnType<typeof signXml>>;
     try {
       sigResult = signXml(testXml, {
+        certBlob: runtimeConfig.certBlob,
         certPath: runtimeConfig.certPath,
         certPassword: runtimeConfig.certPassword,
+        cacheKey: req.user!.companyId,
       });
       steps.push({ step: '② XAdES-BES Sign', status: 'ok', detail: `signatureId=${sigResult.signatureId}`, ms: Date.now() - t2 });
     } catch (e) {

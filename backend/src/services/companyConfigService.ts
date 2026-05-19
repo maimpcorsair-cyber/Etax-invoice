@@ -5,6 +5,8 @@ const ENCRYPTED_PREFIX = 'enc:v1:';
 type NullableString = string | null | undefined;
 
 export interface CompanyRuntimeConfigSource {
+  // Per-company .p12 bytes — Prisma returns Buffer for Bytes columns.
+  certificateBlob?: Buffer | Uint8Array | null;
   certificatePath?: NullableString;
   certificatePassword?: NullableString;
   rdClientId?: NullableString;
@@ -13,6 +15,7 @@ export interface CompanyRuntimeConfigSource {
 }
 
 export interface ResolvedCompanyRuntimeConfig {
+  certBlob?: Buffer;
   certPath?: string;
   certPassword?: string;
   rdClientId?: string;
@@ -61,8 +64,12 @@ export function decryptConfigValue(value: NullableString): string | null {
 }
 
 export function resolveCompanyRuntimeConfig(source?: CompanyRuntimeConfigSource | null): ResolvedCompanyRuntimeConfig {
+  const blob = source?.certificateBlob
+    ? (Buffer.isBuffer(source.certificateBlob) ? source.certificateBlob : Buffer.from(source.certificateBlob))
+    : undefined;
   return {
-    certPath: source?.certificatePath ?? process.env.CERT_PATH ?? undefined,
+    certBlob: blob,
+    certPath: source?.certificatePath ?? (blob ? undefined : process.env.CERT_PATH ?? undefined),
     certPassword: decryptConfigValue(source?.certificatePassword) ?? process.env.CERT_PASSWORD ?? undefined,
     rdClientId: source?.rdClientId ?? process.env.RD_CLIENT_ID ?? undefined,
     rdClientSecret: decryptConfigValue(source?.rdClientSecret) ?? process.env.RD_CLIENT_SECRET ?? undefined,

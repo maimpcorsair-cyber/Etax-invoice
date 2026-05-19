@@ -384,7 +384,7 @@ systemRouter.get('/companies/:id', async (req, res) => {
       // owner sees "uploaded vs dev cert" without exposing key material.
       prisma.company.findFirst({
         where: { id: companyId },
-        select: { certificatePath: true },
+        select: { certificateBlob: true, certificatePath: true, certificateUploadedAt: true },
       }),
     ]);
 
@@ -432,8 +432,14 @@ systemRouter.get('/companies/:id', async (req, res) => {
           createdAt: t.createdAt.toISOString(),
         })),
         certificate: {
-          configured: !!certificateInfo?.certificatePath,
-          isDev: certificateInfo?.certificatePath?.includes('test-company.p12') ?? false,
+          // True once the company uploads its own .p12 (stored as BYTEA).
+          // A still-present `certificatePath` falls back to the dev cert
+          // (test-company.p12) — flag that distinctly so ops can spot
+          // companies that haven't replaced the dev key yet.
+          configured: !!certificateInfo?.certificateBlob,
+          uploadedAt: certificateInfo?.certificateUploadedAt?.toISOString() ?? null,
+          isDev: !certificateInfo?.certificateBlob
+            && (certificateInfo?.certificatePath?.includes('test-company.p12') ?? false),
         },
       },
     });
