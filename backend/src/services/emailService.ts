@@ -466,3 +466,60 @@ export async function sendBillingPaymentFailedEmail(
     logger.error('Failed to send billing failure email', err);
   }
 }
+
+// PDPA Section 33 — confirmation of erasure request. The user receives an
+// email with the cancellation deadline and how to undo within the grace
+// window. Tax invoices retained per Revenue Code are flagged in the body.
+export interface DsrConfirmationData {
+  adminEmail: string;
+  adminName: string;
+  companyNameTh: string;
+  requestedAt: Date;
+  cancelDeadline: Date;
+  hardDeleteScheduledAt: Date;
+  locale: 'th' | 'en';
+}
+
+export async function sendDsrDeleteConfirmationEmail(data: DsrConfirmationData): Promise<void> {
+  if (!isEmailConfigured()) {
+    logger.warn('[DSR] SMTP not configured — confirmation email skipped', { adminEmail: data.adminEmail });
+    return;
+  }
+  const isThai = data.locale === 'th';
+  const subject = isThai
+    ? `[ยืนยัน] คำขอลบบัญชี: ${data.companyNameTh}`
+    : `[Confirmed] Account deletion request: ${data.companyNameTh}`;
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:600px;line-height:1.6">
+      <h2 style="color:#0f172a">${isThai ? 'เราได้รับคำขอลบบัญชีของคุณแล้ว' : 'We received your account deletion request'}</h2>
+      <p>${isThai ? `เรียน ${data.adminName},` : `Hi ${data.adminName},`}</p>
+      <p>${isThai
+        ? `ระบบของ ${data.companyNameTh} ได้ถูกบันทึกคำขอลบเมื่อ ${fmt(data.requestedAt)} ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA) มาตรา 33`
+        : `Your account for ${data.companyNameTh} was scheduled for deletion on ${fmt(data.requestedAt)} under PDPA Section 33.`}</p>
+      <ul>
+        <li>${isThai ? 'PII ของคุณถูก deactivate ทันที (บัญชีถูกล็อก)' : 'Your PII is deactivated immediately (account locked).'}</li>
+        <li>${isThai
+          ? `คุณสามารถยกเลิกคำขอได้ภายในวันที่ ${fmt(data.cancelDeadline)} ที่ /api/account/delete/cancel`
+          : `You may cancel until ${fmt(data.cancelDeadline)} via /api/account/delete/cancel.`}</li>
+        <li>${isThai
+          ? `ข้อมูลใบกำกับภาษีจะถูกเก็บไว้ตามประมวลรัษฎากร และจะถูกลบจริงในวันที่ ${fmt(data.hardDeleteScheduledAt)}`
+          : `Tax invoice records are retained per the Revenue Code and will be permanently deleted on ${fmt(data.hardDeleteScheduledAt)}.`}</li>
+      </ul>
+      <p style="color:#64748b;font-size:13px;margin-top:24px">${isThai
+        ? 'หากคุณไม่ได้เป็นผู้ส่งคำขอนี้ กรุณา cancel ทันทีหรือติดต่อ DPO ที่ '
+        : 'If you did not request this, please cancel immediately or contact our DPO at '}<a href="mailto:dpo@maidomdom.com">dpo@maidomdom.com</a>.</p>
+    </div>
+  `;
+  try {
+    await transporter.sendMail({
+      from: `"ชัชบัญชี DPO" <${process.env.SMTP_USER}>`,
+      to: data.adminEmail,
+      subject,
+      html,
+    });
+    logger.info('[DSR] confirmation email sent', { adminEmail: data.adminEmail });
+  } catch (err) {
+    logger.error('[DSR] failed to send confirmation email', { err: err instanceof Error ? err.message : String(err) });
+  }
+}

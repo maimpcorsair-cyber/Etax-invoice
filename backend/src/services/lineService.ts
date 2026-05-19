@@ -1057,8 +1057,13 @@ export function verifyLineSignature(body: Buffer, signature: string): boolean {
   try {
     const hmac = crypto.createHmac('sha256', channelSecret);
     hmac.update(body);
-    const digest = hmac.digest('base64');
-    return digest === signature;
+    const digest = hmac.digest();
+    const provided = Buffer.from(signature, 'base64');
+    // Constant-time comparison so an attacker can't byte-test the signature
+    // by timing repeated probes. timingSafeEqual throws on length mismatch,
+    // so guard explicitly first.
+    if (digest.length !== provided.length) return false;
+    return crypto.timingSafeEqual(digest, provided);
   } catch (err) {
     logger.error('[Line] verifyLineSignature error', { error: String(err) });
     return false;

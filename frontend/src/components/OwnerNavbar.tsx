@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Shield, Building2, ArrowLeftRight, LogOut, Receipt, ScrollText, TicketPercent, RefreshCw } from 'lucide-react';
+import { Shield, Building2, ArrowLeftRight, LogOut, Receipt, ScrollText, TicketPercent, RefreshCw, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
 
@@ -10,6 +10,7 @@ const items = [
   { key: 'coupons', href: '/ops/coupons', label: 'Coupons', icon: TicketPercent },
   { key: 'renewals', href: '/ops/renewals', label: 'Renewals', icon: RefreshCw },
   { key: 'audit', href: '/ops/audit', label: 'Audit Log', icon: ScrollText },
+  { key: 'dsr', href: '/ops/dsr', label: 'DSR Queue', icon: Trash2 },
   { key: 'tenant', href: '/ops/tenants', label: 'Tenant App', icon: Building2 },
 ];
 

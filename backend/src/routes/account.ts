@@ -6,6 +6,7 @@ import { logger } from '../config/logger';
 import { withRlsContext, tenantRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { CURRENT_LEGAL_VERSION } from '../config/legalVersion';
+import { sendDsrDeleteConfirmationEmail } from '../services/emailService';
 
 // PDPA data-subject endpoints. Mounted under /api/account (authenticated).
 //
@@ -47,13 +48,17 @@ accountRouter.get('/export', async (req, res) => {
             createdAt: true, updatedAt: true,
           },
         }),
-        tx.invoice.findMany({ where: { companyId }, take: 5000 }),
-        tx.customer.findMany({ where: { companyId }, take: 5000 }),
-        tx.product.findMany({ where: { companyId }, take: 5000 }),
+        // Drop the `take` caps — PDPA Section 30 grants the right to a
+        // COMPLETE copy of personal data. Tables are already bounded by
+        // retention policy (audit_logs 365d, others bounded by tenancy)
+        // so the export size is roughly the live tenant footprint. If a
+        // tenant ever exceeds memory, switch this to a streaming response.
+        tx.invoice.findMany({ where: { companyId } }),
+        tx.customer.findMany({ where: { companyId } }),
+        tx.product.findMany({ where: { companyId } }),
         tx.auditLog.findMany({
           where: { userId },
           orderBy: { createdAt: 'desc' },
-          take: 1000,
         }),
       ]);
 
@@ -143,7 +148,7 @@ accountRouter.post('/delete', requireRole('admin'), async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, passwordHash: true, googleSub: true },
+      select: { id: true, passwordHash: true, googleSub: true, email: true, name: true },
     });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -224,13 +229,34 @@ accountRouter.post('/delete', requireRole('admin'), async (req, res) => {
       }),
     ]);
 
+    const cancelDeadline = new Date(now.getTime() + GRACE_DAYS * 86400_000);
+
+    // Fire-and-forget — email failure shouldn't block the API response.
+    // The audit-log row above is the canonical record either way.
+    const companyForEmail = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { nameTh: true },
+    });
+    if (user.email && companyForEmail) {
+      sendDsrDeleteConfirmationEmail({
+        adminEmail: user.email,
+        adminName: user.name,
+        companyNameTh: companyForEmail.nameTh,
+        requestedAt: now,
+        cancelDeadline,
+        hardDeleteScheduledAt: hardDeleteAt,
+        locale: 'th',
+      }).catch((err) => logger.warn('[DSR] confirmation email dispatch failed', {
+        err: err instanceof Error ? err.message : String(err),
+      }));
+    }
+
     res.json({
       data: {
         status: 'requested',
         requestedAt: now,
         hardDeleteScheduledAt: hardDeleteAt,
-        // Owner can still log in and cancel before this date.
-        cancelDeadline: new Date(now.getTime() + GRACE_DAYS * 86400_000),
+        cancelDeadline,
         note: 'Tax invoices are retained per Revenue Department requirements before permanent deletion.',
       },
     });
@@ -245,6 +271,78 @@ accountRouter.post('/delete', requireRole('admin'), async (req, res) => {
 });
 
 /* ─── Cancel a pending deletion ──────────────────────────────────────── */
+
+/* ─── Owner DSR queue (super_admin) ──────────────────────────────────── */
+
+// Cross-tenant list of pending deletion requests so the platform owner can
+// see who's about to be erased and intervene (e.g., user disputes, support
+// asked to cancel, or — rarely — owner needs to expedite past the 5y
+// tax-retention window with a signed waiver from the customer).
+accountRouter.get('/owner/dsr-queue', requireRole('super_admin'), async (_req, res) => {
+  try {
+    const rows = await prisma.company.findMany({
+      where: { deletionRequestedAt: { not: null } },
+      orderBy: { deletionRequestedAt: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        nameTh: true,
+        taxId: true,
+        email: true,
+        deletionRequestedAt: true,
+        deletionRequestedBy: true,
+        hardDeleteScheduledAt: true,
+      },
+    });
+    res.json({ data: rows });
+  } catch (err) {
+    logger.error('owner dsr-queue list failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Queue load failed' });
+  }
+});
+
+// Owner-side cancel — used when a customer support ticket asks for undo
+// after the user lost access (e.g., they deleted their account, then
+// emailed support saying it was a mistake). Bypasses the 30d grace check.
+accountRouter.post('/owner/dsr-queue/:companyId/cancel', requireRole('super_admin'), async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, deletionRequestedAt: true, deletionRequestedBy: true },
+    });
+    if (!company?.deletionRequestedAt) {
+      res.status(404).json({ error: 'No deletion request for this company' });
+      return;
+    }
+    await prisma.$transaction([
+      prisma.company.update({
+        where: { id: companyId },
+        data: { deletionRequestedAt: null, deletionRequestedBy: null, hardDeleteScheduledAt: null },
+      }),
+      // Reactivate the requester so they can log back in.
+      ...(company.deletionRequestedBy
+        ? [prisma.user.update({ where: { id: company.deletionRequestedBy }, data: { isActive: true } })]
+        : []),
+      prisma.auditLog.create({
+        data: {
+          companyId,
+          userId: req.user!.userId,
+          action: 'account.deletion_cancelled_by_owner',
+          resourceType: 'company',
+          resourceId: companyId,
+          details: { originalRequester: company.deletionRequestedBy },
+          ipAddress: req.ip ?? 'unknown',
+          userAgent: req.headers['user-agent'] ?? 'unknown',
+        },
+      }),
+    ]);
+    res.json({ data: { status: 'cancelled' } });
+  } catch (err) {
+    logger.error('owner dsr cancel failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Cancel failed' });
+  }
+});
 
 accountRouter.post('/delete/cancel', requireRole('admin'), async (req, res) => {
   try {
