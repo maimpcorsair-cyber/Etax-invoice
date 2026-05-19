@@ -23,7 +23,8 @@
     "sales": "Sales",
     "purchases": "Purchases & Expenses",
     "reports": "Tax Reports",
-    "directory": "Directory"
+    "directory": "Directory",
+    "privacy": "Privacy & My Data"
   },
   "landing": {
     "hero": {

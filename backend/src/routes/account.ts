@@ -23,6 +23,66 @@ export const accountRouter = Router();
 const GRACE_DAYS = 30;
 const TAX_RETENTION_YEARS = 5;
 
+/* ─── Status (powers the in-app Privacy & Data tab) ──────────────────── */
+
+// Lightweight read-only summary used by the AccountPrivacy page so it can
+// render the correct UI: which auth methods are available (password vs
+// Google-only — gates the delete confirmation flow), and whether a
+// deletion request is already pending (renders the cancel banner instead
+// of the delete form).
+accountRouter.get('/status', async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const companyId = req.user!.companyId;
+    const [user, company] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true, googleSub: true, legalAcceptedVersion: true, marketingOptInAt: true },
+      }),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { deletionRequestedAt: true, deletionRequestedBy: true, hardDeleteScheduledAt: true },
+      }),
+    ]);
+    if (!user || !company) {
+      res.status(404).json({ error: 'Account not found' });
+      return;
+    }
+    const now = Date.now();
+    const cancelDeadline = company.deletionRequestedAt
+      ? new Date(company.deletionRequestedAt.getTime() + GRACE_DAYS * 86400_000)
+      : null;
+    res.json({
+      data: {
+        auth: {
+          hasPassword: !!user.passwordHash,
+          hasGoogle: !!user.googleSub,
+        },
+        legal: {
+          acceptedVersion: user.legalAcceptedVersion,
+          currentVersion: CURRENT_LEGAL_VERSION,
+        },
+        marketing: {
+          optedIn: !!user.marketingOptInAt,
+        },
+        deletion: company.deletionRequestedAt
+          ? {
+              requested: true,
+              requestedAt: company.deletionRequestedAt,
+              requestedBy: company.deletionRequestedBy,
+              hardDeleteScheduledAt: company.hardDeleteScheduledAt,
+              cancelDeadline,
+              cancellable: cancelDeadline ? now < cancelDeadline.getTime() : false,
+            }
+          : { requested: false },
+      },
+    });
+  } catch (err) {
+    logger.error('account status failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Status failed' });
+  }
+});
+
 /* ─── Export (right of access + portability) ─────────────────────────── */
 
 accountRouter.get('/export', async (req, res) => {

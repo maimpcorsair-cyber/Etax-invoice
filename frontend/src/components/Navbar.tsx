@@ -10,6 +10,7 @@ import {
   Calculator,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   LogOut,
   ChevronDown,
   Settings,
@@ -225,6 +226,17 @@ export default function Navbar() {
                   >
                     <Settings className="w-4 h-4" />
                     {t('nav.settings')}
+                  </Link>
+                  <Link
+                    to="/app/account/privacy"
+                    className={clsx(
+                      'flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50',
+                      location.pathname.startsWith('/app/account/privacy') ? 'font-semibold text-primary-700' : 'text-gray-700',
+                    )}
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    {t('nav.privacy', { defaultValue: 'ความเป็นส่วนตัวและข้อมูล' })}
                   </Link>
                   {(user?.role === 'super_admin' || user?.role === 'admin') && (
                     <>
