@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
-  ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle,
+  ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle, Mail,
   BriefcaseBusiness,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
@@ -81,6 +81,10 @@ export default function InvoiceList() {
   const [paymentForm, setPaymentForm] = useState({ amount: 0, method: 'transfer', reference: '', paidAt: new Date().toISOString().split('T')[0], note: '' });
   const [savingPayment, setSavingPayment] = useState(false);
   const [submittingRD, setSubmittingRD] = useState<string | null>(null);
+  // Track which invoice's email is in flight + which were just successfully
+  // sent (for the "Sent ✓" badge that flashes for a few seconds).
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [emailJustSent, setEmailJustSent] = useState<Record<string, true>>({});
 
   // Cancel modal
   const [cancelModal, setCancelModal] = useState<{ invoice: Invoice } | null>(null);
@@ -304,6 +308,42 @@ export default function InvoiceList() {
     inv.status !== 'cancelled' &&
     inv.status !== 'draft' &&
     (user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant');
+
+  // Email the invoice PDF to the buyer. Backend already validates plan
+   // access + buyer email presence; the UI just disables the button when
+   // we can predict the 400 (no email on buyer) so the user gets a clear
+   // affordance instead of a thrown alert.
+  async function handleSendEmail(inv: Invoice) {
+    if (!inv.buyer?.email) return;
+    const msg = isThai
+      ? `ส่งใบกำกับ ${inv.invoiceNumber} ทางอีเมลไปยัง ${inv.buyer.email}?`
+      : `Email invoice ${inv.invoiceNumber} to ${inv.buyer.email}?`;
+    if (!window.confirm(msg)) return;
+
+    setSendingEmail(inv.id);
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}/send-email`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error ?? 'Failed');
+      }
+      setEmailJustSent((prev) => ({ ...prev, [inv.id]: true }));
+      // Brief "sent ✓" badge then fade back to the normal button so the
+      // user can re-send if needed.
+      setTimeout(() => setEmailJustSent((prev) => {
+        const next = { ...prev };
+        delete next[inv.id];
+        return next;
+      }), 4000);
+    } catch (e) {
+      alert(isThai ? `ส่งอีเมลไม่สำเร็จ: ${(e as Error).message}` : `Failed to send email: ${(e as Error).message}`);
+    } finally {
+      setSendingEmail(null);
+    }
+  }
 
   async function handleSubmitRD(inv: Invoice) {
     const msg = isThai
@@ -706,6 +746,31 @@ export default function InvoiceList() {
                             >
                               <CreditCard className="w-3.5 h-3.5" />
                               <span className="hidden sm:inline">{isThai ? 'รับชำระ' : 'Pay'}</span>
+                            </button>
+                          )}
+                          {policy?.canSendInvoiceEmail && inv.buyer?.email && (
+                            <button
+                              onClick={() => handleSendEmail(inv)}
+                              disabled={sendingEmail === inv.id}
+                              className={`inline-flex items-center gap-1 text-xs font-medium disabled:opacity-50 ${
+                                emailJustSent[inv.id]
+                                  ? 'text-emerald-600'
+                                  : 'text-sky-600 hover:text-sky-800'
+                              }`}
+                              title={emailJustSent[inv.id]
+                                ? (isThai ? `ส่งแล้วไปยัง ${inv.buyer.email}` : `Sent to ${inv.buyer.email}`)
+                                : (isThai ? `ส่งอีเมลไปยัง ${inv.buyer.email}` : `Email to ${inv.buyer.email}`)}
+                            >
+                              {sendingEmail === inv.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : emailJustSent[inv.id]
+                                  ? <CheckCircle className="w-3.5 h-3.5" />
+                                  : <Mail className="w-3.5 h-3.5" />}
+                              <span className="hidden sm:inline">
+                                {emailJustSent[inv.id]
+                                  ? (isThai ? 'ส่งแล้ว' : 'Sent')
+                                  : (isThai ? 'ส่งอีเมล' : 'Email')}
+                              </span>
                             </button>
                           )}
                           {canCancelInvoice(inv) && (

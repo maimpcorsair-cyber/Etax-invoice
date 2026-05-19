@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { CheckCircle, Download, X, ExternalLink, Copy, Check } from 'lucide-react';
+import { CheckCircle, Download, X, ExternalLink, Copy, Check, Mail, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import { useAuthStore } from '../../store/authStore';
 
@@ -10,6 +10,7 @@ interface IssuedInvoice {
   total: number;
   pdfUrl?: string | null;
   verificationUrl?: string | null;
+  buyer?: { email?: string | null } | null;
 }
 
 interface Props {
@@ -22,6 +23,8 @@ export default function IssuedSuccessModal({ invoiceId, onClose }: Props) {
   const { token } = useAuthStore();
   const [invoice, setInvoice] = useState<IssuedInvoice | null>(null);
   const [copied, setCopied] = useState(false);
+  const [emailState, setEmailState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!invoiceId || !token) return;
@@ -52,6 +55,28 @@ export default function IssuedSuccessModal({ invoiceId, onClose }: Props) {
     await navigator.clipboard.writeText(verifyUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const buyerEmail = invoice?.buyer?.email ?? null;
+
+  const sendEmailToBuyer = async () => {
+    if (!invoiceId || !buyerEmail) return;
+    setEmailState('sending');
+    setEmailError(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/send-email`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error ?? 'Failed');
+      }
+      setEmailState('sent');
+    } catch (e) {
+      setEmailError((e as Error).message);
+      setEmailState('error');
+    }
   };
 
   return (
@@ -145,6 +170,41 @@ export default function IssuedSuccessModal({ invoiceId, onClose }: Props) {
               {isThai ? 'ตรวจสอบเอกสาร' : 'Verify'}
             </a>
           </div>
+
+          {/* Email to buyer — only when we know an address. Shown beneath the
+              primary actions because most users will download/verify first,
+              then optionally email the PDF to their customer. */}
+          {buyerEmail && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-sky-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-sky-900 truncate">
+                  {isThai ? 'ส่งอีเมลให้ลูกค้า' : 'Email to customer'}
+                </p>
+                <p className="text-[11px] text-sky-700 truncate">{buyerEmail}</p>
+                {emailState === 'error' && emailError && (
+                  <p className="text-[11px] text-red-600 mt-0.5 truncate">{emailError}</p>
+                )}
+              </div>
+              <button
+                onClick={sendEmailToBuyer}
+                disabled={emailState === 'sending' || emailState === 'sent'}
+                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 disabled:opacity-60 ${
+                  emailState === 'sent'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-sky-600 text-white hover:bg-sky-700'
+                }`}
+              >
+                {emailState === 'sending' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {emailState === 'sent' && <Check className="w-3.5 h-3.5" />}
+                {emailState === 'sending'
+                  ? (isThai ? 'กำลังส่ง...' : 'Sending...')
+                  : emailState === 'sent'
+                    ? (isThai ? 'ส่งแล้ว' : 'Sent')
+                    : (isThai ? 'ส่งเลย' : 'Send')}
+              </button>
+            </div>
+          )}
 
           <button
             onClick={onClose}
