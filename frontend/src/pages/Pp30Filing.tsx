@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Printer, Loader2, FileText, Calendar, Calculator } from 'lucide-react';
+import { Download, Printer, Loader2, FileText, Calendar, Calculator, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Pp30Data, WhtSummaryData } from '../types';
@@ -104,6 +104,7 @@ export default function Pp30Filing() {
     <div className="space-y-4">
       <SectionSubNav
         items={[
+          { key: 'financials', to: '/app/reports/financials', label: isThai ? 'งบการเงิน' : 'Financials', icon: TrendingUp },
           { key: 'vat', to: '/app/vat-summary', label: isThai ? 'สรุปภาษีมูลค่าเพิ่ม' : 'VAT Summary', icon: Calculator },
           { key: 'pp30', to: '/app/pp30', label: isThai ? 'ภพ.30' : 'PP30 Filing', icon: FileText },
           { key: 'wht', to: '/app/wht-certificates', label: isThai ? 'ภงด.3/53 (หัก ณ ที่จ่าย)' : 'WHT Certificates', icon: Receipt },

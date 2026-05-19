@@ -37,7 +37,7 @@ const navItems = [
   { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard', activePrefixes: ['/app/dashboard'] },
   { key: 'sales', href: '/app/invoices', icon: FileText, labelKey: 'nav.sales', activePrefixes: ['/app/invoices', '/app/sales'] },
   { key: 'purchases', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchases', activePrefixes: ['/app/purchase-invoices', '/app/purchases', '/app/expenses'] },
-  { key: 'reports', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.reports', activePrefixes: ['/app/vat-summary', '/app/reports', '/app/pp30'] },
+  { key: 'reports', href: '/app/reports/financials', icon: Calculator, labelKey: 'nav.reports', activePrefixes: ['/app/reports', '/app/vat-summary', '/app/pp30', '/app/wht-certificates'] },
   { key: 'directory', href: '/app/customers', icon: Users, labelKey: 'nav.directory', activePrefixes: ['/app/customers', '/app/directory', '/app/products'] },
 ];
 

@@ -48,7 +48,7 @@ export default function MobileBottomNav() {
   if (!isMobile) return null;
 
   const moreItems = [
-    { key: 'reports', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.reports' },
+    { key: 'reports', href: '/app/reports/financials', icon: Calculator, labelKey: 'nav.reports' },
     { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects' },
     { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
