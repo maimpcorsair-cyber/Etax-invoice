@@ -33,7 +33,7 @@ import { projectsRouter } from './routes/projects';
 import { dbdRouter } from './routes/dbd';
 import { projectPortalRouter } from './routes/projectPortal';
 import { intakeEditRouter } from './routes/intakeEdit';
-import { accountRouter } from './routes/account';
+import { accountRouter, accountPublicRouter } from './routes/account';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -198,6 +198,10 @@ app.use('/api/products', authenticate, productsRouter);
 app.use('/api/audit', authenticate, auditRouter);
 app.use('/api/admin', authenticate, adminRouter);
 app.use('/api/system', authenticate, systemRouter);
+// Public sub-routes (token is the credential, no JWT required) MUST be
+// mounted BEFORE the authenticated router on the same prefix so Express
+// matches them first.
+app.use('/api/account', accountPublicRouter);
 app.use('/api/account', authenticate, accountRouter);
 app.use('/api/dashboard', authenticate, dashboardRouter);
 app.use('/api/company', authenticate, dashboardRouter);

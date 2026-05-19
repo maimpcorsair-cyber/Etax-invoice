@@ -31,6 +31,7 @@ const OpsCompanyDetail = React.lazy(() => import('./pages/OpsCompanyDetail'));
 const OpsAuditLog = React.lazy(() => import('./pages/OpsAuditLog'));
 const OpsDsrQueue = React.lazy(() => import('./pages/OpsDsrQueue'));
 const AccountPrivacy = React.lazy(() => import('./pages/AccountPrivacy'));
+const CancelDelete = React.lazy(() => import('./pages/CancelDelete'));
 const OwnerTransactions = React.lazy(() => import('./pages/OwnerTransactions'));
 const OwnerCoupons = React.lazy(() => import('./pages/OwnerCoupons'));
 const OwnerRenewals = React.lazy(() => import('./pages/OwnerRenewals'));
@@ -168,6 +169,7 @@ export default function App() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/legal/dpa" element={<DataProcessingAgreement />} />
           <Route path="/dpa" element={<DataProcessingAgreement />} />
+          <Route path="/account/cancel-delete" element={<CancelDelete />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/billing/success" element={<BillingSuccess />} />
           <Route path="/billing/cancel" element={<BillingCancel />} />

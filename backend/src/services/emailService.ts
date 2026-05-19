@@ -477,6 +477,11 @@ export interface DsrConfirmationData {
   requestedAt: Date;
   cancelDeadline: Date;
   hardDeleteScheduledAt: Date;
+  // Magic-link URL (HMAC-signed token in query string) that lets the
+  // deactivated user cancel the deletion without logging back in. This
+  // is the load-bearing safety net — without it, a user who let their
+  // session expire couldn't undo their own request.
+  cancelUrl: string;
   locale: 'th' | 'en';
 }
 
@@ -500,15 +505,30 @@ export async function sendDsrDeleteConfirmationEmail(data: DsrConfirmationData):
       <ul>
         <li>${isThai ? 'PII ของคุณถูก deactivate ทันที (บัญชีถูกล็อก)' : 'Your PII is deactivated immediately (account locked).'}</li>
         <li>${isThai
-          ? `คุณสามารถยกเลิกคำขอได้ภายในวันที่ ${fmt(data.cancelDeadline)} ที่ /api/account/delete/cancel`
-          : `You may cancel until ${fmt(data.cancelDeadline)} via /api/account/delete/cancel.`}</li>
+          ? `คุณสามารถยกเลิกคำขอได้ภายในวันที่ ${fmt(data.cancelDeadline)}`
+          : `You may cancel until ${fmt(data.cancelDeadline)}.`}</li>
         <li>${isThai
           ? `ข้อมูลใบกำกับภาษีจะถูกเก็บไว้ตามประมวลรัษฎากร และจะถูกลบจริงในวันที่ ${fmt(data.hardDeleteScheduledAt)}`
           : `Tax invoice records are retained per the Revenue Code and will be permanently deleted on ${fmt(data.hardDeleteScheduledAt)}.`}</li>
       </ul>
+      <div style="margin:28px 0;padding:18px;border:1px solid #fde68a;background:#fef3c7;border-radius:12px">
+        <p style="margin:0 0 12px;font-weight:600;color:#78350f">
+          ${isThai ? 'ไม่ได้เป็นคุณ? ยกเลิกได้ที่นี่:' : "Didn't request this? Cancel here:"}
+        </p>
+        <a href="${data.cancelUrl}"
+           style="display:inline-block;background:#d97706;color:#fff;text-decoration:none;
+                  padding:10px 18px;border-radius:8px;font-weight:600">
+          ${isThai ? 'ยกเลิกคำขอลบบัญชี' : 'Cancel deletion request'}
+        </a>
+        <p style="margin:12px 0 0;font-size:12px;color:#78350f">
+          ${isThai
+            ? 'ลิงก์นี้ทำงานได้แม้ไม่ต้องเข้าสู่ระบบ และหมดอายุพร้อมกับช่วงเวลายกเลิกข้างต้น'
+            : 'This link works without logging in and expires together with the cancel window above.'}
+        </p>
+      </div>
       <p style="color:#64748b;font-size:13px;margin-top:24px">${isThai
-        ? 'หากคุณไม่ได้เป็นผู้ส่งคำขอนี้ กรุณา cancel ทันทีหรือติดต่อ DPO ที่ '
-        : 'If you did not request this, please cancel immediately or contact our DPO at '}<a href="mailto:dpo@maidomdom.com">dpo@maidomdom.com</a>.</p>
+        ? 'หากคุณไม่ได้เป็นผู้ส่งคำขอนี้และไม่สามารถกดลิงก์ด้านบนได้ ติดต่อ DPO ที่ '
+        : 'If you did not request this and the link above does not work, contact our DPO at '}<a href="mailto:dpo@maidomdom.com">dpo@maidomdom.com</a>.</p>
     </div>
   `;
   try {

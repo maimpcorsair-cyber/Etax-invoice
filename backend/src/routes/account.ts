@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
@@ -8,20 +9,64 @@ import { requireRole } from '../middleware/auth';
 import { CURRENT_LEGAL_VERSION } from '../config/legalVersion';
 import { sendDsrDeleteConfirmationEmail } from '../services/emailService';
 
-// PDPA data-subject endpoints. Mounted under /api/account (authenticated).
+// PDPA data-subject endpoints.
 //
-//   GET    /api/account/export   — Section 30 (access) + 31 (portability)
-//   POST   /api/account/delete   — Section 33 (erasure)
-//   POST   /api/account/delete/cancel — undo a pending deletion request
+// Authenticated (mounted under /api/account, requires JWT):
+//   GET    /export                 — Section 30 (access) + 31 (portability)
+//   POST   /delete                 — Section 33 (erasure)
+//   POST   /delete/cancel          — undo while still logged in
+//   GET    /status                 — powers the Privacy & My Data tab
+//
+// Public (mounted under /api/account, NO auth — token is its own credential):
+//   POST   /delete/confirm-cancel  — email-link cancel; lets the deactivated
+//                                    requester undo without logging back in
 //
 // Deletion is a soft request: we anonymise PII immediately but retain
 // tax-document rows until hardDeleteScheduledAt because the Revenue Code
 // requires 5y retention. A separate cron job purges the row after that.
 
 export const accountRouter = Router();
+export const accountPublicRouter = Router();
 
 const GRACE_DAYS = 30;
 const TAX_RETENTION_YEARS = 5;
+
+// ── Cancel token (signed, stateless) ──────────────────────────────────
+// HMAC-SHA256 over `companyId|requestedAtIso` keyed on JWT_SECRET. We
+// don't store the token anywhere; verification re-derives the HMAC and
+// checks against the DB row's `deletionRequestedAt`. That way the token
+// is invalidated automatically the moment the deletion is cancelled
+// (requestedAt becomes null → HMAC payload no longer matches).
+function signCancelToken(companyId: string, requestedAt: Date): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET not configured');
+  const payload = `${companyId}|${requestedAt.toISOString()}`;
+  const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${Buffer.from(payload, 'utf8').toString('base64url')}.${sig}`;
+}
+
+function verifyCancelToken(token: string): { companyId: string; requestedAt: Date } | null {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
+  const [payloadB64, sig] = token.split('.');
+  if (!payloadB64 || !sig) return null;
+  let payload: string;
+  try {
+    payload = Buffer.from(payloadB64, 'base64url').toString('utf8');
+  } catch {
+    return null;
+  }
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  // Constant-time compare so token guessing can't be timed.
+  const a = Buffer.from(sig, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  const [companyId, requestedAtIso] = payload.split('|');
+  if (!companyId || !requestedAtIso) return null;
+  const requestedAt = new Date(requestedAtIso);
+  if (Number.isNaN(requestedAt.getTime())) return null;
+  return { companyId, requestedAt };
+}
 
 /* ─── Status (powers the in-app Privacy & Data tab) ──────────────────── */
 
@@ -290,9 +335,13 @@ accountRouter.post('/delete', requireRole('admin'), async (req, res) => {
     ]);
 
     const cancelDeadline = new Date(now.getTime() + GRACE_DAYS * 86400_000);
+    const cancelToken = signCancelToken(companyId, now);
+    const cancelUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/account/cancel-delete?token=${encodeURIComponent(cancelToken)}`;
 
     // Fire-and-forget — email failure shouldn't block the API response.
-    // The audit-log row above is the canonical record either way.
+    // The audit-log row above is the canonical record either way. The
+    // email is now load-bearing: it carries the magic-link cancel URL
+    // that lets the deactivated user undo without re-logging-in.
     const companyForEmail = await prisma.company.findUnique({
       where: { id: companyId },
       select: { nameTh: true },
@@ -305,6 +354,7 @@ accountRouter.post('/delete', requireRole('admin'), async (req, res) => {
         requestedAt: now,
         cancelDeadline,
         hardDeleteScheduledAt: hardDeleteAt,
+        cancelUrl,
         locale: 'th',
       }).catch((err) => logger.warn('[DSR] confirmation email dispatch failed', {
         err: err instanceof Error ? err.message : String(err),
@@ -400,6 +450,71 @@ accountRouter.post('/owner/dsr-queue/:companyId/cancel', requireRole('super_admi
     res.json({ data: { status: 'cancelled' } });
   } catch (err) {
     logger.error('owner dsr cancel failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Cancel failed' });
+  }
+});
+
+/* ─── Public token-based cancel (email magic link) ───────────────────── */
+
+// Unauthenticated by design — the token itself is the credential, HMAC
+// signed and bound to the exact `deletionRequestedAt` timestamp. The user
+// is deactivated as soon as `/delete` runs, so requiring a JWT here would
+// soft-lock them out of their own cancel flow. This endpoint is the only
+// way back in if they let the in-app session expire.
+accountPublicRouter.post('/delete/confirm-cancel', async (req, res) => {
+  try {
+    const token = z.object({ token: z.string().min(20) }).parse(req.body).token;
+    const parsed = verifyCancelToken(token);
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid or tampered cancel token' });
+      return;
+    }
+    const company = await prisma.company.findUnique({
+      where: { id: parsed.companyId },
+      select: { deletionRequestedAt: true, deletionRequestedBy: true, nameTh: true },
+    });
+    // Token's timestamp must match the row's timestamp — otherwise the
+    // request was already cancelled (and may have been re-issued).
+    if (!company?.deletionRequestedAt || company.deletionRequestedAt.getTime() !== parsed.requestedAt.getTime()) {
+      res.status(400).json({ error: 'No matching deletion request — it may already be cancelled' });
+      return;
+    }
+    const graceCutoff = new Date(parsed.requestedAt.getTime() + GRACE_DAYS * 86400_000);
+    if (new Date() > graceCutoff) {
+      res.status(400).json({ error: 'Grace window for cancellation has expired' });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.company.update({
+        where: { id: parsed.companyId },
+        data: { deletionRequestedAt: null, deletionRequestedBy: null, hardDeleteScheduledAt: null },
+      }),
+      // Reactivate the requester so they can log back in. Other users in
+      // the workspace were never deactivated — only the requester was.
+      ...(company.deletionRequestedBy
+        ? [prisma.user.update({ where: { id: company.deletionRequestedBy }, data: { isActive: true } })]
+        : []),
+      prisma.auditLog.create({
+        data: {
+          companyId: parsed.companyId,
+          userId: company.deletionRequestedBy ?? 'system',
+          action: 'account.deletion_cancelled_via_email',
+          resourceType: 'company',
+          resourceId: parsed.companyId,
+          details: {},
+          ipAddress: req.ip ?? 'unknown',
+          userAgent: req.headers['user-agent'] ?? 'unknown',
+        },
+      }),
+    ]);
+    res.json({ data: { status: 'cancelled', companyNameTh: company.nameTh } });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'token is required' });
+      return;
+    }
+    logger.error('account public cancel failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Cancel failed' });
   }
 });
