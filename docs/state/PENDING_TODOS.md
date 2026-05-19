@@ -5,11 +5,25 @@ Last updated: 2026-05-19
 Items that were intentionally deferred during the launch-readiness push.
 Pick these up when the right trigger fires (column "When to revisit").
 
-## Deferred infrastructure / DX
+## Deploy workflow — current state (2026-05-20)
 
-| Item | Effort | When to revisit | Notes |
-|------|--------|-----------------|-------|
-| **Render auto-deploy on push to main** | 1 h | Next time someone notices a fix took 30 min to land | `render-deploy.yml` currently only fires on `workflow_dispatch`. Every push requires a manual `gh workflow run "Trigger Render Deploy"` to actually ship. Add a `push: branches: [main]` trigger OR enable Render-side auto-deploy (Dashboard → service → "Auto-Deploy: On"). The latter is easier and skips the migration step we currently do in the workflow — figure out whether migrations should also be automated or stay manual. |
+Render `autoDeployTrigger: commit` is live (commit `8047c4e`). Code-only
+pushes ship without human intervention; Render builds + restarts from
+the push webhook directly. The GitHub `Deploy to Render` workflow is
+**bypassed in this path** — it stays around for one specific case below.
+
+| Push contains | How to ship | Why |
+|---|---|---|
+| Code-only (TS/React/configs) | Just push. Render auto-deploys. | The webhook path doesn't run migrations, but it doesn't need to either. |
+| Prisma migration (new SQL under `backend/prisma/migrations/`) | `gh workflow run "Deploy to Render"` manually | Render's webhook deploy SKIPS the migration step. Code expecting new columns will 500 until the workflow's "Apply production migrations" step runs. |
+
+When in doubt: check `git diff origin/main..HEAD backend/prisma/migrations/`.
+Any output → use the workflow. Empty → push and walk away.
+
+Future cleanup (low priority): teach the auto-deploy path to also run
+migrations — e.g., a Render pre-deploy command that runs
+`npx prisma migrate deploy` before the app starts. Then the workflow
+becomes optional.
 
 ## Deferred features
 
