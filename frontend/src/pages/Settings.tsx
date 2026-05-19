@@ -29,6 +29,8 @@ import { useAuthStore } from '../store/authStore';
 import type { BankAccountProfile, InvoiceType, Language } from '../types';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { MascotHelperCard, PageHeader } from '../components/ui/AppChrome';
+import SectionSubNav, { type SectionSubNavItem } from '../components/SectionSubNav';
+import { Settings as SettingsIcon, ScrollText } from 'lucide-react';
 
 type BankDraft = Omit<BankAccountProfile, 'id'> & { id?: string };
 
@@ -507,8 +509,16 @@ export default function Settings() {
     ['language', isThai ? 'ภาษา' : 'Language'],
   ];
 
+  const subNavItems: SectionSubNavItem[] = [
+    { key: 'settings', to: '/app/settings', label: isThai ? 'ตั้งค่าทั่วไป' : 'General Settings', icon: SettingsIcon },
+    ...(isAdmin
+      ? [{ key: 'audit', to: '/app/audit', label: isThai ? 'Audit Log' : 'Audit Log', icon: ScrollText }]
+      : []),
+  ];
+
   return (
     <div className="max-w-7xl space-y-6">
+      <SectionSubNav items={subNavItems} />
       <PageHeader
         eyebrow={isThai ? 'Workspace settings' : 'Workspace settings'}
         title={t('settings.title')}

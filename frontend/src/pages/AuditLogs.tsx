@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Download, Filter, Loader2, ShieldAlert } from 'lucide-react';
+import { Search, Download, Filter, Loader2, ShieldAlert, Settings as SettingsIcon, ScrollText } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { AuditLog } from '../types';
+import SectionSubNav from '../components/SectionSubNav';
 
 const ACTION_COLORS: Record<string, string> = {
   'invoice.create': 'badge-success',
@@ -15,8 +16,9 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AuditLogs() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { formatDate } = useLanguage();
+  const isThai = i18n.language === 'th';
   const { token } = useAuthStore();
   const { policy, loading: policyLoading } = useCompanyAccessPolicy();
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -85,6 +87,12 @@ export default function AuditLogs() {
 
   return (
     <div className="space-y-4">
+      <SectionSubNav
+        items={[
+          { key: 'settings', to: '/app/settings', label: isThai ? 'ตั้งค่าทั่วไป' : 'General Settings', icon: SettingsIcon },
+          { key: 'audit', to: '/app/audit', label: isThai ? 'Audit Log' : 'Audit Log', icon: ScrollText },
+        ]}
+      />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">{t('audit.title')}</h1>
         <button className="btn-secondary" disabled>

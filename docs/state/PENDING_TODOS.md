@@ -5,6 +5,12 @@ Last updated: 2026-05-19
 Items that were intentionally deferred during the launch-readiness push.
 Pick these up when the right trigger fires (column "When to revisit").
 
+## Deferred infrastructure / DX
+
+| Item | Effort | When to revisit | Notes |
+|------|--------|-----------------|-------|
+| **Render auto-deploy on push to main** | 1 h | Next time someone notices a fix took 30 min to land | `render-deploy.yml` currently only fires on `workflow_dispatch`. Every push requires a manual `gh workflow run "Trigger Render Deploy"` to actually ship. Add a `push: branches: [main]` trigger OR enable Render-side auto-deploy (Dashboard → service → "Auto-Deploy: On"). The latter is easier and skips the migration step we currently do in the workflow — figure out whether migrations should also be automated or stay manual. |
+
 ## Deferred features
 
 | Item | Effort | When to revisit | Notes |

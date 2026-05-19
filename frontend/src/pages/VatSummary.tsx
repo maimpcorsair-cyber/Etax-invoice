@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator, TrendingUp, TrendingDown, FileSpreadsheet, Loader2,
-  ArrowRight, Calendar, FolderOpen,
+  ArrowRight, Calendar, FolderOpen, FileText, Receipt,
 } from 'lucide-react';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
+import SectionSubNav from '../components/SectionSubNav';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
@@ -139,6 +140,13 @@ export default function VatSummary() {
 
   return (
     <div className="space-y-4">
+      <SectionSubNav
+        items={[
+          { key: 'vat', to: '/app/vat-summary', label: isThai ? 'สรุปภาษีมูลค่าเพิ่ม' : 'VAT Summary', icon: Calculator },
+          { key: 'pp30', to: '/app/pp30', label: isThai ? 'ภพ.30' : 'PP30 Filing', icon: FileText },
+          { key: 'wht', to: '/app/wht-certificates', label: isThai ? 'ภงด.3/53 (หัก ณ ที่จ่าย)' : 'WHT Certificates', icon: Receipt },
+        ]}
+      />
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
