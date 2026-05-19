@@ -19,7 +19,11 @@
     "audit": "Audit Logs",
     "settings": "Settings",
     "logout": "Logout",
-    "profile": "Profile"
+    "profile": "Profile",
+    "sales": "Sales",
+    "purchases": "Purchases & Expenses",
+    "reports": "Tax Reports",
+    "directory": "Directory"
   },
   "landing": {
     "hero": {

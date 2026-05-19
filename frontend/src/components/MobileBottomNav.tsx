@@ -20,11 +20,14 @@ import { clsx } from 'clsx';
 import { useAuthStore } from '../store/authStore';
 import { isNative } from '../hooks/useNative';
 
+// Mobile mirrors the desktop 5-section IA but only surfaces 4 primary
+// tabs to keep finger-targets comfortable. Projects always appears in the
+// More drawer (rarely the user's first tap) and Reports lives there too.
 const primaryTabs = [
-  { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
-  { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
-  { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects' },
+  { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard', activePrefixes: ['/app/dashboard'] },
+  { key: 'sales', href: '/app/invoices', icon: FileText, labelKey: 'nav.sales', activePrefixes: ['/app/invoices', '/app/sales'] },
+  { key: 'purchases', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchases', activePrefixes: ['/app/purchase-invoices', '/app/purchases', '/app/expenses'] },
+  { key: 'directory', href: '/app/customers', icon: Users, labelKey: 'nav.directory', activePrefixes: ['/app/customers', '/app/directory', '/app/products'] },
 ];
 
 export default function MobileBottomNav() {
@@ -46,9 +49,9 @@ export default function MobileBottomNav() {
   if (!isMobile) return null;
 
   const moreItems = [
+    { key: 'reports', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.reports' },
+    { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects' },
     { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
-    { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
-    { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
     { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'
@@ -67,7 +70,7 @@ export default function MobileBottomNav() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex lg:hidden pb-safe">
         {primaryTabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = location.pathname.startsWith(tab.href);
+          const isActive = tab.activePrefixes.some((p) => location.pathname.startsWith(p));
           return (
             <Link
               key={tab.key}

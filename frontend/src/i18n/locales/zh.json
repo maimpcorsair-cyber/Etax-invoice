@@ -20,7 +20,11 @@
     "settings": "设置",
     "logout": "退出登录",
     "profile": "个人资料",
-    "plan": "套餐 / Plan"
+    "plan": "套餐 / Plan",
+    "sales": "销售",
+    "purchases": "采购与支出",
+    "reports": "税务报告",
+    "directory": "数据库"
   },
   "landing": {
     "hero": {

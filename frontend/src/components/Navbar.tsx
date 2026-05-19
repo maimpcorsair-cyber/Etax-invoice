@@ -1,14 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   FileText,
   Users,
-  Package,
   ShoppingCart,
   BriefcaseBusiness,
-  Wallet,
   Calculator,
   Shield,
   ShieldAlert,
@@ -22,20 +20,71 @@ import LanguageSwitcher from './LanguageSwitcher';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 
+// Reshaped IA — 5 grouped top-level sections.
+//   Sales           → invoices (T01–T05) + future quotations
+//   Purchases       → bills + petty cash + AI Inbox (sub-pages added in Commit B)
+//   Reports         → VAT/PP30 + future WHT/PND
+//   Directory       → customers + vendors + products (sub-pages added in Commit B)
+// Each top item points at the section's current default page so Commit A
+// stays backwards-compatible. Sub-routes ship in Commit B alongside the
+// PurchaseInvoices / Customers page splits.
+// activePrefixes makes the pill highlight whenever the URL matches ANY of
+// the listed prefixes. Future routes (e.g., /app/purchases/inbox or
+// /app/directory/vendors) will land under their grouped section without
+// needing a Navbar change.
 const navItems = [
-  { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { key: 'invoices', href: '/app/invoices', icon: FileText, labelKey: 'nav.invoices' },
-  { key: 'purchaseInvoices', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchaseInvoices' },
-  { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects' },
-  { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
-  { key: 'vatSummary', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.vatSummary' },
-  { key: 'customers', href: '/app/customers', icon: Users, labelKey: 'nav.customers' },
-  { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
+  { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard', activePrefixes: ['/app/dashboard'] },
+  { key: 'sales', href: '/app/invoices', icon: FileText, labelKey: 'nav.sales', activePrefixes: ['/app/invoices', '/app/sales'] },
+  { key: 'purchases', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchases', activePrefixes: ['/app/purchase-invoices', '/app/purchases', '/app/expenses'] },
+  { key: 'reports', href: '/app/vat-summary', icon: Calculator, labelKey: 'nav.reports', activePrefixes: ['/app/vat-summary', '/app/reports', '/app/pp30'] },
+  { key: 'directory', href: '/app/customers', icon: Users, labelKey: 'nav.directory', activePrefixes: ['/app/customers', '/app/directory', '/app/products'] },
 ];
+
+// Projects is conditional — hidden when the workspace has zero active
+// projects so product-only SMEs don't see noise. Reappears the moment a
+// project is created (fetched once per session via `useHasProjects`).
+const projectsNavItem = { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects', activePrefixes: ['/app/projects'] };
 
 const adminNavItems = [
   { key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin', roles: ['super_admin', 'admin'] },
 ];
+
+// Lightweight one-shot check for whether the tenant has any project rows.
+// Cached at module scope so navigation between pages doesn't re-fetch.
+let _projectCountCache: { token: string; count: number } | null = null;
+
+function useHasProjects(): boolean {
+  const token = useAuthStore((s) => s.token);
+  const [hasProjects, setHasProjects] = useState<boolean>(() => {
+    if (_projectCountCache && _projectCountCache.token === token) {
+      return _projectCountCache.count > 0;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (!token) return;
+    if (_projectCountCache && _projectCountCache.token === token) {
+      setHasProjects(_projectCountCache.count > 0);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/projects?take=1', { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const json = await res.json().catch(() => ({ data: [] }));
+        const count = Array.isArray(json.data) ? json.data.length : 0;
+        _projectCountCache = { token, count };
+        if (!cancelled) setHasProjects(count > 0);
+      })
+      .catch(() => {
+        // Endpoint optional / offline — fail closed (hidden).
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  return hasProjects;
+}
 
 const PLAN_BADGE: Record<string, string> = {
   free: 'bg-slate-100 text-slate-600',
@@ -51,7 +100,8 @@ export default function Navbar() {
   const { policy } = useCompanyAccessPolicy();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const visibleItems = navItems;
+  const hasProjects = useHasProjects();
+  const visibleItems = hasProjects ? [...navItems, projectsNavItem] : navItems;
   const visibleAdminItems = adminNavItems.filter(
     (item) => !item.roles || item.roles.includes(user?.role ?? ''),
   );
@@ -97,7 +147,7 @@ export default function Navbar() {
             <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
               {visibleItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname.startsWith(item.href);
+                const isActive = item.activePrefixes.some((p) => location.pathname.startsWith(p));
                 return (
                   <Link
                     key={item.key}
