@@ -3,7 +3,7 @@ import redis from '../../config/redis';
 import prisma from '../../config/database';
 import { withSystemRlsContext } from '../../config/rls';
 import { logger } from '../../config/logger';
-import { exportCompanyWorkspaceToSheets, isSheetsConfigured } from '../../services/googleSheetsService';
+import { exportCompanyWorkspaceToSheets, isSheetsConfigured, linkCell } from '../../services/googleSheetsService';
 
 const QUEUE_NAME = 'master-sheet-sync';
 const SYNC_DELAY_MS = 60_000; // 1 minute debounce
@@ -56,7 +56,7 @@ function taxStatusLabel(vatType: string) {
 }
 
 async function buildWorkspaceData(companyId: string) {
-  const [company, currentUser, products, purchaseInvoices, invoices, expenses, customers] = await Promise.all([
+  const [company, currentUser, products, purchaseInvoices, invoices, expenses, customers, projects, documentIntakes] = await Promise.all([
     withSystemRlsContext(prisma, (tx) => tx.company.findFirst({
       where: { id: companyId },
       select: {
@@ -108,8 +108,31 @@ async function buildWorkspaceData(companyId: string) {
     })),
     withSystemRlsContext(prisma, (tx) => tx.customer.findMany({
       where: { companyId, isActive: true },
-      include: { documents: { select: { documentType: true, status: true, driveUrl: true, driveFolderUrl: true } } },
+      include: { documents: { select: { documentType: true, status: true, s3Url: true, driveUrl: true, driveFolderUrl: true } } },
       take: 2000,
+    })),
+    // Projects feed the "สรุปโปรเจค" rollup tab — every active or recently
+    // completed project gets a per-project revenue/cost/balance row.
+    withSystemRlsContext(prisma, (tx) => tx.project.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      include: {
+        invoices: { select: { total: true, status: true, vatAmount: true } },
+        purchaseInvoices: { select: { total: true } },
+        expenseVouchers: { select: { totalAmount: true, status: true } },
+      },
+    })),
+    // Recent document intakes power the AI Inbox tab — only show items
+    // still needing action, not the already-saved ones.
+    withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+      where: {
+        companyId,
+        status: { in: ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: { project: { select: { code: true, name: true } } },
     })),
   ]);
 
@@ -135,6 +158,9 @@ async function buildWorkspaceData(companyId: string) {
     updatedAt: formatDate(p.updatedAt),
   }));
 
+  // attachmentLink is the column the new sheetDefs read — it's the clickable
+  // HYPERLINK formula. Falls back through s3Url (system of record), driveUrl
+  // (mirror), then pdfUrl (legacy field still used for sales PDFs).
   const inputVatTab = purchaseInvoices.map((pi) => ({
     date: formatDate(pi.invoiceDate),
     supplier: pi.supplierName,
@@ -145,11 +171,12 @@ async function buildWorkspaceData(companyId: string) {
     vat: pi.vatAmount,
     total: pi.total,
     taxStatus: taxStatusLabel(pi.vatType),
-    attachmentUrl: pi.pdfUrl ?? '',
+    attachmentLink: linkCell(pi.pdfUrl),
   }));
 
   const outputVatTab = invoices.map((inv) => {
     const buyer = inv.buyer?.nameTh || inv.buyer?.nameEn || '';
+    const url = (inv as { driveUrl?: string | null }).driveUrl ?? inv.pdfUrl ?? '';
     return {
       date: formatDate(inv.invoiceDate),
       buyer,
@@ -159,7 +186,7 @@ async function buildWorkspaceData(companyId: string) {
       subtotal: inv.subtotal,
       vat: inv.vatAmount,
       total: inv.total,
-      attachmentUrl: (inv as { driveUrl?: string | null }).driveUrl ?? inv.pdfUrl ?? '',
+      attachmentLink: linkCell(url),
     };
   });
 
@@ -171,24 +198,69 @@ async function buildWorkspaceData(companyId: string) {
     description: ev.items.map((i) => i.description).join(', ').slice(0, 200),
     amount: Number(ev.totalAmount),
     status: ev.status,
-    attachmentUrl: '',
+    attachmentLink: '', // populated when expense attachments are wired through worker query
   }));
 
-  const customerEvidenceTab = customers.map((c) => {
+  // Split customers vs vendors so each tab is scoped to its mental model.
+  // `both` shows up in both (it really is both per Prisma's `partyRole` enum).
+  const buildDirectoryRow = (c: typeof customers[number]) => {
     const doc = c.documents[0] ?? null;
+    const url = doc?.s3Url ?? doc?.driveUrl ?? null;
     return {
-      customer: c.nameTh || c.nameEn || '',
+      name: c.nameTh || c.nameEn || '',
       taxId: c.taxId ?? '',
-      role: c.partyRole ?? '',
       useCase: c.useCase ?? '',
       documentType: doc?.documentType ?? '',
       status: doc?.status ?? '',
       readiness: c.verificationStatus ?? '',
-      storage: doc?.driveUrl ? 'Drive' : '',
-      attachmentUrl: doc?.driveUrl ?? '',
-      folderUrl: doc?.driveFolderUrl ?? '',
+      attachmentLink: linkCell(url),
+      folderLink: linkCell(doc?.driveFolderUrl),
+    };
+  };
+  const customersTab = customers
+    .filter((c) => c.partyRole === 'customer' || c.partyRole === 'both')
+    .map(buildDirectoryRow);
+  const vendorsTab = customers
+    .filter((c) => c.partyRole === 'supplier' || c.partyRole === 'both')
+    .map(buildDirectoryRow);
+
+  // Project rollup — per-project revenue, cost, balance, forecast. Replaces
+  // the previously hardcoded empty array. Mirror of the dashboard's logic
+  // so master + dashboard report the same numbers.
+  const projectSummaryTab = projects.map((p) => {
+    const revenue = p.invoices
+      .filter((i) => i.status !== 'cancelled' && i.status !== 'rejected')
+      .reduce((sum, i) => sum + (i.total ?? 0), 0);
+    const purchaseCost = p.purchaseInvoices.reduce((sum, pi) => sum + (pi.total ?? 0), 0);
+    const expenseCost = p.expenseVouchers
+      .filter((ev) => ev.status !== 'rejected')
+      .reduce((sum, ev) => sum + Number(ev.totalAmount ?? 0), 0);
+    const actual = purchaseCost + expenseCost;
+    const budget = Number((p as { budget?: unknown }).budget ?? 0);
+    return {
+      project: `${p.code} ${p.name}`,
+      status: p.status,
+      budget,
+      revenue,
+      actual,
+      balance: budget - actual,
+      forecastProfit: revenue - actual,
+      files: '',
+      folderLink: '',
     };
   });
+
+  // AI Inbox — recent intakes still needing human action. Distinct from the
+  // saved-and-done intakes that already appear in ขาย/ซื้อ.
+  const aiInboxTab = documentIntakes.map((di) => ({
+    date: formatDate(di.createdAt),
+    fileName: di.fileName ?? '',
+    project: di.project ? `${di.project.code} ${di.project.name}` : '',
+    source: di.source ?? '',
+    status: di.status,
+    issue: di.error ?? '',
+    attachmentLink: linkCell(di.fileUrl),
+  }));
 
   return {
     companyName,
@@ -200,9 +272,10 @@ async function buildWorkspaceData(companyId: string) {
       inputVat: inputVatTab,
       outputVat: outputVatTab,
       expenses: expensesTab,
-      customerEvidence: customerEvidenceTab,
-      missingDocs: [],
-      projectSummary: [],
+      customers: customersTab,
+      vendors: vendorsTab,
+      missingDocs: aiInboxTab,
+      projectSummary: projectSummaryTab,
     },
   };
 }

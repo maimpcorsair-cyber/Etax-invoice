@@ -9,6 +9,7 @@ Pick these up when the right trigger fires (column "When to revisit").
 
 | Item | Effort | When to revisit | Notes |
 |------|--------|-----------------|-------|
+| **Drive folder restructure (`01_ขาย`/`02_ซื้อ`/`03_ค่าใช้จ่าย`/`04_ภาษี`/`05_ฐานข้อมูล`/`06_โปรเจค`)** | 4–6 h | Before first paying customer audits — or when an existing tenant complains the Drive is messy | Master Sheet rebuild already groups data the audit-friendly way; Drive can stay on the current `Customers/<code>` + `Projects/<code>` until we have user evidence it's a real problem. Add YYYY/MM bucketing inside transaction folders. `ensureLegacyMoved` helper to migrate existing tenants lazily on first post-deploy upload. |
 | **LINE bot — combined slip+bill Flex card** | 3–4 h | After a real LINE-OA user complains about the split cards | Was intentionally removed in `ae77fb6`; re-adding is design churn unless we have user evidence the split is worse. |
 | **Onboarding tour / in-app guided walkthrough** | 4–6 h | After 5–10 paying customers report "I didn't know what to do" | Needs a library decision (Shepherd / react-joyright / custom) and live UX testing. Don't ship without watching at least one prospect use the product first. |
 | **API documentation (OpenAPI / Swagger)** | 4 h | When a B2B customer asks for an integration spec | Generate via `swagger-jsdoc` or `zod-to-openapi` over existing Zod schemas. |

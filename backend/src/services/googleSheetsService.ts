@@ -230,6 +230,16 @@ function sheetCell(value: unknown): string | number {
   return String(value);
 }
 
+// Wrap a URL as a Google Sheets HYPERLINK formula so the cell renders as a
+// single-click 📎 icon instead of the raw URL string. Empty input → empty
+// cell so audit rows without a file don't render a confusing "📎" link.
+// Escapes double quotes inside the URL (rare but happens with encoded args).
+export function linkCell(url: string | null | undefined, label = '📎'): string {
+  if (!url) return '';
+  const safe = url.replace(/"/g, '""');
+  return `=HYPERLINK("${safe}","${label}")`;
+}
+
 function rowsFromObjects(rows: Array<Record<string, unknown>>, columns: Array<{ key: string; label: string }>) {
   return [
     columns.map((column) => column.label),
@@ -242,9 +252,91 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
   const sheets = google.sheets({ version: 'v4', auth });
   const drive = google.drive({ version: 'v3', auth });
   const title = `${data.companyName} - Billboy Company Workspace ${data.period}`;
+  // Renamed tabs to match SME mental model and Thai tax workflow:
+  //   ขาย Sales            — was "ภาษีขาย" (output VAT)
+  //   ซื้อ Purchases       — was "ภาษีซื้อ" (input VAT); only PurchaseInvoice rows
+  //   ค่าใช้จ่ายและเงินสดย่อย — was "ค่าใช้จ่าย"; ExpenseVoucher only (no tax invoice)
+  //   ลูกค้า Customers     — split from "รายชื่อและเอกสาร"
+  //   คู่ค้า Vendors       — split from "รายชื่อและเอกสาร"
+  //   สินค้า/บริการ Products — unchanged
+  //   AI Inbox              — renamed from "เอกสารต้องตรวจ"
+  //   สรุปโปรเจค Projects   — now populated (was hardcoded [])
+  //
+  // Every transactional tab gets a clickable Drive Link via HYPERLINK formula
+  // (built by linkCell). Project column is already populated per row by the
+  // worker; Google Sheets users can apply a filter view on it to scope the
+  // whole workbook to a single project — the "subset of master" pattern.
   const sheetDefs = [
     {
-      title: 'สินค้าและบริการ',
+      title: 'ขาย Sales',
+      rows: rowsFromObjects(data.tabs.outputVat ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'buyer', label: 'ลูกค้า' },
+        { key: 'documentNo', label: 'เลขเอกสาร' },
+        { key: 'project', label: 'โปรเจค' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'subtotal', label: 'ก่อน VAT' },
+        { key: 'vat', label: 'VAT' },
+        { key: 'total', label: 'รวม' },
+        { key: 'attachmentLink', label: 'ไฟล์' },
+      ]),
+    },
+    {
+      title: 'ซื้อ Purchases',
+      rows: rowsFromObjects(data.tabs.inputVat ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'supplier', label: 'ผู้ขาย' },
+        { key: 'documentNo', label: 'เลขเอกสาร' },
+        { key: 'project', label: 'โปรเจค' },
+        { key: 'category', label: 'หมวด' },
+        { key: 'subtotal', label: 'ก่อน VAT' },
+        { key: 'vat', label: 'VAT' },
+        { key: 'total', label: 'รวม' },
+        { key: 'taxStatus', label: 'สถานะภาษี' },
+        { key: 'attachmentLink', label: 'ไฟล์' },
+      ]),
+    },
+    {
+      title: 'ค่าใช้จ่ายและเงินสดย่อย',
+      rows: rowsFromObjects(data.tabs.expenses ?? [], [
+        { key: 'date', label: 'วันที่' },
+        { key: 'voucherNo', label: 'เลข PV' },
+        { key: 'project', label: 'โปรเจค' },
+        { key: 'category', label: 'หมวด' },
+        { key: 'description', label: 'รายละเอียด' },
+        { key: 'amount', label: 'ยอด' },
+        { key: 'status', label: 'สถานะ' },
+        { key: 'attachmentLink', label: 'ไฟล์' },
+      ]),
+    },
+    {
+      title: 'ลูกค้า Customers',
+      rows: rowsFromObjects(data.tabs.customers ?? [], [
+        { key: 'name', label: 'ชื่อ' },
+        { key: 'taxId', label: 'เลขผู้เสียภาษี' },
+        { key: 'useCase', label: 'ใช้สำหรับ' },
+        { key: 'documentType', label: 'เอกสาร' },
+        { key: 'status', label: 'สถานะไฟล์' },
+        { key: 'readiness', label: 'ความพร้อม' },
+        { key: 'attachmentLink', label: 'ไฟล์' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
+      ]),
+    },
+    {
+      title: 'คู่ค้า Vendors',
+      rows: rowsFromObjects(data.tabs.vendors ?? [], [
+        { key: 'name', label: 'ชื่อ' },
+        { key: 'taxId', label: 'เลขผู้เสียภาษี' },
+        { key: 'useCase', label: 'ใช้สำหรับ' },
+        { key: 'documentType', label: 'เอกสาร' },
+        { key: 'status', label: 'สถานะไฟล์' },
+        { key: 'readiness', label: 'ความพร้อม' },
+        { key: 'attachmentLink', label: 'ไฟล์' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
+      ]),
+    },
+    {
+      title: 'สินค้า/บริการ Products',
       rows: rowsFromObjects(data.tabs.products ?? [], [
         { key: 'code', label: 'รหัส' },
         { key: 'nameTh', label: 'ชื่อไทย' },
@@ -263,77 +355,19 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
       ]),
     },
     {
-      title: 'ภาษีซื้อ',
-      rows: rowsFromObjects(data.tabs.inputVat ?? [], [
-        { key: 'date', label: 'วันที่' },
-        { key: 'supplier', label: 'ผู้ขาย' },
-        { key: 'documentNo', label: 'เลขเอกสาร' },
-        { key: 'project', label: 'โปรเจค/บริษัท' },
-        { key: 'category', label: 'หมวด' },
-        { key: 'subtotal', label: 'ก่อน VAT' },
-        { key: 'vat', label: 'VAT' },
-        { key: 'total', label: 'รวม' },
-        { key: 'taxStatus', label: 'สถานะภาษี' },
-        { key: 'attachmentUrl', label: 'ไฟล์' },
-      ]),
-    },
-    {
-      title: 'ภาษีขาย',
-      rows: rowsFromObjects(data.tabs.outputVat ?? [], [
-        { key: 'date', label: 'วันที่' },
-        { key: 'buyer', label: 'ลูกค้า' },
-        { key: 'documentNo', label: 'เลขเอกสาร' },
-        { key: 'project', label: 'โปรเจค/บริษัท' },
-        { key: 'status', label: 'สถานะ' },
-        { key: 'subtotal', label: 'ก่อน VAT' },
-        { key: 'vat', label: 'VAT' },
-        { key: 'total', label: 'รวม' },
-        { key: 'attachmentUrl', label: 'ไฟล์' },
-      ]),
-    },
-    {
-      title: 'ค่าใช้จ่าย',
-      rows: rowsFromObjects(data.tabs.expenses ?? [], [
-        { key: 'date', label: 'วันที่' },
-        { key: 'voucherNo', label: 'เลข PV' },
-        { key: 'project', label: 'โปรเจค/บริษัท' },
-        { key: 'category', label: 'หมวด' },
-        { key: 'description', label: 'รายละเอียด' },
-        { key: 'amount', label: 'ยอด' },
-        { key: 'status', label: 'สถานะ' },
-        { key: 'attachmentUrl', label: 'ไฟล์' },
-      ]),
-    },
-    {
-      title: 'รายชื่อและเอกสาร',
-      rows: rowsFromObjects(data.tabs.customerEvidence ?? [], [
-        { key: 'customer', label: 'รายชื่อ' },
-        { key: 'taxId', label: 'เลขผู้เสียภาษี' },
-        { key: 'role', label: 'บทบาท' },
-        { key: 'useCase', label: 'ใช้สำหรับ' },
-        { key: 'documentType', label: 'เอกสาร' },
-        { key: 'status', label: 'สถานะไฟล์' },
-        { key: 'readiness', label: 'ความพร้อม' },
-        { key: 'storage', label: 'ที่เก็บ' },
-        { key: 'attachmentUrl', label: 'ไฟล์' },
-        { key: 'folderUrl', label: 'โฟลเดอร์' },
-      ]),
-    },
-    {
-      title: 'เอกสารต้องตรวจ',
+      title: 'AI Inbox',
       rows: rowsFromObjects(data.tabs.missingDocs ?? [], [
         { key: 'date', label: 'วันที่' },
         { key: 'fileName', label: 'ไฟล์' },
-        { key: 'project', label: 'โปรเจค/บริษัท' },
+        { key: 'project', label: 'โปรเจค' },
         { key: 'source', label: 'ที่มา' },
         { key: 'status', label: 'สถานะ' },
-        { key: 'drive', label: 'Drive' },
         { key: 'issue', label: 'สิ่งที่ต้องทำ' },
-        { key: 'attachmentUrl', label: 'เปิด' },
+        { key: 'attachmentLink', label: 'เปิด' },
       ]),
     },
     {
-      title: 'สรุปโปรเจค',
+      title: 'สรุปโปรเจค Projects',
       rows: rowsFromObjects(data.tabs.projectSummary ?? [], [
         { key: 'project', label: 'โปรเจค' },
         { key: 'status', label: 'สถานะ' },
@@ -343,6 +377,7 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
         { key: 'balance', label: 'เหลือ' },
         { key: 'forecastProfit', label: 'กำไรคาดการณ์' },
         { key: 'files', label: 'ไฟล์' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
       ]),
     },
   ];
