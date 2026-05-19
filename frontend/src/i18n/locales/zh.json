@@ -15,7 +15,7 @@
     "projects": "项目",
     "expenses": "零用金",
     "vatSummary": "增值税汇总",
-    "admin": "管理面板",
+    "admin": "公司设置",
     "audit": "审计日志",
     "settings": "设置",
     "logout": "退出登录",
@@ -259,7 +259,7 @@
     }
   },
   "admin": {
-    "title": "管理面板",
+    "title": "公司设置",
     "systemOverview": "系统概览",
     "users": "用户管理",
     "roles": "角色与权限",

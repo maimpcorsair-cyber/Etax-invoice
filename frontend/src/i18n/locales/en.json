@@ -15,7 +15,7 @@
     "projects": "Projects",
     "expenses": "Petty Cash",
     "vatSummary": "VAT Summary",
-    "admin": "Admin Panel",
+    "admin": "Workspace Settings",
     "audit": "Audit Logs",
     "settings": "Settings",
     "logout": "Logout",
@@ -258,7 +258,7 @@
     }
   },
   "admin": {
-    "title": "Admin Panel",
+    "title": "Workspace Settings",
     "systemOverview": "System Overview",
     "users": "User Management",
     "roles": "Roles & Permissions",

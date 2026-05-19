@@ -642,7 +642,7 @@ function UsersTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) 
             >
               <option value="viewer">{isThai ? 'ผู้ดู' : 'Viewer'}</option>
               <option value="accountant">{isThai ? 'บัญชี' : 'Accountant'}</option>
-              <option value="admin">{isThai ? 'ผู้ดูแล' : 'Admin'}</option>
+              <option value="admin">{isThai ? 'ผู้ดูแลบริษัท' : 'Workspace Owner'}</option>
             </select>
           </div>
           <div>
@@ -707,7 +707,7 @@ function UsersTab({ isThai, t }: { isThai: boolean; t: (k: string) => string }) 
                       {managedUser.role === 'super_admin' && <option value="super_admin">Super Admin</option>}
                       <option value="viewer">{isThai ? 'ผู้ดู' : 'Viewer'}</option>
                       <option value="accountant">{isThai ? 'บัญชี' : 'Accountant'}</option>
-                      <option value="admin">{isThai ? 'ผู้ดูแล' : 'Admin'}</option>
+                      <option value="admin">{isThai ? 'ผู้ดูแลบริษัท' : 'Workspace Owner'}</option>
                     </select>
                   </td>
                   <td className="table-cell">

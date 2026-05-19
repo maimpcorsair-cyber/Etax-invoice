@@ -1471,7 +1471,7 @@ export default function Landing() {
                       // manual entry so signup still works end-to-end.
                       <>
                         <div>
-                          <label className="label">{isThai ? 'ชื่อผู้ดูแลระบบ' : 'Admin Name'}</label>
+                          <label className="label">{isThai ? 'ชื่อผู้ดูแลบริษัท' : 'Workspace Owner Name'}</label>
                           <input
                             className="input-field"
                             value={form.adminName}

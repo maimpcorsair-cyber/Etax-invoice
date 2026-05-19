@@ -753,7 +753,7 @@ export default function Settings() {
             id="tax"
             icon={<FileCheck2 className="h-5 w-5" />}
             title={isThai ? 'e-Tax, RD และ Certificate' : 'e-Tax, RD, and certificate'}
-            description={isThai ? 'ดูความพร้อมก่อนส่งเอกสารจริงไปกรมสรรพากร ค่าลับยังจัดการใน Admin Panel' : 'Check readiness before live RD submission. Sensitive values remain in Admin Panel.'}
+            description={isThai ? 'ดูความพร้อมก่อนส่งเอกสารจริงไปกรมสรรพากร ค่าลับยังจัดการในหน้าตั้งค่าบริษัท' : 'Check readiness before live RD submission. Sensitive values remain in Workspace Settings.'}
           >
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -777,7 +777,7 @@ export default function Settings() {
             </div>
             <Link to="/app/admin" className="btn-secondary inline-flex items-center gap-2">
               <ShieldCheck className="h-4 w-4" />
-              {isThai ? 'จัดการ RD / Certificate ใน Admin Panel' : 'Manage RD / certificate in Admin Panel'}
+              {isThai ? 'จัดการ RD / Certificate ในหน้าตั้งค่าบริษัท' : 'Manage RD / certificate in Workspace Settings'}
             </Link>
           </SettingsCard>
 
