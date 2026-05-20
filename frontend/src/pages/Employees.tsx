@@ -118,7 +118,18 @@ export default function Employees() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (!res.ok) {
+        // Surface the failing field name from Zod's details[] so the user
+        // can tell which input is wrong instead of a generic "Validation error".
+        const details = (json as { details?: Array<{ path?: (string | number)[]; message?: string }> }).details;
+        if (details && details.length > 0) {
+          const fields = details
+            .map((d) => `${(d.path ?? []).join('.')}: ${d.message ?? ''}`)
+            .join('; ');
+          throw new Error(fields);
+        }
+        throw new Error(json.error ?? `HTTP ${res.status}`);
+      }
       setSuccess(isEdit ? (isThai ? 'อัปเดตแล้ว' : 'Updated') : (isThai ? 'เพิ่มพนักงานเรียบร้อย' : 'Employee added'));
       setShowForm(false);
       setForm(blankForm);
