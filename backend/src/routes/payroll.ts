@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/database';
 import { logger } from '../config/logger';
-import { withRlsContext, tenantRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { runPayroll, type EmployeeAdjustmentMap } from '../services/payroll/payrollRunner';
 
@@ -57,7 +56,7 @@ function normaliseBody(body: z.infer<typeof employeeBodySchema>) {
 
 payrollRouter.get('/employees', async (req, res) => {
   try {
-    const employees = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+    const employees = await req.txn!((tx) =>
       tx.employee.findMany({
         where: { companyId: req.user!.companyId },
         orderBy: [{ isActive: 'desc' }, { fullName: 'asc' }],
@@ -73,7 +72,7 @@ payrollRouter.get('/employees', async (req, res) => {
 payrollRouter.post('/employees', editRole, async (req, res) => {
   try {
     const body = employeeBodySchema.parse(req.body);
-    const created = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+    const created = await req.txn!((tx) =>
       tx.employee.create({
         data: { ...normaliseBody(body), companyId: req.user!.companyId },
       }),
@@ -130,7 +129,7 @@ payrollRouter.patch('/employees/:id', editRole, async (req, res) => {
 payrollRouter.get('/runs', async (req, res) => {
   try {
     const year = req.query.year ? parseInt(String(req.query.year), 10) : undefined;
-    const runs = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+    const runs = await req.txn!((tx) =>
       tx.payrollRun.findMany({
         where: { companyId: req.user!.companyId, ...(year ? { year } : {}) },
         orderBy: [{ year: 'desc' }, { month: 'desc' }],
