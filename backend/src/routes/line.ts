@@ -18,6 +18,7 @@ import {
   buildPaymentSlipFlexCard,
   buildMatchCandidateBubble,
   buildMatchOptionsBubble,
+  buildCombinedSlipBillFlexCard,
   sendLineFlexCarousel,
   type MatchCandidate,
   buildInvoiceFlexCard,
@@ -876,6 +877,56 @@ async function tryAutoMatchPendingSlipWithPurchase(
   return true;
 }
 
+// Ranks slip vs invoice candidates and returns the best matches. Shared by
+// buildSlipCandidateBubbles (renders 5 bubbles + options) and
+// sendCombinedSlipAndCandidates (uses the top candidate for the combined card).
+async function rankSlipCandidates(_intakeId: string, result: OcrResult, companyId: string): Promise<MatchCandidate[]> {
+  const amount = Number(result.payment?.amount ?? result.total ?? 0);
+  if (amount <= 0) return [];
+  const paidAt = result.payment?.paidAt ? new Date(result.payment.paidAt) : new Date();
+  const reference = result.payment?.reference || result.invoiceNumber || undefined;
+  const counterparty = [result.payment?.fromName, result.payment?.toName, result.supplierName]
+    .filter(Boolean)
+    .join(' ');
+  const slip = { companyId, amount, paidAt, reference, counterpartyName: counterparty };
+  const direction = result.payment?.direction ?? 'unknown';
+
+  const [salesCandidates, purchaseCandidates] = await Promise.all([
+    direction === 'outgoing'
+      ? Promise.resolve([])
+      : findInvoiceCandidates(slip).catch((err) => { logger.warn('[Line] sales candidates failed', { err }); return []; }),
+    direction === 'incoming'
+      ? Promise.resolve([])
+      : findPurchaseInvoiceCandidates(slip).catch((err) => { logger.warn('[Line] purchase candidates failed', { err }); return []; }),
+  ]);
+
+  return [
+    ...salesCandidates.map((c) => ({
+      type: 'sales_invoice' as const,
+      id: c.invoiceId,
+      invoiceNumber: c.invoiceNumber,
+      partyName: c.buyerName,
+      total: c.total,
+      invoiceDate: c.invoiceDate.toISOString().slice(0, 10),
+      score: c.score,
+      amountDelta: c.total - amount,
+    })),
+    ...purchaseCandidates.map((c) => ({
+      type: 'purchase_invoice' as const,
+      id: c.purchaseInvoiceId,
+      invoiceNumber: c.invoiceNumber,
+      partyName: c.supplierName,
+      total: c.total,
+      invoiceDate: c.invoiceDate.toISOString().slice(0, 10),
+      score: c.score,
+      amountDelta: c.total - amount,
+    })),
+  ].sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    return Math.abs(a.amountDelta) - Math.abs(b.amountDelta);
+  });
+}
+
 async function buildSlipCandidateBubbles(intakeId: string, result: OcrResult, companyId: string): Promise<object[]> {
   const amount = Number(result.payment?.amount ?? result.total ?? 0);
   if (amount <= 0) {
@@ -945,9 +996,27 @@ async function sendCombinedSlipAndCandidates(
     await sendLineFlexMessage(lineUserId, altText, buildPaymentSlipFlexCard(result, 'pending', { intakeId }));
     return;
   }
+
+  // High-confidence single match path — show one combined bubble instead of
+  // a slip+candidates carousel. Saves the user from comparing two bubbles
+  // and reduces taps to confirm. Triggers when the top candidate has exact
+  // amount and score ≥ 80.
+  const ranked = await rankSlipCandidates(intakeId, result, intake.companyId);
+  const topCandidate = ranked[0];
+  if (topCandidate && topCandidate.amountDelta === 0 && topCandidate.score >= 80) {
+    await sendLineFlexMessage(
+      lineUserId,
+      altText,
+      buildCombinedSlipBillFlexCard(result, topCandidate, intakeId),
+    );
+    return;
+  }
+
   const combinedEditUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, intake.companyId);
   const slipBubble = buildPaymentSlipFlexCard(result, 'pending', { intakeId, editUrl: combinedEditUrl });
-  const candidateBubbles = await buildSlipCandidateBubbles(intakeId, result, intake.companyId);
+  const candidateBubbles = ranked.length > 0
+    ? [...ranked.slice(0, 5).map((c) => buildMatchCandidateBubble(c, intakeId)), buildMatchOptionsBubble(intakeId, { askDirection: (result.payment?.direction ?? 'unknown') === 'unknown', allowUpload: true })]
+    : await buildSlipCandidateBubbles(intakeId, result, intake.companyId);
   const allBubbles = [slipBubble, ...candidateBubbles].slice(0, 12);
   await sendLineFlexCarousel(lineUserId, altText, allBubbles);
 }
@@ -3667,6 +3736,26 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       lineUserId,
       `📷 ส่งรูปหรือไฟล์ PDF ของบิลที่ยอด ${amtFmt} มาในแชทได้เลย\n\nระบบจะอ่านและคู่กับสลิปนี้ให้อัตโนมัติ (ภายใน 30 นาที)`,
     );
+    return;
+  }
+
+  if (data.startsWith('reject_match:')) {
+    // User saw the combined slip+bill card but said it's not the right bill.
+    // Fall back to the full candidates carousel so they can pick from others
+    // or upload the correct bill.
+    const intakeId = data.slice('reject_match:'.length);
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+    }));
+    const result = intake?.ocrResult as unknown as OcrResult | null;
+    if (!intake || !result) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป');
+      return;
+    }
+    const combinedEditUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, intake.companyId);
+    const slipBubble = buildPaymentSlipFlexCard(result, 'pending', { intakeId, editUrl: combinedEditUrl });
+    const candidateBubbles = await buildSlipCandidateBubbles(intakeId, result, intake.companyId);
+    await sendLineFlexCarousel(lineUserId, 'เลือกบิลที่คู่กับสลิปนี้', [slipBubble, ...candidateBubbles].slice(0, 12));
     return;
   }
 

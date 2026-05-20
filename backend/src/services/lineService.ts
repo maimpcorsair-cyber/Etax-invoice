@@ -737,6 +737,131 @@ export interface MatchCandidate {
   amountDelta: number;
 }
 
+// Combined slip + matched-bill card used when there is a single high-confidence
+// match (exact amount, score ≥ 80). One bubble shows both sides + a single
+// "✅ ยืนยันจับคู่" CTA. Paypers-style — saves the user from comparing two
+// separate bubbles in a carousel.
+export function buildCombinedSlipBillFlexCard(
+  slip: OcrResult,
+  bill: MatchCandidate,
+  intakeId: string,
+): object {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+  const slipAmount = Number(slip.payment?.amount ?? slip.total ?? 0);
+  const slipDate = slip.payment?.paidAt ? new Date(slip.payment.paidAt).toISOString().slice(0, 10) : null;
+  const slipRef = slip.payment?.reference || '';
+  const slipFrom = slip.payment?.fromName || '-';
+  const slipTo = slip.payment?.toName || '-';
+
+  const typeBadge = bill.type === 'sales_invoice'
+    ? { label: '📥 รับชำระจากลูกค้า', bg: '#dcfce7', fg: '#166534' }
+    : { label: '📤 ชำระให้ผู้ขาย', bg: '#dbeafe', fg: '#1e40af' };
+
+  const matchBadge = bill.amountDelta === 0
+    ? { label: '🎯 ยอดตรงเป๊ะ', bg: '#dcfce7', fg: '#166534' }
+    : { label: `±฿${Math.abs(bill.amountDelta).toLocaleString('th-TH')}`, bg: '#fef3c7', fg: '#92400e' };
+
+  const miniRow = (label: string, value: string) => ({
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      { type: 'text', text: label, size: 'xs', color: '#6b7280', flex: 4 },
+      { type: 'text', text: value, size: 'xs', color: '#111827', flex: 6, align: 'end' as const, wrap: true },
+    ],
+  });
+
+  const section = (heading: string, badge: { label: string; bg: string; fg: string }, rows: object[]) => ({
+    type: 'box',
+    layout: 'vertical',
+    spacing: 'xs',
+    paddingAll: '8px',
+    backgroundColor: '#f9fafb',
+    cornerRadius: '6px',
+    contents: [
+      {
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          { type: 'text', text: heading, size: 'sm', weight: 'bold' as const, color: '#111827', flex: 5 },
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: badge.bg,
+            cornerRadius: '4px',
+            paddingAll: '3px',
+            flex: 3,
+            contents: [{ type: 'text', text: badge.label, color: badge.fg, size: 'xxs', weight: 'bold' as const, align: 'center' as const }],
+          },
+        ],
+      },
+      ...rows,
+    ],
+  });
+
+  return {
+    type: 'bubble',
+    size: 'mega',
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: '#0f172a',
+      paddingAll: '10px',
+      contents: [
+        { type: 'text', text: 'พบบิลที่คู่กับสลิปนี้', color: '#ffffff', weight: 'bold' as const, size: 'md' },
+        { type: 'text', text: 'ตรวจแล้วกดยืนยันเพื่อจับคู่', color: '#94a3b8', size: 'xs', margin: 'xs' },
+      ],
+    },
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'md',
+      contents: [
+        section('💸 สลิปโอน', matchBadge, [
+          miniRow('💵 ยอด', fmt(slipAmount)),
+          miniRow('📅 วันที่', slipDate ?? '-'),
+          miniRow('🏦 จาก', slipFrom),
+          miniRow('🏦 ถึง', slipTo),
+          ...(slipRef ? [miniRow('🔖 เลขอ้างอิง', slipRef)] : []),
+        ]),
+        section('📄 บิลที่จับคู่', typeBadge, [
+          miniRow('💵 ยอด', fmt(bill.total)),
+          miniRow('📄 เลขที่', bill.invoiceNumber),
+          miniRow(bill.type === 'sales_invoice' ? '👤 ลูกค้า' : '🏢 ผู้ขาย', bill.partyName || '-'),
+          miniRow('📅 วันที่', bill.invoiceDate ?? '-'),
+          miniRow('⭐ ความตรงกัน', `${bill.score}%`),
+        ]),
+      ],
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#16a34a',
+          action: {
+            type: 'postback',
+            label: '✅ ยืนยันจับคู่',
+            data: `select_match:${intakeId}:${bill.type}:${bill.id}`,
+          },
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          action: {
+            type: 'postback',
+            label: '❌ ไม่ใช่ใบนี้ — ดูตัวเลือกอื่น',
+            data: `reject_match:${intakeId}`,
+          },
+        },
+      ],
+    },
+  };
+}
+
 export function buildMatchCandidateBubble(
   candidate: MatchCandidate,
   intakeId: string,
