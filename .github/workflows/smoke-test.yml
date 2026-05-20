@@ -1,0 +1,74 @@
+name: Prod smoke test
+
+# Read-only health checks against production. Runs every 30 min on a cron and
+# on every push to main. Verifies the public API surface stays alive without
+# polluting prod data (no signup, no invoice create).
+#
+# To run a full signup→invoice→PDF E2E, use the local dev stack or a future
+# staging environment. This workflow is the always-on canary.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backend /api/health is OK
+        run: |
+          BODY=$(curl -sf https://etax-invoice-api.onrender.com/api/health)
+          echo "$BODY" | jq -e '.status == "ok"' >/dev/null
+          echo "✅ /api/health OK"
+
+      - name: Backend /api/health/deep returns 200 or 207
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://etax-invoice-api.onrender.com/api/health/deep)
+          if [[ "$STATUS" != "200" && "$STATUS" != "207" ]]; then
+            echo "❌ unexpected status: $STATUS"
+            exit 1
+          fi
+          echo "✅ /api/health/deep status: $STATUS"
+
+      - name: Backend /api/health/workers is OK or stuck-detected
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://etax-invoice-api.onrender.com/api/health/workers)
+          # 200 (healthy) or 503 (queue stuck) both prove the endpoint is up
+          if [[ "$STATUS" != "200" && "$STATUS" != "503" ]]; then
+            echo "❌ workers endpoint unexpected status: $STATUS"
+            exit 1
+          fi
+          echo "✅ /api/health/workers status: $STATUS"
+
+      - name: Backend rejects unauthenticated /api/invoices with 401
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://etax-invoice-api.onrender.com/api/invoices)
+          [[ "$STATUS" == "401" ]] || (echo "❌ expected 401, got $STATUS" && exit 1)
+          echo "✅ /api/invoices auth gate enforced"
+
+      - name: Backend rejects malformed signup body with 400
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST https://etax-invoice-api.onrender.com/api/billing/free-signup \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          [[ "$STATUS" == "400" ]] || (echo "❌ expected 400, got $STATUS" && exit 1)
+          echo "✅ signup validation gate working"
+
+      - name: Frontend landing returns 200 and has Billboy branding
+        run: |
+          BODY=$(curl -sf https://etax-invoice.vercel.app/)
+          echo "$BODY" | grep -q "Billboy" || (echo "❌ Billboy branding missing" && exit 1)
+          echo "$BODY" | grep -q '<script.*assets/index-' || (echo "❌ JS bundle missing" && exit 1)
+          echo "✅ frontend landing intact"
+
+      - name: Backend lookup endpoint accepts 13-digit tax ID
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://etax-invoice-api.onrender.com/api/billing/signup/lookup-juristic?taxId=0000000000000")
+          # 200 (found OR empty cache) is OK; 400 on malformed tax IDs handled separately
+          [[ "$STATUS" == "200" ]] || (echo "❌ lookup endpoint broken: $STATUS" && exit 1)
+          echo "✅ DBD lookup endpoint responsive"
