@@ -3,8 +3,7 @@ import QRCode from 'qrcode';
 import { amountInWordsThai, amountInWordsEnglish } from './invoiceService';
 import { logger } from '../config/logger';
 import prisma from '../config/database';
-
-type Language = 'th' | 'en' | 'both';
+import { formatDateTh, formatDateEn, formatCurrency, escapeHtml, type Language } from './pdfService/utils';
 
 export interface PdfInvoiceData {
   invoiceNumber: string;
@@ -186,30 +185,6 @@ const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   'builtin:anime-tokyo':   { name: 'Anime Tokyo',   supportedTypes: ALL_DOCUMENT_TYPES },
   'builtin:anime-pastel':  { name: 'Anime Pastel',  supportedTypes: ALL_DOCUMENT_TYPES },
 };
-
-function formatDateTh(date: Date): string {
-  const buddhistYear = date.getFullYear() + 543;
-  const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-  return `${date.getDate()} ${months[date.getMonth()]} ${buddhistYear}`;
-}
-
-function formatDateEn(date: Date): string {
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function resolveTemplateLanguageHtml(template: { htmlTh: string; htmlEn: string }, language: Language) {
   if (language === 'en') return template.htmlEn;
