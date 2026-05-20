@@ -144,7 +144,7 @@ export default function WhtCertificateList() {
               ? 'ยังไม่มีใบรับรองหักภาษีในงวดนี้'
               : 'No WHT certificates for this period'}
           </p>
-          <Link to="/app/invoice-builder" className="btn-primary mt-4 inline-flex">
+          <Link to="/app/invoices/new" className="btn-primary mt-4 inline-flex">
             <FileText className="w-4 h-4" />
             {isThai ? 'สร้างใบกำกับภาษี' : 'Create Invoice'}
           </Link>
