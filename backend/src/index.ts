@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import { rateLimitMiddleware } from './middleware/rateLimit';
+import { attachRlsTxn } from './middleware/rls';
 import { logger } from './config/logger';
 import { authRouter } from './routes/auth';
 import { invoicesRouter } from './routes/invoices';
@@ -71,6 +72,12 @@ app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) }
 // Redis-based rate limiting after body parsing
 // Apply per-companyId for authenticated requests, per-IP for unauthenticated
 app.use('/api/', rateLimitMiddleware);
+
+// req.txn / req.systemTxn helpers — opt-in wrapper around withRlsContext so
+// route handlers don't have to thread prisma + tenantRlsContext(req.user!)
+// manually. Attaches as no-op until called, so unauthenticated routes are
+// unaffected. See [middleware/rls.ts](src/middleware/rls.ts).
+app.use('/api/', attachRlsTxn);
 
 const healthHandler = (_req: express.Request, res: express.Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2026-05-09d' });
