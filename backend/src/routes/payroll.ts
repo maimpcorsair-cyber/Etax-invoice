@@ -4,6 +4,7 @@ import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { requireRole } from '../middleware/auth';
 import { runPayroll, type EmployeeAdjustmentMap } from '../services/payroll/payrollRunner';
+import { buildPnd1Csv, buildSso110Csv, UTF8_BOM, type PayslipRow } from '../services/payroll/csvExports';
 
 // Phase 3 payroll routes — Employee CRUD, monthly run, payslip
 // retrieval, and the two government exports (ภงด.1 + สปส.1-10) as
@@ -220,56 +221,42 @@ payrollRouter.post('/runs/:id/finalize', editRole, async (req, res) => {
 });
 
 // ── Government exports — CSV ─────────────────────────────────────────
-
-function csvEscape(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value);
-  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
-  return str;
-}
-
-function payslipsToCsv(rows: Array<Record<string, unknown>>, columns: Array<{ key: string; label: string }>): string {
-  const header = columns.map((c) => c.label).join(',');
-  const lines = rows.map((row) => columns.map((c) => csvEscape(row[c.key])).join(','));
-  return [header, ...lines].join('\n');
-}
+// Builders live in services/payroll/csvExports.ts so the column
+// schemas can be locked by unit tests and reused outside this route.
 
 payrollRouter.get('/runs/:id/export/pnd1', async (req, res) => {
   try {
     const run = await prisma.payrollRun.findFirst({
       where: { id: req.params.id, companyId: req.user!.companyId },
-      include: { payslips: { include: { employee: { select: { nationalId: true } } } } },
+      include: { payslips: { include: { employee: { select: { nationalId: true, ssoNumber: true } } } } },
     });
     if (!run) {
       res.status(404).json({ error: 'Payroll run not found' });
       return;
     }
-    // ภงด.1 columns the RD e-Filing portal accepts as CSV upload.
-    const csv = payslipsToCsv(
-      run.payslips.map((p) => ({
-        nationalId: p.employee?.nationalId ?? '',
-        name: p.employeeName,
-        incomeType: '1',          // 1 = §40(1) employment income
-        payDate: run.payDate.toISOString().slice(0, 10),
-        grossIncome: p.gross.toFixed(2),
-        whtRate: '',              // monthly withholding — variable per progressive table
-        whtAmount: p.whtAmount.toFixed(2),
-        condition: '1',           // 1 = withheld
-      })),
-      [
-        { key: 'nationalId', label: 'NationalID' },
-        { key: 'name', label: 'Name' },
-        { key: 'incomeType', label: 'IncomeType' },
-        { key: 'payDate', label: 'PayDate' },
-        { key: 'grossIncome', label: 'GrossIncome' },
-        { key: 'whtRate', label: 'WhtRate' },
-        { key: 'whtAmount', label: 'WhtAmount' },
-        { key: 'condition', label: 'Condition' },
-      ],
-    );
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: { taxId: true, nameTh: true },
+    });
+    const rows: PayslipRow[] = run.payslips.map((p) => ({
+      employeeName: p.employeeName,
+      employeeNationalId: p.employee?.nationalId ?? null,
+      employeeSsoNumber: p.employee?.ssoNumber ?? null,
+      gross: p.gross,
+      whtAmount: p.whtAmount,
+      ssoEmployee: p.ssoEmployee,
+      ssoEmployer: p.ssoEmployer,
+    }));
+    const csv = buildPnd1Csv(rows, {
+      year: run.year,
+      month: run.month,
+      payDateIso: run.payDate.toISOString().slice(0, 10),
+      companyTaxId: company?.taxId ?? null,
+      companyNameTh: company?.nameTh ?? null,
+    });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="pnd1-${run.year}-${String(run.month).padStart(2, '0')}.csv"`);
-    res.send('﻿' + csv); // BOM so Excel TH opens UTF-8 properly
+    res.send(UTF8_BOM + csv);
   } catch (err) {
     logger.error('export pnd1 failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to export ภงด.1' });
@@ -286,30 +273,19 @@ payrollRouter.get('/runs/:id/export/sso', async (req, res) => {
       res.status(404).json({ error: 'Payroll run not found' });
       return;
     }
-    // สปส.1-10 columns expected by SSO online filing.
-    const csv = payslipsToCsv(
-      run.payslips.map((p) => ({
-        ssoNumber: p.employee?.ssoNumber || p.employee?.nationalId || '',
-        prefix: '',
-        firstName: p.employeeName.split(' ')[0] ?? p.employeeName,
-        lastName: p.employeeName.split(' ').slice(1).join(' '),
-        salary: p.gross.toFixed(2),
-        employeeContribution: p.ssoEmployee.toFixed(2),
-        employerContribution: p.ssoEmployer.toFixed(2),
-      })),
-      [
-        { key: 'ssoNumber', label: 'SSO_Number' },
-        { key: 'prefix', label: 'Prefix' },
-        { key: 'firstName', label: 'FirstName' },
-        { key: 'lastName', label: 'LastName' },
-        { key: 'salary', label: 'Salary' },
-        { key: 'employeeContribution', label: 'EmployeeContribution' },
-        { key: 'employerContribution', label: 'EmployerContribution' },
-      ],
-    );
+    const rows: PayslipRow[] = run.payslips.map((p) => ({
+      employeeName: p.employeeName,
+      employeeNationalId: p.employee?.nationalId ?? null,
+      employeeSsoNumber: p.employee?.ssoNumber ?? null,
+      gross: p.gross,
+      whtAmount: p.whtAmount,
+      ssoEmployee: p.ssoEmployee,
+      ssoEmployer: p.ssoEmployer,
+    }));
+    const csv = buildSso110Csv(rows);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="sso-1-10-${run.year}-${String(run.month).padStart(2, '0')}.csv"`);
-    res.send('﻿' + csv);
+    res.send(UTF8_BOM + csv);
   } catch (err) {
     logger.error('export sso failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to export สปส.1-10' });

@@ -1,22 +1,14 @@
 import { launchBrowser } from './browserService';
 import QRCode from 'qrcode';
-import { amountInWordsThai, amountInWordsEnglish } from './invoiceService';
 import { logger } from '../config/logger';
 import prisma from '../config/database';
 import {
   formatDateTh,
   formatDateEn,
   formatCurrency,
-  escapeHtml,
-  DOC_TITLE,
-  ALL_DOCUMENT_TYPES,
-  BUILTIN_DOCUMENT_TEMPLATES,
   resolveTemplateLanguageHtml,
   resolveBuiltinTemplate,
-  compileTemplateHtml,
   buildOnlineViewUrl,
-  frontendPublicAssetUrl,
-  resolveDocumentTheme,
   type Language,
 } from './pdfService/utils';
 import { buildHtml } from './pdfService/builders/standard';

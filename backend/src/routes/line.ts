@@ -42,14 +42,9 @@ import {
   supportedDocumentMimeType,
 } from '../services/documentOcrService';
 import {
-  recordFromJson,
-  stringFromUnknown,
-  numberFromUnknown,
-  warningTextFromJson,
   summarizeDocumentIntakeOcr,
   isGroupTextCommand,
   templateFieldsFor,
-  getTemplateValue,
   setTemplateValue,
   missingTemplateFields,
   parseTemplateReply,
@@ -59,7 +54,6 @@ import {
   paymentReference,
   hasUsefulLineOcrData,
   closeAmount,
-  PURCHASE_TEMPLATE_FIELDS,
   BANK_TRANSFER_TEMPLATE_FIELDS,
   type DocumentTemplateField,
 } from './line/helpers';
