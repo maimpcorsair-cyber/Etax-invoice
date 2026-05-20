@@ -35,6 +35,8 @@ const CancelDelete = React.lazy(() => import('./pages/CancelDelete'));
 const Financials = React.lazy(() => import('./pages/Financials'));
 const AcceptInvite = React.lazy(() => import('./pages/AcceptInvite'));
 const Reconciliation = React.lazy(() => import('./pages/Reconciliation'));
+const Employees = React.lazy(() => import('./pages/Employees'));
+const PayrollRuns = React.lazy(() => import('./pages/PayrollRuns'));
 const OwnerTransactions = React.lazy(() => import('./pages/OwnerTransactions'));
 const OwnerCoupons = React.lazy(() => import('./pages/OwnerCoupons'));
 const OwnerRenewals = React.lazy(() => import('./pages/OwnerRenewals'));
@@ -196,6 +198,9 @@ export default function App() {
             <Route path="account/privacy" element={<AccountPrivacy />} />
             <Route path="reports/financials" element={<Financials />} />
             <Route path="reports/reconciliation" element={<Reconciliation />} />
+            <Route path="payroll/employees" element={<Employees />} />
+            <Route path="payroll/runs" element={<PayrollRuns />} />
+            <Route path="payroll" element={<PayrollRuns />} />
           </Route>
           <Route
             path="/ops"

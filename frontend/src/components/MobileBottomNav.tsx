@@ -13,6 +13,7 @@ import {
   BriefcaseBusiness,
   Wallet,
   Calculator,
+  Banknote,
   Settings,
   X,
 } from 'lucide-react';
@@ -49,6 +50,7 @@ export default function MobileBottomNav() {
 
   const moreItems = [
     { key: 'reports', href: '/app/reports/financials', icon: Calculator, labelKey: 'nav.reports' },
+    { key: 'payroll', href: '/app/payroll/employees', icon: Banknote, labelKey: 'nav.payroll' },
     { key: 'projects', href: '/app/projects', icon: BriefcaseBusiness, labelKey: 'nav.projects' },
     { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
