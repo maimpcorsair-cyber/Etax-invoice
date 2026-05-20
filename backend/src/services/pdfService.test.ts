@@ -1,0 +1,138 @@
+// Smoke tests for the 7 HTML builders inside pdfService. These are NOT
+// visual regression tests (no headless browser, no pixel diff). They
+// guard against the worst failure modes:
+//   1. A builder throws on valid input (template logic broke)
+//   2. A builder returns empty or absurdly short HTML
+//   3. Required user-visible fields go missing (invoice number, totals,
+//      buyer name) — usually caused by a token typo in the template
+//
+// When pdfService is later split into per-variant files, these tests
+// catch the case where an internal helper isn't re-exported correctly.
+//
+// Run: cd backend && npm run test:unit
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  buildHtml,
+  buildHtmlMinimal,
+  buildHtmlCute,
+  buildHtmlProfessional,
+  buildHtmlDark,
+  buildHtmlAnime,
+  buildHtmlCrayon,
+  type PdfInvoiceData,
+} from './pdfService';
+
+const FIXTURE: PdfInvoiceData = {
+  invoiceNumber: 'IV-2026-000128',
+  invoiceDate: new Date('2026-04-24T00:00:00Z'),
+  dueDate: new Date('2026-04-30T00:00:00Z'),
+  type: 'tax_invoice',
+  language: 'th',
+  seller: {
+    nameTh: 'บริษัท สยาม เทคโนโลยี จำกัด',
+    nameEn: 'Siam Technology Co., Ltd.',
+    taxId: '0105560123456',
+    branchCode: '00000',
+    branchNameTh: 'สำนักงานใหญ่',
+    addressTh: '123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110',
+    addressEn: '123 Sukhumvit Road, Khlong Toei, Bangkok 10110',
+    phone: '02-123-4567',
+    email: 'contact@siamtech.co.th',
+    website: 'siamtech.co.th',
+    logoUrl: null,
+  },
+  buyer: {
+    nameTh: 'บริษัท เมฆา คอมเมิร์ซ จำกัด',
+    nameEn: 'Mekha Commerce Co., Ltd.',
+    taxId: '0107547000293',
+    branchCode: '00000',
+    addressTh: '456 ถนนพระราม 4 แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110',
+    addressEn: '456 Rama IV Road, Khlong Toei, Bangkok 10110',
+  },
+  items: [
+    {
+      nameTh: 'พัฒนาเว็บไซต์',
+      nameEn: 'Website development',
+      quantity: 1,
+      unit: 'งาน',
+      unitPrice: 30_000,
+      discountAmount: 0,
+      vatType: 'vat7',
+      amount: 30_000,
+      vatAmount: 2_100,
+      totalAmount: 32_100,
+    },
+    {
+      nameTh: 'บำรุงรักษารายเดือน',
+      nameEn: 'Monthly maintenance',
+      quantity: 1,
+      unit: 'เดือน',
+      unitPrice: 15_000,
+      discountAmount: 0,
+      vatType: 'vat7',
+      amount: 15_000,
+      vatAmount: 1_050,
+      totalAmount: 16_050,
+    },
+  ],
+  subtotal: 45_000,
+  vatAmount: 3_150,
+  discountAmount: 0,
+  total: 48_150,
+  notes: 'กรุณาชำระภายในกำหนด',
+  paymentMethod: 'โอนเงินผ่านธนาคาร',
+  showCompanyLogo: false,
+  documentMode: 'electronic',
+};
+
+// Each entry is a name + a () => string callable so we don't fight TS
+// over union types of (data) vs (data, variant) signatures.
+const builders: Array<[name: string, render: (d: PdfInvoiceData) => string]> = [
+  ['buildHtml (standard)', (d) => buildHtml(d)],
+  ['buildHtmlMinimal', (d) => buildHtmlMinimal(d, 'minimal-white')],
+  ['buildHtmlCute', (d) => buildHtmlCute(d, 'cute-pink')],
+  ['buildHtmlProfessional', (d) => buildHtmlProfessional(d, 'pro-blue-modern')],
+  ['buildHtmlDark', (d) => buildHtmlDark(d, 'dark-king')],
+  ['buildHtmlAnime', (d) => buildHtmlAnime(d, 'anime-ink')],
+  ['buildHtmlCrayon', (d) => buildHtmlCrayon(d)],
+];
+
+for (const [name, render] of builders) {
+  test(`${name} produces non-trivial HTML and contains key fields`, () => {
+    const html = render(FIXTURE);
+
+    // Sanity: HTML response is real
+    assert.ok(html, 'builder returned empty');
+    assert.ok(html.length > 2000, `HTML too short (${html.length} bytes) — likely template logic broke`);
+    assert.ok(html.length < 500_000, `HTML too large (${html.length} bytes) — likely template duplication bug`);
+
+    // Required user-facing fields must appear somewhere. If any of these
+    // are missing the document is materially broken even if the template
+    // renders successfully.
+    assert.ok(html.includes('IV-2026-000128'), 'invoice number missing');
+    assert.ok(html.includes('48,150') || html.includes('48150'), 'total amount missing');
+    assert.ok(html.includes('เมฆา') || html.includes('Mekha'), 'buyer name missing');
+    assert.ok(html.includes('สยาม') || html.includes('Siam'), 'seller name missing');
+  });
+}
+
+test('all builders accept English language without throwing', () => {
+  const englishFixture: PdfInvoiceData = { ...FIXTURE, language: 'en' };
+  for (const [name, render] of builders) {
+    const html = render(englishFixture);
+    assert.ok(html.length > 1000, `${name} returned suspiciously short HTML in EN mode`);
+  }
+});
+
+test('all builders accept the 5 document types without throwing', () => {
+  const types = ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'];
+  for (const t of types) {
+    const fixture: PdfInvoiceData = { ...FIXTURE, type: t };
+    for (const [name, render] of builders) {
+      const html = render(fixture);
+      assert.ok(html.length > 1000, `${name}/${t} produced tiny HTML`);
+    }
+  }
+});

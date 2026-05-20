@@ -6,7 +6,7 @@ import prisma from '../config/database';
 
 type Language = 'th' | 'en' | 'both';
 
-interface PdfInvoiceData {
+export interface PdfInvoiceData {
   invoiceNumber: string;
   invoiceDate: Date;
   dueDate?: Date | null;
@@ -330,7 +330,7 @@ async function enrichElectronicDocument(data: PdfInvoiceData): Promise<PdfInvoic
   return { ...data, onlineViewUrl, onlineQrDataUrl };
 }
 
-function buildHtml(data: PdfInvoiceData): string {
+export function buildHtml(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
   const isBoth = data.language === 'both';
@@ -1208,10 +1208,8 @@ export async function generatePdf(data: PdfInvoiceData): Promise<Buffer> {
   }));
 }
 
-export { buildHtml };
-
 // ─── Minimal template builder ────────────────────────────────────────────────
-function buildHtmlMinimal(data: PdfInvoiceData, variant: string): string {
+export function buildHtmlMinimal(data: PdfInvoiceData, variant: string): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
   const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
@@ -1444,7 +1442,7 @@ function buildHtmlMinimal(data: PdfInvoiceData, variant: string): string {
 </html>`;
 }
 
-function buildHtmlCute(data: PdfInvoiceData, variant: string): string {
+export function buildHtmlCute(data: PdfInvoiceData, variant: string): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
   const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
@@ -1715,7 +1713,7 @@ function buildHtmlCute(data: PdfInvoiceData, variant: string): string {
 </html>`;
 }
 
-function buildHtmlProfessional(data: PdfInvoiceData, variant: string): string {
+export function buildHtmlProfessional(data: PdfInvoiceData, variant: string): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
   const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
@@ -2269,7 +2267,7 @@ function buildHtmlPosterTemplate(data: PdfInvoiceData, tokens: PosterTemplateTok
 /* ═══════════════════════════════════════════════════════════
    GROUP 4: DARK / MAN / TECH  (10 variants)
 ═══════════════════════════════════════════════════════════ */
-function buildHtmlDark(data: PdfInvoiceData, variant: string): string {
+export function buildHtmlDark(data: PdfInvoiceData, variant: string): string {
   const posterTokenMap: Record<string, Omit<PosterTemplateTokens, 'group' | 'art'>> = {
     king:     { bg:'#050505', paper:'#070707', ink:'#f8eac0', muted:'#b5a77b', accent:'#d4af37', accent2:'#17120a', soft:'#15120b', border:'#3f341b', headerText:'#fff6d7', title:'Dark King', subtitle:'Luxury Gold' },
     samurai:  { bg:'#0a0000', paper:'#0e0505', ink:'#f2dddd', muted:'#b58b8b', accent:'#c0392b', accent2:'#250707', soft:'#180808', border:'#4a1212', headerText:'#fff1f1', title:'Steel Samurai', subtitle:'Crimson Steel' },
@@ -2444,7 +2442,7 @@ function buildHtmlDark(data: PdfInvoiceData, variant: string): string {
 /* ═══════════════════════════════════════════════════════════
    GROUP 5: ANIME / OTAKU  (10 variants)
 ═══════════════════════════════════════════════════════════ */
-function buildHtmlAnime(data: PdfInvoiceData, variant: string): string {
+export function buildHtmlAnime(data: PdfInvoiceData, variant: string): string {
   const posterTokenMap: Record<string, Omit<PosterTemplateTokens, 'group' | 'art'>> = {
     ink:     { bg:'#f8fafc', paper:'#ffffff', ink:'#111111', muted:'#64748b', accent:'#c0392b', accent2:'#111111', soft:'#f3f4f6', border:'#d4d4d8', headerText:'#ffffff', title:'Anime Black Ink', subtitle:'Manga Ink' },
     flame:   { bg:'#fff5f5', paper:'#ffffff', ink:'#260606', muted:'#8b5a5a', accent:'#ef4444', accent2:'#991b1b', soft:'#fff1f2', border:'#fecaca', headerText:'#ffffff', title:'Anime Red Flame', subtitle:'Red Flame' },
@@ -2622,7 +2620,7 @@ function buildHtmlAnime(data: PdfInvoiceData, variant: string): string {
 </div></body></html>`;
 }
 
-function buildHtmlCrayon(data: PdfInvoiceData): string {
+export function buildHtmlCrayon(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
   const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
