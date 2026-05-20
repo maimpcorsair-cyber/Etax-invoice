@@ -4,7 +4,7 @@ import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { resolveCompanyAccessPolicy } from '../services/accessPolicyService';
-import { exportCompanyWorkspaceToSheets, exportPp30ToSheets } from '../services/googleSheetsService';
+import { exportCompanyWorkspaceToSheets } from '../services/googleSheetsService';
 import { isDriveConfigured } from '../services/googleDriveService';
 import { logger } from '../config/logger';
 
@@ -70,9 +70,8 @@ auditRouter.post('/export-package', requireRole('admin', 'super_admin'), async (
 
     const companyName = company.nameTh || company.nameEn || 'Billboy';
 
-    function vatLabel(v: string) { return v === 'vat7' ? 'VAT 7%' : v === 'vatZero' ? 'VAT 0%' : 'ยกเว้น VAT'; }
-    function taxStatusLabel(v: string) { return v === 'vat7' ? 'ขอคืนภาษีซื้อได้' : v === 'vatZero' ? 'VAT 0%' : 'ไม่มี VAT'; }
-    function fmtDate(d: Date | null | undefined) { return d ? d.toISOString().slice(0, 10) : ''; }
+    const taxStatusLabel = (v: string) => v === 'vat7' ? 'ขอคืนภาษีซื้อได้' : v === 'vatZero' ? 'VAT 0%' : 'ไม่มี VAT';
+    const fmtDate = (d: Date | null | undefined) => d ? d.toISOString().slice(0, 10) : '';
 
     const shareTargets = [currentUser?.email, body.shareWithEmail].filter((e): e is string => !!e);
 

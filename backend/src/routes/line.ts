@@ -546,24 +546,6 @@ async function recordLineProjectMemberActivity(input: {
   });
 }
 
-function buildProjectJoinInviteText(input: { joinUrl: string; companyName: string; projectName?: string | null }) {
-  return `รับไฟล์เข้าโปรเจคแล้วครับ ✅\n\n` +
-    `ตอนนี้บันทึกในนาม LINE guest ของ ${input.companyName}${input.projectName ? ` / ${input.projectName}` : ''}\n` +
-    `ถ้าต้องการดูสถานะเอกสาร, dashboard โปรเจค, หรือรับสิทธิ์ในทีม ให้กดลิงก์นี้แล้วเข้าสู่ระบบด้วย Google:\n${input.joinUrl}`;
-}
-
-async function sendProjectJoinInviteOnce(targetId: string, member: { id: string; joinUrl: string | null } | null, input: { companyName: string; projectName?: string | null }) {
-  if (!member?.joinUrl) return;
-  const key = `line:project-join-invite:${member.id}`;
-  try {
-    const sent = await redis.set(key, '1', 'EX', 24 * 60 * 60, 'NX');
-    if (!sent) return;
-  } catch (err) {
-    logger.warn('[Line] Project join invite rate-limit failed; sending once without cache', { err, memberId: member.id });
-  }
-  await sendLineText(targetId, buildProjectJoinInviteText({ joinUrl: member.joinUrl, ...input }));
-}
-
 function buildOcrTextSummary(result: OcrResult, note?: string) {
   const fmt = (value: number) =>
     new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(value || 0);
@@ -1357,21 +1339,6 @@ function paymentReference(result: OcrResult) {
 
 function hasUsefulLineOcrData(result?: OcrResult) {
   return !!(result && (result.supplierName || result.invoiceNumber || result.total || result.vatAmount || paymentAmount(result)));
-}
-
-function bankTransferDetails(result: OcrResult) {
-  const payment = result.payment;
-  const lines = [
-    payment?.bankName ? `🏦 ธนาคาร/แอป: ${payment.bankName}` : null,
-    payment?.fromName || payment?.fromAccount
-      ? `จาก: ${payment?.fromName || '-'}${payment?.fromAccount ? ` (${payment.fromAccount})` : ''}`
-      : null,
-    payment?.toName || payment?.toAccount
-      ? `ถึง: ${payment?.toName || '-'}${payment?.toAccount ? ` (${payment.toAccount})` : ''}`
-      : null,
-    paymentReference(result) ? `เลขอ้างอิง: ${paymentReference(result)}` : null,
-  ].filter(Boolean);
-  return lines.length ? `\n${lines.join('\n')}` : '';
 }
 
 function closeAmount(left: number, right: number) {
