@@ -46,8 +46,4 @@ jobs:
           # tests since each test stubs/overrides as needed, but the module
           # throws if absent.
           JWT_SECRET: ci-unit-test-secret-not-used-in-prod
-        run: |
-          npx tsx --test \
-            src/services/payroll/thaiTaxCalculator.test.ts \
-            src/services/payroll/ssoCalculator.test.ts \
-            src/services/intakeEditToken.test.ts
+        run: npm run test:unit

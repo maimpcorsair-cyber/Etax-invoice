@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "test": "tsx --test src/**/*.test.ts",
+    "test:unit": "tsx --test src/services/payroll/thaiTaxCalculator.test.ts src/services/payroll/ssoCalculator.test.ts src/services/intakeEditToken.test.ts",
     "test:e2e:domains": "tsx --test src/routes/domain-split.e2e.test.ts",
     "test:integration:payments": "tsx --test src/routes/payments.integration.test.ts",
     "test:integration:invoices": "tsx --test src/routes/invoices.integration.test.ts",
