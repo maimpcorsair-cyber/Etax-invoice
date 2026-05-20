@@ -92,14 +92,18 @@ export default function Employees() {
       const isEdit = !!form.id;
       const url = isEdit ? `/api/payroll/employees/${form.id}` : '/api/payroll/employees';
       const method = isEdit ? 'PATCH' : 'POST';
+      // Backend Zod requires exactly 13 digits for nationalId/ssoNumber, so
+      // strip dashes/spaces that Thai users naturally type (e.g.
+      // "1-2345-67890-12-3"). Empty strings pass through unchanged.
+      const digits = (v: string | null) => (v ? v.replace(/\D/g, '') : '');
       const payload = {
         employeeCode: form.employeeCode,
         fullName: form.fullName,
         position: form.position || '',
         email: form.email || '',
         phone: form.phone || '',
-        nationalId: form.nationalId || '',
-        ssoNumber: form.ssoNumber || '',
+        nationalId: digits(form.nationalId),
+        ssoNumber: digits(form.ssoNumber),
         baseSalary: Number(form.baseSalary),
         bankAccount: form.bankAccount || '',
         bankName: form.bankName || '',
@@ -119,13 +123,27 @@ export default function Employees() {
       });
       const json = await res.json();
       if (!res.ok) {
-        // Surface the failing field name from Zod's details[] so the user
-        // can tell which input is wrong instead of a generic "Validation error".
+        // Surface the failing field with a Thai-friendly message so the
+        // user doesn't have to translate a raw Zod error.
         const details = (json as { details?: Array<{ path?: (string | number)[]; message?: string }> }).details;
         if (details && details.length > 0) {
+          const fieldLabels: Record<string, { th: string; hint: string }> = {
+            employeeCode: { th: 'รหัสพนักงาน', hint: 'ต้องไม่ว่าง' },
+            fullName: { th: 'ชื่อ-นามสกุล', hint: 'ต้องไม่ว่าง' },
+            nationalId: { th: 'เลขบัตรประชาชน', hint: 'ต้องเป็นตัวเลข 13 หลัก' },
+            ssoNumber: { th: 'เลขประกันสังคม', hint: 'ต้องเป็นตัวเลข 13 หลัก' },
+            email: { th: 'อีเมล', hint: 'รูปแบบอีเมลไม่ถูกต้อง' },
+            baseSalary: { th: 'เงินเดือน', hint: 'ต้องเป็นตัวเลข ≥ 0' },
+            startDate: { th: 'วันที่เริ่มงาน', hint: 'ต้องเป็นรูปแบบ YYYY-MM-DD' },
+          };
           const fields = details
-            .map((d) => `${(d.path ?? []).join('.')}: ${d.message ?? ''}`)
-            .join('; ');
+            .map((d) => {
+              const key = String(d.path?.[0] ?? '');
+              const lbl = fieldLabels[key];
+              if (!lbl) return `${key}: ${d.message ?? ''}`;
+              return isThai ? `${lbl.th} — ${lbl.hint}` : `${key}: ${d.message ?? ''}`;
+            })
+            .join(' · ');
           throw new Error(fields);
         }
         throw new Error(json.error ?? `HTTP ${res.status}`);
