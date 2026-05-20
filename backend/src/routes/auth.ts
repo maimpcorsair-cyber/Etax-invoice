@@ -34,8 +34,7 @@ function issueToken(user: { id: string; companyId: string; role: string; email: 
   return jwt.sign(
     { userId: user.id, companyId: user.companyId, role: user.role, email: user.email },
     process.env.JWT_SECRET!,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any },
+    { expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as jwt.SignOptions['expiresIn'] },
   );
 }
 

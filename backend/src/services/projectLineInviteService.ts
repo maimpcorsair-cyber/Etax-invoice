@@ -50,8 +50,7 @@ export function signProjectLineMemberInvite(input: Omit<ProjectLineMemberInviteT
   return jwt.sign(
     { type: 'project_line_member_invite', ...input },
     process.env.JWT_SECRET!,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { expiresIn: PROJECT_LINE_INVITE_TTL as any },
+    { expiresIn: PROJECT_LINE_INVITE_TTL as jwt.SignOptions['expiresIn'] },
   );
 }
 

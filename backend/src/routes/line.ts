@@ -2022,8 +2022,7 @@ lineRouter.post('/admin/groups/:groupId/portal-link', authenticate, requireRole(
         groupLinkId: group.id,
       },
       process.env.JWT_SECRET!,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { expiresIn: PROJECT_PORTAL_TTL as any },
+      { expiresIn: PROJECT_PORTAL_TTL as jwt.SignOptions['expiresIn'] },
     );
     const url = `${getFrontendBaseUrl()}/project-portal/${token}`;
 

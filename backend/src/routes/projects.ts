@@ -100,8 +100,7 @@ function buildProjectPortalUrl(input: { companyId: string; projectId: string; gr
       groupLinkId: input.groupLinkId,
     },
     process.env.JWT_SECRET!,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { expiresIn: PROJECT_PORTAL_TTL as any },
+    { expiresIn: PROJECT_PORTAL_TTL as jwt.SignOptions['expiresIn'] },
   );
   return `${getFrontendBaseUrl()}/project-portal/${token}`;
 }
