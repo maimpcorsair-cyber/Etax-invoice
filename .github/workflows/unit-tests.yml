@@ -1,0 +1,53 @@
+name: Unit tests
+
+# Runs the pure-function unit tests (tax/SSO calculator + HMAC tokens)
+# on every push and PR. These don't need Postgres or Redis, so the job
+# is fast (≤ 1 min) and can gate merges to main.
+#
+# Integration tests live alongside but are gated on a running stack —
+# they're invoked manually via the package.json scripts and excluded
+# here to keep this job hermetic.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Run unit tests
+        working-directory: backend
+        env:
+          # Required by intakeEditToken module; value is irrelevant for unit
+          # tests since each test stubs/overrides as needed, but the module
+          # throws if absent.
+          JWT_SECRET: ci-unit-test-secret-not-used-in-prod
+        run: |
+          npx tsx --test \
+            src/services/payroll/thaiTaxCalculator.test.ts \
+            src/services/payroll/ssoCalculator.test.ts \
+            src/services/intakeEditToken.test.ts
