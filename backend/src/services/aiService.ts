@@ -506,9 +506,9 @@ function normalizeVendorName(name: string | null | undefined): string {
     // Strip common English business suffixes
     .replace(/\b(co\.?,?\s*ltd\.?|company\s+limited|limited|inc\.?|ltd\.?|llc|gmbh)\b/g, '')
     // Strip parenthesized content like "(สำนักงานใหญ่)" / "(head office)"
-    .replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, '')
+    .replace(/[([{][^)\]}]*[)\]}]/g, '')
     // Collapse all whitespace + remove punctuation/symbols (Thai keeps its chars)
-    .replace(/[\.,;:!?'"`~@#$%^&*+=|\\\/<>_-]/g, ' ')
+    .replace(/[.,;:!?'"`~@#$%^&*+=|\\/<>_-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1051,7 +1051,7 @@ function parseOcrJson(raw: string, emptyResult: OcrResult, azureContent?: string
   // Strip markdown code fences the model occasionally adds despite a
   // json-only prompt (` ```json ... ``` `).
   const stripped = raw
-    .replace(/^[\s​]*```(?:json)?\s*/i, '')
+    .replace(/^\s*```(?:json)?\s*/i, '')
     .replace(/\s*```\s*$/i, '')
     .trim();
   const jsonMatch = stripped.match(/\{[\s\S]*\}/);

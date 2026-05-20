@@ -103,7 +103,7 @@ function parseDate(raw: string): string | null {
 }
 
 function parseCsv(buffer: Buffer): ParsedTxn[] {
-  const text = buffer.toString('utf8').replace(/^﻿/, ''); // strip BOM
+  const text = buffer.toString('utf8').replace(/^\uFEFF/, ''); // strip BOM
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return [];
 
