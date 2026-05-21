@@ -16,6 +16,8 @@ const QuotationList = React.lazy(() => import('./pages/QuotationList'));
 const QuotationBuilder = React.lazy(() => import('./pages/QuotationBuilder'));
 const DeliveryNoteList = React.lazy(() => import('./pages/DeliveryNoteList'));
 const DeliveryNoteBuilder = React.lazy(() => import('./pages/DeliveryNoteBuilder'));
+const RecurringInvoiceList = React.lazy(() => import('./pages/RecurringInvoiceList'));
+const RecurringInvoiceBuilder = React.lazy(() => import('./pages/RecurringInvoiceBuilder'));
 const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
@@ -191,6 +193,9 @@ export default function App() {
             <Route path="delivery-notes" element={<DeliveryNoteList />} />
             <Route path="delivery-notes/new" element={<DeliveryNoteBuilder />} />
             <Route path="delivery-notes/:id" element={<DeliveryNoteBuilder />} />
+            <Route path="recurring-invoices" element={<RecurringInvoiceList />} />
+            <Route path="recurring-invoices/new" element={<RecurringInvoiceBuilder />} />
+            <Route path="recurring-invoices/:id" element={<RecurringInvoiceBuilder />} />
             <Route path="customers" element={<Customers />} />
             <Route path="customers/:id/statement" element={<CustomerStatementPage />} />
             <Route path="products" element={<Products />} />

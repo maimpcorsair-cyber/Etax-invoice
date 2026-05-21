@@ -66,6 +66,20 @@ enum DeliveryNoteStatus {
   cancelled // ยกเลิกฝั่งผู้ขาย
 }
 
+enum RecurringInvoiceStatus {
+  active
+  paused
+  ended
+  cancelled
+}
+
+enum RecurringInvoiceFrequency {
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
 enum BillingPlan {
   starter
   business
@@ -208,6 +222,7 @@ model Company {
   invoices              Invoice[]
   quotations            Quotation[]
   deliveryNotes         DeliveryNote[]
+  recurringInvoices     RecurringInvoice[]
   subscription          CompanySubscription?
   billingTransactions   BillingTransaction[]
   purchaseInvoices      PurchaseInvoice[]
@@ -249,6 +264,7 @@ model User {
   invoices           Invoice[]           @relation("CreatedBy")
   quotations         Quotation[]         @relation("QuotationCreatedBy")
   deliveryNotes      DeliveryNote[]      @relation("DeliveryNoteCreatedBy")
+  recurringInvoices  RecurringInvoice[]  @relation("RecurringInvoiceCreatedBy")
   auditLogs          AuditLog[]
   fcmTokens          FcmToken[]
   purchaseInvoices   PurchaseInvoice[]   @relation("PurchaseCreatedBy")
@@ -314,11 +330,12 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoices   Invoice[]
-  quotations Quotation[]
-  deliveryNotes DeliveryNote[]
-  documents  CustomerDocument[]
+  company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices          Invoice[]
+  quotations        Quotation[]
+  deliveryNotes     DeliveryNote[]
+  recurringInvoices RecurringInvoice[]
+  documents         CustomerDocument[]
 
   @@unique([companyId, taxId, branchCode])
   @@index([companyId])
@@ -431,10 +448,11 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoiceItems   InvoiceItem[]
-  quotationItems QuotationItem[]
-  deliveryNoteItems DeliveryNoteItem[]
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoiceItems          InvoiceItem[]
+  quotationItems        QuotationItem[]
+  deliveryNoteItems     DeliveryNoteItem[]
+  recurringInvoiceItems RecurringInvoiceItem[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -505,16 +523,17 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company          Company          @relation(fields: [companyId], references: [id])
-  project          Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  buyer            Customer         @relation(fields: [buyerId], references: [id])
-  creator          User             @relation("CreatedBy", fields: [createdBy], references: [id])
+  company          Company               @relation(fields: [companyId], references: [id])
+  project          Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buyer            Customer              @relation(fields: [buyerId], references: [id])
+  creator          User                  @relation("CreatedBy", fields: [createdBy], references: [id])
   items            InvoiceItem[]
   deliveryNotes    DeliveryNote[]
-  referenceInvoice Invoice?         @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
-  relatedDocuments Invoice[]        @relation("InvoiceReference")
+  referenceInvoice Invoice?              @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
+  relatedDocuments Invoice[]             @relation("InvoiceReference")
   payments         Payment[]
   whtCertificates  WhtCertificate[]
+  recurringRuns    RecurringInvoiceRun[]
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
@@ -530,6 +549,92 @@ model Invoice {
   @@index([createdBy])
   @@index([referenceInvoiceId])
   @@map("invoices")
+}
+
+// ── Recurring Invoice (ใบแจ้งหนี้/ใบกำกับซ้ำอัตโนมัติ) ─────────────
+// Stores a reusable invoice template. The worker creates draft invoices only;
+// issuing/submitting to RD remains an explicit user action.
+model RecurringInvoice {
+  id          String                    @id @default(cuid())
+  companyId   String
+  projectId   String?
+  customerId  String
+  name        String
+  status      RecurringInvoiceStatus    @default(active)
+  frequency   RecurringInvoiceFrequency
+  interval    Int                       @default(1)
+  language    String                    @default("th")
+  invoiceType InvoiceType               @default(tax_invoice)
+
+  startDate   DateTime
+  nextRunDate DateTime
+  endDate     DateTime?
+  dueDays     Int?
+  maxRuns     Int?
+  runCount    Int       @default(0)
+  lastRunAt   DateTime?
+
+  discountAmount Float   @default(0) @map("discount")
+  notes          String?
+  paymentMethod  String?
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project  Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  customer Customer               @relation(fields: [customerId], references: [id])
+  creator  User                   @relation("RecurringInvoiceCreatedBy", fields: [createdBy], references: [id])
+  items    RecurringInvoiceItem[]
+  runs     RecurringInvoiceRun[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, nextRunDate])
+  @@index([customerId])
+  @@index([createdBy])
+  @@map("recurring_invoices")
+}
+
+model RecurringInvoiceItem {
+  id                 String  @id @default(cuid())
+  recurringInvoiceId String
+  productId          String?
+  nameTh             String
+  nameEn             String?
+  descriptionTh      String?
+  descriptionEn      String?
+  quantity           Float
+  unit               String
+  unitPrice          Float
+  discountAmount     Float   @default(0) @map("discount")
+  vatType            VatType @default(vat7)
+
+  recurringInvoice RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+  product          Product?         @relation(fields: [productId], references: [id])
+
+  @@index([recurringInvoiceId])
+  @@map("recurring_invoice_items")
+}
+
+model RecurringInvoiceRun {
+  id                 String   @id @default(cuid())
+  recurringInvoiceId String
+  companyId          String
+  invoiceId          String?
+  scheduledFor       DateTime
+  generatedAt        DateTime @default(now())
+  status             String   @default("generated")
+  error              String?
+
+  recurringInvoice RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+  invoice          Invoice?         @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([recurringInvoiceId, scheduledFor])
+  @@index([companyId, scheduledFor])
+  @@index([invoiceId])
+  @@map("recurring_invoice_runs")
 }
 
 model InvoiceItem {
@@ -603,11 +708,11 @@ model Quotation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company Company         @relation(fields: [companyId], references: [id])
-  project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  buyer   Customer        @relation(fields: [buyerId], references: [id])
-  creator User            @relation("QuotationCreatedBy", fields: [createdBy], references: [id])
-  items   QuotationItem[]
+  company       Company         @relation(fields: [companyId], references: [id])
+  project       Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buyer         Customer        @relation(fields: [buyerId], references: [id])
+  creator       User            @relation("QuotationCreatedBy", fields: [createdBy], references: [id])
+  items         QuotationItem[]
   deliveryNotes DeliveryNote[]
 
   @@unique([companyId, quotationNumber])
@@ -1007,6 +1112,7 @@ model Project {
   invoices              Invoice[]
   quotations            Quotation[]
   deliveryNotes         DeliveryNote[]
+  recurringInvoices     RecurringInvoice[]
   purchaseInvoices      PurchaseInvoice[]
   projectPurchaseOrders ProjectPurchaseOrder[]
   documentIntakes       DocumentIntake[]

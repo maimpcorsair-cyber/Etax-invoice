@@ -40,6 +40,7 @@ import { reconciliationRouter } from './routes/reconciliation';
 import { payrollRouter } from './routes/payroll';
 import { quotationsRouter } from './routes/quotations';
 import { deliveryNotesRouter } from './routes/deliveryNotes';
+import { recurringInvoicesRouter } from './routes/recurringInvoices';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -220,6 +221,7 @@ app.use('/api/reconciliation', authenticate, reconciliationRouter);
 app.use('/api/payroll', authenticate, payrollRouter);
 app.use('/api/quotations', authenticate, quotationsRouter);
 app.use('/api/delivery-notes', authenticate, deliveryNotesRouter);
+app.use('/api/recurring-invoices', authenticate, recurringInvoicesRouter);
 app.use('/api/dashboard', authenticate, dashboardRouter);
 app.use('/api/company', authenticate, dashboardRouter);
 app.use('/api/notifications', authenticate, notificationsRouter);
@@ -273,6 +275,7 @@ app.listen(Number(PORT), '0.0.0.0', () => {
     import('./queues/workers/rdSubmitWorker'),
     import('./queues/workers/rdComplianceWorker'), // cron: runs on 10th of each month
     import('./queues/workers/billingRenewalWorker'), // cron: runs daily for renewal reminders
+    import('./queues/workers/recurringInvoiceWorker'), // cron: creates recurring invoice drafts
     import('./queues/workers/overdueReminderWorker'), // cron: runs daily at 08:00 for overdue Line notifications
     import('./queues/workers/dbdOpenDataSyncWorker'), // cron: syncs free DBD/RD open data weekly
     import('./queues/workers/masterSheetWorker'), // debounced: syncs company workspace Google Sheet

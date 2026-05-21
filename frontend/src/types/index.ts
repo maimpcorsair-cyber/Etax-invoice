@@ -339,6 +339,71 @@ export interface DeliveryNote {
   updatedAt: string;
 }
 
+// ── Recurring Invoice (ใบแจ้งหนี้ซ้ำ) ────────────────────────────────
+export type RecurringInvoiceStatus = 'active' | 'paused' | 'ended' | 'cancelled';
+export type RecurringInvoiceFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface RecurringInvoiceItem {
+  id?: string;
+  productId?: string | null;
+  nameTh: string;
+  nameEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionEn?: string | null;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  discountAmount: number;
+  vatType: 'vat7' | 'vatExempt' | 'vatZero';
+}
+
+export interface RecurringInvoiceRun {
+  id: string;
+  recurringInvoiceId: string;
+  companyId: string;
+  invoiceId?: string | null;
+  scheduledFor: string;
+  generatedAt: string;
+  status: string;
+  error?: string | null;
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    total: number;
+    status: InvoiceStatus;
+    invoiceDate: string;
+  } | null;
+}
+
+export interface RecurringInvoice {
+  id: string;
+  companyId: string;
+  projectId?: string | null;
+  customerId: string;
+  customer?: { id: string; nameTh: string; nameEn?: string | null; taxId: string; creditDays?: number | null };
+  name: string;
+  status: RecurringInvoiceStatus;
+  frequency: RecurringInvoiceFrequency;
+  interval: number;
+  language: Language;
+  invoiceType: InvoiceType;
+  startDate: string;
+  nextRunDate: string;
+  endDate?: string | null;
+  dueDays?: number | null;
+  maxRuns?: number | null;
+  runCount: number;
+  lastRunAt?: string | null;
+  discountAmount: number;
+  notes?: string | null;
+  paymentMethod?: string | null;
+  items: RecurringInvoiceItem[];
+  runs?: RecurringInvoiceRun[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Invoice {
   id: string;
   companyId: string;

@@ -25,7 +25,7 @@ import { useAuthStore } from '../store/authStore';
 // More drawer (rarely the user's first tap) and Reports lives there too.
 const primaryTabs = [
   { key: 'dashboard', href: '/app/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard', activePrefixes: ['/app/dashboard'] },
-  { key: 'sales', href: '/app/invoices', icon: FileText, labelKey: 'nav.sales', activePrefixes: ['/app/invoices', '/app/sales', '/app/quotations', '/app/delivery-notes'] },
+  { key: 'sales', href: '/app/invoices', icon: FileText, labelKey: 'nav.sales', activePrefixes: ['/app/invoices', '/app/sales', '/app/quotations', '/app/delivery-notes', '/app/recurring-invoices'] },
   { key: 'purchases', href: '/app/purchase-invoices', icon: ShoppingCart, labelKey: 'nav.purchases', activePrefixes: ['/app/purchase-invoices', '/app/purchases', '/app/expenses'] },
   { key: 'directory', href: '/app/customers', icon: Users, labelKey: 'nav.directory', activePrefixes: ['/app/customers', '/app/directory', '/app/products'] },
 ];
