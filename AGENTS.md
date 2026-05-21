@@ -78,12 +78,31 @@ Codex will auto-route to the right agent when a task matches; you can also invok
 
 **Plus 18 Impeccable design skills** (`critique`, `polish`, `harden`, `clarify`, `distill`, `layout`, `typeset`, `colorize`, `shape`, `bolder`, `quieter`, `delight`, `animate`, `adapt`, `optimize`, `overdrive`, `audit`, `impeccable`) — auto-applied to frontend design tasks. See `.Codex/TOOLS.md` for the full matrix.
 
+**Karpathy + Matt Pocock skills** are mirrored into `.agents/skills/` for Codex project use. Notable additions: `karpathy-guidelines`, `diagnose`, `tdd`, `to-prd`, `to-issues`, `triage`, `zoom-out`, `prototype`, `improve-codebase-architecture`, `grill-me`, and `handoff`.
+
+## Agent skills
+
+### Issue tracker
+
+Work is tracked in GitHub Issues for `maimpcorsair-cyber/Etax-invoice`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default Matt Pocock label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo. Start from `AI_HANDOFF.md`, then `PROJECT_STATE.md`, then `AGENTS.md`/`CLAUDE.md`. See `docs/agents/domain.md`.
+
 ## MCP servers
 
 Project-scoped in `.mcp.json`:
 
 - ✅ **context7** — up-to-date library docs (Prisma, node-forge, etc.) — no auth
 - ✅ **playwright** — E2E browser testing of the React UI — no auth
+- ✅ **sequential-thinking** — structured reasoning for tricky debugging/planning — no auth
+- ✅ **memory** — local MCP memory graph — no auth
+- ✅ **sentry** — Sentry project context and issue debugging — uses the local MCP auth/session if configured
 - 🔑 **tavily** — AI web search — needs `TAVILY_API_KEY`
 - 🔑 **firecrawl** — web scraping — needs `FIRECRAWL_API_KEY`
 

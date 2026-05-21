@@ -8,7 +8,7 @@ Request a code review.
 
 First, gather the diff context:
 ```bash
-cd "/Users/chuvit/Documents/E-tax invoice"
+cd "/Users/domdom/Documents/GitHub/Etax-invoice"
 git status
 git diff --stat HEAD 2>/dev/null || echo "(no git or no changes)"
 git diff HEAD 2>/dev/null | head -300
@@ -16,7 +16,7 @@ git diff HEAD 2>/dev/null | head -300
 
 Then invoke the `code-reviewer` subagent with a prompt like:
 
-> Review the uncommitted changes in the repo at `/Users/chuvit/Documents/E-tax invoice`.
+> Review the uncommitted changes in the repo at `/Users/domdom/Documents/GitHub/Etax-invoice`.
 > Context: this is a Thai e-Tax Invoice system (ETDA ขมธอ.3-2560 compliant). Recent work added XAdES-BES signing + RFC 3161 TSA + RD API submission + payment tracking.
 > Focus areas: security of cert/key handling, tenant scoping by companyId, XML signing correctness, TypeScript safety.
 > Give findings with file:line and severity (🔴/🟠/🟡/🟢), ending with APPROVE / APPROVE WITH CHANGES / REQUEST CHANGES / BLOCK.

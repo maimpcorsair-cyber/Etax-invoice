@@ -27,3 +27,24 @@ args = [
 ]
 command = "npx"
 env_vars = ["TAVILY_API_KEY"]
+
+[mcp_servers.sequential-thinking]
+args = [
+    "-y",
+    "@modelcontextprotocol/server-sequential-thinking",
+]
+command = "npx"
+
+[mcp_servers.memory]
+args = [
+    "-y",
+    "@modelcontextprotocol/server-memory",
+]
+command = "npx"
+
+[mcp_servers.sentry]
+args = [
+    "-y",
+    "@sentry/mcp-server@latest",
+]
+command = "npx"

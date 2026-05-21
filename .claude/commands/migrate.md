@@ -7,7 +7,7 @@ argument-hint: "[optional migration name for new migration, or blank to just app
 Run Prisma migration workflow.
 
 ```bash
-cd "/Users/chuvit/Documents/E-tax invoice/backend"
+cd "/Users/domdom/Documents/GitHub/Etax-invoice/backend"
 ```
 
 If `$ARGUMENTS` is empty: apply pending migrations only.
@@ -22,12 +22,9 @@ npx prisma migrate dev --name "$ARGUMENTS"
 npx prisma generate
 ```
 
-After generate, ensure the backend's local Prisma client is fresh:
+After generate, validate the backend Prisma schema:
 ```bash
-if [ -d "../node_modules/.prisma/client" ]; then
-  cp -r "../node_modules/.prisma/client/." "node_modules/.prisma/client/" 2>/dev/null || true
-  echo "✅ Synced generated client to backend/node_modules/.prisma/client"
-fi
+npx prisma validate
 ```
 
 Then remind to run `/typecheck` and `/restart-backend` to pick up the schema changes.

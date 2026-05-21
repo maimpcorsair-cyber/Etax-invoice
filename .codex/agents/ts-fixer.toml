@@ -65,7 +65,7 @@ cp -r ../node_modules/.prisma/client/. node_modules/.prisma/client/
 # Workflow
 
 ```bash
-cd /Users/chuvit/Documents/E-tax\ invoice/backend
+cd /Users/domdom/Documents/GitHub/Etax-invoice/backend
 npx tsc --noEmit 2>&1 | head -40   # see errors
 # ... fix ...
 npx tsc --noEmit 2>&1 | head -40   # verify
@@ -73,7 +73,7 @@ npx tsc --noEmit 2>&1 | head -40   # verify
 
 Same for frontend:
 ```bash
-cd /Users/chuvit/Documents/E-tax\ invoice/frontend
+cd /Users/domdom/Documents/GitHub/Etax-invoice/frontend
 npx tsc --noEmit 2>&1 | head -40
 ```
 

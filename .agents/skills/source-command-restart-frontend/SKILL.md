@@ -14,7 +14,7 @@ Restart the frontend in background mode.
 ```bash
 pkill -f "vite" 2>/dev/null
 sleep 1
-cd "/Users/chuvit/Documents/E-tax invoice/frontend" && npm run dev > ../frontend.out 2>&1 &
+cd "/Users/domdom/Documents/GitHub/Etax-invoice/frontend" && npm run dev > ../frontend.out 2>&1 &
 echo "Frontend started, PID $!"
 ```
 

@@ -77,6 +77,19 @@ Official Anthropic skills auto-discovered by Claude Code:
 
 **Usage**: Just ask — "polish the Login page" or "critique the InvoiceBuilder UX" or "run audit on AdminPanel". Claude picks the matching skill.
 
+### Karpathy + Matt Pocock skills
+
+Claude has these as user-level plugins; Codex mirrors the non-deprecated skills in `.agents/skills/`.
+
+| Skill group | Notable skills |
+|-------------|----------------|
+| Karpathy | `karpathy-guidelines` — avoid overcomplication, make surgical changes, surface assumptions, define verifiable success |
+| Matt Pocock engineering | `diagnose`, `tdd`, `to-prd`, `to-issues`, `triage`, `zoom-out`, `prototype`, `improve-codebase-architecture` |
+| Matt Pocock productivity | `grill-me`, `handoff`, `caveman`, `write-a-skill` |
+| Matt Pocock misc/writing | `setup-pre-commit`, `migrate-to-shoehorn`, `review`, `writing-shape`, `writing-fragments`, `writing-beats` |
+
+Matt Pocock repo context lives in `docs/agents/`: issue tracker, triage labels, and domain docs.
+
 **Location convention**: Each skill is `.claude/skills/<name>/SKILL.md` with optional `scripts/`, `templates/`, `examples/` subdirs. Claude auto-discovers — no registration needed.
 
 ### Adding more skills
@@ -93,7 +106,7 @@ Then Claude picks it up on next turn.
 
 ## 🔌 MCP Servers (`.mcp.json`)
 
-Project-scoped MCP servers — shared with the team via git. Two work out-of-the-box, two require API keys.
+Project-scoped MCP servers. No secrets are stored in repo config; key-backed tools reference environment variables.
 
 ### ✅ No-auth (active immediately)
 
@@ -106,6 +119,15 @@ Project-scoped MCP servers — shared with the team via git. Two work out-of-the
 - Browser automation for E2E testing of the React UI
 - Example: "use Playwright to fill out the Invoice Builder and click Save; screenshot the result"
 - Critical for: regression testing the Invoice Builder / Login / AdminPanel flows
+
+**Sequential Thinking** (`@modelcontextprotocol/server-sequential-thinking`)
+- Structured reasoning scratchpad for tricky debugging and planning
+
+**Memory** (`@modelcontextprotocol/server-memory`)
+- Local MCP memory graph for relationship-style notes
+
+**Sentry** (`@sentry/mcp-server@latest`)
+- Sentry issue/release/debug context if the local MCP auth/session is configured
 
 ### 🔑 Opt-in (needs API key — skip if not needed)
 

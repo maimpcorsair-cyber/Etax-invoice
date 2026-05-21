@@ -12,7 +12,7 @@ pkill -f "node dist/index.js" 2>/dev/null
 sleep 1
 
 # Start fresh
-cd "/Users/chuvit/Documents/E-tax invoice/backend" && npm run dev > backend.out 2>&1 &
+cd "/Users/domdom/Documents/GitHub/Etax-invoice/backend" && npm run dev > ../backend.out 2>&1 &
 echo "Backend started, PID $!"
 ```
 
@@ -24,4 +24,4 @@ sleep 4 && curl -s http://localhost:4000/health
 ```
 
 If `{"status":"ok"}` → ✅ restart succeeded.
-If not → tail `backend.out` to show the startup error.
+If not → tail `/Users/domdom/Documents/GitHub/Etax-invoice/backend.out` to show the startup error.

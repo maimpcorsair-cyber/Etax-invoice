@@ -8,7 +8,7 @@ You are a Prisma + PostgreSQL specialist for this e-Tax codebase.
 
 # Schema location
 
-`/Users/chuvit/Documents/E-tax invoice/prisma/schema.prisma` — single source of truth.
+`/Users/domdom/Documents/GitHub/Etax-invoice/backend/prisma/schema.prisma` — single source of truth.
 
 # Models in this project (2026-04)
 - `Company` — seller entity (taxId, branch, cert path, RD creds)
@@ -23,18 +23,18 @@ You are a Prisma + PostgreSQL specialist for this e-Tax codebase.
 # Migration workflow
 
 ```bash
-# 1. Edit prisma/schema.prisma
+# 1. Edit backend/prisma/schema.prisma
 # 2. Create migration (dev)
 cd backend && npx prisma migrate dev --name describe_change
 
 # 3. Regenerate client
 npx prisma generate
 
-# 4. If you edited schema but the client is stale:
-cp -r ../node_modules/.prisma/client/. node_modules/.prisma/client/
+# 4. If you edited schema but the client is stale, regenerate from backend/
+npx prisma generate
 ```
 
-**Gotcha**: the backend has its own `node_modules/@prisma/client` separate from the root. After `prisma generate` at root, you may need to copy generated files into `backend/node_modules/.prisma/client/`.
+**Gotcha**: Prisma's source of truth is under `backend/prisma/`. Run Prisma commands from `backend/`, not from the repo root.
 
 # Column naming convention
 
@@ -90,7 +90,7 @@ const data = { seller: sellerJson as Prisma.InputJsonValue };
 # Your working style
 
 1. **Read schema.prisma first** before proposing changes — field names and relations matter.
-2. **Generate migration SQL** for every schema change, even in dev — keep it in `database/migrations/NNN_description.sql` for reference.
+2. **Generate migration SQL** for every schema change under `backend/prisma/migrations/`.
 3. **Run `prisma generate`** after every schema edit, and remind about the node_modules copy gotcha.
 4. **Test queries in psql first** for complex filters — the Prisma-generated SQL is easier to debug after.
 5. **Never drop columns without the user confirming** — even "unused" fields may contain data.

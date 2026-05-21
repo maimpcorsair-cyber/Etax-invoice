@@ -8,7 +8,7 @@ Regenerate the development certificate at `backend/certs/test-company.p12`.
 
 Steps:
 1. Kill any cert cache in running backend (backend will reload on next signing call).
-2. `cd "/Users/chuvit/Documents/E-tax invoice/backend" && npx tsx scripts/generate-test-cert.ts`
+2. `cd "/Users/domdom/Documents/GitHub/Etax-invoice/backend" && npx tsx scripts/generate-test-cert.ts`
 3. Verify with openssl:
    `openssl pkcs12 -in backend/certs/test-company.p12 -nokeys -noout -passin pass:etax-dev-password`
 4. If MAC verify fails, update `scripts/generate-test-cert.ts` to use `algorithm: 'aes256'` instead of `'3des'` in the `forge.pkcs12.toPkcs12Asn1` call, then regenerate.

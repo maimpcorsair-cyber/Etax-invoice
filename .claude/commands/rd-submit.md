@@ -32,7 +32,7 @@ After queueing, the BullMQ `rd-submission` worker picks it up and runs:
 
 Tail logs to watch progress:
 ```bash
-tail -f "/Users/chuvit/Documents/E-tax invoice/backend.out" | grep -i "rd worker\|rd-submit"
+tail -f "/Users/domdom/Documents/GitHub/Etax-invoice/backend.out" | grep -i "rd worker\|rd-submit"
 ```
 
 (In dev with `RD_ENVIRONMENT=sandbox`, step 4 returns a mocked success.)

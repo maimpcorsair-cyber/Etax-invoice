@@ -85,6 +85,23 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 - `gh` CLI ✅ — logged in locally as `maimpcorsair-cyber`; use for Actions/deploy run checks
 - `context7` ✅ — library docs
 - `playwright` ✅ — E2E browser testing
+- `sequential-thinking` ✅ — structured step-by-step reasoning for tricky debugging/planning
+- `memory` ✅ — local MCP memory graph
+- `sentry` ✅ — Sentry issue/release/debug context
+
+## Agent skills
+
+### Issue tracker
+
+Work is tracked in GitHub Issues for `maimpcorsair-cyber/Etax-invoice`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default Matt Pocock label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo. Start from `AI_HANDOFF.md`, then `PROJECT_STATE.md`, then `AGENTS.md`/`CLAUDE.md`. See `docs/agents/domain.md`.
 
 ## สิ่งที่ยังต้องทำ (priority — verified 2026-05-19)
 1. 🟡 **Real cert per company — backend infra พร้อมแล้ว แต่ไม่มีใครอัพโหลดจริง** — DB BYTEA + per-tenant cache fix shipped (`bdff724`). ขั้นต่อไปคือ user ทดสอบ upload TDID/INET cert ผ่าน Admin Panel (`frontend/src/pages/AdminPanel.tsx:1566`) แล้วรัน `/signing-test`

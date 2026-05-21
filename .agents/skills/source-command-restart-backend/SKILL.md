@@ -18,7 +18,7 @@ pkill -f "node dist/index.js" 2>/dev/null
 sleep 1
 
 # Start fresh
-cd "/Users/chuvit/Documents/E-tax invoice/backend" && npm run dev > backend.out 2>&1 &
+cd "/Users/domdom/Documents/GitHub/Etax-invoice/backend" && npm run dev > ../backend.out 2>&1 &
 echo "Backend started, PID $!"
 ```
 

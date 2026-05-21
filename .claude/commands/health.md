@@ -15,5 +15,5 @@ Summarize each as ✅/❌ with a one-line explanation.
 If any service is down, suggest the matching fix:
 - Backend down → `/restart-backend`
 - Frontend down → `/restart-frontend`
-- Postgres down → `cd /Users/chuvit/Documents/E-tax\ invoice && docker-compose up -d postgres`
+- Postgres down → `cd /Users/domdom/Documents/GitHub/Etax-invoice && docker-compose up -d postgres`
 - Redis down → `docker-compose up -d redis`

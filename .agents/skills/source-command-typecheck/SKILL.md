@@ -11,8 +11,8 @@ Use this skill when the user asks to run the migrated source command `typecheck`
 
 Run the following two commands in **parallel** (single message with two Bash tool calls):
 
-1. `cd "/Users/chuvit/Documents/E-tax invoice/backend" && npx tsc --noEmit 2>&1 | head -50`
-2. `cd "/Users/chuvit/Documents/E-tax invoice/frontend" && npx tsc --noEmit 2>&1 | head -50`
+1. `cd "/Users/domdom/Documents/GitHub/Etax-invoice/backend" && npx tsc --noEmit 2>&1 | head -50`
+2. `cd "/Users/domdom/Documents/GitHub/Etax-invoice/frontend" && npx tsc --noEmit 2>&1 | head -50`
 
 Then report:
 - ✅ Clean / ❌ errors per side
