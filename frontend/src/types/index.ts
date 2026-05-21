@@ -294,6 +294,51 @@ export interface Quotation {
   updatedAt: string;
 }
 
+// ── Delivery Note (ใบส่งของ) ─────────────────────────────────────────
+export type DeliveryNoteStatus = 'draft' | 'issued' | 'delivered' | 'converted' | 'cancelled';
+
+export interface DeliveryNoteItem {
+  id?: string;
+  productId?: string | null;
+  nameTh: string;
+  nameEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionEn?: string | null;
+  quantity: number;
+  deliveredQty: number;
+  unit: string;
+  unitPrice?: number | null;
+  vatType: 'vat7' | 'vatExempt' | 'vatZero';
+  amount?: number | null;
+}
+
+export interface DeliveryNote {
+  id: string;
+  companyId: string;
+  projectId?: string | null;
+  deliveryNoteNumber: string;
+  status: DeliveryNoteStatus;
+  language: Language;
+  deliveryDate: string;
+  expectedDate?: string | null;
+  deliveredAt?: string | null;
+  buyerId: string;
+  buyer?: { id: string; nameTh: string; nameEn?: string | null; taxId: string };
+  items: DeliveryNoteItem[];
+  shippingAddress?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  vehicleNo?: string | null;
+  trackingNo?: string | null;
+  notes?: string | null;
+  deliveryTerms?: string | null;
+  quotationId?: string | null;
+  invoiceId?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Invoice {
   id: string;
   companyId: string;

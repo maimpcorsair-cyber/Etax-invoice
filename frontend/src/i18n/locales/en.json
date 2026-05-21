@@ -26,7 +26,8 @@
     "directory": "Directory",
     "privacy": "Privacy & My Data",
     "payroll": "Payroll",
-    "quotations": "Quotations"
+    "quotations": "Quotations",
+    "deliveryNotes": "Delivery Notes"
   },
   "landing": {
     "hero": {

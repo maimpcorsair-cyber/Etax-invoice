@@ -26,7 +26,8 @@
     "directory": "ฐานข้อมูล",
     "privacy": "ความเป็นส่วนตัวและข้อมูล",
     "payroll": "เงินเดือน",
-    "quotations": "ใบเสนอราคา"
+    "quotations": "ใบเสนอราคา",
+    "deliveryNotes": "ใบส่งของ"
   },
   "landing": {
     "hero": {

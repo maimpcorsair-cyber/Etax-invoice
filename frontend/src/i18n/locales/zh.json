@@ -27,7 +27,8 @@
     "directory": "数据库",
     "privacy": "隐私与数据",
     "payroll": "工资",
-    "quotations": "报价单"
+    "quotations": "报价单",
+    "deliveryNotes": "送货单"
   },
   "landing": {
     "hero": {

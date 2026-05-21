@@ -58,6 +58,14 @@ enum QuotationStatus {
   cancelled // ยกเลิกฝั่งผู้ขาย
 }
 
+enum DeliveryNoteStatus {
+  draft // ยังไม่ออกเอกสาร — แก้ได้
+  issued // ออกเอกสารแล้ว
+  delivered // ส่งของครบแล้ว
+  converted // แปลง/ผูกกับ Invoice แล้ว
+  cancelled // ยกเลิกฝั่งผู้ขาย
+}
+
 enum BillingPlan {
   starter
   business
@@ -199,6 +207,7 @@ model Company {
   products              Product[]
   invoices              Invoice[]
   quotations            Quotation[]
+  deliveryNotes         DeliveryNote[]
   subscription          CompanySubscription?
   billingTransactions   BillingTransaction[]
   purchaseInvoices      PurchaseInvoice[]
@@ -239,6 +248,7 @@ model User {
   company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices           Invoice[]           @relation("CreatedBy")
   quotations         Quotation[]         @relation("QuotationCreatedBy")
+  deliveryNotes      DeliveryNote[]      @relation("DeliveryNoteCreatedBy")
   auditLogs          AuditLog[]
   fcmTokens          FcmToken[]
   purchaseInvoices   PurchaseInvoice[]   @relation("PurchaseCreatedBy")
@@ -307,6 +317,7 @@ model Customer {
   company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices   Invoice[]
   quotations Quotation[]
+  deliveryNotes DeliveryNote[]
   documents  CustomerDocument[]
 
   @@unique([companyId, taxId, branchCode])
@@ -423,6 +434,7 @@ model Product {
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoiceItems   InvoiceItem[]
   quotationItems QuotationItem[]
+  deliveryNoteItems DeliveryNoteItem[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -498,6 +510,7 @@ model Invoice {
   buyer            Customer         @relation(fields: [buyerId], references: [id])
   creator          User             @relation("CreatedBy", fields: [createdBy], references: [id])
   items            InvoiceItem[]
+  deliveryNotes    DeliveryNote[]
   referenceInvoice Invoice?         @relation("InvoiceReference", fields: [referenceInvoiceId], references: [id])
   relatedDocuments Invoice[]        @relation("InvoiceReference")
   payments         Payment[]
@@ -595,6 +608,7 @@ model Quotation {
   buyer   Customer        @relation(fields: [buyerId], references: [id])
   creator User            @relation("QuotationCreatedBy", fields: [createdBy], references: [id])
   items   QuotationItem[]
+  deliveryNotes DeliveryNote[]
 
   @@unique([companyId, quotationNumber])
   @@index([companyId])
@@ -629,6 +643,95 @@ model QuotationItem {
 
   @@index([quotationId])
   @@map("quotation_items")
+}
+
+// ── Delivery Note (ใบส่งของ) ─────────────────────────────────────────
+// Operational delivery document. Not a tax document — no VAT obligation and
+// no RD submission. Can be created standalone or from a quotation/invoice.
+model DeliveryNote {
+  id                 String             @id @default(cuid())
+  companyId          String
+  projectId          String?
+  deliveryNoteNumber String
+  status             DeliveryNoteStatus @default(draft)
+  language           String             @default("th")
+
+  deliveryDate DateTime
+  expectedDate DateTime?
+  deliveredAt  DateTime? @map("delivered_at")
+
+  buyerId String
+  seller  Json // snapshot of seller at time of issue
+
+  // Optional source/target links
+  quotationId String? @map("quotation_id")
+  invoiceId   String? @map("invoice_id")
+
+  shippingAddress String?
+  contactName     String?
+  contactPhone    String?
+  vehicleNo       String?
+  trackingNo      String?
+
+  notes         String?
+  deliveryTerms String?
+
+  // Storage
+  pdfUrl String?
+
+  // Google Drive sync (no XML — not an e-Tax doc)
+  driveFileId String?
+  driveUrl    String?
+
+  // Audit
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by")
+  cancelReason String?   @map("cancel_reason")
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company            @relation(fields: [companyId], references: [id])
+  project   Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buyer     Customer           @relation(fields: [buyerId], references: [id])
+  creator   User               @relation("DeliveryNoteCreatedBy", fields: [createdBy], references: [id])
+  quotation Quotation?         @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  invoice   Invoice?           @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  items     DeliveryNoteItem[]
+
+  @@unique([companyId, deliveryNoteNumber])
+  @@index([companyId])
+  @@index([companyId, projectId])
+  @@index([companyId, status])
+  @@index([companyId, deliveryDate])
+  @@index([buyerId])
+  @@index([createdBy])
+  @@index([quotationId])
+  @@index([invoiceId])
+  @@map("delivery_notes")
+}
+
+model DeliveryNoteItem {
+  id             String  @id @default(cuid())
+  deliveryNoteId String
+  productId      String?
+  nameTh         String
+  nameEn         String?
+  descriptionTh  String?
+  descriptionEn  String?
+  quantity       Float
+  deliveredQty   Float   @default(0)
+  unit           String
+  unitPrice      Float?
+  vatType        VatType @default(vat7)
+  amount         Float?
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+  product      Product?     @relation(fields: [productId], references: [id])
+
+  @@index([deliveryNoteId])
+  @@map("delivery_note_items")
 }
 
 model PurchaseInvoice {
@@ -903,6 +1006,7 @@ model Project {
   members               ProjectMember[]
   invoices              Invoice[]
   quotations            Quotation[]
+  deliveryNotes         DeliveryNote[]
   purchaseInvoices      PurchaseInvoice[]
   projectPurchaseOrders ProjectPurchaseOrder[]
   documentIntakes       DocumentIntake[]

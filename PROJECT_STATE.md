@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-19 (PDPA launch-readiness landed)
+Last updated: 2026-05-22 (Delivery Note local implementation)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -52,6 +52,9 @@ Last CI:
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml`, `LOCAL_DEPLOYMENT.md` modified locally — not part of any feature work.
+- Day 2 Delivery Note work is local/uncommitted: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
+- Verified locally: `cd backend && npx prisma validate`, `cd backend && npx prisma generate`, `cd backend && npx tsc --noEmit`, `cd frontend && npx tsc --noEmit`.
+- Not yet applied to any database/deploy. Next runtime check needs applying the new migration, then creating a delivery note from `/app/delivery-notes/new`.
 
 ## Sentry verification status (verified 2026-05-19)
 
