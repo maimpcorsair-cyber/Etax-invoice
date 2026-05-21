@@ -784,12 +784,23 @@ export function buildHtml(data: PdfInvoiceData): string {
         </div>
       ` : ''}
 
-      ${(data.bankPaymentInfo || isElectronicDocument) ? `
+      ${(data.bankPaymentInfo || isElectronicDocument || data.promptPayQrDataUrl) ? `
         <div class="document-support">
-          ${data.bankPaymentInfo ? `
+          ${data.bankPaymentInfo || data.promptPayQrDataUrl ? `
             <div class="bank-box">
               <div class="section-label">${labels.bankPayment}</div>
-              <div class="bank-text">${escapeHtml(data.bankPaymentInfo)}</div>
+              ${data.bankPaymentInfo ? `<div class="bank-text">${escapeHtml(data.bankPaymentInfo)}</div>` : ''}
+              ${data.promptPayQrDataUrl ? `
+                <div style="display:flex;gap:12px;align-items:center;margin-top:${data.bankPaymentInfo ? '8px' : '0'};padding-top:${data.bankPaymentInfo ? '8px' : '0'};${data.bankPaymentInfo ? 'border-top:1px dashed #cbd5e1;' : ''}">
+                  <img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:96px;height:96px;flex-shrink:0"/>
+                  <div style="font-size:11px;line-height:1.5;color:#0f172a;">
+                    <div style="font-weight:700;color:#0d3b8a;margin-bottom:2px">📱 PromptPay</div>
+                    <div>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} <strong>${formatCurrency(data.total)}</strong></div>
+                    ${data.promptPayTarget ? `<div style="color:#64748b;margin-top:2px">${escapeHtml(String(data.promptPayTarget))}</div>` : ''}
+                    <div style="color:#94a3b8;margin-top:2px;font-size:10px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</div>
+                  </div>
+                </div>
+              ` : ''}
             </div>
           ` : '<div></div>'}
           ${isElectronicDocument ? `

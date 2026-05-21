@@ -155,6 +155,7 @@ export function buildHtmlDark(data: PdfInvoiceData, variant: string): string {
   <div class="words">${isTh ? 'จำนวนเงินเป็นตัวอักษร: ' : 'Amount in Words: '}${escapeHtml(totalWords)}</div>
   ${data.notes ? `<div class="notes"><strong style="color:${t.accent}">${isTh ? 'หมายเหตุ' : 'Notes'}:</strong> ${escapeHtml(data.notes ?? '')}</div>` : ''}
   ${data.bankPaymentInfo ? `<div class="notes"><strong style="color:${t.accent}">${isTh ? 'ข้อมูลบัญชี' : 'Bank Transfer'}:</strong><br><span style="white-space:pre-line">${escapeHtml(data.bankPaymentInfo ?? '')}</span></div>` : ''}
+  ${data.promptPayQrDataUrl ? `<div class="notes" style="display:flex;gap:12px;align-items:center"><img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:88px;height:88px;background:#fff;padding:4px;border-radius:4px;flex-shrink:0"/><div style="font-size:11px;line-height:1.5"><div style="font-weight:700;color:${t.accent}">📱 PromptPay</div><div>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} <strong>${formatCurrency(data.total)}</strong></div>${data.promptPayTarget ? `<div style="opacity:0.7">${escapeHtml(String(data.promptPayTarget))}</div>` : ''}<div style="opacity:0.5;font-size:10px">Ref: ${escapeHtml(data.invoiceNumber)}</div></div></div>` : ''}
 
   <div class="sig-row">
     <div class="sig-box">

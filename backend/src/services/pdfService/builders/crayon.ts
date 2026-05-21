@@ -316,6 +316,8 @@ export function buildHtmlCrayon(data: PdfInvoiceData): string {
 
   ${data.bankPaymentInfo ? `<div class="bank-box"><div class="words-label" style="color:#1e40af">🏦 ${isTh ? 'ข้อมูลบัญชีสำหรับโอนเงิน' : 'Bank Transfer'}</div><div style="white-space:pre-line">${escapeHtml(data.bankPaymentInfo)}</div></div>` : ''}
 
+  ${data.promptPayQrDataUrl ? `<div class="bank-box" style="display:flex;gap:12px;align-items:center"><img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:96px;height:96px;flex-shrink:0"/><div style="font-size:11px;line-height:1.5"><div style="font-weight:700;color:#1e40af">📱 PromptPay</div><div>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} <strong>${formatCurrency(data.total)}</strong></div>${data.promptPayTarget ? `<div style="color:#64748b">${escapeHtml(String(data.promptPayTarget))}</div>` : ''}<div style="color:#94a3b8;font-size:10px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</div></div></div>` : ''}
+
   <div class="sig-section">
     <div class="sig-box">
       <div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="signature"/>` : ''}</div>

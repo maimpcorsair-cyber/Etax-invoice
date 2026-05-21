@@ -88,6 +88,10 @@ export interface PdfInvoiceData {
   signerTitle?: string | null;
   onlineViewUrl?: string | null;
   onlineQrDataUrl?: string | null;
+  // PromptPay QR — a scannable QR that pre-fills the invoice total +
+  // reference number. Rendered next to bankPaymentInfo in builders.
+  promptPayQrDataUrl?: string | null;
+  promptPayTarget?: string | null; // masked phone/national-id shown under QR
 }
 
 interface CustomerStatementPdfData {
@@ -209,15 +213,42 @@ export async function generatePdf(data: PdfInvoiceData): Promise<Buffer> {
 /* ═══════════════════════════════════════════════════════════
    GROUP 5: ANIME / OTAKU  (10 variants)
 ═══════════════════════════════════════════════════════════ */
+// Look up the company's default PromptPay account and build a QR for the
+// invoice total + invoice number. Returns null when no PromptPay is set,
+// when the doc has 0 total (e.g., quotation drafts), or when QR generation
+// fails — we never want PromptPay to block PDF rendering.
+async function enrichPromptPayQr(data: PdfInvoiceData, companyId: string): Promise<{ url: string; target: string } | null> {
+  if (!data.total || data.total <= 0) return null;
+  try {
+    const { buildPromptPayQr } = await import('./promptPayService');
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { documentBankAccounts: true },
+    });
+    const accounts = Array.isArray(company?.documentBankAccounts) ? (company!.documentBankAccounts as Array<Record<string, unknown>>) : [];
+    const ppAccount = accounts.find((a) => typeof a.promptPayId === 'string' && a.promptPayId.trim().length > 0);
+    if (!ppAccount) return null;
+    const target = String(ppAccount.promptPayId).trim();
+    const qr = await buildPromptPayQr(target, data.total, data.invoiceNumber);
+    return { url: qr.imageDataUrl, target };
+  } catch (err) {
+    logger.warn('[pdfService] PromptPay QR build failed (non-fatal)', { err: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
 export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: string): Promise<string> {
   const template = await resolveTemplateForDocument(companyId, data.type, data.language, data.templateId);
   const enrichedData = await enrichElectronicDocument(data);
+  const promptPay = await enrichPromptPayQr(enrichedData, companyId);
 
   const mergedData = {
     ...enrichedData,
     templateName: data.templateName ?? template?.name ?? null,
     templateHtml: data.templateHtml ?? template?.html ?? null,
     templateNote: null,
+    promptPayQrDataUrl: promptPay?.url ?? null,
+    promptPayTarget: promptPay?.target ?? null,
   };
 
   const marketplaceTokens = mergedData.templateId ? MARKETPLACE_TEMPLATE_TOKENS[mergedData.templateId] : null;

@@ -258,6 +258,7 @@ export function buildHtmlProfessional(data: PdfInvoiceData, variant: string): st
         </div>
         ${data.notes ? `<div class="info-box"><div class="info-label">${labels.notes}</div><div class="info-text">${escapeHtml(data.notes)}</div></div>` : ''}
         ${data.bankPaymentInfo ? `<div class="info-box"><div class="info-label">${labels.bank}</div><div class="info-text">${escapeHtml(data.bankPaymentInfo)}</div></div>` : ''}
+        ${data.promptPayQrDataUrl ? `<div class="info-box" style="display:flex;gap:12px;align-items:center"><img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:96px;height:96px;flex-shrink:0"/><div style="font-size:11px;line-height:1.5"><div style="font-weight:700;color:#1e40af">📱 PromptPay</div><div>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} <strong>${formatCurrency(data.total)}</strong></div>${data.promptPayTarget ? `<div style="color:#64748b">${escapeHtml(String(data.promptPayTarget))}</div>` : ''}<div style="color:#94a3b8;font-size:10px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</div></div></div>` : ''}
       </div>
       <div class="totals-box">
         <div class="totals-label">${labels.grandTotal}</div>
