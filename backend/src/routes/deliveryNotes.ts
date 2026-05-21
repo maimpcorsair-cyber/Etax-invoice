@@ -3,7 +3,6 @@ import { z } from 'zod';
 import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { withInvoiceLock, withRlsContext, tenantRlsContext } from '../config/rls';
-import { generateInvoiceNumber } from '../services/invoiceService';
 
 // ใบส่งของ (Delivery Note) — operational delivery document.
 // Not a tax document. No e-Tax submission, no VAT remittance obligation.
@@ -385,7 +384,9 @@ deliveryNotesRouter.post('/:id/convert-to-invoice', async (req, res) => {
       return;
     }
 
-    const invoiceNumber = await generateInvoiceNumber(req.user!.companyId, 'tax_invoice');
+    const draftSeq = Date.now().toString().slice(-6);
+    const ym = new Date().toISOString().slice(0, 7).replace('-', '');
+    const invoiceNumber = `DRAFT-${ym}-${draftSeq}`;
     const invoiceItems = existing.items.map((item) => {
       const unitPrice = item.unitPrice ?? 0;
       const amount = +(item.quantity * unitPrice).toFixed(2);
