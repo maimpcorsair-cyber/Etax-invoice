@@ -33,6 +33,7 @@ frontend.dev.log
 .DS_Store
 .vscode/
 .idea/
+.roo/
 
 # Runtime / temp
 tmp/
