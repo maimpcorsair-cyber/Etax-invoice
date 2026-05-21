@@ -410,7 +410,7 @@ deliveryNotesRouter.post('/:id/convert-to-invoice', async (req, res) => {
     const vatAmount = +invoiceItems.reduce((sum, item) => sum + item.vatAmount, 0).toFixed(2);
     const total = +(subtotal + vatAmount).toFixed(2);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       const invoice = await tx.invoice.create({
         data: {
           companyId: existing.companyId,
