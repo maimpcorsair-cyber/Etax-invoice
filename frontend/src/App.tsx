@@ -12,6 +12,8 @@ const Landing = React.lazy(() => import('./pages/Landing'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const InvoiceBuilder = React.lazy(() => import('./pages/InvoiceBuilder'));
 const InvoiceList = React.lazy(() => import('./pages/InvoiceList'));
+const QuotationList = React.lazy(() => import('./pages/QuotationList'));
+const QuotationBuilder = React.lazy(() => import('./pages/QuotationBuilder'));
 const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
@@ -181,6 +183,9 @@ export default function App() {
             <Route path="invoices" element={<InvoiceList />} />
             <Route path="invoices/new" element={<InvoiceBuilder />} />
             <Route path="invoices/:id/edit" element={<InvoiceBuilder />} />
+            <Route path="quotations" element={<QuotationList />} />
+            <Route path="quotations/new" element={<QuotationBuilder />} />
+            <Route path="quotations/:id" element={<QuotationBuilder />} />
             <Route path="customers" element={<Customers />} />
             <Route path="customers/:id/statement" element={<CustomerStatementPage />} />
             <Route path="products" element={<Products />} />

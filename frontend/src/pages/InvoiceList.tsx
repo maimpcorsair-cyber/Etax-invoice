@@ -11,6 +11,7 @@ import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus, InvoiceType, Payment } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { EmptyState, MetricCard, PageHeader } from '../components/ui/AppChrome';
+import SectionSubNav from '../components/SectionSubNav';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -386,6 +387,12 @@ export default function InvoiceList() {
 
   return (
     <div className="space-y-5">
+      <SectionSubNav
+        items={[
+          { key: 'quotations', to: '/app/quotations', label: isThai ? 'ใบเสนอราคา' : 'Quotations', icon: FileText },
+          { key: 'invoices', to: '/app/invoices', label: isThai ? 'ใบกำกับภาษี/ใบเสร็จ' : 'Tax Invoices', icon: Receipt },
+        ]}
+      />
       {/* Header */}
       <PageHeader
         eyebrow={isThai ? 'Revenue document workspace' : 'Revenue document workspace'}

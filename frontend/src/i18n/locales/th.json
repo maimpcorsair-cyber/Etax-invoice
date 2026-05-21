@@ -25,7 +25,8 @@
     "reports": "รายงานภาษี",
     "directory": "ฐานข้อมูล",
     "privacy": "ความเป็นส่วนตัวและข้อมูล",
-    "payroll": "เงินเดือน"
+    "payroll": "เงินเดือน",
+    "quotations": "ใบเสนอราคา"
   },
   "landing": {
     "hero": {

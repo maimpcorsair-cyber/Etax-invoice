@@ -248,6 +248,52 @@ export type InvoiceType = 'tax_invoice' | 'tax_invoice_receipt' | 'receipt' | 'c
 export type InvoiceStatus = 'draft' | 'pending' | 'approved' | 'submitted' | 'rejected' | 'cancelled';
 export type RDSubmissionStatus = 'pending' | 'in_progress' | 'success' | 'failed' | 'retrying';
 
+// ── Quotation (ใบเสนอราคา) ───────────────────────────────────────────
+export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'converted' | 'rejected' | 'expired' | 'cancelled';
+
+export interface QuotationItem {
+  id?: string;
+  productId?: string | null;
+  nameTh: string;
+  nameEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionEn?: string | null;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  discountAmount: number;
+  vatType: 'vat7' | 'vatExempt' | 'vatZero';
+  amount: number;
+  vatAmount: number;
+  totalAmount: number;
+}
+
+export interface Quotation {
+  id: string;
+  companyId: string;
+  projectId?: string | null;
+  quotationNumber: string;
+  status: QuotationStatus;
+  language: Language;
+  quotationDate: string;
+  validUntil?: string | null;
+  buyerId: string;
+  buyer?: { id: string; nameTh: string; nameEn?: string | null; taxId: string };
+  items: QuotationItem[];
+  subtotal: number;
+  vatAmount: number;
+  discountAmount: number;
+  total: number;
+  notes?: string | null;
+  paymentTerms?: string | null;
+  deliveryTerms?: string | null;
+  convertedToInvoiceId?: string | null;
+  convertedAt?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Invoice {
   id: string;
   companyId: string;

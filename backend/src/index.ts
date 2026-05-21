@@ -38,6 +38,7 @@ import { accountRouter, accountPublicRouter } from './routes/account';
 import { reportsRouter } from './routes/reports';
 import { reconciliationRouter } from './routes/reconciliation';
 import { payrollRouter } from './routes/payroll';
+import { quotationsRouter } from './routes/quotations';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -216,6 +217,7 @@ app.use('/api/account', authenticate, accountRouter);
 app.use('/api/reports', authenticate, reportsRouter);
 app.use('/api/reconciliation', authenticate, reconciliationRouter);
 app.use('/api/payroll', authenticate, payrollRouter);
+app.use('/api/quotations', authenticate, quotationsRouter);
 app.use('/api/dashboard', authenticate, dashboardRouter);
 app.use('/api/company', authenticate, dashboardRouter);
 app.use('/api/notifications', authenticate, notificationsRouter);

@@ -25,7 +25,8 @@
     "reports": "Tax Reports",
     "directory": "Directory",
     "privacy": "Privacy & My Data",
-    "payroll": "Payroll"
+    "payroll": "Payroll",
+    "quotations": "Quotations"
   },
   "landing": {
     "hero": {

@@ -48,6 +48,16 @@ enum VatType {
   vatZero
 }
 
+enum QuotationStatus {
+  draft // ยังไม่ส่ง — แก้ได้
+  sent // ส่งให้ลูกค้าแล้ว
+  accepted // ลูกค้ายืนยัน — รอแปลงเป็นใบกำกับภาษี
+  converted // แปลงเป็น Invoice แล้ว
+  rejected // ลูกค้าปฏิเสธ
+  expired // เลยวัน validUntil
+  cancelled // ยกเลิกฝั่งผู้ขาย
+}
+
 enum BillingPlan {
   starter
   business
@@ -138,10 +148,10 @@ model Company {
   // own the domain and add SPF/DKIM DNS records pointing at our SMTP
   // provider (Resend). brandDomainProviderId stores the provider-side
   // record id so we can re-check verification status without re-creating.
-  brandDomain            String?
-  brandDomainProviderId  String?
-  brandDomainStatus      String?   // 'pending' | 'verified' | 'failed'
-  brandDomainVerifiedAt  DateTime?
+  brandDomain           String?
+  brandDomainProviderId String?
+  brandDomainStatus     String? // 'pending' | 'verified' | 'failed'
+  brandDomainVerifiedAt DateTime?
 
   // RD Config
   rdClientId     String?
@@ -158,8 +168,8 @@ model Company {
   googleDriveOwnerLinkedAt DateTime?
 
   // Company master workspace sheet (deduplicated)
-  googleWorkspaceSheetId      String?
-  googleWorkspaceSheetUrl     String?
+  googleWorkspaceSheetId       String?
+  googleWorkspaceSheetUrl      String?
   googleWorkspaceSheetSyncedAt DateTime?
 
   // OCR cost controls
@@ -188,6 +198,7 @@ model Company {
   customers             Customer[]
   products              Product[]
   invoices              Invoice[]
+  quotations            Quotation[]
   subscription          CompanySubscription?
   billingTransactions   BillingTransaction[]
   purchaseInvoices      PurchaseInvoice[]
@@ -227,6 +238,7 @@ model User {
 
   company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices           Invoice[]           @relation("CreatedBy")
+  quotations         Quotation[]         @relation("QuotationCreatedBy")
   auditLogs          AuditLog[]
   fcmTokens          FcmToken[]
   purchaseInvoices   PurchaseInvoice[]   @relation("PurchaseCreatedBy")
@@ -266,35 +278,36 @@ model DriveOAuthState {
 }
 
 model Customer {
-  id            String  @id @default(cuid())
-  companyId     String
-  nameTh        String
-  nameEn        String?
-  taxId         String
-  branchCode    String  @default("00000")
-  branchNameTh  String?
-  branchNameEn  String?
-  addressTh     String
-  addressEn     String?
-  email         String?
-  phone         String?
-  contactPerson String?
-  creditLimit   Decimal? @db.Decimal(12, 2)
-  creditDays    Int?
-  personalId    String? // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
-  partyRole     String  @default("customer") // customer | supplier | both
-  customerKind  String  @default("company") // company | individual
-  useCase       String  @default("general") // general | full_tax_invoice | credit | contract_project | vendor_payee
-  verificationStatus String @default("not_required") // not_required | missing | partial | complete
-  vatEvidenceStatus  String @default("not_required") // not_required | missing | uploaded | verified
-  isActive      Boolean @default(true)
+  id                 String   @id @default(cuid())
+  companyId          String
+  nameTh             String
+  nameEn             String?
+  taxId              String
+  branchCode         String   @default("00000")
+  branchNameTh       String?
+  branchNameEn       String?
+  addressTh          String
+  addressEn          String?
+  email              String?
+  phone              String?
+  contactPerson      String?
+  creditLimit        Decimal? @db.Decimal(12, 2)
+  creditDays         Int?
+  personalId         String? // เลขประจำตัว 13 หลักสำหรับบุคคลธรรมดา
+  partyRole          String   @default("customer") // customer | supplier | both
+  customerKind       String   @default("company") // company | individual
+  useCase            String   @default("general") // general | full_tax_invoice | credit | contract_project | vendor_payee
+  verificationStatus String   @default("not_required") // not_required | missing | partial | complete
+  vatEvidenceStatus  String   @default("not_required") // not_required | missing | uploaded | verified
+  isActive           Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoices  Invoice[]
-  documents CustomerDocument[]
+  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices   Invoice[]
+  quotations Quotation[]
+  documents  CustomerDocument[]
 
   @@unique([companyId, taxId, branchCode])
   @@index([companyId])
@@ -307,32 +320,32 @@ model Customer {
 }
 
 model CustomerDocument {
-  id              String   @id @default(cuid())
-  companyId       String
-  customerId      String
-  uploadedById    String?
-  documentType    String   // company_registration | vat_certificate | contract | credit_agreement | director_id | personal_id | bank_account | other
-  requiredFor     String   @default("general")
-  status          String   @default("uploaded") // uploaded | verified | rejected
-  fileName        String
-  mimeType        String
-  fileSize        Int
+  id             String    @id @default(cuid())
+  companyId      String
+  customerId     String
+  uploadedById   String?
+  documentType   String // company_registration | vat_certificate | contract | credit_agreement | director_id | personal_id | bank_account | other
+  requiredFor    String    @default("general")
+  status         String    @default("uploaded") // uploaded | verified | rejected
+  fileName       String
+  mimeType       String
+  fileSize       Int
   // S3 is the system of record. Drive is an optional mirror so customers
   // who connect Google Drive can collaborate on their own files. If they
   // ever revoke OAuth or delete the Drive folder, S3 still has the file.
-  s3Key           String?
-  s3Url           String?
-  driveFileId     String?
-  driveUrl        String?
-  driveFolderId   String?
-  driveFolderUrl  String?
-  driveUserDrive  Boolean  @default(false)
-  sensitive       Boolean  @default(false)
-  notes           String?
-  uploadedAt      DateTime @default(now())
-  verifiedAt      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  s3Key          String?
+  s3Url          String?
+  driveFileId    String?
+  driveUrl       String?
+  driveFolderId  String?
+  driveFolderUrl String?
+  driveUserDrive Boolean   @default(false)
+  sensitive      Boolean   @default(false)
+  notes          String?
+  uploadedAt     DateTime  @default(now())
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -407,8 +420,9 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invoiceItems InvoiceItem[]
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoiceItems   InvoiceItem[]
+  quotationItems QuotationItem[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -527,6 +541,94 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@map("invoice_items")
+}
+
+// ── Quotation (ใบเสนอราคา) ───────────────────────────────────────────
+// Pre-sale offer document. Not a tax document — no VAT obligation, no e-Tax
+// submission. When the customer accepts, convert to an Invoice (sets
+// convertedToInvoiceId pointing at the new Invoice row).
+model Quotation {
+  id              String          @id @default(cuid())
+  companyId       String
+  projectId       String?
+  quotationNumber String
+  status          QuotationStatus @default(draft)
+  language        String          @default("th")
+
+  quotationDate DateTime
+  validUntil    DateTime? // วันที่สิ้นสุดราคา — หลังจากนี้ status auto → expired
+
+  buyerId String
+  seller  Json // snapshot of seller at time of issue
+
+  subtotal       Float
+  vatAmount      Float
+  discountAmount Float @default(0) @map("discount")
+  total          Float
+
+  notes         String?
+  paymentTerms  String? // เงื่อนไขการชำระเงิน — placeholder string ที่ขึ้นบน PDF
+  deliveryTerms String? // เงื่อนไขการส่งของ
+
+  // Conversion to Invoice
+  convertedToInvoiceId String?   @map("converted_to_invoice_id")
+  convertedAt          DateTime? @map("converted_at")
+
+  // Storage
+  pdfUrl String?
+
+  // Google Drive sync (no XML — not an e-Tax doc)
+  driveFileId String?
+  driveUrl    String?
+
+  // Audit
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by")
+  cancelReason String?   @map("cancel_reason")
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company         @relation(fields: [companyId], references: [id])
+  project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buyer   Customer        @relation(fields: [buyerId], references: [id])
+  creator User            @relation("QuotationCreatedBy", fields: [createdBy], references: [id])
+  items   QuotationItem[]
+
+  @@unique([companyId, quotationNumber])
+  @@index([companyId])
+  @@index([companyId, projectId])
+  @@index([companyId, status])
+  @@index([companyId, quotationDate])
+  @@index([buyerId])
+  @@index([createdBy])
+  @@index([convertedToInvoiceId])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id             String  @id @default(cuid())
+  quotationId    String
+  productId      String?
+  nameTh         String
+  nameEn         String?
+  descriptionTh  String?
+  descriptionEn  String?
+  quantity       Float
+  unit           String
+  unitPrice      Float
+  discountAmount Float   @default(0) @map("discount")
+  vatType        VatType @default(vat7)
+  amount         Float
+  vatAmount      Float
+  totalAmount    Float
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id])
+
+  @@index([quotationId])
+  @@map("quotation_items")
 }
 
 model PurchaseInvoice {
@@ -682,12 +784,12 @@ model IntakeAccessLog {
   intakeId   String
   companyId  String
   lineUserId String
-  method     String   // GET, POST, PATCH
+  method     String // GET, POST, PATCH
   path       String
   ip         String
   userAgent  String?
   isMutation Boolean  @default(false)
-  rlCount    Int?     // request count in the current rate-limit window
+  rlCount    Int? // request count in the current rate-limit window
   createdAt  DateTime @default(now())
 
   @@index([companyId, createdAt])
@@ -697,18 +799,18 @@ model IntakeAccessLog {
 }
 
 model Payment {
-  id                String   @id @default(cuid())
-  invoiceId         String
-  amount            Float
-  method            String // cash, transfer, cheque, credit_card, other
-  reference         String? // เลขอ้างอิงการชำระ / slip ref
-  paidAt            DateTime @default(now())
-  note              String?
-  createdBy         String
-  createdAt         DateTime @default(now())
-  evidenceIntakeId  String? // DocumentIntake.id of the bank slip
-  matchScore        Int?    // 0-100 match confidence for auto-matched payments
-  matchedBy         String? // 'auto' | 'manual'
+  id               String   @id @default(cuid())
+  invoiceId        String
+  amount           Float
+  method           String // cash, transfer, cheque, credit_card, other
+  reference        String? // เลขอ้างอิงการชำระ / slip ref
+  paidAt           DateTime @default(now())
+  note             String?
+  createdBy        String
+  createdAt        DateTime @default(now())
+  evidenceIntakeId String? // DocumentIntake.id of the bank slip
+  matchScore       Int? // 0-100 match confidence for auto-matched payments
+  matchedBy        String? // 'auto' | 'manual'
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -800,6 +902,7 @@ model Project {
   creator               User                   @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
   members               ProjectMember[]
   invoices              Invoice[]
+  quotations            Quotation[]
   purchaseInvoices      PurchaseInvoice[]
   projectPurchaseOrders ProjectPurchaseOrder[]
   documentIntakes       DocumentIntake[]
@@ -1248,30 +1351,30 @@ enum PayrollRunStatus {
 }
 
 model Employee {
-  id                  String   @id @default(cuid())
-  companyId           String   @map("company_id")
-  employeeCode        String   @map("employee_code") // internal HR code
-  fullName            String   @map("full_name")
-  position            String?
-  email               String?
-  phone               String?
-  nationalId          String?  @map("national_id") // 13-digit, used on ภงด.1 / 50 ทวิ
-  ssoNumber           String?  @map("sso_number") // 13-digit social security ID
-  baseSalary          Float    @map("base_salary") // monthly
-  bankAccount         String?  @map("bank_account")
-  bankName            String?  @map("bank_name")
-  startDate           DateTime @map("start_date")
-  endDate             DateTime? @map("end_date") // if resigned
+  id           String    @id @default(cuid())
+  companyId    String    @map("company_id")
+  employeeCode String    @map("employee_code") // internal HR code
+  fullName     String    @map("full_name")
+  position     String?
+  email        String?
+  phone        String?
+  nationalId   String?   @map("national_id") // 13-digit, used on ภงด.1 / 50 ทวิ
+  ssoNumber    String?   @map("sso_number") // 13-digit social security ID
+  baseSalary   Float     @map("base_salary") // monthly
+  bankAccount  String?   @map("bank_account")
+  bankName     String?   @map("bank_name")
+  startDate    DateTime  @map("start_date")
+  endDate      DateTime? @map("end_date") // if resigned
   // Tax allowance inputs (used by income-tax calculator)
-  hasSpouse           Boolean  @default(false) @map("has_spouse")
-  numChildren         Int      @default(0) @map("num_children")
-  numParents          Int      @default(0) @map("num_parents")
-  pvdPercent          Float    @default(0) @map("pvd_percent") // 0-15 %, contributes to PVD
-  ssoMember           Boolean  @default(true) @map("sso_member") // SSO opt-out is rare
+  hasSpouse    Boolean   @default(false) @map("has_spouse")
+  numChildren  Int       @default(0) @map("num_children")
+  numParents   Int       @default(0) @map("num_parents")
+  pvdPercent   Float     @default(0) @map("pvd_percent") // 0-15 %, contributes to PVD
+  ssoMember    Boolean   @default(true) @map("sso_member") // SSO opt-out is rare
 
-  isActive            Boolean  @default(true) @map("is_active")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   payslips Payslip[]
@@ -1283,25 +1386,25 @@ model Employee {
 }
 
 model PayrollRun {
-  id           String           @id @default(cuid())
-  companyId    String           @map("company_id")
+  id          String           @id @default(cuid())
+  companyId   String           @map("company_id")
   // Period — month covered by this run. We key uniquely on (company,
   // year, month) so re-running for the same month idempotently
   // replaces existing payslips.
-  year         Int
-  month        Int               // 1-12
-  status       PayrollRunStatus  @default(draft)
-  payDate      DateTime          @map("pay_date")
-  totalGross   Float             @default(0) @map("total_gross")
-  totalNet     Float             @default(0) @map("total_net")
-  totalWht     Float             @default(0) @map("total_wht") // ภงด.1
-  totalSso     Float             @default(0) @map("total_sso") // employee side
-  notes        String?
-  createdBy    String            @map("created_by")
-  finalizedAt  DateTime?         @map("finalized_at")
-  paidAt       DateTime?         @map("paid_at")
-  createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt @map("updated_at")
+  year        Int
+  month       Int // 1-12
+  status      PayrollRunStatus @default(draft)
+  payDate     DateTime         @map("pay_date")
+  totalGross  Float            @default(0) @map("total_gross")
+  totalNet    Float            @default(0) @map("total_net")
+  totalWht    Float            @default(0) @map("total_wht") // ภงด.1
+  totalSso    Float            @default(0) @map("total_sso") // employee side
+  notes       String?
+  createdBy   String           @map("created_by")
+  finalizedAt DateTime?        @map("finalized_at")
+  paidAt      DateTime?        @map("paid_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   payslips Payslip[]
@@ -1312,25 +1415,25 @@ model PayrollRun {
 }
 
 model Payslip {
-  id              String   @id @default(cuid())
-  payrollRunId    String   @map("payroll_run_id")
-  employeeId      String   @map("employee_id")
+  id           String    @id @default(cuid())
+  payrollRunId String    @map("payroll_run_id")
+  employeeId   String    @map("employee_id")
   // Snapshot of employee identity at run time so historical payslips
   // don't change if the employee row is later edited.
-  employeeName    String   @map("employee_name")
-  employeeCode    String   @map("employee_code")
-  position        String?
-  baseSalary      Float    @map("base_salary")
-  adjustments     Json?   // [{ label, amount, type: 'addition' | 'deduction' }]
-  gross           Float
-  whtAmount       Float    @map("wht_amount")     // ภงด.1
-  ssoEmployee     Float    @map("sso_employee")   // 5% (capped)
-  ssoEmployer     Float    @map("sso_employer")   // 5% (capped)
-  pvdAmount       Float    @default(0) @map("pvd_amount")
-  net             Float
-  pdfUrl          String?  @map("pdf_url")
-  emailedAt       DateTime? @map("emailed_at")
-  createdAt       DateTime @default(now()) @map("created_at")
+  employeeName String    @map("employee_name")
+  employeeCode String    @map("employee_code")
+  position     String?
+  baseSalary   Float     @map("base_salary")
+  adjustments  Json? // [{ label, amount, type: 'addition' | 'deduction' }]
+  gross        Float
+  whtAmount    Float     @map("wht_amount") // ภงด.1
+  ssoEmployee  Float     @map("sso_employee") // 5% (capped)
+  ssoEmployer  Float     @map("sso_employer") // 5% (capped)
+  pvdAmount    Float     @default(0) @map("pvd_amount")
+  net          Float
+  pdfUrl       String?   @map("pdf_url")
+  emailedAt    DateTime? @map("emailed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee   Employee   @relation(fields: [employeeId], references: [id])
