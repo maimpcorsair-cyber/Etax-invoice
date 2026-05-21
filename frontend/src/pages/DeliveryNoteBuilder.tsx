@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle,
-  Loader2, AlertTriangle, ArrowRight, Clock, Receipt, Truck,
+  Loader2, AlertTriangle, ArrowRight, Clock, Receipt, Truck, Download, Printer,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -70,6 +70,7 @@ export default function DeliveryNoteBuilder() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [acting, setActing] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<'open' | 'download' | null>(null);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const [form, setForm] = useState<FormState>({
@@ -254,6 +255,39 @@ export default function DeliveryNoteBuilder() {
     }
   }
 
+  async function openPdf(mode: 'open' | 'download') {
+    if (!token || !id || !existing) return;
+    setPdfBusy(mode);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/delivery-notes/${id}/preview?format=pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'PDF failed' }));
+        throw new Error(surfaceError(json));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (mode === 'open') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${existing.deliveryNoteNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setPdfBusy(null);
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>;
   }
@@ -289,6 +323,14 @@ export default function DeliveryNoteBuilder() {
           </div>
         ) : existing && (
           <div className="flex gap-2 flex-wrap">
+            <button onClick={() => openPdf('open')} disabled={pdfBusy !== null} className="btn-secondary">
+              {pdfBusy === 'open' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              {isThai ? 'เปิด/พิมพ์ PDF' : 'Open / print PDF'}
+            </button>
+            <button onClick={() => openPdf('download')} disabled={pdfBusy !== null} className="btn-secondary">
+              {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {isThai ? 'ดาวน์โหลด' : 'Download'}
+            </button>
             {existing.status === 'issued' && (
               <button onClick={() => changeStatus('delivered')} disabled={acting} className="btn-secondary">
                 <CheckCircle className="w-4 h-4 text-emerald-600" /> {isThai ? 'ส่งของครบแล้ว' : 'Mark delivered'}

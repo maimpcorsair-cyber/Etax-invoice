@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
-  Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt,
+  Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt, Truck,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -251,7 +251,32 @@ export default function QuotationBuilder() {
       if (!res.ok) throw new Error(surfaceError(json));
       const invoiceId = json.data.invoice.id;
       setMsg({ type: 'ok', text: isThai ? 'แปลงเป็นใบกำกับภาษีแล้ว' : 'Converted to invoice' });
-      navigate(`/app/invoices/${invoiceId}`);
+      navigate(`/app/invoices/${invoiceId}/edit`);
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function createDeliveryNote() {
+    if (!token || !id) return;
+    setActing(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/delivery-notes/from-quotation/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 && json.data?.id) {
+          navigate(`/app/delivery-notes/${json.data.id}`);
+          return;
+        }
+        throw new Error(surfaceError(json));
+      }
+      navigate(`/app/delivery-notes/${json.data.id}`);
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
     } finally {
@@ -307,13 +332,19 @@ export default function QuotationBuilder() {
               </>
             )}
             {existing.status === 'accepted' && (
-              <button onClick={convertToInvoice} disabled={acting} className="btn-primary">
-                {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {isThai ? 'ออกใบกำกับภาษี' : 'Convert to tax invoice'}
-              </button>
+              <>
+                <button onClick={createDeliveryNote} disabled={acting} className="btn-secondary">
+                  {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
+                  {isThai ? 'ออกใบส่งของ' : 'Create delivery note'}
+                </button>
+                <button onClick={convertToInvoice} disabled={acting} className="btn-primary">
+                  {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                  {isThai ? 'ออกใบกำกับภาษี' : 'Convert to tax invoice'}
+                </button>
+              </>
             )}
             {existing.status === 'converted' && existing.convertedToInvoiceId && (
-              <Link to={`/app/invoices/${existing.convertedToInvoiceId}`} className="btn-primary">
+              <Link to={`/app/invoices/${existing.convertedToInvoiceId}/edit`} className="btn-primary">
                 <Receipt className="w-4 h-4" /> {isThai ? 'ดูใบกำกับภาษี' : 'View tax invoice'}
               </Link>
             )}
