@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-22 (Delivery Note smoke passed)
+Last updated: 2026-05-22 (Delivery Note Day 2 polish live)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -10,14 +10,15 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest checked route: `/app/delivery-notes` returned 200 after Day 2 deploy.
+- Latest production deployment: `dpl_vCoT4FhF2gKejcPEn5dpzTnFWmqx` (`https://etax-invoice-cjx0j9ota-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
+- Latest checked route: `/app/delivery-notes` returned 200; production chunks contain Delivery Note PDF controls and Quotation -> Delivery Note handoff code.
 
 Backend:
 - Platform: Render
 - Service: `etax-invoice-api` (`srv-d7lkqkvavr4c73a0qqh0`)
 - Plan: Standard ($25)
 - URL: `https://etax-invoice-api.onrender.com`
-- Latest live deploy checked: `9d739f4` via `Deploy to Render` run `26250852616`.
+- Latest live deploy checked: `7d2d7ee` via `Deploy to Render` run `26251753025`.
 - Health endpoints:
   - `/api/health` — shallow process liveness (express responding)
   - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
@@ -31,9 +32,9 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Push checks for `f174653` green: Typecheck, Unit tests, Prod smoke test.
-- Manual `Deploy to Render` run `26249439366` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
-- Convert fix deploys `0cde329` and `9d739f4` went live through Render runs `26250530797` and `26250852616`.
+- Push checks for `7d2d7ee` green: Typecheck (`26251750041`), Unit tests (`26251750039`), Prod smoke test (`26251750139`).
+- Manual `Deploy to Render` run `26251753025` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
+- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_vCoT4FhF2gKejcPEn5dpzTnFWmqx`.
 
 ## LINE / OCR pipeline (current)
 
@@ -51,11 +52,13 @@ Last CI:
 ## Current Dirty State
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
-- `.serena/project.yml`, `LOCAL_DEPLOYMENT.md` modified locally — not part of any feature work.
+- `.serena/project.yml` is modified locally and intentionally not committed.
 - Day 2 Delivery Note shipped in `f174653`: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
 - Production smoke passed: created `DN-2026-000001`, issued it, marked it delivered, then converted it to draft invoice `DRAFT-202605-112699` (`total=1.07`). A separate diagnostic draft invoice was cancelled after use.
 - Convert fix note: `0cde329` wrapped invoice conversion in tenant RLS context; `9d739f4` makes converted invoices use draft numbering until explicitly issued.
-- Next best action: polish Day 2 with PDF/print delivery note and Quotation -> Delivery Note conversion.
+- Day 2 polish shipped in `7d2d7ee`: Delivery Note HTML/PDF preview at `GET /api/delivery-notes/:id/preview?format=pdf`, frontend print/download buttons, and `POST /api/delivery-notes/from-quotation/:quotationId`.
+- Production polish smoke passed: `DN-2026-000001` preview HTML 200, PDF 200 with `%PDF` signature (`169428` bytes); smoke quotation `QT-2026-000001` converted to draft delivery note `DN-2026-000002`.
+- Next best action: Day 3 Recurring invoice, or a cleanup pass to archive/cancel smoke artifacts if desired.
 
 ## Sentry verification status (verified 2026-05-19)
 
@@ -112,6 +115,7 @@ To finish on production:
 
 ## Latest Completed Changes
 
+- Delivery Note Day 2 polish is live: printable/downloadable PDF, Quotation -> Delivery Note handoff, backend Render deploy verified, frontend Vercel alias verified.
 - Invoice builder UX: `/app/invoices/new` now uses a framed form/preview workspace, removes nested desktop form scroll, keeps section chips sticky, and makes the preview pane sticky on desktop.
 - DBD/RD/MOC autofill: Thai address selection prefers the most complete official address and preserves postcode; English address is official/user-verified only, not romanized from Thai.
 - Product catalog: products/services support type, category, account code, unit cost, default WHT, and sync into the company Google Sheet tab `สินค้าและบริการ`.
