@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-22 (Delivery Note local implementation)
+Last updated: 2026-05-22 (Delivery Note deployed)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -33,7 +33,8 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Both backend + frontend `npx tsc --noEmit` clean at `56f4dad`
+- Push checks for `f174653` green: Typecheck, Unit tests, Prod smoke test.
+- Manual `Deploy to Render` run `26249439366` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
 
 ## LINE / OCR pipeline (current)
 
@@ -52,9 +53,9 @@ Last CI:
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml`, `LOCAL_DEPLOYMENT.md` modified locally — not part of any feature work.
-- Day 2 Delivery Note work is local/uncommitted: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
-- Verified locally: `cd backend && npx prisma validate`, `cd backend && npx prisma generate`, `cd backend && npx tsc --noEmit`, `cd frontend && npx tsc --noEmit`.
-- Not yet applied to any database/deploy. Next runtime check needs applying the new migration, then creating a delivery note from `/app/delivery-notes/new`.
+- Day 2 Delivery Note shipped in `f174653`: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
+- Production verification: `GET /api/health` returned 200, authenticated `GET /api/delivery-notes` returned 200 with empty pagination, and `https://etax-invoice.vercel.app/app/delivery-notes` returned 200.
+- Next functional check: log in to production UI, create one delivery note from `/app/delivery-notes/new`, mark it issued/delivered, then convert to a draft tax invoice.
 
 ## Sentry verification status (verified 2026-05-19)
 
