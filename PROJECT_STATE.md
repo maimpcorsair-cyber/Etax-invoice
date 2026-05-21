@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-22 (Delivery Note deployed)
+Last updated: 2026-05-22 (Delivery Note smoke passed)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -10,16 +10,14 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest deploy commit: `56f4dad` (slip OCR race + empty-OCR fixes — pending auto-deploy)
-- Previous live commit: `d505fc9` (slip attachment + auto-OCR feature)
+- Latest checked route: `/app/delivery-notes` returned 200 after Day 2 deploy.
 
 Backend:
 - Platform: Render
 - Service: `etax-invoice-api` (`srv-d7lkqkvavr4c73a0qqh0`)
 - Plan: Standard ($25)
 - URL: `https://etax-invoice-api.onrender.com`
-- Latest live deploy: commit `d505fc9` (2026-05-18 12:58 UTC, `dep-d85goleq1p3s73fpkr10`)
-- Pending: `56f4dad` (slip race + empty-OCR rejection fixes)
+- Latest live deploy checked: `9d739f4` via `Deploy to Render` run `26250852616`.
 - Health endpoints:
   - `/api/health` — shallow process liveness (express responding)
   - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
@@ -35,6 +33,7 @@ Worker:
 Last CI:
 - Push checks for `f174653` green: Typecheck, Unit tests, Prod smoke test.
 - Manual `Deploy to Render` run `26249439366` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
+- Convert fix deploys `0cde329` and `9d739f4` went live through Render runs `26250530797` and `26250852616`.
 
 ## LINE / OCR pipeline (current)
 
@@ -54,8 +53,9 @@ Last CI:
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml`, `LOCAL_DEPLOYMENT.md` modified locally — not part of any feature work.
 - Day 2 Delivery Note shipped in `f174653`: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
-- Production verification: `GET /api/health` returned 200, authenticated `GET /api/delivery-notes` returned 200 with empty pagination, and `https://etax-invoice.vercel.app/app/delivery-notes` returned 200.
-- Next functional check: log in to production UI, create one delivery note from `/app/delivery-notes/new`, mark it issued/delivered, then convert to a draft tax invoice.
+- Production smoke passed: created `DN-2026-000001`, issued it, marked it delivered, then converted it to draft invoice `DRAFT-202605-112699` (`total=1.07`). A separate diagnostic draft invoice was cancelled after use.
+- Convert fix note: `0cde329` wrapped invoice conversion in tenant RLS context; `9d739f4` makes converted invoices use draft numbering until explicitly issued.
+- Next best action: polish Day 2 with PDF/print delivery note and Quotation -> Delivery Note conversion.
 
 ## Sentry verification status (verified 2026-05-19)
 
