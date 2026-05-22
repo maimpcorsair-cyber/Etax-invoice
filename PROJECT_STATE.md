@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-22 09:48 +07 (Day 3 recurring from existing invoice UI live)
+Last updated: 2026-05-22 10:15 +07 (Day 4 Customer Portal shipped)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -62,7 +62,9 @@ Last CI:
 - Production recurring smoke passed: created smoke template `cmpg09kej0008gasdo2r1ckgi`, generated draft invoice `DRAFT-202605-MPG09L7ECKGI` (`total=1.07`, invoice `cmpg09l7p000jgasdwa4qmxzy`), verified listing, then cancelled both the smoke recurring template and smoke draft invoice.
 - Day 3 polish shipped in `7ea2eae`: Invoice List now has "ทำซ้ำ"/"Repeat" actions that open a responsive modal and create a recurring schedule from the selected invoice via `POST /api/recurring-invoices/from-invoice/:invoiceId`.
 - Production recurring-from-invoice smoke passed: source invoice `DRAFT-202605-112699` (`cmpfxwo3o000713bqu0docq7s`) created recurring schedule `cmpgbl8bf00a4gasdo8yyb8wg`, then cancelled the smoke schedule immediately.
-- Next best action: Day 4 Customer portal (ลูกค้าดูใบของตัวเอง).
+- Codex Day 2/3 review fixes shipped in `e4a1c90`: Quotation line discountAmount switched from FLAT baht to PERCENT (matches Invoice + RecurringInvoice), and DRAFT- invoice numbers in recurringInvoiceService + deliveryNotes convert flow now use `generateInvoiceNumber()` advisory-locked sequence (was Date.now() based — would collide on [companyId, invoiceNumber] under concurrent generation).
+- Day 4 Customer Portal shipped in `16eb4ba`: magic-link buyer portal at `/portal`. `services/customerPortalToken.ts` (JWT, audience 'customer-portal', 14d TTL), `routes/customerPortal.ts` (request-link / me / documents / invoices/:id / invoices/:id/pdf / quotations/:id / delivery-notes/:id), `sendCustomerPortalLinkEmail` consolidates multi-tenant matches into one email, frontend `/portal` Landing + Verify + Dashboard pages.
+- Next best action: production-verify Day 4 by sending a magic link to a real customer email (`POST /api/customer-portal/request-link`) and walking the flow on the deployed site.
 
 ## Sentry verification status (verified 2026-05-19)
 
