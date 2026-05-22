@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
+import { applyInvoiceStockMovements, reverseStockMovementsFor } from '../services/inventoryService';
 import { invoiceQueue, rdSubmissionQueue, enqueueMasterSheetSync } from '../queues';
 import { auditLog } from '../services/auditService';
 import { requireRole } from '../middleware/auth';
@@ -451,7 +452,7 @@ invoicesRouter.post('/', async (req, res) => {
     };
 
     const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-      return tx.invoice.create({
+      const created = await tx.invoice.create({
         data: {
         invoiceNumber,
         type: body.type,
@@ -495,6 +496,19 @@ invoicesRouter.post('/', async (req, res) => {
       },
       include: { items: true, buyer: true, project: { select: { id: true, code: true, name: true } } },
     });
+
+      // Inventory hook — decrement stock for any line that points at a
+      // tracked product. Sale documents only (T01-T03). Credit notes
+      // and debit notes don't move stock — they adjust money only.
+      if (body.type === 'tax_invoice' || body.type === 'tax_invoice_receipt' || body.type === 'receipt') {
+        await applyInvoiceStockMovements(tx, {
+          companyId: req.user!.companyId,
+          invoiceId: created.id,
+          items: created.items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+          createdBy: req.user!.userId,
+        });
+      }
+      return created;
     });
 
     if (!isDraft) {
@@ -1151,6 +1165,9 @@ invoicesRouter.delete('/:id', requireRole('admin'), async (req, res) => {
 
     await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       await tx.invoice.update({ where: { id: invoice.id }, data: { status: 'cancelled' } });
+      // Reverse inventory impact so the stock ledger reflects only
+      // documents that still exist as billable.
+      await reverseStockMovementsFor(tx, 'invoice', invoice.id, req.user!.userId);
       return null;
     });
 

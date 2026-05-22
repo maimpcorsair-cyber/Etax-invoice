@@ -10,6 +10,8 @@ import {
   resolveCompanyAccessPolicy,
 } from '../services/accessPolicyService';
 import { exportCompanyWorkspaceToSheets } from '../services/googleSheetsService';
+import { adjustStock, setOpeningBalance } from '../services/inventoryService';
+import { logger } from '../config/logger';
 
 export const productsRouter = Router();
 
@@ -28,6 +30,9 @@ const productSchema = z.object({
   unitCost: z.number().min(0).optional().nullable(),
   defaultWhtRate: z.enum(['1', '3', '5']).optional().nullable(),
   internalNote: z.string().trim().optional().nullable(),
+  // Inventory (opt-in). Tracked products auto-decrement on Invoice issue.
+  trackInventory: z.boolean().optional(),
+  reorderPoint: z.number().min(0).optional().nullable(),
 });
 
 function productTypeLabel(type?: string | null) {
@@ -205,5 +210,114 @@ productsRouter.put('/:id', async (req, res) => {
     res.json({ message: 'Product updated' });
   } catch {
     res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+// ── Inventory routes ────────────────────────────────────────────────
+
+// Manual stock adjustment — positive delta adds, negative subtracts.
+// Used for: correcting a count after physical inventory, recording loss
+// or damage, or recording stock received without a per-product Purchase
+// Invoice (the common case since PurchaseInvoice is header-only).
+productsRouter.post('/:id/stock/adjust', async (req, res) => {
+  try {
+    const body = z.object({
+      delta: z.number().refine((n) => n !== 0, { message: 'delta cannot be zero' }),
+      note: z.string().max(500).optional().nullable(),
+    }).parse(req.body);
+    const product = await prisma.product.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      select: { id: true, trackInventory: true },
+    });
+    if (!product) { res.status(404).json({ error: 'Product not found' }); return; }
+    if (!product.trackInventory) { res.status(400).json({ error: 'Inventory tracking is not enabled for this product' }); return; }
+
+    const result = await adjustStock({
+      companyId: req.user!.companyId,
+      productId: product.id,
+      delta: body.delta,
+      note: body.note ?? null,
+      createdBy: req.user!.userId,
+    });
+    if (!result) { res.status(500).json({ error: 'Failed to adjust stock' }); return; }
+    res.json({ data: result });
+  } catch (err) {
+    if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('adjust stock failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to adjust stock' });
+  }
+});
+
+// Set the opening balance when a product is FIRST switched to tracked,
+// or when correcting the running total wholesale.
+productsRouter.post('/:id/stock/opening-balance', async (req, res) => {
+  try {
+    const body = z.object({
+      qty: z.number().min(0),
+    }).parse(req.body);
+    const product = await prisma.product.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      select: { id: true, trackInventory: true },
+    });
+    if (!product) { res.status(404).json({ error: 'Product not found' }); return; }
+    if (!product.trackInventory) { res.status(400).json({ error: 'Enable inventory tracking on this product first' }); return; }
+
+    await setOpeningBalance({
+      companyId: req.user!.companyId,
+      productId: product.id,
+      qty: body.qty,
+      createdBy: req.user!.userId,
+    });
+    res.json({ data: { qty: body.qty } });
+  } catch (err) {
+    if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('set opening balance failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to set opening balance' });
+  }
+});
+
+// History — most recent first. Used by the Product detail page.
+productsRouter.get('/:id/stock-movements', async (req, res) => {
+  try {
+    const product = await prisma.product.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      select: { id: true },
+    });
+    if (!product) { res.status(404).json({ error: 'Product not found' }); return; }
+
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const rows = await prisma.stockMovement.findMany({
+      where: { companyId: req.user!.companyId, productId: product.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    res.json({ data: rows });
+  } catch (err) {
+    logger.error('list stock movements failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to list stock movements' });
+  }
+});
+
+// Low-stock list — products where currentStock <= reorderPoint AND tracking
+// is on. Powers the dashboard widget.
+productsRouter.get('/low-stock', async (req, res) => {
+  try {
+    const rows = await prisma.$queryRaw<Array<{
+      id: string; code: string; nameTh: string; currentStock: number; reorderPoint: number | null;
+    }>>`
+      SELECT id, code, "nameTh", "current_stock" AS "currentStock", "reorder_point" AS "reorderPoint"
+      FROM products
+      WHERE "companyId" = ${req.user!.companyId}
+        AND "track_inventory" = true
+        AND "isActive" = true
+        AND "reorder_point" IS NOT NULL
+        AND "current_stock" <= "reorder_point"
+      ORDER BY ("current_stock" - "reorder_point") ASC
+      LIMIT 50
+    `;
+    res.json({ data: rows });
+  } catch (err) {
+    logger.error('list low stock failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to list low-stock products' });
   }
 });

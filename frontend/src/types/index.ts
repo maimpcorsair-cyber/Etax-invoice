@@ -225,6 +225,10 @@ export interface Product {
   defaultWhtRate?: '1' | '3' | '5' | null;
   internalNote?: string | null;
   isActive: boolean;
+  // Inventory (opt-in)
+  trackInventory?: boolean;
+  currentStock?: number;
+  reorderPoint?: number | null;
 }
 
 export interface InvoiceItem {

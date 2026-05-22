@@ -40,6 +40,9 @@ const EMPTY_FORM: Omit<Product, 'id' | 'companyId' | 'isActive'> = {
   unitCost: null,
   defaultWhtRate: null,
   internalNote: '',
+  trackInventory: false,
+  currentStock: 0,
+  reorderPoint: null,
 };
 
 export default function Products() {
@@ -57,6 +60,10 @@ export default function Products() {
   const [saving, setSaving] = useState(false);
   const [sheetExporting, setSheetExporting] = useState(false);
   const [error, setError] = useState('');
+  const [stockAdjustProduct, setStockAdjustProduct] = useState<Product | null>(null);
+  const [stockDelta, setStockDelta] = useState<string>('');
+  const [stockNote, setStockNote] = useState('');
+  const [stockSaving, setStockSaving] = useState(false);
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
@@ -96,6 +103,37 @@ export default function Products() {
     setShowModal(true);
   }
 
+  function openStockAdjust(p: Product) {
+    setStockAdjustProduct(p);
+    setStockDelta('');
+    setStockNote('');
+  }
+
+  async function handleStockAdjust() {
+    if (!stockAdjustProduct) return;
+    const delta = parseFloat(stockDelta);
+    if (!Number.isFinite(delta) || delta === 0) {
+      alert(isThai ? 'กรอกจำนวนที่จะปรับ (+ เพิ่ม / − ลด)' : 'Enter a non-zero delta (+ to add, − to subtract)');
+      return;
+    }
+    setStockSaving(true);
+    try {
+      const res = await fetch(`/api/products/${stockAdjustProduct.id}/stock/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ delta, note: stockNote || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Adjust failed');
+      setStockAdjustProduct(null);
+      await fetchProducts();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setStockSaving(false);
+    }
+  }
+
   function openEdit(p: Product) {
     setEditing(p);
     setForm({
@@ -113,6 +151,9 @@ export default function Products() {
       unitCost: p.unitCost ?? null,
       defaultWhtRate: p.defaultWhtRate ?? null,
       internalNote: p.internalNote ?? '',
+      trackInventory: p.trackInventory ?? false,
+      currentStock: p.currentStock ?? 0,
+      reorderPoint: p.reorderPoint ?? null,
     });
     setError('');
     setShowModal(true);
@@ -338,6 +379,7 @@ export default function Products() {
                 <th className="table-header">{t('product.unit')}</th>
                 <th className="table-header text-right">{t('product.price')}</th>
                 <th className="table-header">{t('product.vatType')}</th>
+                <th className="table-header">{isThai ? 'สต๊อก' : 'Stock'}</th>
                 <th className="table-header">{t('common.status')}</th>
                 <th className="table-header">{t('common.actions')}</th>
               </tr>
@@ -377,18 +419,48 @@ export default function Products() {
                       <span className={vatBadge(p.vatType)}>{vatLabel(p.vatType)}</span>
                     </td>
                     <td className="table-cell">
+                      {p.trackInventory ? (
+                        (() => {
+                          const stock = p.currentStock ?? 0;
+                          const reorder = p.reorderPoint;
+                          const low = reorder !== null && reorder !== undefined && stock <= reorder;
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${low ? 'bg-rose-100 text-rose-700' : stock === 0 ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
+                              📦 {stock}
+                              {low && reorder !== null && reorder !== undefined && (
+                                <span className="text-rose-600">≤{reorder}</span>
+                              )}
+                            </span>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="table-cell">
                       <span className={p.isActive ? 'badge-success' : 'badge-error'}>
                         {p.isActive ? t('common.active') : t('common.inactive')}
                       </span>
                     </td>
                     <td className="table-cell">
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="p-1 text-primary-600 hover:text-primary-800"
-                        title={t('common.edit')}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {p.trackInventory && (
+                          <button
+                            onClick={() => openStockAdjust(p)}
+                            className="p-1 text-indigo-600 hover:text-indigo-800"
+                            title={isThai ? 'ปรับสต๊อก' : 'Adjust stock'}
+                          >
+                            📦
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="p-1 text-primary-600 hover:text-primary-800"
+                          title={t('common.edit')}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -586,12 +658,127 @@ export default function Products() {
                   </div>
                 </div>
               </details>
+
+              {/* Inventory tracking — opt-in per product. Service-business
+                  tenants leave this off and never see the stock UI. */}
+              <details className="rounded-2xl border border-gray-200 bg-gray-50/60 px-1 sm:px-2">
+                <summary className="cursor-pointer select-none rounded-2xl px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                  📦 {isThai ? 'ติดตามสต๊อก (Inventory)' : 'Inventory tracking'}
+                  {form.trackInventory && (
+                    <span className="ml-2 text-xs font-normal text-emerald-600">• {isThai ? 'เปิดอยู่' : 'On'}</span>
+                  )}
+                </summary>
+                <div className="space-y-3 border-t border-gray-200 bg-white px-4 py-4">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.trackInventory ?? false}
+                      onChange={(e) => field('trackInventory', e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm">
+                      {isThai
+                        ? 'เปิดติดตามสต๊อก — ระบบจะหักสต๊อกอัตโนมัติเมื่อออกใบกำกับภาษี (T01-T03)'
+                        : 'Enable tracking — stock auto-decrements when a sales invoice is issued (T01-T03).'}
+                    </span>
+                  </label>
+                  {form.trackInventory && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="label">{isThai ? 'สต๊อกเริ่มต้น' : 'Opening stock'}</label>
+                        <input
+                          type="number"
+                          value={form.currentStock ?? 0}
+                          onChange={(e) => field('currentStock', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                          className="input-field text-right"
+                          min={0}
+                          step={1}
+                          disabled={!!editing}
+                          placeholder="0"
+                        />
+                        <p className="mt-1 text-xs text-gray-400">
+                          {editing
+                            ? (isThai ? 'หลังบันทึก ใช้ปุ่ม "ปรับสต๊อก" ในรายการสินค้าเพื่อแก้ยอด' : 'After save, use "Adjust" on the row to change stock.')
+                            : (isThai ? 'จำนวนที่มีในคลังตอนนี้' : 'Quantity in hand right now')}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="label">{isThai ? 'แจ้งเตือนเมื่อต่ำกว่า' : 'Reorder point'}</label>
+                        <input
+                          type="number"
+                          value={form.reorderPoint ?? ''}
+                          onChange={(e) => field('reorderPoint', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
+                          className="input-field text-right"
+                          min={0}
+                          step={1}
+                          placeholder={isThai ? 'เช่น 20' : 'e.g. 20'}
+                        />
+                        <p className="mt-1 text-xs text-gray-400">
+                          {isThai ? 'ขึ้น Dashboard เมื่อยอดสต๊อก ≤ ค่านี้' : 'Shows on Dashboard when stock ≤ this value'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </details>
             </div>
 
             <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-100">
               <button onClick={() => setShowModal(false)} className="btn-secondary">{t('common.cancel')}</button>
               <button onClick={handleSave} disabled={saving} className="btn-primary">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock adjust modal */}
+      {stockAdjustProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">
+                📦 {isThai ? 'ปรับสต๊อก' : 'Adjust stock'} — {stockAdjustProduct.code}
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {isThai ? 'สต๊อกปัจจุบัน:' : 'Current stock:'}{' '}
+                <strong>{stockAdjustProduct.currentStock ?? 0}</strong>
+              </p>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="label">{isThai ? 'จำนวนที่จะปรับ' : 'Adjust by'}</label>
+                <input
+                  type="number"
+                  value={stockDelta}
+                  onChange={(e) => setStockDelta(e.target.value)}
+                  className="input-field text-right"
+                  placeholder={isThai ? 'เช่น +10 (รับเข้า) หรือ -2 (ของหาย)' : 'e.g. +10 (received) or -2 (loss)'}
+                  step={1}
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  {isThai ? 'ใส่จำนวนบวกเพื่อเพิ่ม / ลบเพื่อหัก' : 'Positive to add, negative to subtract'}
+                </p>
+              </div>
+              <div>
+                <label className="label">{isThai ? 'หมายเหตุ' : 'Note'}</label>
+                <input
+                  type="text"
+                  value={stockNote}
+                  onChange={(e) => setStockNote(e.target.value)}
+                  className="input-field"
+                  placeholder={isThai ? 'เช่น "ตรวจนับ", "ของหาย", "รับเข้าจาก ABC"' : 'e.g. "Count fix", "Loss", "Received from ABC"'}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-100">
+              <button onClick={() => setStockAdjustProduct(null)} className="btn-secondary">
+                {t('common.cancel')}
+              </button>
+              <button onClick={handleStockAdjust} disabled={stockSaving} className="btn-primary">
+                {stockSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {t('common.save')}
               </button>
             </div>

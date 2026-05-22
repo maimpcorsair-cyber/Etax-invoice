@@ -219,6 +219,7 @@ model Company {
   users                 User[]
   customers             Customer[]
   products              Product[]
+  stockMovements        StockMovement[]
   invoices              Invoice[]
   quotations            Quotation[]
   deliveryNotes         DeliveryNote[]
@@ -445,6 +446,15 @@ model Product {
   internalNote   String? @map("internal_note")
   isActive       Boolean @default(true)
 
+  // ── Inventory (opt-in per product) ─────────────────────────────────
+  // Service-business tenants leave trackInventory false and never see
+  // the inventory UI. Once flipped on, hooks on Invoice issue and
+  // PurchaseInvoice create write StockMovement rows and keep
+  // currentStock in sync.
+  trackInventory Boolean @default(false) @map("track_inventory")
+  currentStock   Float   @default(0) @map("current_stock")
+  reorderPoint   Float?  @map("reorder_point")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -453,12 +463,45 @@ model Product {
   quotationItems        QuotationItem[]
   deliveryNoteItems     DeliveryNoteItem[]
   recurringInvoiceItems RecurringInvoiceItem[]
+  stockMovements        StockMovement[]
 
   @@unique([companyId, code])
   @@index([companyId])
   @@index([companyId, productType])
   @@index([companyId, category])
+  @@index([companyId, trackInventory])
   @@map("products")
+}
+
+// Stock ledger — one row per increment / decrement event. currentStock
+// on Product is the running sum, but this table is the audit truth.
+enum StockMovementType {
+  sale // Invoice issued (auto)
+  purchase // PurchaseInvoice created (auto)
+  adjustment_in // Manual count fix (found more than expected)
+  adjustment_out // Manual count fix (loss / damage / write-off)
+  opening_balance // Initial stock when trackInventory is first enabled
+}
+
+model StockMovement {
+  id        String            @id @default(cuid())
+  companyId String
+  productId String
+  type      StockMovementType
+  qty       Float // positive for IN, negative for OUT — caller writes the sign
+  refType   String? // 'invoice' | 'purchase_invoice' | 'manual'
+  refId     String?
+  note      String?
+  createdBy String?
+  createdAt DateTime          @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, productId])
+  @@index([companyId, createdAt])
+  @@index([refType, refId])
+  @@map("stock_movements")
 }
 
 model Invoice {
