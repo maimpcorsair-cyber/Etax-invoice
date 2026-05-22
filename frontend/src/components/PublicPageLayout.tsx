@@ -39,9 +39,6 @@ export default function PublicPageLayout({
             <a href={getPlanePath('/login', 'app')} className="btn-secondary sm">
               {t('auth.login')}
             </a>
-            <a href={getPlanePath('/login', 'ops')} className="hidden rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:inline-flex">
-              {isThai ? 'Owner Login' : 'Owner Login'}
-            </a>
           </div>
         </div>
       </header>

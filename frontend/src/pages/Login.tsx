@@ -278,31 +278,23 @@ export default function Login() {
               </p>
             </div>
 
-            <div className={`mb-6 rounded-2xl px-4 py-3 ${ownerMode ? 'border border-amber-200 bg-amber-50/90' : 'border border-teal-200 bg-teal-50/90'}`}>
-              <div className="flex items-start gap-3">
-                {ownerMode ? (
+            {ownerMode && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3">
+                <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 h-4 w-4 text-amber-700" />
-                ) : (
-                  <Lock className="mt-0.5 h-4 w-4 text-teal-700" />
-                )}
-                <div className="space-y-1">
-                  <p className={`text-sm font-semibold ${ownerMode ? 'text-amber-900' : 'text-teal-900'}`}>
-                    {ownerMode
-                      ? (isThai ? 'ใช้เฉพาะบัญชีเจ้าของระบบ' : 'Use only with owner accounts')
-                      : (isThai ? 'เจ้าของระบบ / Super Admin' : 'Owner / Super Admin')}
-                  </p>
-                  <p className={`text-xs leading-5 ${ownerMode ? 'text-amber-800' : 'text-teal-800'}`}>
-                    {ownerMode
-                      ? (isThai
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-amber-900">
+                      {isThai ? 'ใช้เฉพาะบัญชีเจ้าของระบบ' : 'Use only with owner accounts'}
+                    </p>
+                    <p className="text-xs leading-5 text-amber-800">
+                      {isThai
                         ? 'ถ้าบัญชีนี้ไม่ใช่ super_admin ระบบจะไม่อนุญาตให้เข้า Owner Plane จากหน้านี้'
-                        : 'Only super admin accounts can continue from this entry into Owner Plane.')
-                      : (isThai
-                        ? 'ถ้าบัญชีเป็น super_admin ระบบจะพาไปหน้า Owner Plane อัตโนมัติหลัง login'
-                        : 'If the account is a super_admin, the system will take it to Owner Plane automatically after sign-in.')}
-                  </p>
+                        : 'Only super admin accounts can continue from this entry into Owner Plane.'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {error && (
               <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-xl">
@@ -460,11 +452,13 @@ export default function Login() {
                 ? (isThai ? 'หากคุณเป็นผู้ใช้ทั่วไป ให้กลับไปใช้หน้า Customer Login' : 'If you are a regular user, go back to Customer Login.')
                 : (isThai ? 'หากยังไม่มีสิทธิ์เข้าใช้ ให้ติดต่อผู้ดูแลระบบ' : 'If you do not have access yet, contact your administrator')}
             </p>
-            <div className="mt-3">
-              <a href={ownerMode ? getPlanePath('/login', 'app') : getPlanePath('/login', 'ops')} className="text-sm font-semibold text-primary-700 hover:text-primary-800">
-                {ownerMode ? (isThai ? 'ไปหน้า Customer Login' : 'Go to Customer Login') : (isThai ? 'ไปหน้า Owner Login' : 'Go to Owner Login')}
-              </a>
-            </div>
+            {ownerMode && (
+              <div className="mt-3">
+                <a href={getPlanePath('/login', 'app')} className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+                  {isThai ? 'ไปหน้า Customer Login' : 'Go to Customer Login'}
+                </a>
+              </div>
+            )}
           </div>
           </div>
         </div>

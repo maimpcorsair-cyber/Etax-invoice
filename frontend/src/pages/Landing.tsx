@@ -548,9 +548,6 @@ export default function Landing() {
             <a href={getPlanePath('/login', 'app')} className="btn-secondary sm">
               {t('auth.login')}
             </a>
-            <a href={getPlanePath('/login', 'ops')} className="hidden rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:inline-flex">
-              {isThai ? 'Owner Login' : 'Owner Login'}
-            </a>
             <button type="button" onClick={() => openCheckout('free')} className="btn-primary sm hidden sm:flex">
               {t('landing.hero.cta')}
             </button>
@@ -767,19 +764,19 @@ export default function Landing() {
 
               <div className="mt-5 space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Owner Control Plane' : 'Owner Control Plane'}</div>
+                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Business Dashboard' : 'Business Dashboard'}</div>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
                     {isThai
-                      ? 'เจ้าของระบบดูรายได้, subscription, coupon, renewals, และธุรกรรมทุกช่องทางได้จากหน้าเดียว'
-                      : 'Owners can monitor revenue, subscriptions, coupons, renewals, and transactions from one control surface.'}
+                      ? 'ดูรายได้ ลูกหนี้ สถานะใบกำกับ และสต๊อกสินค้าได้จากหน้าเดียว'
+                      : 'See revenue, receivables, invoice status, and stock from a single dashboard.'}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Tenant Isolation' : 'Tenant Isolation'}</div>
+                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Data Security' : 'Data Security'}</div>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
                     {isThai
-                      ? 'ข้อมูลแต่ละบริษัทถูกแยกด้วย role + domain split + PostgreSQL RLS'
-                      : 'Each company is isolated with role checks, domain split, and PostgreSQL RLS.'}
+                      ? 'ข้อมูลแต่ละบริษัทถูกแยกอย่างเข้มงวด เข้ารหัส และสำรองข้อมูลทุกวัน'
+                      : 'Per-company data isolation with encryption and daily automated backups.'}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1406,7 +1403,7 @@ export default function Landing() {
                       // manual entry so signup still works end-to-end.
                       <>
                         <div>
-                          <label className="label">{isThai ? 'ชื่อผู้ดูแลบริษัท' : 'Workspace Owner Name'}</label>
+                          <label className="label">{isThai ? 'ชื่อผู้ดูแลบริษัท' : 'Administrator Name'}</label>
                           <input
                             className="input-field"
                             value={form.adminName}
@@ -1492,8 +1489,8 @@ export default function Landing() {
                           <p><span className="font-semibold">{isThai ? 'ยอดสุทธิ:' : 'Net amount:'}</span> {currency(checkoutResult.amountSummary?.totalAmount ?? 0)}</p>
                           <p className="text-emerald-800">
                             {isThai
-                              ? 'หลังลูกค้าชำระแล้ว Owner สามารถเข้า Owner Control Plane เพื่อกดยืนยันและเปิด tenant ได้ทันที'
-                              : 'After payment, the owner can approve the transaction in Owner Control Plane and activate the tenant immediately.'}
+                              ? 'หลังโอนชำระแล้ว ระบบจะตรวจสอบและเปิดบัญชีให้ภายใน 1 วันทำการ'
+                              : 'After transfer, your account will be verified and activated within 1 business day.'}
                           </p>
                         </div>
                       </div>
