@@ -7,10 +7,11 @@ import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { generateCustomerStatementExcel } from '../services/exportService';
 import { generateCustomerStatementPdf } from '../services/pdfService';
-import { sendStatementToCustomer } from '../services/emailService';
+import { sendStatementToCustomer, sendCustomerPortalLinkEmail, isEmailConfigured } from '../services/emailService';
 import { auditLog } from '../services/auditService';
 import { logger } from '../config/logger';
 import { uploadToDrive, isDriveConfigured } from '../services/googleDriveService';
+import { signCustomerPortalToken, buildCustomerPortalUrl } from '../services/customerPortalToken';
 import type { DriveCustomerDocumentFolder } from '../services/googleDriveService';
 import { isStorageConfigured, uploadToStorage } from '../services/storageService';
 import {
@@ -898,6 +899,67 @@ customersRouter.post('/:id/statement/send-email', async (req, res) => {
     res.json({ message: 'Statement email sent', to: customer.email });
   } catch {
     res.status(500).json({ error: 'Failed to send statement email' });
+  }
+});
+
+// Seller-initiated Customer Portal invite. Generates a magic-link for THIS
+// company's record of the customer and emails it directly so the seller
+// doesn't need the customer to remember the /portal URL.
+customersRouter.post('/:id/portal-link', async (req, res) => {
+  try {
+    if (!isEmailConfigured()) {
+      res.status(503).json({ error: 'SMTP is not configured on this deployment' });
+      return;
+    }
+
+    const customer = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.customer.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId, isActive: true },
+        include: { company: { select: { nameTh: true, nameEn: true } } },
+      });
+    });
+    if (!customer) {
+      res.status(404).json({ error: 'Customer not found' });
+      return;
+    }
+    if (!customer.email) {
+      res.status(400).json({ error: 'Customer has no email — add one first' });
+      return;
+    }
+
+    const baseUrl = process.env.FRONTEND_URL ?? process.env.APP_URL ?? 'https://etax-invoice.vercel.app';
+    const token = signCustomerPortalToken({
+      customerId: customer.id,
+      companyId: customer.companyId,
+      email: customer.email,
+    });
+    const portalUrl = buildCustomerPortalUrl(baseUrl, token);
+
+    await sendCustomerPortalLinkEmail({
+      toEmail: customer.email,
+      links: [{
+        sellerNameTh: customer.company.nameTh,
+        sellerNameEn: customer.company.nameEn ?? customer.company.nameTh,
+        portalUrl,
+      }],
+    });
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      action: 'send_customer_portal_link',
+      resourceType: 'customer',
+      resourceId: customer.id,
+      details: { email: customer.email },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.json({ data: { sent: true, to: customer.email } });
+  } catch (err) {
+    logger.error('send customer portal link failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to send portal link' });
   }
 });
 

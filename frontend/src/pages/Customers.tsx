@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck, ChevronDown, FolderOpen, Package } from 'lucide-react';
+import { Plus, Search, Edit2, UserX, FileText, X, Save, Loader2, Users, ReceiptText, Database, CheckCircle2, AlertTriangle, Upload, ExternalLink, ShieldCheck, Handshake, Truck, ChevronDown, FolderOpen, Package, Send } from 'lucide-react';
 import SectionSubNav from '../components/SectionSubNav';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
@@ -503,6 +503,31 @@ export default function Customers() {
     fetchCustomers();
   }
 
+  // Seller-initiated Customer Portal invite. We POST to the customer
+  // endpoint, backend generates a magic-link and emails it directly so
+  // the buyer doesn't have to remember /portal + retype their email.
+  async function handleSendPortalLink(customer: Customer) {
+    if (!customer.email) {
+      alert(isThai ? 'ลูกค้ายังไม่มีอีเมล — เพิ่มก่อนค่อยส่งลิงก์' : 'Customer has no email yet — add one first');
+      return;
+    }
+    const ok = confirm(isThai
+      ? `ส่งลิงก์ Customer Portal ไปที่ ${customer.email}?\n\nลูกค้าจะคลิกแล้วเห็นใบกำกับ/ใบเสนอราคา/ใบส่งของ ของตัวเอง (ลิงก์อายุ 14 วัน)`
+      : `Send Customer Portal link to ${customer.email}?\n\nThey'll see only the invoices/quotations/delivery notes you've issued to them (link expires in 14 days).`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/customers/${customer.id}/portal-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Failed');
+      alert(isThai ? `ส่งลิงก์ไปที่ ${customer.email} แล้ว` : `Sent link to ${customer.email}`);
+    } catch (e) {
+      alert(isThai ? `ส่งไม่สำเร็จ: ${(e as Error).message}` : `Send failed: ${(e as Error).message}`);
+    }
+  }
+
   const field = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -970,6 +995,15 @@ export default function Customers() {
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
+                        {c.email && (
+                          <button
+                            onClick={() => handleSendPortalLink(c)}
+                            className="p-1 text-indigo-500 hover:text-indigo-700"
+                            title={isThai ? 'ส่งลิงก์ Customer Portal ให้ลูกค้า' : 'Send Customer Portal link'}
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        )}
                         {c.isActive && (
                           <button
                             onClick={() => handleDeactivate(c.id)}
