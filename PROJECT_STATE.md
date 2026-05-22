@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-22 (Day 3 Recurring invoice live)
+Last updated: 2026-05-22 09:48 +07 (Day 3 recurring from existing invoice UI live)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -10,8 +10,8 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest production deployment: `dpl_2oSEyzgmtvhLka3MaBoeCsrxwuFf` (`https://etax-invoice-ilmulub6m-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
-- Latest checked route: `/app/recurring-invoices` returned 200; production chunks contain RecurringInvoice list/builder code and `/api/recurring-invoices` calls.
+- Latest production deployment: `dpl_9UjVgJYzAkLuHz7fP1Ft9uuTmUCm` (`https://etax-invoice-264ofvxqh-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
+- Latest checked route: `/app/invoices` returned 200; production `InvoiceList-BryrLTMy.js` contains the new recurring-from-invoice UI (`/from-invoice/`, `Repeat`/`ทำซ้ำ`, modal copy).
 
 Backend:
 - Platform: Render
@@ -32,9 +32,9 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Push checks for `537166f` green: Typecheck (`26253951351`), Unit tests (`26253951350`), Prod smoke test (`26253951390`).
+- Push checks for `7ea2eae` green: Typecheck (`26265452309`), Unit tests (`26265452332`), Prod smoke test (`26265452314`).
 - Manual `Deploy to Render` run `26253961989` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
-- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_2oSEyzgmtvhLka3MaBoeCsrxwuFf`.
+- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_9UjVgJYzAkLuHz7fP1Ft9uuTmUCm`.
 
 ## LINE / OCR pipeline (current)
 
@@ -60,7 +60,9 @@ Last CI:
 - Production polish smoke passed: `DN-2026-000001` preview HTML 200, PDF 200 with `%PDF` signature (`169428` bytes); smoke quotation `QT-2026-000001` converted to draft delivery note `DN-2026-000002`.
 - Day 3 Recurring invoice shipped in `537166f`: Prisma models/migration `20260522_recurring_invoices`, backend `/api/recurring-invoices`, daily BullMQ worker `recurring-invoices`, and frontend `/app/recurring-invoices`.
 - Production recurring smoke passed: created smoke template `cmpg09kej0008gasdo2r1ckgi`, generated draft invoice `DRAFT-202605-MPG09L7ECKGI` (`total=1.07`, invoice `cmpg09l7p000jgasdwa4qmxzy`), verified listing, then cancelled both the smoke recurring template and smoke draft invoice.
-- Next best action: Day 4 Customer portal, or polish Recurring invoices with "create schedule from existing invoice" UI using the already-added backend endpoint `POST /api/recurring-invoices/from-invoice/:invoiceId`.
+- Day 3 polish shipped in `7ea2eae`: Invoice List now has "ทำซ้ำ"/"Repeat" actions that open a responsive modal and create a recurring schedule from the selected invoice via `POST /api/recurring-invoices/from-invoice/:invoiceId`.
+- Production recurring-from-invoice smoke passed: source invoice `DRAFT-202605-112699` (`cmpfxwo3o000713bqu0docq7s`) created recurring schedule `cmpgbl8bf00a4gasdo8yyb8wg`, then cancelled the smoke schedule immediately.
+- Next best action: Day 4 Customer portal (ลูกค้าดูใบของตัวเอง).
 
 ## Sentry verification status (verified 2026-05-19)
 
@@ -117,7 +119,7 @@ To finish on production:
 
 ## Latest Completed Changes
 
-- Day 3 Recurring invoice is live: create/edit recurring invoice templates, generate draft invoices manually, daily worker creates due drafts, production deploy/migration verified.
+- Day 3 Recurring invoice is live: create/edit recurring invoice templates, generate draft invoices manually, daily worker creates due drafts, and create recurring schedules from existing invoices via Invoice List.
 - Delivery Note Day 2 polish is live: printable/downloadable PDF, Quotation -> Delivery Note handoff, backend Render deploy verified, frontend Vercel alias verified.
 - Invoice builder UX: `/app/invoices/new` now uses a framed form/preview workspace, removes nested desktop form scroll, keeps section chips sticky, and makes the preview pane sticky on desktop.
 - DBD/RD/MOC autofill: Thai address selection prefers the most complete official address and preserves postcode; English address is official/user-verified only, not romanized from Thai.
