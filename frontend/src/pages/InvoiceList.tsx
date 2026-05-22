@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
@@ -46,10 +46,41 @@ interface ProjectOption {
   status: string;
 }
 
+type RecurringSeedForm = {
+  name: string;
+  frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  interval: number;
+  nextRunDate: string;
+  dueDays: number | '';
+  maxRuns: number | '';
+  endDate: string;
+};
+
+function dateInput(value: string | Date) {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
+function addMonthsIso(value: string, months: number) {
+  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  return date.toISOString().slice(0, 10);
+}
+
+function daysBetweenIso(start?: string, end?: string) {
+  if (!start || !end) return '';
+  const startDate = new Date(`${start.slice(0, 10)}T00:00:00.000Z`);
+  const endDate = new Date(`${end.slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return '';
+  return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000));
+}
+
 export default function InvoiceList() {
   const { t } = useTranslation();
   const { isThai, formatCurrency, formatDate } = useLanguage();
   const { token, user } = useAuthStore();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { policy } = useCompanyAccessPolicy();
 
@@ -90,6 +121,19 @@ export default function InvoiceList() {
   const [cancelModal, setCancelModal] = useState<{ invoice: Invoice } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+
+  // Recurring invoice seed modal
+  const [recurringModal, setRecurringModal] = useState<{ invoice: Invoice } | null>(null);
+  const [recurringForm, setRecurringForm] = useState<RecurringSeedForm>({
+    name: '',
+    frequency: 'monthly',
+    interval: 1,
+    nextRunDate: addMonthsIso(new Date().toISOString(), 1),
+    dueDays: '',
+    maxRuns: '',
+    endDate: '',
+  });
+  const [creatingRecurring, setCreatingRecurring] = useState(false);
 
   const fetchInvoices = useCallback(async (page = 1) => {
     setLoading(true);
@@ -298,6 +342,60 @@ export default function InvoiceList() {
     inv.status !== 'cancelled' &&
     inv.status !== 'draft' &&
     (user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant');
+
+  const canCreateRecurringFromInvoice = (inv: Invoice) =>
+    inv.status !== 'cancelled' &&
+    inv.type !== 'receipt' &&
+    (user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant');
+
+  function openRecurringModal(inv: Invoice) {
+    const customerName = isThai
+      ? inv.buyer?.nameTh ?? inv.buyer?.nameEn ?? ''
+      : inv.buyer?.nameEn ?? inv.buyer?.nameTh ?? '';
+    const invoiceDate = dateInput(inv.invoiceDate);
+    setRecurringModal({ invoice: inv });
+    setRecurringForm({
+      name: `${customerName || (isThai ? 'ลูกค้า' : 'Customer')} / ${inv.invoiceNumber}`,
+      frequency: 'monthly',
+      interval: 1,
+      nextRunDate: addMonthsIso(invoiceDate, 1),
+      dueDays: daysBetweenIso(inv.invoiceDate, inv.dueDate),
+      maxRuns: '',
+      endDate: '',
+    });
+  }
+
+  async function handleCreateRecurringFromInvoice() {
+    if (!recurringModal) return;
+    setCreatingRecurring(true);
+    try {
+      const payload = {
+        name: recurringForm.name.trim() || undefined,
+        frequency: recurringForm.frequency,
+        interval: Number(recurringForm.interval || 1),
+        nextRunDate: recurringForm.nextRunDate || undefined,
+        dueDays: recurringForm.dueDays === '' ? null : Number(recurringForm.dueDays),
+        maxRuns: recurringForm.maxRuns === '' ? null : Number(recurringForm.maxRuns),
+        endDate: recurringForm.endDate || null,
+      };
+      const res = await fetch(`/api/recurring-invoices/from-invoice/${recurringModal.invoice.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json() as { data?: { id: string }; error?: string; details?: Array<{ path?: (string | number)[]; message?: string }> };
+      if (!res.ok || !json.data?.id) {
+        const detail = json.details?.map((d) => `${(d.path ?? []).join('.')}: ${d.message ?? ''}`).join(' · ');
+        throw new Error(detail || json.error || 'Failed');
+      }
+      setRecurringModal(null);
+      navigate(`/app/recurring-invoices/${json.data.id}`);
+    } catch (e) {
+      alert(isThai ? `สร้าง recurring ไม่สำเร็จ: ${(e as Error).message}` : `Failed to create recurring schedule: ${(e as Error).message}`);
+    } finally {
+      setCreatingRecurring(false);
+    }
+  }
 
   // Email the invoice PDF to the buyer. Backend already validates plan
    // access + buyer email presence; the UI just disables the button when
@@ -554,6 +652,15 @@ export default function InvoiceList() {
                     <Eye className="w-3.5 h-3.5" />
                     {isThai ? 'ดู/View' : 'View'}
                   </button>
+                  {canCreateRecurringFromInvoice(inv) && (
+                    <button
+                      onClick={() => openRecurringModal(inv)}
+                      className="inline-flex items-center gap-1.5 text-xs border border-indigo-100 text-indigo-600 hover:bg-indigo-50 rounded-lg px-3 py-1.5 font-medium"
+                    >
+                      <CalendarClock className="w-3.5 h-3.5" />
+                      {isThai ? 'ทำซ้ำ' : 'Repeat'}
+                    </button>
+                  )}
                   <Link
                     to={`/app/invoices/${inv.id}/edit`}
                     className="ml-auto inline-flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium"
@@ -726,6 +833,16 @@ export default function InvoiceList() {
                             <Eye className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">{isThai ? 'ดู' : 'View'}</span>
                           </button>
+                          {canCreateRecurringFromInvoice(inv) && (
+                            <button
+                              onClick={() => openRecurringModal(inv)}
+                              className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                              title={isThai ? 'สร้าง recurring invoice จากเอกสารนี้' : 'Create recurring invoice from this document'}
+                            >
+                              <CalendarClock className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">{isThai ? 'ทำซ้ำ' : 'Repeat'}</span>
+                            </button>
+                          )}
                           {canIssueReceipt(inv) && (
                             <button
                               onClick={() => { setReceiptModal({ invoice: inv }); setReceiptForm({ paymentMethod: 'transfer', note: '', paidAt: new Date().toISOString().split('T')[0] }); }}
@@ -818,6 +935,140 @@ export default function InvoiceList() {
           </div>
         </div>
       </div>
+
+      {/* ── Create Recurring Schedule Modal ── */}
+      {recurringModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto p-6 space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-indigo-600" />
+                  {isThai ? 'สร้าง recurring จาก invoice เดิม' : 'Create recurring schedule'}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {isThai ? 'คัดลอกลูกค้า รายการสินค้า ยอดเงิน และเงื่อนไขจากเอกสารนี้' : 'Copies customer, line items, totals, and payment settings from this invoice.'}
+                </p>
+              </div>
+              <button onClick={() => setRecurringModal(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" disabled={creatingRecurring}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-3 text-sm space-y-1">
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-500">{isThai ? 'ต้นฉบับ' : 'Source'}</span>
+                <span className="font-mono font-medium text-gray-900">{recurringModal.invoice.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-500">{isThai ? 'ลูกค้า' : 'Customer'}</span>
+                <span className="font-medium text-gray-900 text-right">
+                  {isThai
+                    ? recurringModal.invoice.buyer?.nameTh ?? recurringModal.invoice.buyer?.nameEn ?? '—'
+                    : recurringModal.invoice.buyer?.nameEn ?? recurringModal.invoice.buyer?.nameTh ?? '—'}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3 text-base font-semibold">
+                <span>{isThai ? 'ยอดต่อรอบ' : 'Per run'}</span>
+                <span className="text-primary-600">{formatCurrency(recurringModal.invoice.total)}</span>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block sm:col-span-2">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'ชื่อรอบวางบิล' : 'Schedule name'}</span>
+                <input
+                  value={recurringForm.name}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, name: e.target.value }))}
+                  className="input-field w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'ความถี่' : 'Frequency'}</span>
+                <select
+                  value={recurringForm.frequency}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, frequency: e.target.value as RecurringSeedForm['frequency'] }))}
+                  className="input-field w-full"
+                >
+                  <option value="weekly">{isThai ? 'รายสัปดาห์' : 'Weekly'}</option>
+                  <option value="monthly">{isThai ? 'รายเดือน' : 'Monthly'}</option>
+                  <option value="quarterly">{isThai ? 'รายไตรมาส' : 'Quarterly'}</option>
+                  <option value="yearly">{isThai ? 'รายปี' : 'Yearly'}</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'ทุกกี่รอบ' : 'Every'}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={36}
+                  value={recurringForm.interval}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, interval: Number(e.target.value) }))}
+                  className="input-field w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'สร้างครั้งถัดไป' : 'Next run date'}</span>
+                <input
+                  type="date"
+                  value={recurringForm.nextRunDate}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, nextRunDate: e.target.value }))}
+                  className="input-field w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'กำหนดชำระ (วัน)' : 'Due days'}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={recurringForm.dueDays}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, dueDays: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  placeholder={isThai ? 'ไม่กำหนด' : 'No due date'}
+                  className="input-field w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'จำนวนครั้งสูงสุด' : 'Max runs'}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={recurringForm.maxRuns}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, maxRuns: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  placeholder={isThai ? 'ไม่จำกัด' : 'Unlimited'}
+                  className="input-field w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-gray-700 mb-1">{isThai ? 'สิ้นสุดวันที่' : 'End date'}</span>
+                <input
+                  type="date"
+                  value={recurringForm.endDate}
+                  onChange={(e) => setRecurringForm((f) => ({ ...f, endDate: e.target.value }))}
+                  className="input-field w-full"
+                />
+              </label>
+            </div>
+
+            <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {isThai
+                ? 'ระบบจะสร้างเป็น draft invoice เท่านั้น ยังไม่ออกเลขจริงและยังไม่ส่ง RD จนกว่าจะกดออกเอกสาร'
+                : 'This creates draft invoices only. It will not issue a final number or submit to RD until you issue the document.'}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setRecurringModal(null)} className="btn-secondary flex-1" disabled={creatingRecurring}>
+                {t('common.cancel')}
+              </button>
+              <button onClick={handleCreateRecurringFromInvoice} className="btn-primary flex-1" disabled={creatingRecurring || !recurringForm.nextRunDate}>
+                {creatingRecurring ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
+                {isThai ? 'สร้างรอบวางบิล' : 'Create schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Issue Receipt Modal ── */}
       {receiptModal && (
