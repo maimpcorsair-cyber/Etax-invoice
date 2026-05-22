@@ -53,6 +53,9 @@ const Projects = React.lazy(() => import('./pages/Projects'));
 const ProjectDetail = React.lazy(() => import('./pages/ProjectDetail'));
 const ProjectGuestPortal = React.lazy(() => import('./pages/ProjectGuestPortal'));
 const IntakeEdit = React.lazy(() => import('./pages/IntakeEdit'));
+const CustomerPortalLanding = React.lazy(() => import('./pages/CustomerPortal/Landing'));
+const CustomerPortalVerify = React.lazy(() => import('./pages/CustomerPortal/Verify'));
+const CustomerPortalDashboard = React.lazy(() => import('./pages/CustomerPortal/Dashboard'));
 const ProjectJoin = React.lazy(() => import('./pages/ProjectJoin'));
 const Expenses = React.lazy(() => import('./pages/Expenses'));
 const VatSummary = React.lazy(() => import('./pages/VatSummary'));
@@ -173,6 +176,9 @@ export default function App() {
           <Route path="/invoices/verify/:id" element={<InvoiceVerify />} />
           <Route path="/project-portal/:token" element={<ProjectGuestPortal />} />
           <Route path="/intake-edit/:token" element={<IntakeEdit />} />
+          <Route path="/portal" element={<CustomerPortalLanding />} />
+          <Route path="/portal/verify" element={<CustomerPortalVerify />} />
+          <Route path="/portal/dashboard" element={<CustomerPortalDashboard />} />
           <Route path="/join/project/:token" element={<ProjectJoin />} />
           <Route
             path="/app"

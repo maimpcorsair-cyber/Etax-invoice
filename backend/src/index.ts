@@ -39,6 +39,7 @@ import { reportsRouter } from './routes/reports';
 import { reconciliationRouter } from './routes/reconciliation';
 import { payrollRouter } from './routes/payroll';
 import { quotationsRouter } from './routes/quotations';
+import { customerPortalRouter } from './routes/customerPortal';
 import { deliveryNotesRouter } from './routes/deliveryNotes';
 import { recurringInvoicesRouter } from './routes/recurringInvoices';
 
@@ -203,6 +204,7 @@ app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use('/api/auth', authRouter);
 app.use('/api/project-portal', projectPortalRouter);
 app.use('/api/intake-edit', intakeEditRouter);
+app.use('/api/customer-portal', customerPortalRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/invoices', authenticate, invoicesRouter);
 app.use('/api/invoices/:invoiceId/payments', authenticate, paymentsRouter);

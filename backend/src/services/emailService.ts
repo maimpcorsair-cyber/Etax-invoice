@@ -602,3 +602,66 @@ export async function sendDsrDeleteConfirmationEmail(data: DsrConfirmationData):
     logger.error('[DSR] failed to send confirmation email', { err: err instanceof Error ? err.message : String(err) });
   }
 }
+
+// ── Customer portal magic-link ───────────────────────────────────────
+// One email may match customer rows across MULTIPLE seller tenants
+// (e.g., the buyer's accountant has the same email at two sellers). We
+// send one email containing all matching portal links so the recipient
+// picks which seller's documents to view.
+export interface CustomerPortalLinkEmailData {
+  toEmail: string;
+  links: Array<{
+    sellerNameTh: string;
+    sellerNameEn: string;
+    portalUrl: string;
+  }>;
+}
+
+export async function sendCustomerPortalLinkEmail(data: CustomerPortalLinkEmailData): Promise<void> {
+  if (!isEmailConfigured()) {
+    logger.warn('[customer-portal] SMTP not configured — link email skipped', { toEmail: data.toEmail });
+    return;
+  }
+  if (data.links.length === 0) return;
+
+  const subject = data.links.length === 1
+    ? `ดูเอกสารจาก ${data.links[0].sellerNameTh} — Billboy Customer Portal`
+    : `ดูเอกสารจาก ${data.links.length} ผู้ขาย — Billboy Customer Portal`;
+
+  const linkRows = data.links.map((link) => `
+    <div style="margin:12px 0;padding:14px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px">
+      <div style="font-weight:600;color:#0f172a;margin-bottom:8px">${link.sellerNameTh}</div>
+      <a href="${link.portalUrl}"
+         style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;
+                padding:10px 18px;border-radius:8px;font-weight:600">
+        เปิดเอกสาร / Open documents
+      </a>
+    </div>
+  `).join('');
+
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:600px;line-height:1.6">
+      <h2 style="color:#0f172a">ดูเอกสารของคุณ / View your documents</h2>
+      <p>คุณ (หรือใครก็ตาม) ขอลิงก์ดูเอกสารด้วยอีเมล <strong>${data.toEmail}</strong></p>
+      <p style="color:#475569">กดปุ่มด้านล่างเพื่อเปิดพอร์ทัล — ไม่ต้องสมัครสมาชิก ลิงก์มีอายุ 14 วัน</p>
+      ${linkRows}
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px">
+        หากคุณไม่ได้ขอลิงก์นี้ ละเลยอีเมลฉบับนี้ได้เลย ลิงก์จะหมดอายุเอง<br/>
+        If you did not request this, you can ignore this email. The link will expire on its own.
+      </p>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Billboy Customer Portal" <${process.env.SMTP_USER}>`,
+      to: data.toEmail,
+      subject,
+      html,
+    });
+    logger.info('[customer-portal] link email sent', { toEmail: data.toEmail, linkCount: data.links.length });
+  } catch (err) {
+    logger.error('[customer-portal] failed to send link email', { err: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+}
