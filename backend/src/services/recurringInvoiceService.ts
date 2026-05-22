@@ -9,6 +9,7 @@ import {
   hasFeatureAccess,
   resolveCompanyAccessPolicy,
 } from './accessPolicyService';
+import { generateInvoiceNumber } from './invoiceService';
 
 const VAT_RATE = 0.07;
 
@@ -63,10 +64,11 @@ export function calculateRecurringTotals<T extends {
   return { calculated, subtotal, vatAmount, total: +(subtotal + vatAmount).toFixed(2) };
 }
 
-function buildDraftInvoiceNumber(scheduledFor: Date, templateId: string) {
-  const ym = scheduledFor.toISOString().slice(0, 7).replace('-', '');
-  const suffix = `${Date.now().toString(36)}${templateId.slice(-4)}`.toUpperCase();
-  return `DRAFT-${ym}-${suffix}`;
+// Drafts use the same advisory-lock + per-tenant sequence as real invoices
+// so two cron workers (or a cron + manual generate) can't collide on the
+// same invoiceNumber and hit the [companyId, invoiceNumber] unique key.
+async function buildDraftInvoiceNumber(companyId: string, invoiceType: string): Promise<string> {
+  return generateInvoiceNumber(companyId, invoiceType);
 }
 
 async function resolveCompanySeller(companyId: string) {
@@ -149,7 +151,7 @@ export async function generateRecurringInvoiceDraft(options: {
   const total = +(subtotal + vatAmount - template.discountAmount).toFixed(2);
   const invoiceDate = scheduledFor;
   const dueDate = typeof template.dueDays === 'number' ? addDays(invoiceDate, template.dueDays) : null;
-  const invoiceNumber = buildDraftInvoiceNumber(scheduledFor, template.id);
+  const invoiceNumber = await buildDraftInvoiceNumber(template.companyId, template.invoiceType);
   const nextRunDate = addFrequency(scheduledFor, template.frequency, template.interval);
   const shouldEnd = (template.endDate !== null && nextRunDate > startOfUtcDate(template.endDate))
     || (template.maxRuns !== null && template.runCount + 1 >= template.maxRuns);

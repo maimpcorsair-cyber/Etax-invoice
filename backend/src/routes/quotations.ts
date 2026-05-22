@@ -24,7 +24,8 @@ const itemSchema = z.object({
   quantity: z.number().positive(),
   unit: z.string().max(50),
   unitPrice: z.number().nonnegative(),
-  discountAmount: z.number().nonnegative().default(0),
+  // Line-level discount is PERCENT (0-100) — matches Invoice + RecurringInvoice
+  discountAmount: z.number().min(0).max(100).default(0),
   vatType: z.enum(['vat7', 'vatExempt', 'vatZero']).default('vat7'),
 });
 
@@ -42,8 +43,13 @@ const quotationCreateSchema = z.object({
 });
 
 function computeLineTotals(input: z.infer<typeof itemSchema>) {
+  // discountAmount is treated as a PERCENT (0-100) to match Invoice +
+  // RecurringInvoice conventions. Without this, converting a quotation
+  // to an invoice would produce different totals than the quotation
+  // preview because Invoice multiplies discountAmount by gross/100.
   const grossLine = input.quantity * input.unitPrice;
-  const amount = Math.max(0, grossLine - input.discountAmount);
+  const lineDiscount = input.discountAmount > 0 ? (grossLine * input.discountAmount) / 100 : 0;
+  const amount = Math.max(0, grossLine - lineDiscount);
   const vatRate = input.vatType === 'vat7' ? 0.07 : 0;
   const vatAmount = +(amount * vatRate).toFixed(2);
   const totalAmount = +(amount + vatAmount).toFixed(2);
