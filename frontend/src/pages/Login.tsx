@@ -201,12 +201,6 @@ export default function Login() {
           <span className="font-bold text-lg text-gray-900 group-hover:text-primary-600 transition-colors hidden sm:inline">{t('app.shortName')}</span>
         </a>
         <div className="flex items-center gap-3">
-          {!ownerMode && (
-            <a href={getPlanePath('/login', 'ops')} className="hidden sm:inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100">
-              <ShieldCheck className="h-4 w-4" />
-              {isThai ? 'Owner Login' : 'Owner Login'}
-            </a>
-          )}
           {ownerMode && (
             <a href={getPlanePath('/login', 'app')} className="hidden sm:inline-flex rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100">
               {isThai ? 'Customer Login' : 'Customer Login'}
