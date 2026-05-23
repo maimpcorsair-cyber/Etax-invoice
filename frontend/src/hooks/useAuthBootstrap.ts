@@ -83,8 +83,26 @@ export function useAuthBootstrap() {
           updateUser(user);
           setAuthReady(true);
 
+          // Public, token-protected pages (share links, portals, invites,
+          // verify pages, etc.) intentionally do NOT belong to either the
+          // app or ops surface — they get the apex domain so they can be
+          // opened by buyers / guests without redirecting them into the
+          // seller's workspace. Without this guard a logged-in seller who
+          // opens their own share link would bounce to /app/dashboard
+          // instead of seeing the public view their customer sees.
+          const path = window.location.pathname;
+          const isPublicTokenRoute =
+            path.startsWith('/share/') ||
+            path.startsWith('/portal') ||
+            path.startsWith('/intake-edit/') ||
+            path.startsWith('/project-portal/') ||
+            path.startsWith('/invoices/verify/') ||
+            path.startsWith('/join/') ||
+            path.startsWith('/account/cancel-delete') ||
+            path.startsWith('/accept-invite');
+
           const surface = detectSurface();
-          if (surface === 'apex') {
+          if (surface === 'apex' && !isPublicTokenRoute) {
             window.location.replace(
               user.role === 'super_admin'
                 ? buildPlaneUrl('/ops/overview', 'ops', { token, user })
