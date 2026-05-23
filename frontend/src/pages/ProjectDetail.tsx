@@ -1200,7 +1200,7 @@ export default function ProjectDetail() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid gap-4 xl:grid-cols-4">
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           <WorkspacePanel title={isThai ? 'งานที่ต้องตรวจ' : 'Needs attention'} icon={AlertTriangle}>
             <ActionList actions={workspace.actionNeeded.slice(0, 5)} docs={workspace.documentIntakes} isThai={isThai} onReview={openReview} />
           </WorkspacePanel>
@@ -1226,7 +1226,7 @@ export default function ProjectDetail() {
             />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'ไฟล์ล่าสุด' : 'Latest files'} icon={FolderOpen}>
-            <DocumentList docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onReview={openReview} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
+            <DocumentList compact docs={workspace.documentIntakes.slice(0, 5)} token={token ?? ''} isThai={isThai} formatDate={formatDate} formatCurrency={formatCurrency} onOpen={openDocument} onComment={requestDocumentComment} onReview={openReview} onCreateVoucher={createExpenseVoucherFromDoc} onDriveRetry={retryDriveSync} commentingId={commentingId} voucherCreatingId={voucherCreatingId} driveRetryingId={driveRetryingId} />
           </WorkspacePanel>
           <WorkspacePanel title={isThai ? 'LINE / ทีม' : 'LINE / team'} icon={Users}>
             <div className="space-y-3">
@@ -2241,6 +2241,7 @@ function DocumentList({
   commentingId,
   voucherCreatingId,
   driveRetryingId,
+  compact = false,
 }: {
   docs: DocumentIntake[];
   isThai: boolean;
@@ -2255,9 +2256,60 @@ function DocumentList({
   commentingId?: string | null;
   voucherCreatingId?: string | null;
   driveRetryingId?: string | null;
+  compact?: boolean;
 }) {
   if (docs.length === 0) {
     return <EmptyBlock text={isThai ? 'ยังไม่มีไฟล์ในโปรเจคนี้' : 'No files in this project yet'} />;
+  }
+  if (compact) {
+    return (
+      <div className="space-y-2">
+        {docs.map((doc) => {
+          const driveStatus = doc.driveSyncStatus ?? 'not_synced';
+          const driveOk = driveStatus === 'synced' && !!doc.driveUrl;
+          const driveBusy = driveStatus === 'syncing' || driveRetryingId === doc.id;
+          return (
+            <button
+              key={doc.id}
+              type="button"
+              onClick={() => void onReview(doc)}
+              disabled={!token}
+              className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 text-left transition hover:border-primary-300 hover:bg-primary-50/40 disabled:opacity-60"
+            >
+              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-md border border-slate-100 bg-slate-50">
+                <FilePreview doc={doc} token={token} variant="thumb" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900" title={doc.fileName || undefined}>
+                  {doc.fileName || (isThai ? 'ไฟล์ไม่มีชื่อ' : 'Untitled file')}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">
+                  {doc.kind} · {formatDate(doc.createdAt)}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  <span className={clsx(
+                    'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                    driveOk ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : driveStatus === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-700'
+                        : driveStatus === 'skipped' ? 'border-slate-200 bg-slate-50 text-slate-500'
+                          : 'border-amber-200 bg-amber-50 text-amber-700',
+                  )}>
+                    {driveBusy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <FolderOpen className="h-2.5 w-2.5" />}
+                    {driveOk ? (isThai ? 'Drive' : 'Drive')
+                      : driveStatus === 'failed' ? (isThai ? 'Drive ล้ม' : 'Drive failed')
+                        : driveStatus === 'skipped' ? (isThai ? 'ไม่มี Drive' : 'No Drive')
+                          : driveStatus === 'syncing' ? (isThai ? 'sync' : 'sync')
+                            : (isThai ? 'รอ' : 'pending')}
+                  </span>
+                  <TaxSafetyBadge taxSafety={doc.taxSafety} />
+                </div>
+              </div>
+              <ShieldCheck className="h-4 w-4 flex-shrink-0 text-primary-600" />
+            </button>
+          );
+        })}
+      </div>
+    );
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
