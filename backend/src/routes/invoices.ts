@@ -1175,7 +1175,21 @@ invoicesRouter.post('/:id/share-link', requireRole('admin', 'super_admin', 'acco
     }
 
     const token = signInvoiceShareToken({ invoiceId: invoice.id, companyId: req.user!.companyId });
-    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',')[0].trim();
+    // Prefer the requesting browser's Origin so the magic link points back
+    // to wherever the seller is using Billboy (prod Vercel, preview URL,
+    // local dev) — without depending on a FRONTEND_URL env that may be
+    // missing in production. Fall back to env only for non-browser callers.
+    let frontendUrl: string;
+    const originHeader = req.get('origin') ?? req.get('referer');
+    if (originHeader) {
+      try {
+        frontendUrl = new URL(originHeader).origin;
+      } catch {
+        frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',')[0].trim();
+      }
+    } else {
+      frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',')[0].trim();
+    }
     const url = buildInvoiceShareUrl(frontendUrl, token);
 
     await auditLog({
