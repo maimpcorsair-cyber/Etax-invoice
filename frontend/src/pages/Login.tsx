@@ -234,9 +234,9 @@ export default function Login() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  isThai ? 'XAdES + TSA' : 'XAdES + TSA',
-                  isThai ? 'RD-ready' : 'RD-ready',
-                  isThai ? 'AI intake' : 'AI intake',
+                  isThai ? 'ลายเซ็นดิจิทัล' : 'Digital signature',
+                  isThai ? 'ส่งสรรพากรได้' : 'Ready for RD',
+                  isThai ? 'อ่านบิลอัตโนมัติ' : 'Auto bill reader',
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 text-center text-xs font-bold text-white/90">
                     {item}

@@ -648,14 +648,14 @@ export default function Dashboard() {
               </p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
                 {isThai
-                  ? 'ผู้ใช้สามารถเริ่มจากสร้างเอกสารขายและจัดเก็บภาษีได้ก่อน ส่วนการส่ง e-Tax ไป RD ต้องตั้งค่าบริษัทและลงทะเบียนกับกรมสรรพากรให้เรียบร้อย ระบบจะช่วยพาไปทีละขั้นเมื่อพร้อมใช้งานจริง'
-                  : 'Teams can start by creating sales documents and organizing VAT first. RD e-Tax submission only becomes part of the flow after the company registration and settings are ready.'}
+                  ? 'เริ่มจากสร้างเอกสารขายและจัดการภาษีได้เลย ส่วนการส่ง e-Tax ไป RD ต้องกรอกข้อมูลบริษัทและลงทะเบียนกับกรมสรรพากรให้เรียบร้อย ระบบจะช่วยพาไปทีละขั้น'
+                  : 'You can start creating sales documents and tracking VAT right away. RD e-Tax submission only kicks in once your company details and RD registration are complete — the system will walk you through each step.'}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/app/settings" className="btn-secondary text-sm">
-              {isThai ? 'ตั้งค่าบริษัท' : 'Company settings'}
+              {isThai ? 'ไปที่การตั้งค่า' : 'Open Settings'}
             </Link>
             <Link to="/app/admin" className="btn-primary text-sm">
               {isThai ? 'ดูขั้นตอน e-Tax' : 'View e-Tax setup'}
@@ -682,8 +682,8 @@ export default function Dashboard() {
           <p className="font-bold">{isThai ? 'ตารางสรุปรายเดือนยังไม่แสดง' : 'Month-end workspace is not showing yet'}</p>
           <p className="mt-1">
             {isThai
-              ? 'ระบบโหลดข้อมูล Dashboard หลักได้แล้ว แต่โหลดตารางรวมบริษัทไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง หากยังไม่ขึ้นให้เช็คสิทธิ์หรือ backend endpoint /api/dashboard/month-end-workspace'
-              : 'The main dashboard loaded, but the company spreadsheet preview did not. Refresh this page, then check permissions or /api/dashboard/month-end-workspace if it still does not appear.'}
+              ? 'ระบบโหลดข้อมูลหลักได้แล้ว แต่โหลดตารางสรุปรายเดือนไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง — ถ้ายังไม่ขึ้น อาจไม่มีสิทธิ์ดูข้อมูลส่วนนี้ ติดต่อผู้ดูแลของบริษัท'
+              : 'The main dashboard loaded but the month-end summary did not. Refresh this page — if it still does not show, you may not have permission to view this section; please contact your admin.'}
           </p>
           {monthEndError && (
             <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-amber-900">

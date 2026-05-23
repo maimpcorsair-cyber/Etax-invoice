@@ -1293,7 +1293,7 @@ export default function Landing() {
                   <div className="space-y-5 rounded-lg border border-slate-200 bg-white p-4">
                     <div>
                       <p className="text-sm font-semibold text-slate-950">{isThai ? 'ข้อมูลบริษัท' : 'Company details'}</p>
-                      <p className="text-xs leading-5 text-slate-500">{isThai ? 'ใช้สำหรับตั้งค่าเอกสารและแยกข้อมูลของ tenant' : 'Used for document setup and tenant isolation.'}</p>
+                      <p className="text-xs leading-5 text-slate-500">{isThai ? 'ใช้แสดงในเอกสารและแยกข้อมูลของแต่ละบริษัท' : 'Used on documents and to keep each company’s data separate.'}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {selectedPlan !== 'free' && (

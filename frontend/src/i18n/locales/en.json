@@ -5,25 +5,25 @@
     "shortName": "Billboy"
   },
   "nav": {
-    "dashboard": "Dashboard",
+    "dashboard": "Overview",
     "invoices": "Invoices",
     "createInvoice": "Create Sales Document",
     "receipts": "Receipts",
-    "customers": "Directory",
+    "customers": "Customers",
     "products": "Products / Services",
     "purchaseInvoices": "Purchase Invoices",
     "projects": "Projects",
     "expenses": "Petty Cash",
     "vatSummary": "VAT Summary",
-    "admin": "Workspace Settings",
-    "audit": "Audit Logs",
+    "admin": "Users & Company",
+    "audit": "Activity Log",
     "settings": "Settings",
     "logout": "Logout",
     "profile": "Profile",
     "sales": "Sales",
     "purchases": "Purchases & Expenses",
     "reports": "Tax Reports",
-    "directory": "Directory",
+    "directory": "Customers & Products",
     "privacy": "Privacy & My Data",
     "payroll": "Payroll",
     "quotations": "Quotations",
@@ -52,8 +52,8 @@
         "desc": "Generate PDF with Thai font support and embedded XML"
       },
       "queue": {
-        "title": "Automated Queue",
-        "desc": "Process documents in batch with BullMQ and automatic retry"
+        "title": "Runs in the background",
+        "desc": "Issue multiple documents at once — the system queues them and retries automatically on failure"
       }
     }
   },
