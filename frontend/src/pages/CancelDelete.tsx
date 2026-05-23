@@ -17,8 +17,7 @@ export default function CancelDelete() {
   const token = params.get('token') ?? '';
 
   const isThai = i18n.language === 'th';
-  const isZh = i18n.language === 'zh' || i18n.language?.startsWith('zh');
-  const txt = (th: string, en: string, zh: string) => (isThai ? th : isZh ? zh : en);
+  const txt = (th: string, en: string, _zh?: string) => (isThai ? th : en);
 
   const [phase, setPhase] = useState<Phase>(token ? 'idle' : 'error');
   const [error, setError] = useState<string | null>(token ? null : 'Missing token');
@@ -32,7 +31,7 @@ export default function CancelDelete() {
       setError(txt('ลิงก์ไม่ถูกต้อง — ไม่มี token', 'Invalid link — token missing', '链接无效 — 缺少令牌'));
       setPhase('error');
     }
-  }, [token, isThai, isZh]);
+  }, [token, isThai]);
 
   async function handleConfirm() {
     if (!token || phase === 'confirming') return;

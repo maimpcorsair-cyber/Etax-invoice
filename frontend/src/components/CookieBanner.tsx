@@ -43,7 +43,6 @@ export default function CookieBanner() {
   if (!mounted || consent !== null) return null;
 
   const isThai = i18n.language === 'th';
-  const isZh = i18n.language === 'zh' || i18n.language?.startsWith('zh');
 
   const handle = (value: 'accepted' | 'rejected') => {
     writeConsent(value);
@@ -56,25 +55,23 @@ export default function CookieBanner() {
     <div
       role="dialog"
       aria-live="polite"
-      aria-label={t('cookieBanner.title', { defaultValue: isThai ? 'การใช้คุกกี้' : isZh ? '使用 Cookie' : 'Cookie usage' })}
+      aria-label={t('cookieBanner.title', { defaultValue: isThai ? 'การใช้คุกกี้' : 'Cookie usage' })}
       className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-5xl px-3 pb-3 sm:pb-4"
     >
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
         <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:gap-6 sm:px-6">
           <div className="flex-1 text-sm leading-6 text-slate-700">
             <p className="font-semibold text-slate-900">
-              {t('cookieBanner.title', { defaultValue: isThai ? 'เราใช้คุกกี้' : isZh ? '我们使用 Cookie' : 'We use cookies' })}
+              {t('cookieBanner.title', { defaultValue: isThai ? 'เราใช้คุกกี้' : 'We use cookies' })}
             </p>
             <p className="mt-1">
               {t('cookieBanner.body', {
                 defaultValue: isThai
                   ? 'เราใช้คุกกี้ที่จำเป็นเพื่อให้ระบบทำงาน และคุกกี้สำหรับวิเคราะห์/รายงานข้อผิดพลาดเมื่อท่านอนุญาตเท่านั้น'
-                  : isZh
-                  ? '我们使用必要 Cookie 以保证系统运行,并仅在您同意后使用用于分析和错误报告的 Cookie。'
                   : 'We use cookies that are strictly necessary, and analytics/error-reporting cookies only with your consent.',
               })}{' '}
               <a href="/privacy" className="font-medium text-emerald-700 underline">
-                {t('cookieBanner.learnMore', { defaultValue: isThai ? 'อ่านนโยบาย' : isZh ? '查看政策' : 'Learn more' })}
+                {t('cookieBanner.learnMore', { defaultValue: isThai ? 'อ่านนโยบาย' : 'Learn more' })}
               </a>
             </p>
           </div>
@@ -84,14 +81,14 @@ export default function CookieBanner() {
               onClick={() => handle('rejected')}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              {t('cookieBanner.reject', { defaultValue: isThai ? 'ปฏิเสธทั้งหมด' : isZh ? '全部拒绝' : 'Reject all' })}
+              {t('cookieBanner.reject', { defaultValue: isThai ? 'ปฏิเสธทั้งหมด' : 'Reject all' })}
             </button>
             <button
               type="button"
               onClick={() => handle('accepted')}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
             >
-              {t('cookieBanner.accept', { defaultValue: isThai ? 'ยอมรับ' : isZh ? '接受' : 'Accept' })}
+              {t('cookieBanner.accept', { defaultValue: isThai ? 'ยอมรับ' : 'Accept' })}
             </button>
           </div>
         </div>

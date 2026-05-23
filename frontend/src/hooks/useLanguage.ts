@@ -5,13 +5,12 @@ import type { Language } from '../types';
 export function useLanguage() {
   const { i18n } = useTranslation();
 
-  const currentLanguage = i18n.language as 'th' | 'en' | 'zh';
+  const currentLanguage = i18n.language as 'th' | 'en';
   const isThai = currentLanguage === 'th';
   const isEnglish = currentLanguage === 'en';
-  const isChinese = currentLanguage === 'zh';
 
   const switchLanguage = useCallback(
-    (lang: 'th' | 'en' | 'zh') => {
+    (lang: 'th' | 'en') => {
       i18n.changeLanguage(lang);
       document.documentElement.lang = lang;
       localStorage.setItem('etax_language', lang);
@@ -20,10 +19,8 @@ export function useLanguage() {
   );
 
   const toggleLanguage = useCallback(() => {
-    if (isThai) switchLanguage('en');
-    else if (isEnglish) switchLanguage('zh');
-    else switchLanguage('th');
-  }, [isThai, isEnglish, switchLanguage]);
+    switchLanguage(isThai ? 'en' : 'th');
+  }, [isThai, switchLanguage]);
 
   /** Pick the right localized field from bilingual objects */
   const localizedField = useCallback(
@@ -38,12 +35,12 @@ export function useLanguage() {
 
   const formatCurrency = useCallback(
     (amount: number): string =>
-      new Intl.NumberFormat(isThai ? 'th-TH' : isChinese ? 'zh-CN' : 'en-US', {
+      new Intl.NumberFormat(isThai ? 'th-TH' : 'en-US', {
         style: 'currency',
         currency: 'THB',
         minimumFractionDigits: 2,
       }).format(amount),
-    [isThai, isChinese],
+    [isThai],
   );
 
   const formatDate = useCallback(
@@ -60,10 +57,10 @@ export function useLanguage() {
 
   const getDocumentLanguageLabel = useCallback(
     (lang: Language): string => {
-      const labels: Record<Language, Record<'th' | 'en' | 'zh', string>> = {
-        th: { th: 'ภาษาไทย', en: 'Thai', zh: '泰语' },
-        en: { th: 'ภาษาอังกฤษ', en: 'English', zh: '英语' },
-        both: { th: 'สองภาษา', en: 'Bilingual', zh: '双语' },
+      const labels: Record<Language, Record<'th' | 'en', string>> = {
+        th: { th: 'ภาษาไทย', en: 'Thai' },
+        en: { th: 'ภาษาอังกฤษ', en: 'English' },
+        both: { th: 'สองภาษา', en: 'Bilingual' },
       };
       return labels[lang][currentLanguage] ?? labels[lang].en;
     },
@@ -74,7 +71,6 @@ export function useLanguage() {
     currentLanguage,
     isThai,
     isEnglish,
-    isChinese,
     switchLanguage,
     toggleLanguage,
     localizedField,

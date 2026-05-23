@@ -12,7 +12,7 @@ export default function LanguageSwitcher({ variant = 'toggle', className }: Prop
   if (variant === 'toggle') {
     return (
       <div className={clsx('flex items-center bg-gray-100 rounded-lg p-0.5', className)}>
-        {(['th', 'en', 'zh'] as const).map((lang) => (
+        {(['th', 'en'] as const).map((lang) => (
           <button
             key={lang}
             onClick={() => switchLanguage(lang)}
@@ -22,9 +22,9 @@ export default function LanguageSwitcher({ variant = 'toggle', className }: Prop
                 ? 'bg-white text-primary-700 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700',
             )}
-            aria-label={lang === 'th' ? 'Switch to Thai' : lang === 'en' ? 'Switch to English' : 'Switch to Chinese'}
+            aria-label={lang === 'th' ? 'Switch to Thai' : 'Switch to English'}
           >
-            {lang === 'th' ? 'TH' : lang === 'en' ? 'EN' : '中文'}
+            {lang === 'th' ? 'TH' : 'EN'}
           </button>
         ))}
       </div>
@@ -32,8 +32,8 @@ export default function LanguageSwitcher({ variant = 'toggle', className }: Prop
   }
 
   if (variant === 'button') {
-    const flags: Record<string, string> = { th: '🇹🇭', en: '🇬🇧', zh: '🇨🇳' };
-    const labels: Record<string, string> = { th: 'ไทย', en: 'English', zh: '中文' };
+    const flags: Record<string, string> = { th: '🇹🇭', en: '🇬🇧' };
+    const labels: Record<string, string> = { th: 'ไทย', en: 'English' };
     return (
       <button
         onClick={toggleLanguage}

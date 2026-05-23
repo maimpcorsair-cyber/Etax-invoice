@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 // Layout shells stay eagerly loaded — they render immediately as route wrappers
 import Layout from './components/Layout';
 import OwnerLayout from './components/OwnerLayout';
-import HardcodedChineseBridge from './components/HardcodedChineseBridge';
 import CookieBanner from './components/CookieBanner';
 import ReConsentModal from './components/ReConsentModal';
 // All pages are lazy-loaded so each becomes its own JS chunk
@@ -145,7 +144,6 @@ export default function App() {
 
   return (
     <>
-      <HardcodedChineseBridge />
       <CookieBanner />
       <ReConsentModal />
       <Suspense fallback={<LoadingSpinner />}>

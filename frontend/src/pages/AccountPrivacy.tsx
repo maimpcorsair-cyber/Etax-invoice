@@ -29,7 +29,7 @@ interface AccountStatus {
 
 function formatDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(locale === 'th' ? 'th-TH' : locale === 'zh' ? 'zh-CN' : 'en-US', {
+  return new Date(iso).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -40,7 +40,6 @@ export default function AccountPrivacy() {
   const { i18n } = useTranslation();
   const token = useAuthStore((s) => s.token);
   const isThai = i18n.language === 'th';
-  const isZh = i18n.language === 'zh' || i18n.language?.startsWith('zh');
 
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,7 +163,7 @@ export default function AccountPrivacy() {
     }
   }
 
-  const txt = (th: string, en: string, zh: string) => (isThai ? th : isZh ? zh : en);
+  const txt = (th: string, en: string, _zh?: string) => (isThai ? th : en);
 
   return (
     <div className="space-y-6">

@@ -17,8 +17,7 @@ export default function AcceptInvite() {
   const token = params.get('token') ?? '';
 
   const isThai = i18n.language === 'th';
-  const isZh = i18n.language === 'zh' || i18n.language?.startsWith('zh');
-  const txt = (th: string, en: string, zh: string) => (isThai ? th : isZh ? zh : en);
+  const txt = (th: string, en: string, _zh?: string) => (isThai ? th : en);
 
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
