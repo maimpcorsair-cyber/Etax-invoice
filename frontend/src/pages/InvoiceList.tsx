@@ -116,9 +116,14 @@ export default function InvoiceList() {
   // sent (for the "Sent ✓" badge that flashes for a few seconds).
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [emailJustSent, setEmailJustSent] = useState<Record<string, true>>({});
-  // LINE share — busy state while creating the magic link before opening
-  // LINE's "select chat" sheet.
+  // LINE share — busy state while creating the magic link, then a modal
+  // that lets the seller copy the link or hand off to LINE. We stopped
+  // auto-opening line.me's share sheet because users couldn't tell whether
+  // the message actually sent (LINE shows a "shared!" confirm even when
+  // the receiving chat scrolls past or the link preview fails).
   const [sharingLine, setSharingLine] = useState<string | null>(null);
+  const [shareModal, setShareModal] = useState<{ invoiceNumber: string; url: string } | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Cancel modal
   const [cancelModal, setCancelModal] = useState<{ invoice: Invoice } | null>(null);
@@ -436,13 +441,14 @@ export default function InvoiceList() {
     }
   }
 
-  // Generate a magic link for the invoice and hand the user off to LINE
-  // with the link pre-filled. We use line.me's universal redirect — it
-  // opens the LINE app on mobile and the LINE web client on desktop, so
-  // the seller doesn't have to worry about which device they're on.
+  // Generate a magic link for the invoice and open a modal showing the
+  // link + Copy + Open-in-LINE buttons. The seller can verify the link
+  // is correct before sending, and can fall back to any channel (email,
+  // SMS, manual paste) if LINE doesn't behave on their device.
   async function handleShareLine(inv: Invoice) {
     if (inv.status === 'cancelled') return;
     setSharingLine(inv.id);
+    setShareCopied(false);
     try {
       const res = await fetch(`/api/invoices/${inv.id}/share-link`, {
         method: 'POST',
@@ -450,20 +456,35 @@ export default function InvoiceList() {
       });
       const body = await res.json() as { url?: string; error?: string };
       if (!res.ok || !body.url) throw new Error(body.error ?? 'Failed');
-
-      const message = isThai
-        ? `📄 ${inv.invoiceNumber}\nดูใบกำกับและชำระเงินได้ที่นี่:\n${body.url}`
-        : `📄 ${inv.invoiceNumber}\nView invoice and pay here:\n${body.url}`;
-      // line.me/R/msg/text/?<encoded> works on both mobile (opens app) and
-      // desktop (opens line.me chooser) — better than line://msg/text
-      // which only works on mobile.
-      const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(message)}`;
-      window.open(lineUrl, '_blank', 'noopener,noreferrer');
+      setShareModal({ invoiceNumber: inv.invoiceNumber, url: body.url });
     } catch (e) {
       alert(isThai ? `สร้างลิงก์ไม่สำเร็จ: ${(e as Error).message}` : `Failed: ${(e as Error).message}`);
     } finally {
       setSharingLine(null);
     }
+  }
+
+  async function copyShareLink() {
+    if (!shareModal) return;
+    try {
+      await navigator.clipboard.writeText(shareModal.url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch {
+      // Some browsers (older Safari, embedded webviews) block clipboard
+      // writes silently. Fall back to selecting the input so the user can
+      // Cmd/Ctrl-C.
+      const input = document.getElementById('share-url-input') as HTMLInputElement | null;
+      input?.select();
+    }
+  }
+
+  function openShareInLine() {
+    if (!shareModal) return;
+    const message = isThai
+      ? `📄 ${shareModal.invoiceNumber}\nดูใบกำกับและชำระเงินได้ที่นี่:\n${shareModal.url}`
+      : `📄 ${shareModal.invoiceNumber}\nView invoice and pay here:\n${shareModal.url}`;
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
 
   async function handleSubmitRD(inv: Invoice) {
@@ -1200,6 +1221,69 @@ export default function InvoiceList() {
               <button onClick={handleIssueReceipt} className="btn-primary flex-1" disabled={issuingReceipt}>
                 {issuingReceipt ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isThai ? 'ออกใบเสร็จ' : 'Issue Receipt')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Share Link Modal (LINE / Copy / any channel) ── */}
+      {shareModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShareModal(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-green-600" />
+                <span className="font-semibold text-gray-900 text-sm">
+                  {isThai ? `ส่ง ${shareModal.invoiceNumber} ให้ลูกค้า` : `Share ${shareModal.invoiceNumber}`}
+                </span>
+              </div>
+              <button onClick={() => setShareModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500">
+                {isThai
+                  ? 'ส่งลิงก์นี้ให้ลูกค้าผ่าน LINE, email, หรือ SMS ลูกค้าเปิดดูใบกำกับและจ่ายผ่าน PromptPay ได้ทันที (ลิงก์อยู่ได้ 30 วัน)'
+                  : 'Send this link via LINE, email, or SMS. The buyer can open the invoice and pay via PromptPay (link valid 30 days).'}
+              </p>
+              <div className="flex items-stretch gap-2">
+                <input
+                  id="share-url-input"
+                  readOnly
+                  value={shareModal.url}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                />
+                <button
+                  onClick={copyShareLink}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg whitespace-nowrap ${
+                    shareCopied ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800'
+                  }`}
+                >
+                  {shareCopied ? (isThai ? 'คัดลอกแล้ว ✓' : 'Copied ✓') : (isThai ? 'คัดลอก' : 'Copy')}
+                </button>
+              </div>
+              <button
+                onClick={openShareInLine}
+                className="w-full inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 rounded-lg"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {isThai ? 'เปิด LINE และส่งให้ลูกค้า' : 'Open LINE and send'}
+              </button>
+              <div className="text-xs text-gray-500 leading-relaxed bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <p className="font-semibold text-amber-800 mb-1">
+                  {isThai ? 'วิธีส่งผ่าน LINE (ถ้ากดปุ่ม)' : 'How to send via LINE'}
+                </p>
+                <p>
+                  {isThai
+                    ? '1. กดปุ่ม "เปิด LINE" → 2. เลือกแชทลูกค้า → 3. กดปุ่มสีเขียว "ส่ง" ที่ล่างสุด'
+                    : '1. Tap "Open LINE" → 2. Select customer chat → 3. Tap the green "Send" button at the bottom'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
