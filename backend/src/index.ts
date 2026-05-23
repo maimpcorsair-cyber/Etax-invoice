@@ -40,6 +40,7 @@ import { reconciliationRouter } from './routes/reconciliation';
 import { payrollRouter } from './routes/payroll';
 import { quotationsRouter } from './routes/quotations';
 import { customerPortalRouter } from './routes/customerPortal';
+import { invoiceSharePublicRouter } from './routes/invoiceShare';
 import { deliveryNotesRouter } from './routes/deliveryNotes';
 import { recurringInvoicesRouter } from './routes/recurringInvoices';
 
@@ -205,6 +206,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/project-portal', projectPortalRouter);
 app.use('/api/intake-edit', intakeEditRouter);
 app.use('/api/customer-portal', customerPortalRouter);
+app.use('/api/share', invoiceSharePublicRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/invoices', authenticate, invoicesRouter);
 app.use('/api/invoices/:invoiceId/payments', authenticate, paymentsRouter);

@@ -55,6 +55,7 @@ const IntakeEdit = React.lazy(() => import('./pages/IntakeEdit'));
 const CustomerPortalLanding = React.lazy(() => import('./pages/CustomerPortal/Landing'));
 const CustomerPortalVerify = React.lazy(() => import('./pages/CustomerPortal/Verify'));
 const CustomerPortalDashboard = React.lazy(() => import('./pages/CustomerPortal/Dashboard'));
+const InvoiceShare = React.lazy(() => import('./pages/Public/InvoiceShare'));
 const ProjectJoin = React.lazy(() => import('./pages/ProjectJoin'));
 const Expenses = React.lazy(() => import('./pages/Expenses'));
 const VatSummary = React.lazy(() => import('./pages/VatSummary'));
@@ -177,6 +178,7 @@ export default function App() {
           <Route path="/portal" element={<CustomerPortalLanding />} />
           <Route path="/portal/verify" element={<CustomerPortalVerify />} />
           <Route path="/portal/dashboard" element={<CustomerPortalDashboard />} />
+          <Route path="/share/invoice/:token" element={<InvoiceShare />} />
           <Route path="/join/project/:token" element={<ProjectJoin />} />
           <Route
             path="/app"

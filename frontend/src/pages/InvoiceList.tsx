@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
   ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle, Mail,
-  BriefcaseBusiness, CalendarClock, Truck,
+  BriefcaseBusiness, CalendarClock, Truck, MessageCircle,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -116,6 +116,9 @@ export default function InvoiceList() {
   // sent (for the "Sent ✓" badge that flashes for a few seconds).
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [emailJustSent, setEmailJustSent] = useState<Record<string, true>>({});
+  // LINE share — busy state while creating the magic link before opening
+  // LINE's "select chat" sheet.
+  const [sharingLine, setSharingLine] = useState<string | null>(null);
 
   // Cancel modal
   const [cancelModal, setCancelModal] = useState<{ invoice: Invoice } | null>(null);
@@ -433,6 +436,36 @@ export default function InvoiceList() {
     }
   }
 
+  // Generate a magic link for the invoice and hand the user off to LINE
+  // with the link pre-filled. We use line.me's universal redirect — it
+  // opens the LINE app on mobile and the LINE web client on desktop, so
+  // the seller doesn't have to worry about which device they're on.
+  async function handleShareLine(inv: Invoice) {
+    if (inv.status === 'cancelled') return;
+    setSharingLine(inv.id);
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}/share-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !body.url) throw new Error(body.error ?? 'Failed');
+
+      const message = isThai
+        ? `📄 ${inv.invoiceNumber}\nดูใบกำกับและชำระเงินได้ที่นี่:\n${body.url}`
+        : `📄 ${inv.invoiceNumber}\nView invoice and pay here:\n${body.url}`;
+      // line.me/R/msg/text/?<encoded> works on both mobile (opens app) and
+      // desktop (opens line.me chooser) — better than line://msg/text
+      // which only works on mobile.
+      const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(message)}`;
+      window.open(lineUrl, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      alert(isThai ? `สร้างลิงก์ไม่สำเร็จ: ${(e as Error).message}` : `Failed: ${(e as Error).message}`);
+    } finally {
+      setSharingLine(null);
+    }
+  }
+
   async function handleSubmitRD(inv: Invoice) {
     const msg = isThai
       ? `ยืนยันส่งใบกำกับ ${inv.invoiceNumber} ให้กรมสรรพากร?`
@@ -661,6 +694,18 @@ export default function InvoiceList() {
                       {isThai ? 'ทำซ้ำ' : 'Repeat'}
                     </button>
                   )}
+                  {inv.status !== 'cancelled' && (
+                    <button
+                      onClick={() => handleShareLine(inv)}
+                      disabled={sharingLine === inv.id}
+                      className="inline-flex items-center gap-1.5 text-xs border border-green-200 text-green-700 hover:bg-green-50 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50"
+                    >
+                      {sharingLine === inv.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <MessageCircle className="w-3.5 h-3.5" />}
+                      {isThai ? 'ส่ง LINE' : 'LINE'}
+                    </button>
+                  )}
                   <Link
                     to={`/app/invoices/${inv.id}/edit`}
                     className="ml-auto inline-flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium"
@@ -886,6 +931,19 @@ export default function InvoiceList() {
                                   ? (isThai ? 'ส่งแล้ว' : 'Sent')
                                   : (isThai ? 'ส่งอีเมล' : 'Email')}
                               </span>
+                            </button>
+                          )}
+                          {inv.status !== 'cancelled' && (
+                            <button
+                              onClick={() => handleShareLine(inv)}
+                              disabled={sharingLine === inv.id}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-800 disabled:opacity-50"
+                              title={isThai ? 'สร้างลิงก์แล้วเปิด LINE เพื่อส่งให้ลูกค้า' : 'Create a link and open LINE to send to customer'}
+                            >
+                              {sharingLine === inv.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <MessageCircle className="w-3.5 h-3.5" />}
+                              <span className="hidden sm:inline">{isThai ? 'ส่ง LINE' : 'LINE'}</span>
                             </button>
                           )}
                           {canCancelInvoice(inv) && (

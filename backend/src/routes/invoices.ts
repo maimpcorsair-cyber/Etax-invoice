@@ -10,6 +10,7 @@ import { generateInvoiceNumber } from '../services/invoiceService';
 import { generateInvoiceExcel } from '../services/exportService';
 import { exportInvoicesToSheets } from '../services/googleSheetsService';
 import { sendInvoiceToCustomer, EmailNotConfiguredError } from '../services/emailService';
+import { buildInvoiceShareUrl, signInvoiceShareToken } from '../services/invoiceShareToken';
 import { cancelDocumentRD } from '../services/rdApiService';
 import { sendInvoiceIssuedNotification, sendInvoiceIssuedLineNotification } from '../services/notificationService';
 import { generatePdfFromHtml, buildHtmlForCompany } from '../services/pdfService';
@@ -1151,6 +1152,48 @@ invoicesRouter.post('/:id/send-email', requireRole('admin', 'accountant'), async
       return;
     }
     const message = err instanceof Error ? err.message : 'Failed to send email';
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /:id/share-link — seller generates a magic link that the buyer can
+// open without logging in. Used by the "ส่งผ่าน LINE" button in the
+// invoice list. The buyer's web viewer is at `/share/invoice/<token>`
+// served by the unauthenticated invoiceSharePublicRouter.
+invoicesRouter.post('/:id/share-link', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const invoice = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      return tx.invoice.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        select: { id: true, invoiceNumber: true, status: true },
+      });
+    });
+    if (!invoice) { res.status(404).json({ error: 'Invoice not found' }); return; }
+    if (invoice.status === 'cancelled') {
+      res.status(400).json({ error: 'Cannot share a cancelled invoice' });
+      return;
+    }
+
+    const token = signInvoiceShareToken({ invoiceId: invoice.id, companyId: req.user!.companyId });
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',')[0].trim();
+    const url = buildInvoiceShareUrl(frontendUrl, token);
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'invoice.share_link.create',
+      resourceType: 'invoice',
+      resourceId: invoice.id,
+      details: { invoiceNumber: invoice.invoiceNumber },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    res.json({ url, token, invoiceNumber: invoice.invoiceNumber });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create share link';
     res.status(500).json({ error: message });
   }
 });
