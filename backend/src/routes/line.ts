@@ -921,10 +921,10 @@ async function rankSlipCandidates(_intakeId: string, result: OcrResult, companyI
   });
 }
 
-async function buildSlipCandidateBubbles(intakeId: string, result: OcrResult, companyId: string): Promise<object[]> {
+async function buildSlipCandidateBubbles(intakeId: string, result: OcrResult, companyId: string, editUrl?: string): Promise<object[]> {
   const amount = Number(result.payment?.amount ?? result.total ?? 0);
   if (amount <= 0) {
-    return [buildMatchOptionsBubble(intakeId, { askDirection: false, allowUpload: true })];
+    return [buildMatchOptionsBubble(intakeId, { askDirection: false, allowUpload: true, editUrl })];
   }
   const paidAt = result.payment?.paidAt ? new Date(result.payment.paidAt) : new Date();
   const reference = result.payment?.reference || result.invoiceNumber || undefined;
@@ -971,7 +971,7 @@ async function buildSlipCandidateBubbles(intakeId: string, result: OcrResult, co
 
   const top = combined.slice(0, 5);
   const bubbles: object[] = top.map((c) => buildMatchCandidateBubble(c, intakeId));
-  bubbles.push(buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true }));
+  bubbles.push(buildMatchOptionsBubble(intakeId, { askDirection: direction === 'unknown', allowUpload: true, editUrl }));
   return bubbles;
 }
 
@@ -1009,8 +1009,8 @@ async function sendCombinedSlipAndCandidates(
   const combinedEditUrl = buildIntakeEditUrlSafe(intakeId, lineUserId, intake.companyId);
   const slipBubble = buildPaymentSlipFlexCard(result, 'pending', { intakeId, editUrl: combinedEditUrl });
   const candidateBubbles = ranked.length > 0
-    ? [...ranked.slice(0, 5).map((c) => buildMatchCandidateBubble(c, intakeId)), buildMatchOptionsBubble(intakeId, { askDirection: (result.payment?.direction ?? 'unknown') === 'unknown', allowUpload: true })]
-    : await buildSlipCandidateBubbles(intakeId, result, intake.companyId);
+    ? [...ranked.slice(0, 5).map((c) => buildMatchCandidateBubble(c, intakeId)), buildMatchOptionsBubble(intakeId, { askDirection: (result.payment?.direction ?? 'unknown') === 'unknown', allowUpload: true, editUrl: combinedEditUrl })]
+    : await buildSlipCandidateBubbles(intakeId, result, intake.companyId, combinedEditUrl);
   const allBubbles = [slipBubble, ...candidateBubbles].slice(0, 12);
   await sendLineFlexCarousel(lineUserId, altText, allBubbles);
 }
@@ -3697,7 +3697,52 @@ async function handlePostback(lineUserId: string, data: string): Promise<void> {
       where: { id: intakeId, lineUserId },
       data: { status: 'needs_review', error: 'pending_manual_match' },
     }));
-    await sendLineText(lineUserId, '⏭ ข้ามไปก่อน — สลิปนี้ยังไม่ได้จับคู่ คุณสามารถเข้าไปจับคู่ในหน้า Input VAT ภายหลังได้');
+    await sendLineText(lineUserId, '💾 บันทึกไว้ก่อน — สลิปอยู่ในระบบแล้ว เข้าไปจับคู่บิลทีหลังในหน้า Input VAT ได้เลย');
+    return;
+  }
+
+  // 'บันทึกเป็นค่าใช้จ่ายทั่วไป' — covers the SME slips that don't have a
+  // matching purchase invoice: salary, tax payment, bank fee, personal meal,
+  // internal transfer, etc. Marks the intake as saved without forcing a
+  // slip↔bill match; user can categorise the expense from the web edit page.
+  if (data.startsWith('save_as_expense:')) {
+    const intakeId = data.slice('save_as_expense:'.length);
+    const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+      where: { id: intakeId, lineUserId },
+      select: { id: true, companyId: true, ocrResult: true },
+    }));
+    if (!intake) {
+      await sendLineText(lineUserId, 'ไม่พบข้อมูลสลิป กรุณาส่งใหม่');
+      return;
+    }
+    // Annotate the OCR result with the user's intent so the web edit page
+    // can pre-fill the expense category section instead of re-asking. The
+    // `taxSafety.status = 'expense_only_no_vat'` signal also unlocks the
+    // "Create Expense Voucher" button in the file list UI.
+    const result = (intake.ocrResult as unknown as OcrResult | null) ?? null;
+    // taxSafety isn't a typed field on OcrResult — it's surfaced as part of
+    // documentMetadata or as a derived signal elsewhere. We store the intent
+    // in expenseCategory + a side-channel marker that the web edit page can
+    // recognise without changing the OCR contract.
+    const annotated = result ? {
+      ...result,
+      expenseCategory: result.expenseCategory || 'other',
+      expenseSubcategory: result.expenseSubcategory || 'general expense (no bill)',
+      taxTreatment: 'non_deductible' as const,
+    } : null;
+    await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
+      where: { id: intake.id },
+      data: {
+        status: 'saved',
+        error: 'saved_as_expense',
+        ocrResult: (annotated ?? undefined) as Prisma.InputJsonValue | undefined,
+      },
+    }));
+    const editUrl = buildIntakeEditUrlSafe(intake.id, lineUserId, intake.companyId);
+    const followup = editUrl
+      ? `💾 บันทึกเป็นค่าใช้จ่ายแล้ว — ระบุหมวด/รายละเอียดเพิ่มได้ที่:\n${editUrl}`
+      : '💾 บันทึกเป็นค่าใช้จ่ายแล้ว — ระบุหมวดเพิ่มในหน้า Input VAT ได้';
+    await sendLineText(lineUserId, followup);
     return;
   }
 

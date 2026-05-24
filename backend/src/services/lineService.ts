@@ -931,7 +931,14 @@ export function buildMatchCandidateBubble(
   };
 }
 
-export function buildMatchOptionsBubble(intakeId: string, options: { askDirection?: boolean; allowUpload?: boolean } = {}): object {
+export function buildMatchOptionsBubble(intakeId: string, options: { askDirection?: boolean; allowUpload?: boolean; editUrl?: string } = {}): object {
+  // The button vocabulary is the actual user-facing UX for slips that
+  // didn't auto-match a bill. The earlier label "⏭ ข้ามไปก่อน (ยังไม่จับคู่)"
+  // sounded like "discard" to users; renamed to "💾 บันทึกไว้ก่อน". Added
+  // an explicit "บันทึกเป็นค่าใช้จ่ายทั่วไป" path for slips that legitimately
+  // don't need a bill (salary, tax, bank fee, personal expense, internal
+  // transfer) so SME owners aren't forced to pick between incoming/outgoing
+  // when neither fits their actual workflow.
   const buttons: object[] = [];
   if (options.askDirection) {
     buttons.push({
@@ -943,15 +950,25 @@ export function buildMatchOptionsBubble(intakeId: string, options: { askDirectio
       action: { type: 'postback', label: '📤 จ่ายให้ผู้ขาย', data: `match_direction:${intakeId}:outgoing` },
     });
   }
+  buttons.push({
+    type: 'button', style: 'secondary',
+    action: { type: 'postback', label: '💾 บันทึกเป็นค่าใช้จ่ายทั่วไป', data: `save_as_expense:${intakeId}` },
+  });
   if (options.allowUpload) {
     buttons.push({
       type: 'button', style: 'secondary',
       action: { type: 'postback', label: '📤 อัพโหลดบิลเพิ่ม', data: `upload_bill_for_slip:${intakeId}` },
     });
   }
+  if (options.editUrl) {
+    buttons.push({
+      type: 'button', style: 'link',
+      action: { type: 'uri', label: '✏️ จัดการในเว็บ', uri: options.editUrl },
+    });
+  }
   buttons.push({
     type: 'button', style: 'secondary',
-    action: { type: 'postback', label: '⏭ ข้ามไปก่อน (ยังไม่จับคู่)', data: `skip_match:${intakeId}` },
+    action: { type: 'postback', label: '💾 บันทึกไว้ก่อน (จับคู่ทีหลังในเว็บ)', data: `skip_match:${intakeId}` },
   });
 
   return {
@@ -965,8 +982,8 @@ export function buildMatchOptionsBubble(intakeId: string, options: { askDirectio
       layout: 'vertical',
       spacing: 'sm',
       contents: [
-        { type: 'text', text: 'สลิปนี้คู่กับบิลไหน?', weight: 'bold' as const, size: 'md', align: 'center' as const },
-        { type: 'text', text: 'เลือกประเภท หรือข้ามไปก่อน', size: 'xs', color: '#888888', align: 'center' as const, wrap: true },
+        { type: 'text', text: 'จัดการสลิปนี้ยังไง?', weight: 'bold' as const, size: 'md', align: 'center' as const },
+        { type: 'text', text: 'เลือกจับคู่บิล หรือบันทึกเป็นค่าใช้จ่ายได้', size: 'xs', color: '#888888', align: 'center' as const, wrap: true },
       ],
     },
     footer: {
