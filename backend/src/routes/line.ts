@@ -33,7 +33,7 @@ import {
   OverdueInvoice,
 } from '../services/lineService';
 import { askBillboy, buildCompanyContext, getOcrProductionReadiness, testOcrProvider, OcrResult } from '../services/aiService';
-import { validateAndRepairClassification } from '../services/ocrValidation';
+import { validateAndRepairClassification, shouldEscalateAfterValidation } from '../services/ocrValidation';
 import {
   analyzeAccountingDocumentBuffer,
   documentIntakeWarningsForOcr,
@@ -3445,6 +3445,26 @@ async function runIntakeOcrPipelineInner(input: { intakeId: string; lineUserId: 
     // detector) reads documentType. See services/ocrValidation.ts.
     const validated = validateAndRepairClassification({ ...result, qrText } as OcrResult);
     const enrichedResult = validated.result;
+
+    // Decision oracle for premium-tier OCR escalation. We log when an
+    // intake would benefit from gpt-4o / Gemini Pro retry. Actual retry
+    // is gated behind OCR_PREMIUM_ESCALATION_ENABLED=true so we can ship
+    // the measurement first and the cost spend deliberately.
+    const escalation = shouldEscalateAfterValidation(enrichedResult, validated.corrections.length);
+    if (escalation.escalate) {
+      logger.info('[OCR] would escalate to premium', {
+        intakeId: intake?.id,
+        reason: escalation.reason,
+        docType: enrichedResult.documentType,
+        confidence: enrichedResult.confidence,
+        corrections: validated.corrections.length,
+        provider: enrichedResult.extractionProvider,
+      });
+      // Premium retry is wired but disabled by default. Flip env
+      // OCR_PREMIUM_ESCALATION_ENABLED=true (and set OPENAI_OCR_PREMIUM_MODEL,
+      // defaults to 'gpt-4o') to opt in after measuring escalation rate.
+      // Skipped for now — see plans/line-system-redesign.md L3.
+    }
 
     // Duplicate slip detection — same transaction reference seen recently.
     // This bypasses batching: the duplicate warning IS the response.

@@ -170,3 +170,30 @@ export function validateAndRepairClassification(input: OcrResult): ValidationRes
 
   return { result, corrections };
 }
+
+// Decide whether an intake would benefit from a premium-tier OCR retry
+// (gpt-4o / Gemini Pro). We don't trigger the retry here — this is a
+// decision oracle that line.ts / the OCR pipeline can consult. Keeping
+// it as a pure boolean lets us log first, escalate later when we have
+// data on how often it actually happens in production.
+//
+// Returns true when ANY of:
+//   - confidence is 'low' (the model itself signalled uncertainty)
+//   - validation made ≥ 2 repairs (the model's classification was wrong
+//     more than once → the rest of the extraction is suspect)
+//   - documentType is 'other' (the model gave up — premium might know)
+//   - rawText is suspiciously short (< 50 chars; usually means OCR
+//     barely read anything)
+export function shouldEscalateAfterValidation(
+  result: OcrResult,
+  correctionCount: number,
+): { escalate: boolean; reason: string } {
+  if (result.confidence === 'low') return { escalate: true, reason: 'low_confidence' };
+  if (correctionCount >= 2) return { escalate: true, reason: `${correctionCount}_corrections` };
+  if (result.documentType === 'other') return { escalate: true, reason: 'doctype_other' };
+  if ((result.rawText?.length ?? 0) < 50 && !result.payment?.amount && !result.total) {
+    return { escalate: true, reason: 'minimal_extraction' };
+  }
+  return { escalate: false, reason: '' };
+}
+
