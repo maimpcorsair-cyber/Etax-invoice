@@ -33,6 +33,7 @@ import {
   OverdueInvoice,
 } from '../services/lineService';
 import { askBillboy, buildCompanyContext, getOcrProductionReadiness, testOcrProvider, OcrResult } from '../services/aiService';
+import { validateAndRepairClassification } from '../services/ocrValidation';
 import {
   analyzeAccountingDocumentBuffer,
   documentIntakeWarningsForOcr,
@@ -3439,10 +3440,11 @@ async function runIntakeOcrPipelineInner(input: { intakeId: string; lineUserId: 
       return;
     }
 
-    const enrichedResult = {
-      ...result,
-      qrText,
-    } as OcrResult;
+    // Post-OCR validation pass — repair classification mistakes before any
+    // downstream code (Flex card builder, intake state machine, duplicate
+    // detector) reads documentType. See services/ocrValidation.ts.
+    const validated = validateAndRepairClassification({ ...result, qrText } as OcrResult);
+    const enrichedResult = validated.result;
 
     // Duplicate slip detection — same transaction reference seen recently.
     // This bypasses batching: the duplicate warning IS the response.
