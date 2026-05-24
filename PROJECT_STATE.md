@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-22 21:05 +07 (Day 5 Inventory shipped + prod migration applied)
+Last updated: 2026-05-25 04:40 +07 (LINE redesign L1-L4 shipped, L4 partial)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -67,6 +67,12 @@ Last CI:
 - Day 5 Inventory tracking shipped in `345e75f`: opt-in `Product.trackInventory` + `currentStock` + `reorderPoint`; new `StockMovement` ledger table (sale / purchase / adjustment_in / adjustment_out / opening_balance) with refType/refId back-pointer. `services/inventoryService.ts` provides tx-aware `moveStock`, `applyInvoiceStockMovements` (auto-decrement on issuing T01/T02/T03), `reverseStockMovementsFor` (auto-revert on cancel), plus `adjustStock` + `setOpeningBalance` for manual operations. Backend routes: `POST /api/products/:id/stock/adjust`, `POST /api/products/:id/stock/opening-balance`, `GET /api/products/:id/stock-movements`, `GET /api/products/low-stock`. Frontend `Products.tsx` gained inventory section in product modal, stock column with reorder badge, and per-row adjust dialog.
 - Migration `20260522_inventory` applied to production via `Manual Prisma DB Migration` workflow (run `26291916334`, 33s, all steps green). Schema now live: `products.track_inventory` / `current_stock` / `reorder_point` columns + `stock_movements` table + `StockMovementType` enum.
 - Next best action: enable inventory on one or two real products in production, issue a tax invoice referencing them, and verify `current_stock` decrements + the matching `stock_movements` ledger row exists.
+- LINE system redesign L1-L4 shipped (2026-05-25). See `docs/state/line-system-redesign.md` for the full plan + red-team + steel-man.
+  - **L1** (`0474aeb`): card UX cleanup — renamed "⏭ ข้ามไปก่อน" → "💾 บันทึกไว้ก่อน (จับคู่ทีหลังในเว็บ)"; added explicit "💾 บันทึกเป็นค่าใช้จ่ายทั่วไป" path with `save_as_expense:<intakeId>` postback handler; rephrased slip-options bubble from "สลิปนี้คู่กับบิลไหน?" to "จัดการสลิปนี้ยังไง?".
+  - **L2** (`11fdec0`): new `services/ocrValidation.ts` runs deterministic regex/heuristic repair AFTER OCR returns. Rules: bank_transfer without bank signal → expense_receipt; 2+ restaurant signals → expense_receipt + meals + supplier backfill from header; tax_invoice without header+taxId → receipt. Every repair surfaced as `auto-repair: <orig>→<repaired>:<reason>` in `validationWarnings`.
+  - **L3** (`d5e1ad1`): decision oracle `shouldEscalateAfterValidation()` logs when premium-tier OCR retry (gpt-4o / Gemini Pro) would help. Actual retry gated behind `OCR_PREMIUM_ESCALATION_ENABLED=true` env (default off) so we measure escalation rate before spending. Env `OPENAI_OCR_PREMIUM_MODEL=gpt-4o` reserved.
+  - **L4** (this commit): partial. Added `transactionDate?: Date` to `DriveUploadOptions` + helper `getTransactionMonthBucket(date)` returning "YYYY/MM". Folder-structure migration deferred until R2/SMTP envs are set on Render (otherwise the dual-write that already shipped at `7788001` returns 503 on every upload anyway).
+- Pending env config on Render (`etax-invoice-api` + `etax-invoice-worker`) before further storage work: `S3_BUCKET` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (or Cloudflare R2 equivalents) + `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS`.
 
 ## Sentry verification status (verified 2026-05-19)
 

@@ -142,6 +142,30 @@ export interface DriveUploadOptions {
   shareAnyone?: boolean;
   shareWithEmails?: string[];
   duplicatePolicy?: 'rename' | 'replace' | 'skip' | 'error';
+  /**
+   * The TRANSACTION date of the document (invoiceDate, paidAt, etc.) — used
+   * for YYYY/MM bucketing under Customers/Projects/Root. Falls back to upload
+   * date when the OCR couldn't parse a date. Auditors and accountants both
+   * expect documents filed by transaction month, not upload month: a January
+   * receipt uploaded in March belongs under 2026/01, not 2026/03.
+   *
+   * Currently used by getTransactionMonthBucket() for path computation; the
+   * actual folder structure change ships in a separate migration commit so
+   * existing tenants don't see their files relocate mid-deploy.
+   */
+  transactionDate?: Date | null;
+}
+
+/**
+ * Bucket key for transaction-month folders. Returns "YYYY/MM" string. Use
+ * the transactionDate when available; fall back to "now" only when OCR
+ * couldn't read one (intake fails, OCR mode='other', etc.).
+ */
+export function getTransactionMonthBucket(date?: Date | null): string {
+  const d = date && !Number.isNaN(date.getTime()) ? date : new Date();
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}/${mm}`;
 }
 
 function driveFolderUrl(folderId: string) {
