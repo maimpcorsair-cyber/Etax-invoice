@@ -1639,8 +1639,33 @@ Document-type-specific extraction rules — STEP 1: classify the document first 
 - vatAmount may be 0 if seller is non-VAT-registered. total = subtotal in that case.
 - Common for: 7-Eleven, taxi, parking, small vendors. expenseCategory often retail/utilities.
 
-【expense_receipt / ใบเสร็จค่าใช้จ่ายส่วนบุคคล】
+【expense_receipt / ใบเสร็จค่าใช้จ่ายส่วนบุคคล + POS receipt ร้านอาหาร/คาเฟ่】
 - Receipt for personal-ish expenses (meals, taxis, hotel one-night, supplies)
+- POS thermal-printer receipts from restaurants/cafés/bars/food trucks ALWAYS go here,
+  even if their header literally prints the word "Invoice" — the layout, not the
+  header, decides the type. Restaurant POS receipts are NOT tax invoices because
+  they rarely include the buyer's tax ID or a 13-digit seller tax ID.
+- RESTAURANT/POS SIGNALS (any 2+ of these → expense_receipt, NEVER bank_transfer
+  even if total is small and date/time are present):
+    • "Table no." / "โต๊ะ" / "Table:" near the top
+    • "Guests:" / "Pax:" / "Cover charge"
+    • "Service Charge" / "ค่าบริการ" (typically 3-10%)
+    • "Subtotal" then "Service Charge" then "Total" (the SC pattern is unique to F&B)
+    • "Thanks For Dining" / "Thank you for dining" / "ขอบคุณที่ใช้บริการ"
+    • Restaurant brand at top (logo + name like "61 Bistro", "After You", "MK", "Sizzler")
+    • Line items with food/drink names (ผัด, แกง, ข้าว, coffee, latte, cola, beer)
+    • "Order #" / "Bill no." / "Check no."
+    • "Rounding" line right before total
+- When you detect a restaurant POS receipt:
+    • supplierName = the restaurant brand at the top (e.g., "61 Bistro" — DO NOT
+      leave blank when a brand is clearly visible, even if no tax ID is printed)
+    • expenseCategory = "meals"
+    • expenseSubcategory = describe the meal type briefly ("dinner at restaurant",
+      "coffee shop", "food court")
+    • taxTreatment = "non_deductible" (personal-ish meal) unless the document
+      explicitly shows it's a business client entertainment with a tax invoice
+    • subtotal, vatAmount may be 0; total includes service charge + rounding
+    • Extract every visible food/drink line into rawText so it can be reviewed
 - Lower default confidence; taxTreatment defaults to needs_review unless clearly business
 
 【withholding_tax / 50ทวิ หนังสือรับรองหักภาษี ณ ที่จ่าย】
@@ -1654,6 +1679,19 @@ Document-type-specific extraction rules — STEP 1: classify the document first 
 - Common rates: 1% (transport/services), 3% (professional services), 5% (rent)
 
 【bank_transfer / สลิปโอนเงิน】
+- HARD REQUIREMENT — do NOT classify as bank_transfer unless AT LEAST ONE of these
+  signals is clearly visible:
+    (a) A bank logo or bank brand name: KBank/SCB/Bangkok Bank/กรุงเทพ/KTB/กรุงไทย/
+        Krungsri/กรุงศรี/TTB/ทหารไทย/ธนชาต/GSB/ออมสิน/BAAC/ธ.ก.ส./CIMB/UOB/Kasikorn/
+        ไทยพาณิชย์
+    (b) The word "PromptPay" / "พร้อมเพย์" prominently displayed
+    (c) Explicit transfer phrasing: "โอนเงิน" / "Transfer" / "เงินเข้า" / "เงินออก" /
+        "โอนสำเร็จ" / "Transaction Successful" / "ทำรายการสำเร็จ"
+    (d) Account-number rows (e.g., "From account: XXX-X-XXXXX-X" / "To account: ...")
+        or QR code with bank context
+  Receipts, invoices, and POS bills can ALSO show a Total + Date + Time without
+  being slips. Total + Date alone is NOT a bank_transfer signal. If none of (a)-(d)
+  are present, prefer expense_receipt / receipt / invoice / tax_invoice instead.
 - Mobile banking screenshot: KBank/SCB/Bangkok Bank/KTB/Krungsri/TTB/GSB/BAAC/CIMB/UOB/PromptPay
 - payment.fromName = ผู้โอน (top, near source bank logo). payment.toName = ผู้รับ (below the arrow/PromptPay logo)
 - payment.amount = transferred amount (NOT balance, NOT fee). payment.paidAt = transfer time.
@@ -1686,7 +1724,21 @@ Document-type-specific extraction rules — STEP 1: classify the document first 
 - total = balance OR period sum (note which in description)
 
 【payment_advice / หนังสือแจ้งการชำระเงิน】
-- Letter/notification advising a payment will be / has been made. Treat like bank_transfer for amount fields but classification stays "payment_advice".
+- Formal letter/notification advising a payment was made or is coming. Header usually
+  says "Payment Advice" / "หนังสือแจ้งการชำระเงิน" / "Remittance Advice".
+- Same hard requirement as bank_transfer — there must be explicit transfer/payment
+  context (bank name, account numbers, transfer keywords). A restaurant or retail
+  receipt that happens to mention "Total" + "Date" + "Time" is NOT payment_advice.
+- Treat like bank_transfer for amount fields but classification stays "payment_advice".
+
+CLASSIFICATION PRIORITY when unsure between bank_transfer / payment_advice / receipt /
+expense_receipt:
+  1. Bank logo or "PromptPay" visible → bank_transfer
+  2. Restaurant signals (Table no., Service Charge, Thanks For Dining, food line items)
+     → expense_receipt (NEVER bank_transfer)
+  3. Header "ใบกำกับภาษี" / "TAX INVOICE" + 13-digit tax IDs → tax_invoice
+  4. Header "ใบเสร็จรับเงิน" / "RECEIPT" without VAT line → receipt
+  5. Otherwise → use "other" rather than guessing bank_transfer
 
 If none of the above clearly matches, use "other" — better honest than wrong.`;
 
