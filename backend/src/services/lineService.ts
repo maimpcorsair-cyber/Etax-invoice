@@ -2,6 +2,47 @@ import crypto from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
 import { logger } from '../config/logger';
 import { OcrResult } from './aiService';
+import redis from '../config/redis';
+
+// LINE Messaging Free tier: 500 push messages / month.
+// We track usage in Redis and emit a single WARN log when crossing 80%
+// (400 messages), then a single ERROR log when crossing 100% so the
+// owner has actionable signal before push deliveries silently drop.
+const LINE_FREE_TIER_MONTHLY_PUSH_QUOTA = 500;
+const LINE_PUSH_WARN_THRESHOLD = 0.8;
+const lineMonthlyKey = () => {
+  const d = new Date();
+  return `line:push_count:${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+async function recordLinePush(): Promise<void> {
+  try {
+    const key = lineMonthlyKey();
+    const count = await redis.incr(key);
+    // First write of the month — set 40-day expiry so old months auto-drop.
+    if (count === 1) await redis.expire(key, 40 * 86_400);
+    if (count === Math.floor(LINE_FREE_TIER_MONTHLY_PUSH_QUOTA * LINE_PUSH_WARN_THRESHOLD)) {
+      logger.warn('[Line] push budget approaching free-tier ceiling', { count, quota: LINE_FREE_TIER_MONTHLY_PUSH_QUOTA, key });
+    } else if (count === LINE_FREE_TIER_MONTHLY_PUSH_QUOTA + 1) {
+      // First push beyond the free quota — surface so the owner knows
+      // additional messages will be billed (or dropped depending on plan).
+      logger.error('[Line] push budget exceeded free-tier quota', { count, quota: LINE_FREE_TIER_MONTHLY_PUSH_QUOTA, key });
+    }
+  } catch (err) {
+    // Redis failure must not block message delivery. Log and continue.
+    logger.warn('[Line] push counter increment failed', { err: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+export async function getLinePushBudget(): Promise<{ count: number; quota: number; monthKey: string }> {
+  const key = lineMonthlyKey();
+  const raw = await redis.get(key).catch(() => null);
+  return {
+    count: Number(raw) || 0,
+    quota: LINE_FREE_TIER_MONTHLY_PUSH_QUOTA,
+    monthKey: key,
+  };
+}
 
 const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
 const channelSecret = process.env.LINE_CHANNEL_SECRET ?? '';
@@ -62,6 +103,9 @@ async function linePush(lineUserId: string, messages: object[]): Promise<boolean
       return false;
     }
     lineDiagnostics.lastPushOkAt = new Date().toISOString();
+    // Count successful pushes toward the monthly free-tier ceiling. Fire-and-
+    // forget — Redis failures must not affect the user-visible delivery.
+    void recordLinePush();
     return true;
   } catch (err) {
     lineDiagnostics.lastPushFailure = { at: new Date().toISOString(), error: String(err) };

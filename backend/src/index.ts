@@ -199,6 +199,25 @@ app.get('/api/health/pdf', async (_req, res) => {
   }
 });
 
+// Current month's LINE push count against the free-tier quota.
+// Used to spot when we're about to hit the 500/mo ceiling so the owner
+// can decide on a Premium plan upgrade before deliveries silently drop.
+app.get('/api/health/line-budget', async (_req, res) => {
+  try {
+    const { getLinePushBudget } = await import('./services/lineService');
+    const budget = await getLinePushBudget();
+    const pct = budget.quota > 0 ? Math.round((budget.count / budget.quota) * 100) : 0;
+    res.json({
+      ...budget,
+      pct,
+      warnAt: Math.floor(budget.quota * 0.8),
+      status: pct >= 100 ? 'exceeded' : pct >= 80 ? 'warning' : 'ok',
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // Keep-alive endpoint — no auth required, used by UptimeRobot to prevent Render cold starts
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

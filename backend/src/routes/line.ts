@@ -3488,14 +3488,18 @@ async function runIntakeOcrPipelineInner(input: { intakeId: string; lineUserId: 
           intakeId: intake.id,
           extra: { duplicateOfIntakeId: dup.id, reference: enrichedResult.payment?.reference },
         });
+        // Use status='pending' card here — it renders the "✅ บันทึก"
+        // button the follow-up text refers to. 'unmatched' would render
+        // "🔗 จับคู่ด้วยมือ" instead, leaving the text instruction
+        // misaligned with the buttons the user actually sees.
         await sendLineFlexMessage(
           lineUserId,
           `⚠️ สลิปซ้ำ — เลขรายการเดียวกันเคยส่งแล้ว (${ageLabel})`,
-          buildPaymentSlipFlexCard(enrichedResult, 'unmatched', { intakeId: intake.id }),
+          buildPaymentSlipFlexCard(enrichedResult, 'pending', { intakeId: intake.id }),
         );
         await sendLineText(
           lineUserId,
-          `⚠️ สลิปนี้เคยส่งมาแล้ว (${ageLabel}, ${statusLabel})\nเลขรายการ: ${enrichedResult.payment?.reference ?? '-'}\n\nถ้าต้องการบันทึกซ้ำให้กด "บันทึก" บนการ์ดด้านบน — มิฉะนั้นไฟล์จะค้างในคิวรอตรวจ`,
+          `⚠️ สลิปนี้เคยส่งมาแล้ว (${ageLabel}, ${statusLabel})\nเลขรายการ: ${enrichedResult.payment?.reference ?? '-'}\n\nถ้าต้องการบันทึกซ้ำให้กด "✅ บันทึก" บนการ์ดด้านบน — มิฉะนั้นไฟล์จะค้างในคิวรอตรวจ`,
         );
         return;
       }
