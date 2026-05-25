@@ -51,10 +51,15 @@ function combinedHaystack(result: OcrResult): string {
   // Pool all the places OCR signals can hide so the regexes have one large
   // string to inspect. rawText is the biggest, but the model sometimes drops
   // signals there and keeps them only on structured fields.
+  //
+  // NOTE: documentTypeLabel is intentionally excluded — the model writes
+  // that field AFTER classifying, so trusting it would let the model's own
+  // (possibly wrong) label confirm its own classification. Header-signal
+  // checks must read from the document content (rawText), not from the
+  // model's interpretation.
   return [
     result.rawText ?? '',
     result.supplierName ?? '',
-    result.documentTypeLabel ?? '',
     result.payment?.bankName ?? '',
     result.payment?.fromName ?? '',
     result.payment?.toName ?? '',
