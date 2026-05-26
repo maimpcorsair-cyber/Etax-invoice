@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-26 (LINE redesign + gap fixes + SMTP env set on Render, R2 still pending user)
+Last updated: 2026-05-26 (R2 compatibility patch ready; R2 env still pending user)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -87,12 +87,13 @@ Last CI:
   - `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_USER=resend`, `SMTP_PASS=re_...`, `SMTP_SECURE=false`
   - Customer Portal magic link, free-signup welcome email, customer invite, and password reset are now functional.
   - R2/S3 storage envs still NOT set — file uploads still 503. User has the step-by-step instructions but hasn't done Part A yet.
+- R2 compatibility patch shipped locally in `69055a2`: `storageService` no longer sends `ServerSideEncryption: AES256` when `S3_ENDPOINT` is configured, because Cloudflare R2 rejects the standard `x-amz-server-side-encryption` header on `PutObject`. AWS S3 still defaults to AES256. Setup runbook added at `docs/deployment/r2-render-setup.md`.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
 User is switching to Codex to continue. Pending work, ranked by impact:
 
-1. **R2 setup (15 min)** — unblock all file upload endpoints (customer evidence, expense attachment, LINE-OCR slip persistence, Master sheet Drive Link). Instructions written in chat at the end of the 2026-05-25 session. Cloudflare R2 free tier 10GB. Envs needed on both `etax-invoice-api` and `etax-invoice-worker`: `S3_BUCKET`, `S3_REGION=auto`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. After: verify with `curl /api/health/deep` — `notConfigured` should show `[]`.
+1. **R2 setup (15 min)** — unblock all file upload endpoints (customer evidence, expense attachment, LINE-OCR slip persistence, Master sheet Drive Link). Step-by-step runbook now lives in `docs/deployment/r2-render-setup.md`. Cloudflare R2 free tier 10GB. Envs needed on both `etax-invoice-api` and `etax-invoice-worker`: `S3_BUCKET`, `S3_REGION=auto`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. After: verify with `curl /api/health/deep` — `notConfigured` should no longer include `s3`.
 
 2. **Drive folder migration (deferred until R2)** — `getTransactionMonthBucket()` helper already exists ([googleDriveService.ts](backend/src/services/googleDriveService.ts)). Need to wire `transactionDate` into `ensureProjectFolder` so YYYY/MM bucket is created based on `invoiceDate` not `createdAt`. Skipped this session because changing folder structure before R2 is the canonical storage doesn't help.
 
