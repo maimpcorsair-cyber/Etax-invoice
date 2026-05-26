@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-25 04:40 +07 (LINE redesign L1-L4 shipped, L4 partial)
+Last updated: 2026-05-26 (LINE redesign + gap fixes + SMTP env set on Render, R2 still pending user)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -73,6 +73,58 @@ Last CI:
   - **L3** (`d5e1ad1`): decision oracle `shouldEscalateAfterValidation()` logs when premium-tier OCR retry (gpt-4o / Gemini Pro) would help. Actual retry gated behind `OCR_PREMIUM_ESCALATION_ENABLED=true` env (default off) so we measure escalation rate before spending. Env `OPENAI_OCR_PREMIUM_MODEL=gpt-4o` reserved.
   - **L4** (this commit): partial. Added `transactionDate?: Date` to `DriveUploadOptions` + helper `getTransactionMonthBucket(date)` returning "YYYY/MM". Folder-structure migration deferred until R2/SMTP envs are set on Render (otherwise the dual-write that already shipped at `7788001` returns 503 on every upload anyway).
 - Pending env config on Render (`etax-invoice-api` + `etax-invoice-worker`) before further storage work: `S3_BUCKET` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (or Cloudflare R2 equivalents) + `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS`.
+- LINE gap-audit fixes shipped 2026-05-25 (`2690683`):
+  - LINE push budget tracking: Redis counter `line:push_count:YYYY-MM` increments on every successful push; WARN at 80% of 500/mo free tier, ERROR at 100%. Exposed at `GET /api/health/line-budget`.
+  - Duplicate-slip warning UX: dup-slip Flex card now renders `status='pending'` (with "✅ บันทึก" button) instead of `'unmatched'` (which had no save button despite the text instructing to tap it).
+  - Confirmed: `paymentMatchingService.scoreCandidate`/`scorePurchaseCandidate` already factor supplier-name similarity into the 100-point match score (max 30). RT-8 concern from the plan was incorrect.
+- LINE invoice share via magic link shipped (`cf15fd3` + fixes `205dd4d` `51a5ec1` `9c6172e`):
+  - `/share/invoice/<token>` public viewer page (no login, 30-day TTL)
+  - "ส่ง LINE" button on InvoiceList opens a modal with Copy link + Open-LINE-share-dialog buttons + clear 3-step instructions
+  - PromptPay QR rendered on the viewer when invoice is unpaid and seller has PromptPay configured
+  - useAuthBootstrap guards public token routes from the apex-domain auto-redirect (logged-in sellers can open their own share links without being bounced to /app/dashboard)
+- LINE redesign L1-L4 + tests shipped 2026-05-25: see `docs/state/line-system-redesign.md` (plan + red-team + steel-man).
+- SMTP env vars set on Render `etax-invoice-api` 2026-05-26 (user did Part B of the R2/SMTP setup guide):
+  - `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_USER=resend`, `SMTP_PASS=re_...`, `SMTP_SECURE=false`
+  - Customer Portal magic link, free-signup welcome email, customer invite, and password reset are now functional.
+  - R2/S3 storage envs still NOT set — file uploads still 503. User has the step-by-step instructions but hasn't done Part A yet.
+
+## Session handoff (2026-05-26) — what Codex/next-session should pick up
+
+User is switching to Codex to continue. Pending work, ranked by impact:
+
+1. **R2 setup (15 min)** — unblock all file upload endpoints (customer evidence, expense attachment, LINE-OCR slip persistence, Master sheet Drive Link). Instructions written in chat at the end of the 2026-05-25 session. Cloudflare R2 free tier 10GB. Envs needed on both `etax-invoice-api` and `etax-invoice-worker`: `S3_BUCKET`, `S3_REGION=auto`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. After: verify with `curl /api/health/deep` — `notConfigured` should show `[]`.
+
+2. **Drive folder migration (deferred until R2)** — `getTransactionMonthBucket()` helper already exists ([googleDriveService.ts](backend/src/services/googleDriveService.ts)). Need to wire `transactionDate` into `ensureProjectFolder` so YYYY/MM bucket is created based on `invoiceDate` not `createdAt`. Skipped this session because changing folder structure before R2 is the canonical storage doesn't help.
+
+3. **Acquire first paying customer** — Owner Plane shows 5-7 real PromptPay pending signups (`PP-5O8XOKUC`, `PP-2Z042BS4`, `PP-25N6YV20`, `PP-125ZUQ7C`, `PP-NYYJFDUY`) and 4 Stripe pending (`cs_test_*`) totaling ~฿6,930 of stuck revenue. User explicitly said these are "เพื่อนทดสอบ" (friends testing) so don't auto-approve, but they prove the signup flow works end-to-end.
+
+4. **PromptPay auto-verify via Stripe** — current PromptPay flow requires manual "Mark paid and activate tenant" tap by owner from `/ops/overview`. Stripe PromptPay (`stripe_promptpay`) channel already exists in `billing.ts:162` and has webhook auto-confirm. Move the marketing signup flow to that channel and drop the manual approval path.
+
+5. **Real OCR sample corpus** — synthetic test fixtures landed in `backend/src/services/ocrValidation.test.ts`. Real images (61 Bistro receipt, KBank slip, Lazada tax invoice, etc.) belong in a `backend/samples/` folder + a runner that calls the OCR pipeline and asserts classification against expected. Foundation for measuring accuracy over time.
+
+6. **AskBillboy AI chat audit** — never audited this session. The /api/ai-chat route is the chat interface inside the web app. Quality depends on prompt + context. Spot-check by asking 5 representative questions.
+
+7. **OTP linking flow audit** — never audited. Web signup → admin sends invite → user enters OTP → LINE bot links to companyId. Read `backend/src/routes/line.ts` OTP handlers + `lineUserLink` schema.
+
+Recent commit log this session (newest first):
+- `2690683` LINE gap fixes (push budget + dup-slip status + supplier-similarity confirmation)
+- `a77cb27` 12 regression tests for ocrValidation
+- `5bd2815` L4: transactionDate option + bucket helper
+- `d5e1ad1` L3: escalation decision oracle (log-only)
+- `11fdec0` L2: post-OCR classification repair pass
+- `0474aeb` L1: slip card UX + save_as_expense path
+- `e06bbae` OCR prompt trim (fix 75s timeout)
+- `8797ac0` OCR restaurant receipt classifier fix
+- `9c6172e` share-link auth-bootstrap guard + LINE modal fallback
+- `51a5ec1` share-link modal with Copy + Open-LINE
+- `205dd4d` share-link Origin header fix (localhost bug)
+- `cf15fd3` invoice share via LINE magic link (new feat)
+- `867340a` UX audit pass — dev jargon + nav label cleanup
+- `3fdb0d5` remove Chinese language entirely
+- `badad3e` ProjectDetail layout fix (compact file list + 3-col grid)
+- `2e111e0` hide Owner Plane/super_admin from customer surfaces
+- `02dfaf9` drop Owner Login pill from customer login header
+- `b2c370e` Day 5 Inventory prod migration applied
 
 ## Sentry verification status (verified 2026-05-19)
 
