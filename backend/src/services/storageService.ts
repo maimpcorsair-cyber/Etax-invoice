@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, type ServerSideEncryption } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '../config/logger';
 
@@ -18,13 +18,23 @@ export function isStorageConfigured() {
   return !!process.env.S3_BUCKET && !!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY;
 }
 
+export function getStorageServerSideEncryption(): ServerSideEncryption | undefined {
+  if (process.env.S3_SERVER_SIDE_ENCRYPTION === 'false') return undefined;
+  if (process.env.S3_SERVER_SIDE_ENCRYPTION) return process.env.S3_SERVER_SIDE_ENCRYPTION as ServerSideEncryption;
+
+  // Cloudflare R2 and some S3-compatible providers reject the standard
+  // x-amz-server-side-encryption header; AWS S3 accepts AES256 by default.
+  return process.env.S3_ENDPOINT ? undefined : 'AES256';
+}
+
 export async function uploadToStorage(key: string, body: Buffer, contentType: string): Promise<string> {
+  const serverSideEncryption = getStorageServerSideEncryption();
   await s3.send(new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
     Body: body,
     ContentType: contentType,
-    ServerSideEncryption: 'AES256',
+    ...(serverSideEncryption ? { ServerSideEncryption: serverSideEncryption } : {}),
     Metadata: { uploadedAt: new Date().toISOString() },
   }));
 
