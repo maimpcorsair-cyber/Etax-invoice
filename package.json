@@ -1,6 +1,7 @@
 {
   "scripts": {
     "render:status": "node scripts/render-deploy-status.mjs",
-    "render:deploy": "node scripts/render-trigger-deploy.mjs"
+    "render:deploy": "node scripts/render-trigger-deploy.mjs",
+    "render:r2": "node scripts/render-sync-r2-env.mjs"
   }
 }

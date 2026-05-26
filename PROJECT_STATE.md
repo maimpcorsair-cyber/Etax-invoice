@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-27 (Winning Flow Sprint added; R2 env still pending user)
+Last updated: 2026-05-27 (R2 sync helper added; R2 credentials still pending user)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -91,6 +91,7 @@ Last CI:
 - Codex/Claude tool parity hardened 2026-05-27: `.agents/skills/` and `.claude/skills/` now both contain 59 skills; `.codex/commands/` mirrors the 11 `.claude/commands/`; `.codex/TOOLS.md` exists; `docs/agents/tool-parity.md` is the canonical checklist for skills, commands, MCP, CLI, and known runtime differences.
 - Winning Flow Sprint defined 2026-05-27: `docs/state/winning-flow-sprint.md` now sets the competitor-winning product loop against FlowAccount/PEAK/Paypers, and `.impeccable.md` was expanded so Codex/Claude frontend work optimizes for "photo/chat/invoice -> paid or tax-ready record in under 3 minutes." Next implementation target: First Invoice Winning Path (dashboard next action + invoice post-create share/pay flow), after or in parallel with R2 setup.
 - Frontend lint debt cleared 2026-05-27: `npm run lint`, `npm run typecheck`, and `npm run build` pass from `frontend/`; stale Chinese fallback strings were removed from the remaining React pages, and `frontend/src` now has no Han-script matches.
+- R2 setup status 2026-05-27: production `/api/health/deep` still reports `notConfigured:["s3"]`. Local shell and GitHub repo secrets do not contain R2 values yet. Added `npm run render:r2` (`scripts/render-sync-r2-env.mjs`) to sync `S3_BUCKET`, `S3_REGION=auto`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to both Render services without printing secret values, then trigger deploys.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 

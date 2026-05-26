@@ -35,6 +35,40 @@ Do not set `S3_SERVER_SIDE_ENCRYPTION` for Cloudflare R2.
 4. Add the five required env vars above to both Render services.
 5. Redeploy both Render services so the env vars are loaded.
 
+## Automated Sync
+
+If the R2 values are available in your local shell, use the repo helper. It
+sets the five variables on both Render services and triggers fresh deploys,
+without printing secret values:
+
+```bash
+export RENDER_API_KEY=...
+export S3_BUCKET=...
+export S3_REGION=auto
+export S3_ENDPOINT=https://<cloudflare-account-id>.r2.cloudflarestorage.com
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+npm run render:r2
+```
+
+Accepted aliases:
+
+```bash
+export R2_BUCKET=...
+export R2_ACCESS_KEY_ID=...
+export R2_SECRET_ACCESS_KEY=...
+export CLOUDFLARE_ACCOUNT_ID=...
+```
+
+Useful options:
+
+```bash
+npm run render:r2 -- --dry-run
+npm run render:r2 -- --target api
+npm run render:r2 -- --target worker
+npm run render:r2 -- --no-deploy
+```
+
 ## Verification
 
 After redeploy:
