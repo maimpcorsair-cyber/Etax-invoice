@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-27 (Codex/Claude tool parity hardened; R2 env still pending user)
+Last updated: 2026-05-27 (Winning Flow Sprint added; R2 env still pending user)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -89,6 +89,7 @@ Last CI:
   - R2/S3 storage envs still NOT set — file uploads still 503. User has the step-by-step instructions but hasn't done Part A yet.
 - R2 compatibility patch shipped locally in `69055a2`: `storageService` no longer sends `ServerSideEncryption: AES256` when `S3_ENDPOINT` is configured, because Cloudflare R2 rejects the standard `x-amz-server-side-encryption` header on `PutObject`. AWS S3 still defaults to AES256. Setup runbook added at `docs/deployment/r2-render-setup.md`.
 - Codex/Claude tool parity hardened 2026-05-27: `.agents/skills/` and `.claude/skills/` now both contain 59 skills; `.codex/commands/` mirrors the 11 `.claude/commands/`; `.codex/TOOLS.md` exists; `docs/agents/tool-parity.md` is the canonical checklist for skills, commands, MCP, CLI, and known runtime differences.
+- Winning Flow Sprint defined 2026-05-27: `docs/state/winning-flow-sprint.md` now sets the competitor-winning product loop against FlowAccount/PEAK/Paypers, and `.impeccable.md` was expanded so Codex/Claude frontend work optimizes for "photo/chat/invoice -> paid or tax-ready record in under 3 minutes." Next implementation target: First Invoice Winning Path (dashboard next action + invoice post-create share/pay flow), after or in parallel with R2 setup.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
@@ -193,6 +194,7 @@ To finish on production:
 
 ## Next Best Actions
 
+- Execute the Winning Flow Sprint starting with `docs/state/winning-flow-sprint.md`: R2 setup verification, then First Invoice Winning Path, Customer Pay Flow, LINE OCR Review Flow, PromptPay auto-verify, and real OCR sample corpus.
 - If more invoice-builder UX work continues, verify desktop at `/app/invoices/new` after choosing buyer and adding at least one product item.
 - If touching backend/worker, run backend typecheck/build and verify Render with `npm run render:status`.
 - If touching frontend UX only, run frontend typecheck, touched-file lint, build, push, then verify the Vercel bundle.

@@ -440,6 +440,37 @@ export default function Dashboard() {
     },
   ];
 
+  const shouldShowFirstInvoicePath = Boolean(stats && stats.totalInvoices <= 2);
+  const firstInvoiceSteps = [
+    {
+      key: 'create',
+      icon: FileText,
+      href: '/app/invoices/new',
+      done: (stats?.totalInvoices ?? 0) > 0,
+      title: isThai ? 'สร้างใบขายแรก' : 'Create first invoice',
+      detail: isThai ? 'ลูกค้า รายการสินค้า ยอดเงิน' : 'Customer, line item, amount',
+      action: isThai ? 'สร้างเลย' : 'Create',
+    },
+    {
+      key: 'share',
+      icon: LinkIcon,
+      href: '/app/invoices',
+      done: false,
+      title: isThai ? 'ส่งลิงก์ให้ลูกค้า' : 'Send customer link',
+      detail: isThai ? 'LINE, คัดลอกลิงก์, PDF' : 'LINE, copy link, PDF',
+      action: isThai ? 'เปิดรายการ' : 'Open list',
+    },
+    {
+      key: 'collect',
+      icon: CreditCard,
+      href: '/app/invoices',
+      done: (stats?.receivables.currentOutstanding ?? 0) === 0 && (stats?.totalInvoices ?? 0) > 0,
+      title: isThai ? 'ตามยอดและบันทึกรับเงิน' : 'Track and record payment',
+      detail: isThai ? 'เห็นยอดค้างและใบเกินกำหนด' : 'Outstanding and overdue status',
+      action: isThai ? 'ดูยอดค้าง' : 'View status',
+    },
+  ];
+
   async function handleConnectDrive() {
     if (!token) return;
     setDriveConnecting(true);
@@ -569,6 +600,65 @@ export default function Dashboard() {
           </>
         )}
       />
+
+      {shouldShowFirstInvoicePath && (
+        <section className="rounded-2xl border border-blue-200 bg-blue-50/70 px-4 py-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                {isThai ? 'เส้นทางใบแรก' : 'First invoice path'}
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950">
+                {isThai ? 'ออกใบแรกแล้วส่งให้ลูกค้าในรอบเดียว' : 'Create and send the first invoice in one pass'}
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-700">
+                {isThai
+                  ? 'เริ่มจากใบขายหนึ่งใบ จากนั้นส่งลิงก์ให้ลูกค้าดู PDF และชำระเงินได้ทันที'
+                  : 'Start with one sales document, then share a customer link with PDF and payment details.'}
+              </p>
+            </div>
+            <Link to="/app/invoices/new" className="btn-primary w-full justify-center sm:w-auto">
+              <Plus className="h-4 w-4" />
+              {isThai ? 'สร้างใบแรก' : 'Create first invoice'}
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {firstInvoiceSteps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <Link
+                  key={step.key}
+                  to={step.href}
+                  className="group flex min-h-[108px] flex-col justify-between rounded-xl border border-white/70 bg-white/85 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950">{step.title}</p>
+                        <p className="mt-0.5 text-xs text-slate-600">{step.detail}</p>
+                      </div>
+                    </div>
+                    {step.done ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                    ) : (
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+                        {index + 1}
+                      </span>
+                    )}
+                  </div>
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
+                    {step.action}
+                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {stats?.totalInvoices === 0 && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4">
