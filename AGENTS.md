@@ -26,14 +26,14 @@ Full-stack e-Tax Invoice application compliant with **ETDA ขมธอ. 3-2560*
 ├── prisma/         schema.prisma (single source of truth)
 ├── database/       Raw SQL migrations for reference
 ├── docker-compose.yml  Postgres + Redis
-└── .Codex/
+└── .codex/
     ├── agents/     Specialized subagents (etax-specialist, cert-manager, etc.)
     └── commands/   Slash commands (/typecheck, /sign-test, etc.)
 ```
 
 ## Quick index
 
-- **Full tools reference**: see [`.Codex/TOOLS.md`](.Codex/TOOLS.md) — agents, commands, skills, MCP servers with a task → best-fit tool matrix.
+- **Full tools reference**: see [`.codex/TOOLS.md`](.codex/TOOLS.md) and [`docs/agents/tool-parity.md`](docs/agents/tool-parity.md) — agents, commands, skills, MCP servers, and Codex/Claude parity notes.
 
 ## Team agents — when to invoke which
 
@@ -76,9 +76,9 @@ Codex will auto-route to the right agent when a task matches; you can also invok
 | `skill-creator` | Creating new project-specific skills |
 | `brand-guidelines` | Applying consistent branding to UI/docs |
 
-**Plus 18 Impeccable design skills** (`critique`, `polish`, `harden`, `clarify`, `distill`, `layout`, `typeset`, `colorize`, `shape`, `bolder`, `quieter`, `delight`, `animate`, `adapt`, `optimize`, `overdrive`, `audit`, `impeccable`) — auto-applied to frontend design tasks. See `.Codex/TOOLS.md` for the full matrix.
+**Plus 18 Impeccable design skills** (`critique`, `polish`, `harden`, `clarify`, `distill`, `layout`, `typeset`, `colorize`, `shape`, `bolder`, `quieter`, `delight`, `animate`, `adapt`, `optimize`, `overdrive`, `audit`, `impeccable`) — auto-applied to frontend design tasks. See `.codex/TOOLS.md` for the full matrix.
 
-**Karpathy + Matt Pocock skills** are mirrored into `.agents/skills/` for Codex project use. Notable additions: `karpathy-guidelines`, `diagnose`, `tdd`, `to-prd`, `to-issues`, `triage`, `zoom-out`, `prototype`, `improve-codebase-architecture`, `grill-me`, and `handoff`.
+**Karpathy + Matt Pocock skills** are mirrored into both `.agents/skills/` and `.claude/skills/` for Codex/Claude parity. Notable additions: `karpathy-guidelines`, `diagnose`, `tdd`, `to-prd`, `to-issues`, `triage`, `zoom-out`, `prototype`, `improve-codebase-architecture`, `grill-me`, and `handoff`. See `docs/agents/tool-parity.md`.
 
 ## Agent skills
 
@@ -94,6 +94,10 @@ Use the default Matt Pocock label vocabulary: `needs-triage`, `needs-info`, `rea
 
 Single-context repo. Start from `AI_HANDOFF.md`, then `PROJECT_STATE.md`, then `AGENTS.md`/`CLAUDE.md`. See `docs/agents/domain.md`.
 
+### Tool parity
+
+Codex and Claude skill/command/MCP parity is tracked in `docs/agents/tool-parity.md`.
+
 ## MCP servers
 
 Project-scoped in `.mcp.json`:
@@ -106,7 +110,7 @@ Project-scoped in `.mcp.json`:
 - 🔑 **tavily** — AI web search — needs `TAVILY_API_KEY`
 - 🔑 **firecrawl** — web scraping — needs `FIRECRAWL_API_KEY`
 
-Run `/mcp` in Codex to see live status.
+Run `/mcp` in Claude to see live status. In Codex, use the tool list exposed in the current session; availability can differ from `.mcp.json`.
 
 ### Serena MCP
 

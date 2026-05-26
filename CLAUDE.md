@@ -81,13 +81,16 @@ Always use `req.user!.companyId` — **never trust companyId from request body**
 - See `PROJECT_STATE.md` for the current verified backend health version and CLI status. Use `docs/state/PROJECT_HISTORY_2026-05.md` only for older detailed deploy history.
 
 ## MCP tools ที่ใช้งานได้
-- `mcp__postgres__query` ✅ — query production DB ได้ตรงๆ
 - `gh` CLI ✅ — logged in locally as `maimpcorsair-cyber`; use for Actions/deploy run checks
 - `context7` ✅ — library docs
 - `playwright` ✅ — E2E browser testing
 - `sequential-thinking` ✅ — structured step-by-step reasoning for tricky debugging/planning
 - `memory` ✅ — local MCP memory graph
 - `sentry` ✅ — Sentry issue/release/debug context
+- `tavily` 🔑 — AI web search, needs `TAVILY_API_KEY`
+- `firecrawl` 🔑 — web scraping, needs `FIRECRAWL_API_KEY`
+
+Do not assume Postgres MCP is available unless `/mcp` shows it in the current Claude session. If absent, use `/db-shell`, `source-command-db-shell`, or `psql`-based project commands. Codex/Claude parity notes live in `docs/agents/tool-parity.md`.
 
 ## Agent skills
 
@@ -102,6 +105,10 @@ Use the default Matt Pocock label vocabulary: `needs-triage`, `needs-info`, `rea
 ### Domain docs
 
 Single-context repo. Start from `AI_HANDOFF.md`, then `PROJECT_STATE.md`, then `AGENTS.md`/`CLAUDE.md`. See `docs/agents/domain.md`.
+
+### Tool parity
+
+Codex and Claude should both see the 59 mirrored project skills. Keep `.agents/skills/` and `.claude/skills/` aligned. See `docs/agents/tool-parity.md`.
 
 ## สิ่งที่ยังต้องทำ (priority — verified 2026-05-19)
 1. 🟡 **Real cert per company — backend infra พร้อมแล้ว แต่ไม่มีใครอัพโหลดจริง** — DB BYTEA + per-tenant cache fix shipped (`bdff724`). ขั้นต่อไปคือ user ทดสอบ upload TDID/INET cert ผ่าน Admin Panel (`frontend/src/pages/AdminPanel.tsx:1566`) แล้วรัน `/signing-test`
