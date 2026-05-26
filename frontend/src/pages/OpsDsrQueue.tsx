@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 
@@ -23,7 +23,7 @@ export default function OpsDsrQueue() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return;
     setError(null);
     try {
@@ -36,9 +36,9 @@ export default function OpsDsrQueue() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     }
-  }
+  }, [token]);
 
-  useEffect(() => { void load(); }, [token]);
+  useEffect(() => { void load(); }, [load]);
 
   async function cancel(companyId: string) {
     if (!token || busyId) return;

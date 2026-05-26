@@ -5,7 +5,7 @@
 const TAX_ID_RE = /\b\d{13}\b/g;
 const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 const THAI_PHONE_RE = /\b(?:\+?66|0)\d{8,9}\b/g;
-const BEARER_RE = /Bearer\s+[A-Za-z0-9._\-]+/g;
+const BEARER_RE = /Bearer\s+[A-Za-z0-9._-]+/g;
 
 const REDACTIONS: Array<[RegExp, string]> = [
   [TAX_ID_RE, '[REDACTED-TAX-ID]'],

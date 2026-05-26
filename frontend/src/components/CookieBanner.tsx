@@ -96,8 +96,3 @@ export default function CookieBanner() {
     </div>
   );
 }
-
-/** Read current consent state from any component or service (e.g., Sentry boot). */
-export function getCookieConsent(): ConsentValue {
-  return readConsent();
-}

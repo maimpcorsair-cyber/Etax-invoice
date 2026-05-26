@@ -223,7 +223,6 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
       cancelled = true;
       window.clearInterval(timer);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, statusOpen]);
 
   async function handleUserLinkStart(user: LineManagedUser) {

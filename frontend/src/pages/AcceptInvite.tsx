@@ -17,7 +17,7 @@ export default function AcceptInvite() {
   const token = params.get('token') ?? '';
 
   const isThai = i18n.language === 'th';
-  const txt = (th: string, en: string, _zh?: string) => (isThai ? th : en);
+  const txt = (th: string, en: string) => (isThai ? th : en);
 
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +28,7 @@ export default function AcceptInvite() {
     e.preventDefault();
     if (!token || phase === 'submitting') return;
     if (name.trim().length < 1 || password.length < 8) {
-      setError(txt('กรอกชื่อและรหัสผ่านอย่างน้อย 8 ตัวอักษร', 'Enter your name and a password (8+ chars)', '请输入姓名和至少 8 位密码'));
+      setError(txt('กรอกชื่อและรหัสผ่านอย่างน้อย 8 ตัวอักษร', 'Enter your name and a password (8+ chars)'));
       return;
     }
     setPhase('submitting');
@@ -56,7 +56,7 @@ export default function AcceptInvite() {
         <div className="flex items-center gap-2 text-emerald-700">
           <ShieldCheck className="h-5 w-5" />
           <span className="text-sm font-semibold uppercase tracking-wide">
-            {txt('Billboy · ยอมรับคำเชิญ', 'Billboy · Accept invite', 'Billboy · 接受邀请')}
+            {txt('Billboy · ยอมรับคำเชิญ', 'Billboy · Accept invite')}
           </span>
         </div>
 
@@ -65,18 +65,18 @@ export default function AcceptInvite() {
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <div className="font-semibold">{txt('เพิ่มเข้าระบบเรียบร้อย', 'Joined the workspace', '已成功加入工作区')}</div>
-                <div className="mt-1 text-xs">{txt('กำลังพาไปหน้าเข้าสู่ระบบ...', 'Redirecting to sign-in…', '正在跳转到登录页面…')}</div>
+                <div className="font-semibold">{txt('เพิ่มเข้าระบบเรียบร้อย', 'Joined the workspace')}</div>
+                <div className="mt-1 text-xs">{txt('กำลังพาไปหน้าเข้าสู่ระบบ...', 'Redirecting to sign-in…')}</div>
               </div>
             </div>
           </>
         ) : (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <h1 className="text-xl font-bold text-slate-900">
-              {txt('ตั้งชื่อและรหัสผ่านเพื่อเริ่มใช้งาน', 'Set your name + password to join', '设置姓名和密码以加入')}
+              {txt('ตั้งชื่อและรหัสผ่านเพื่อเริ่มใช้งาน', 'Set your name + password to join')}
             </h1>
             <div>
-              <label className="block text-sm font-medium text-slate-700">{txt('ชื่อ', 'Your name', '姓名')}</label>
+              <label className="block text-sm font-medium text-slate-700">{txt('ชื่อ', 'Your name')}</label>
               <input
                 type="text"
                 value={name}
@@ -86,7 +86,7 @@ export default function AcceptInvite() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700">{txt('ตั้งรหัสผ่าน (8 ตัวอักษรขึ้นไป)', 'Set password (8+ chars)', '设置密码(8 位以上)')}</label>
+              <label className="block text-sm font-medium text-slate-700">{txt('ตั้งรหัสผ่าน (8 ตัวอักษรขึ้นไป)', 'Set password (8+ chars)')}</label>
               <input
                 type="password"
                 value={password}
@@ -108,12 +108,12 @@ export default function AcceptInvite() {
               className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
               {phase === 'submitting'
-                ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{txt('กำลังบันทึก...', 'Saving…', '保存中…')}</span>
-                : txt('เข้าร่วมและสร้างบัญชี', 'Join workspace', '加入工作区')}
+                ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{txt('กำลังบันทึก...', 'Saving…')}</span>
+                : txt('เข้าร่วมและสร้างบัญชี', 'Join workspace')}
             </button>
             <p className="text-xs text-slate-500 text-center">
-              {txt('มีบัญชีอยู่แล้ว?', 'Already have an account?', '已有账户?')}{' '}
-              <Link to="/login" className="text-emerald-700 underline">{txt('เข้าสู่ระบบ', 'Sign in', '登录')}</Link>
+              {txt('มีบัญชีอยู่แล้ว?', 'Already have an account?')}{' '}
+              <Link to="/login" className="text-emerald-700 underline">{txt('เข้าสู่ระบบ', 'Sign in')}</Link>
             </p>
           </form>
         )}

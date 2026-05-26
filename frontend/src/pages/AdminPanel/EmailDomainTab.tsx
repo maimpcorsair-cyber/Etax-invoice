@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Check, CheckCircle, Copy, Loader2, Trash2, XCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -22,7 +22,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
   const [msg, setMsg] = useState<{ type: 'ok'|'err'|'info'; text: string } | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
 
-  async function reload() {
+  const reload = useCallback(async () => {
     setLoading(true);
     setMsg(null);
     try {
@@ -40,8 +40,8 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
     } finally { setLoading(false); }
-  }
-  useEffect(() => { void reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [token]);
+  }, [isThai, token]);
+  useEffect(() => { void reload(); }, [reload]);
 
   async function handleAdd() {
     const domain = input.trim().toLowerCase();

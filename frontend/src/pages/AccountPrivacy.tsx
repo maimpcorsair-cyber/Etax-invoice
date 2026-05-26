@@ -163,17 +163,16 @@ export default function AccountPrivacy() {
     }
   }
 
-  const txt = (th: string, en: string, _zh?: string) => (isThai ? th : en);
+  const txt = (th: string, en: string) => (isThai ? th : en);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={txt('PDPA · สิทธิเจ้าของข้อมูล', 'PDPA · Data subject rights', 'PDPA · 数据主体权利')}
-        title={txt('ความเป็นส่วนตัวและข้อมูลของฉัน', 'Privacy & My Data', '隐私与我的数据')}
+        eyebrow={txt('PDPA · สิทธิเจ้าของข้อมูล', 'PDPA · Data subject rights')}
+        title={txt('ความเป็นส่วนตัวและข้อมูลของฉัน', 'Privacy & My Data')}
         description={txt(
           'ใช้สิทธิตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล มาตรา 30, 31, 33 — ดาวน์โหลดข้อมูล ลบบัญชี และจัดการความยินยอม',
           'Exercise your rights under PDPA Sections 30, 31, 33 — download your data, delete your account, and manage consent.',
-          '依据《个人数据保护法》第 30、31、33 条行使您的权利 — 下载数据、删除账户、管理同意。',
         )}
         icon={<ShieldCheck className="h-3.5 w-3.5" />}
         tone="teal"
@@ -189,7 +188,7 @@ export default function AccountPrivacy() {
       {loading || !status ? (
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" />
-          {txt('กำลังโหลด…', 'Loading…', '加载中…')}
+          {txt('กำลังโหลด…', 'Loading…')}
         </div>
       ) : (
         <>
@@ -201,27 +200,26 @@ export default function AccountPrivacy() {
                 <div className="flex-1 space-y-3">
                   <div>
                     <h3 className="font-semibold text-amber-900">
-                      {txt('คำขอลบบัญชีกำลังรออยู่', 'Deletion request pending', '账户删除请求待处理')}
+                      {txt('คำขอลบบัญชีกำลังรออยู่', 'Deletion request pending')}
                     </h3>
                     <p className="mt-1 text-sm text-amber-800">
                       {txt(
                         'PII ถูก deactivate ไปแล้ว — บัญชีถูกล็อก ใบกำกับภาษีจะถูกเก็บไว้ตามประมวลรัษฎากร 5 ปี ก่อนลบจริง',
                         'PII has been deactivated — the account is locked. Tax invoices are retained 5 years per the Revenue Code before final deletion.',
-                        'PII 已停用 — 账户已锁定。税务发票按《税务法典》保留 5 年后将被永久删除。',
                       )}
                     </p>
                   </div>
                   <div className="grid grid-cols-1 gap-2 text-sm text-amber-900 sm:grid-cols-3">
                     <div>
-                      <div className="text-xs text-amber-700">{txt('ขอลบเมื่อ', 'Requested', '请求时间')}</div>
+                      <div className="text-xs text-amber-700">{txt('ขอลบเมื่อ', 'Requested')}</div>
                       <div className="font-semibold">{formatDate(status.deletion.requestedAt, i18n.language)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-amber-700">{txt('ยกเลิกได้ถึง', 'Cancel until', '可取消至')}</div>
+                      <div className="text-xs text-amber-700">{txt('ยกเลิกได้ถึง', 'Cancel until')}</div>
                       <div className="font-semibold">{formatDate(status.deletion.cancelDeadline, i18n.language)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-amber-700">{txt('ลบจริงวันที่', 'Hard delete on', '彻底删除日期')}</div>
+                      <div className="text-xs text-amber-700">{txt('ลบจริงวันที่', 'Hard delete on')}</div>
                       <div className="font-semibold">{formatDate(status.deletion.hardDeleteScheduledAt, i18n.language)}</div>
                     </div>
                   </div>
@@ -234,8 +232,8 @@ export default function AccountPrivacy() {
                     >
                       <RotateCcw className={`h-4 w-4 ${cancelling ? 'animate-spin' : ''}`} />
                       {cancelling
-                        ? txt('กำลังยกเลิก…', 'Cancelling…', '取消中…')
-                        : txt('ยกเลิกคำขอ', 'Cancel request', '取消请求')}
+                        ? txt('กำลังยกเลิก…', 'Cancelling…')
+                        : txt('ยกเลิกคำขอ', 'Cancel request')}
                     </button>
                   )}
                 </div>
@@ -250,20 +248,18 @@ export default function AccountPrivacy() {
               <div className="flex-1 space-y-3">
                 <div>
                   <h3 className="font-semibold text-slate-900">
-                    {txt('ดาวน์โหลดข้อมูลของฉัน', 'Download my data', '下载我的数据')}
+                    {txt('ดาวน์โหลดข้อมูลของฉัน', 'Download my data')}
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">
                     {txt(
                       'ขอสำเนาข้อมูลทั้งหมดในรูปแบบ JSON — รวมข้อมูลบัญชี บริษัท ใบกำกับ ลูกค้า สินค้า และ audit log',
                       'Request a complete JSON copy — account, company, invoices, customers, products, and audit log.',
-                      '获取完整的 JSON 副本 — 账户、公司、发票、客户、产品和审计日志。',
                     )}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {txt(
                       'PDPA มาตรา 30 (สิทธิเข้าถึง) และ 31 (สิทธิให้โอนย้ายข้อมูล)',
                       'PDPA Section 30 (right of access) and 31 (right to data portability).',
-                      'PDPA 第 30 条(访问权)和第 31 条(数据可携带权)。',
                     )}
                   </p>
                 </div>
@@ -275,8 +271,8 @@ export default function AccountPrivacy() {
                 >
                   {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   {exporting
-                    ? txt('กำลังเตรียมไฟล์…', 'Preparing…', '正在准备…')
-                    : txt('ดาวน์โหลด JSON', 'Download JSON', '下载 JSON')}
+                    ? txt('กำลังเตรียมไฟล์…', 'Preparing…')
+                    : txt('ดาวน์โหลด JSON', 'Download JSON')}
                 </button>
               </div>
             </div>
@@ -290,24 +286,23 @@ export default function AccountPrivacy() {
                 <div className="flex-1 space-y-4">
                   <div>
                     <h3 className="font-semibold text-rose-900">
-                      {txt('ลบบัญชีของฉัน', 'Delete my account', '删除我的账户')}
+                      {txt('ลบบัญชีของฉัน', 'Delete my account')}
                     </h3>
                     <p className="mt-1 text-sm text-rose-800">
                       {txt(
                         'ระบบจะ deactivate PII ทันที (บัญชีจะถูกล็อก) ใบกำกับภาษีเก็บไว้ 5 ปีตามประมวลรัษฎากร แล้วลบจริง ยกเลิกคำขอได้ภายใน 30 วัน',
                         'PII will be deactivated immediately (account locked). Tax invoices are retained 5 years per the Revenue Code before final deletion. You may cancel within 30 days.',
-                        '系统将立即停用 PII(账户锁定)。税务发票按《税务法典》保留 5 年后彻底删除。您可在 30 天内取消。',
                       )}
                     </p>
                     <p className="mt-1 text-xs text-rose-700">
-                      {txt('PDPA มาตรา 33 (สิทธิให้ลบข้อมูล)', 'PDPA Section 33 (right to erasure).', 'PDPA 第 33 条(删除权)。')}
+                      {txt('PDPA มาตรา 33 (สิทธิให้ลบข้อมูล)', 'PDPA Section 33 (right to erasure).')}
                     </p>
                   </div>
 
                   {status.auth.hasPassword ? (
                     <div>
                       <label className="block text-sm font-medium text-rose-900">
-                        {txt('ยืนยันด้วยรหัสผ่าน', 'Confirm with password', '使用密码确认')}
+                        {txt('ยืนยันด้วยรหัสผ่าน', 'Confirm with password')}
                       </label>
                       <input
                         type="password"
@@ -320,7 +315,7 @@ export default function AccountPrivacy() {
                   ) : (
                     <div>
                       <label className="block text-sm font-medium text-rose-900">
-                        {txt('พิมพ์ "DELETE" เพื่อยืนยัน', 'Type "DELETE" to confirm', '输入 "DELETE" 确认')}
+                        {txt('พิมพ์ "DELETE" เพื่อยืนยัน', 'Type "DELETE" to confirm')}
                       </label>
                       <input
                         type="text"
@@ -334,7 +329,7 @@ export default function AccountPrivacy() {
 
                   <div>
                     <label className="block text-sm font-medium text-rose-900">
-                      {txt('เหตุผล (ไม่บังคับ)', 'Reason (optional)', '原因(可选)')}
+                      {txt('เหตุผล (ไม่บังคับ)', 'Reason (optional)')}
                     </label>
                     <textarea
                       value={deleteReason}
@@ -356,8 +351,8 @@ export default function AccountPrivacy() {
                   >
                     {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                     {deleting
-                      ? txt('กำลังลบ…', 'Deleting…', '删除中…')
-                      : txt('ลบบัญชี', 'Delete account', '删除账户')}
+                      ? txt('กำลังลบ…', 'Deleting…')
+                      : txt('ลบบัญชี', 'Delete account')}
                   </button>
                 </div>
               </div>
@@ -368,21 +363,21 @@ export default function AccountPrivacy() {
           <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
             <div className="space-y-1">
               <div className="font-semibold text-slate-900">
-                {txt('สถานะการยอมรับเอกสารทางกฎหมาย', 'Legal acceptance status', '法律文档接受状态')}
+                {txt('สถานะการยอมรับเอกสารทางกฎหมาย', 'Legal acceptance status')}
               </div>
               <div>
-                {txt('เวอร์ชันที่ยอมรับ', 'Accepted version', '已接受版本')}:{' '}
+                {txt('เวอร์ชันที่ยอมรับ', 'Accepted version')}:{' '}
                 <span className="font-mono">{status.legal.acceptedVersion ?? '—'}</span>
               </div>
               <div>
-                {txt('เวอร์ชันปัจจุบัน', 'Current version', '当前版本')}:{' '}
+                {txt('เวอร์ชันปัจจุบัน', 'Current version')}:{' '}
                 <span className="font-mono">{status.legal.currentVersion}</span>
               </div>
               <div>
-                {txt('รับอีเมลการตลาด', 'Marketing emails', '营销邮件')}:{' '}
+                {txt('รับอีเมลการตลาด', 'Marketing emails')}:{' '}
                 {status.marketing.optedIn
-                  ? txt('เปิด', 'On', '已开启')
-                  : txt('ปิด', 'Off', '已关闭')}
+                  ? txt('เปิด', 'On')
+                  : txt('ปิด', 'Off')}
               </div>
             </div>
           </section>

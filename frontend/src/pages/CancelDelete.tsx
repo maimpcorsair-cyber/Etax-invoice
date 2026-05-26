@@ -17,7 +17,7 @@ export default function CancelDelete() {
   const token = params.get('token') ?? '';
 
   const isThai = i18n.language === 'th';
-  const txt = (th: string, en: string, _zh?: string) => (isThai ? th : en);
+  const txt = (th: string, en: string) => (isThai ? th : en);
 
   const [phase, setPhase] = useState<Phase>(token ? 'idle' : 'error');
   const [error, setError] = useState<string | null>(token ? null : 'Missing token');
@@ -28,7 +28,7 @@ export default function CancelDelete() {
   // deletion request without the human's intent.
   useEffect(() => {
     if (!token) {
-      setError(txt('ลิงก์ไม่ถูกต้อง — ไม่มี token', 'Invalid link — token missing', '链接无效 — 缺少令牌'));
+      setError(isThai ? 'ลิงก์ไม่ถูกต้อง — ไม่มี token' : 'Invalid link — token missing');
       setPhase('error');
     }
   }, [token, isThai]);
@@ -59,20 +59,19 @@ export default function CancelDelete() {
         <div className="flex items-center gap-2 text-emerald-700">
           <ShieldCheck className="h-5 w-5" />
           <span className="text-sm font-semibold uppercase tracking-wide">
-            {txt('PDPA · ยกเลิกคำขอลบ', 'PDPA · Cancel deletion', 'PDPA · 取消删除')}
+            {txt('PDPA · ยกเลิกคำขอลบ', 'PDPA · Cancel deletion')}
           </span>
         </div>
 
         {phase === 'idle' && (
           <>
             <h1 className="mt-4 text-xl font-bold text-slate-900">
-              {txt('ยืนยันการยกเลิกคำขอลบบัญชี', 'Confirm cancel deletion request', '确认取消账户删除请求')}
+              {txt('ยืนยันการยกเลิกคำขอลบบัญชี', 'Confirm cancel deletion request')}
             </h1>
             <p className="mt-2 text-sm text-slate-600">
               {txt(
                 'การกดยืนยันด้านล่างจะ ยกเลิก คำขอลบบัญชีที่กำลังรออยู่ และเปิดใช้งานบัญชีของคุณกลับมาทันที',
                 'Clicking confirm below will cancel the pending deletion request and reactivate your account immediately.',
-                '点击下方确认将取消待处理的删除请求,并立即重新激活您的账户。',
               )}
             </p>
             <button
@@ -80,13 +79,12 @@ export default function CancelDelete() {
               onClick={handleConfirm}
               className="mt-5 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
             >
-              {txt('ยืนยันยกเลิก', 'Confirm cancel', '确认取消')}
+              {txt('ยืนยันยกเลิก', 'Confirm cancel')}
             </button>
             <p className="mt-3 text-xs text-slate-500">
               {txt(
                 'ไม่ต้องเข้าสู่ระบบ — ลิงก์นี้มี token ที่ลงนามไว้แล้ว',
                 'No login required — this link carries a signed token.',
-                '无需登录 — 此链接包含已签名的令牌。',
               )}
             </p>
           </>
@@ -95,7 +93,7 @@ export default function CancelDelete() {
         {phase === 'confirming' && (
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-700">
             <Loader2 className="h-4 w-4 animate-spin" />
-            {txt('กำลังยกเลิก…', 'Cancelling…', '正在取消…')}
+            {txt('กำลังยกเลิก…', 'Cancelling…')}
           </div>
         )}
 
@@ -105,18 +103,17 @@ export default function CancelDelete() {
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
                 <div className="font-semibold">
-                  {txt('ยกเลิกเรียบร้อย', 'Cancelled successfully', '已成功取消')}
+                  {txt('ยกเลิกเรียบร้อย', 'Cancelled successfully')}
                 </div>
                 {companyNameTh && (
                   <div className="mt-1 text-xs">
-                    {txt('บัญชี', 'Workspace', '工作区')}: {companyNameTh}
+                    {txt('บัญชี', 'Workspace')}: {companyNameTh}
                   </div>
                 )}
                 <div className="mt-1 text-xs">
                   {txt(
                     'บัญชีของคุณถูกเปิดใช้งานกลับมาแล้ว สามารถเข้าสู่ระบบได้ตามปกติ',
                     'Your account has been reactivated. You can sign in normally.',
-                    '您的账户已重新激活。可以正常登录。',
                   )}
                 </div>
               </div>
@@ -125,7 +122,7 @@ export default function CancelDelete() {
               to="/login"
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
             >
-              {txt('เข้าสู่ระบบ', 'Sign in', '登录')}
+              {txt('เข้าสู่ระบบ', 'Sign in')}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </>
@@ -137,7 +134,7 @@ export default function CancelDelete() {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
                 <div className="font-semibold">
-                  {txt('ยกเลิกไม่สำเร็จ', 'Cancel failed', '取消失败')}
+                  {txt('ยกเลิกไม่สำเร็จ', 'Cancel failed')}
                 </div>
                 <div className="mt-1 text-xs">{error}</div>
               </div>
@@ -146,7 +143,6 @@ export default function CancelDelete() {
               {txt(
                 'หากลิงก์หมดอายุหรือถูกใช้ไปแล้ว ติดต่อ DPO ที่ ',
                 'If the link is expired or already used, contact our DPO at ',
-                '如果链接已过期或已被使用,请联系 DPO:',
               )}
               <a href="mailto:dpo@maidomdom.com" className="text-emerald-700 underline">
                 dpo@maidomdom.com

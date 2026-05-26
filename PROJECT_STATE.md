@@ -90,6 +90,7 @@ Last CI:
 - R2 compatibility patch shipped locally in `69055a2`: `storageService` no longer sends `ServerSideEncryption: AES256` when `S3_ENDPOINT` is configured, because Cloudflare R2 rejects the standard `x-amz-server-side-encryption` header on `PutObject`. AWS S3 still defaults to AES256. Setup runbook added at `docs/deployment/r2-render-setup.md`.
 - Codex/Claude tool parity hardened 2026-05-27: `.agents/skills/` and `.claude/skills/` now both contain 59 skills; `.codex/commands/` mirrors the 11 `.claude/commands/`; `.codex/TOOLS.md` exists; `docs/agents/tool-parity.md` is the canonical checklist for skills, commands, MCP, CLI, and known runtime differences.
 - Winning Flow Sprint defined 2026-05-27: `docs/state/winning-flow-sprint.md` now sets the competitor-winning product loop against FlowAccount/PEAK/Paypers, and `.impeccable.md` was expanded so Codex/Claude frontend work optimizes for "photo/chat/invoice -> paid or tax-ready record in under 3 minutes." Next implementation target: First Invoice Winning Path (dashboard next action + invoice post-create share/pay flow), after or in parallel with R2 setup.
+- Frontend lint debt cleared 2026-05-27: `npm run lint`, `npm run typecheck`, and `npm run build` pass from `frontend/`; stale Chinese fallback strings were removed from the remaining React pages, and `frontend/src` now has no Han-script matches.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
