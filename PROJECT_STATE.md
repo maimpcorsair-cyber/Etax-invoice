@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-28 (purchase document R2 preview/MIME fix verified locally)
+Last updated: 2026-05-28 (purchase document R2 preview/MIME fix pushed; CI green)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -92,7 +92,7 @@ Last CI:
 - Winning Flow Sprint defined 2026-05-27: `docs/state/winning-flow-sprint.md` now sets the competitor-winning product loop against FlowAccount/PEAK/Paypers, and `.impeccable.md` was expanded so Codex/Claude frontend work optimizes for "photo/chat/invoice -> paid or tax-ready record in under 3 minutes." Next implementation target: First Invoice Winning Path (dashboard next action + invoice post-create share/pay flow), after or in parallel with R2 setup.
 - Frontend lint debt cleared 2026-05-27: `npm run lint`, `npm run typecheck`, and `npm run build` pass from `frontend/`; stale Chinese fallback strings were removed from the remaining React pages, and `frontend/src` now has no Han-script matches.
 - R2 production storage configured 2026-05-27: user added R2/S3 env vars on Render; production `/api/health/deep` returned `providers.s3.ok=true` and `notConfigured=[]` at `2026-05-27T16:24:59.213Z`. `npm run render:r2` remains available for future secret sync/deploys without printing values.
-- Purchase document intake R2 preview/MIME fix verified locally 2026-05-28: frontend thumbnails/previews/open-file now load through authenticated `/api/purchase-invoices/document-intakes/:id/file` instead of private R2 `fileUrl`; backend streams stored objects instead of redirecting to presigned URLs, sniffs PDF/JPEG/PNG/WebP signatures, stores corrected `mimeType` on upload, and corrects `mimeType` on re-analysis. Verified with `frontend` typecheck/build/lint and `backend` typecheck/lint. Next production check after deploy: upload the real `invoice-preview-2026-05-27.pdf` from `/app/purchase-invoices` and confirm the card says PDF, preview opens, and OCR no longer uses image-only `qr_decode` stages for that PDF.
+- Purchase document intake R2 preview/MIME fix pushed in `1811f47` on 2026-05-28; GitHub Typecheck, Unit tests, and Prod smoke all green. Frontend thumbnails/previews/open-file now load through authenticated `/api/purchase-invoices/document-intakes/:id/file` instead of private R2 `fileUrl`; backend streams stored objects instead of redirecting to presigned URLs, sniffs PDF/JPEG/PNG/WebP signatures, stores corrected `mimeType` on upload, and corrects `mimeType` on re-analysis. Local verification also passed `frontend` typecheck/build/lint and `backend` typecheck/lint. Next production check after deploy: upload the real `invoice-preview-2026-05-27.pdf` from `/app/purchase-invoices` and confirm the card says PDF, preview opens, and OCR no longer uses image-only `qr_decode` stages for that PDF.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
