@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-27 (R2 sync helper added; R2 credentials still pending user)
+Last updated: 2026-05-27 (R2 production storage configured and health-verified)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -91,15 +91,15 @@ Last CI:
 - Codex/Claude tool parity hardened 2026-05-27: `.agents/skills/` and `.claude/skills/` now both contain 59 skills; `.codex/commands/` mirrors the 11 `.claude/commands/`; `.codex/TOOLS.md` exists; `docs/agents/tool-parity.md` is the canonical checklist for skills, commands, MCP, CLI, and known runtime differences.
 - Winning Flow Sprint defined 2026-05-27: `docs/state/winning-flow-sprint.md` now sets the competitor-winning product loop against FlowAccount/PEAK/Paypers, and `.impeccable.md` was expanded so Codex/Claude frontend work optimizes for "photo/chat/invoice -> paid or tax-ready record in under 3 minutes." Next implementation target: First Invoice Winning Path (dashboard next action + invoice post-create share/pay flow), after or in parallel with R2 setup.
 - Frontend lint debt cleared 2026-05-27: `npm run lint`, `npm run typecheck`, and `npm run build` pass from `frontend/`; stale Chinese fallback strings were removed from the remaining React pages, and `frontend/src` now has no Han-script matches.
-- R2 setup status 2026-05-27: production `/api/health/deep` still reports `notConfigured:["s3"]`. Local shell and GitHub repo secrets do not contain R2 values yet. Added `npm run render:r2` (`scripts/render-sync-r2-env.mjs`) to sync `S3_BUCKET`, `S3_REGION=auto`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to both Render services without printing secret values, then trigger deploys.
+- R2 production storage configured 2026-05-27: user added R2/S3 env vars on Render; production `/api/health/deep` returned `providers.s3.ok=true` and `notConfigured=[]` at `2026-05-27T16:24:59.213Z`. `npm run render:r2` remains available for future secret sync/deploys without printing values.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
 User is switching to Codex to continue. Pending work, ranked by impact:
 
-1. **R2 setup (15 min)** — unblock all file upload endpoints (customer evidence, expense attachment, LINE-OCR slip persistence, Master sheet Drive Link). Step-by-step runbook now lives in `docs/deployment/r2-render-setup.md`. Cloudflare R2 free tier 10GB. Envs needed on both `etax-invoice-api` and `etax-invoice-worker`: `S3_BUCKET`, `S3_REGION=auto`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. After: verify with `curl /api/health/deep` — `notConfigured` should no longer include `s3`.
+1. **R2 upload smoke** — R2 health is configured and green (`providers.s3.ok=true`, `notConfigured=[]`). Next prove one real upload path: sign in to production, upload a small PDF/JPG from `/app/purchase-invoices`, confirm no `503 File storage is not configured`, and confirm the document reopens from stored object storage.
 
-2. **Drive folder migration (deferred until R2)** — `getTransactionMonthBucket()` helper already exists ([googleDriveService.ts](backend/src/services/googleDriveService.ts)). Need to wire `transactionDate` into `ensureProjectFolder` so YYYY/MM bucket is created based on `invoiceDate` not `createdAt`. Skipped this session because changing folder structure before R2 is the canonical storage doesn't help.
+2. **Drive folder migration** — `getTransactionMonthBucket()` helper already exists ([googleDriveService.ts](backend/src/services/googleDriveService.ts)). Now that R2 is configured, wire `transactionDate` into `ensureProjectFolder` so YYYY/MM bucket is created based on `invoiceDate` not `createdAt`.
 
 3. **Acquire first paying customer** — Owner Plane shows 5-7 real PromptPay pending signups (`PP-5O8XOKUC`, `PP-2Z042BS4`, `PP-25N6YV20`, `PP-125ZUQ7C`, `PP-NYYJFDUY`) and 4 Stripe pending (`cs_test_*`) totaling ~฿6,930 of stuck revenue. User explicitly said these are "เพื่อนทดสอบ" (friends testing) so don't auto-approve, but they prove the signup flow works end-to-end.
 
