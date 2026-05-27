@@ -93,16 +93,19 @@ const VAT_TYPE_LABELS: Record<VatType, { th: string; en: string }> = {
   vatZero: { th: 'VAT 0%', en: 'Zero-rated' },
 };
 
+function cleanMimeType(value?: string | null) {
+  return value?.split(';')[0]?.trim().toLowerCase() || '';
+}
+
 interface DocumentThumbnailProps {
   docId: string;
   mimeType: string;
-  fileUrl?: string | null;
   token: string;
-  isPdf: boolean;
 }
 
-function DocumentThumbnail({ docId, mimeType, fileUrl, token, isPdf }: DocumentThumbnailProps) {
+function DocumentThumbnail({ docId, mimeType, token }: DocumentThumbnailProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [displayMimeType, setDisplayMimeType] = useState(cleanMimeType(mimeType) || mimeType);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const blobRef = useRef<string | null>(null);
@@ -113,22 +116,15 @@ function DocumentThumbnail({ docId, mimeType, fileUrl, token, isPdf }: DocumentT
     async function load() {
       setLoading(true);
       setError(false);
+      setDisplayMimeType(cleanMimeType(mimeType) || mimeType);
       try {
-        const isImage = mimeType.includes('image');
-        if (isImage && fileUrl && fileUrl.startsWith('http')) {
-          if (!cancelled) {
-            setBlobUrl(fileUrl);
-            setLoading(false);
-          }
-          return;
-        }
-
         const res = await fetch(`/api/purchase-invoices/document-intakes/${docId}/file`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error('fetch failed');
         const blob = await res.blob();
         if (cancelled) return;
+        setDisplayMimeType(cleanMimeType(blob.type || res.headers.get('content-type')) || mimeType);
         const url = URL.createObjectURL(blob);
         blobRef.current = url;
         setBlobUrl(url);
@@ -147,10 +143,11 @@ function DocumentThumbnail({ docId, mimeType, fileUrl, token, isPdf }: DocumentT
         blobRef.current = null;
       }
     };
-  }, [docId, mimeType, fileUrl, token]);
+  }, [docId, mimeType, token]);
 
-  const isImage = mimeType.includes('image');
-  const ext = isPdf ? 'PDF' : mimeType.split('/')[1]?.toUpperCase().slice(0, 4) ?? 'IMG';
+  const isPdf = displayMimeType === 'application/pdf';
+  const isImage = displayMimeType.includes('image');
+  const ext = isPdf ? 'PDF' : displayMimeType.split('/')[1]?.toUpperCase().slice(0, 4) ?? 'IMG';
 
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
@@ -217,6 +214,7 @@ export default function PurchaseInvoices() {
   const [attachTargetId, setAttachTargetId] = useState('');
   const [previewDoc, setPreviewDoc] = useState<DocumentIntake | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewMimeType, setPreviewMimeType] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [storageUsage, setStorageUsage] = useState<{ usedBytes: number; quotaBytes: number; usedPercent: number } | null>(null);
 
@@ -522,10 +520,6 @@ export default function PurchaseInvoices() {
   async function openDocumentFile(item: DocumentIntake) {
     setError('');
     try {
-      if (item.fileUrl && /^https?:\/\//i.test(item.fileUrl)) {
-        window.open(item.fileUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
       const res = await fetch(`/api/purchase-invoices/document-intakes/${item.id}/file`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -545,17 +539,15 @@ export default function PurchaseInvoices() {
   async function openPreview(doc: DocumentIntake) {
     setPreviewDoc(doc);
     setPreviewUrl(null);
+    setPreviewMimeType(cleanMimeType(doc.mimeType) || doc.mimeType);
     setPreviewLoading(true);
     try {
-      if (doc.fileUrl && /^https?:\/\//i.test(doc.fileUrl)) {
-        setPreviewUrl(doc.fileUrl);
-        return;
-      }
       const res = await fetch(`/api/purchase-invoices/document-intakes/${doc.id}/file`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('fetch failed');
       const blob = await res.blob();
+      setPreviewMimeType(cleanMimeType(blob.type || res.headers.get('content-type')) || doc.mimeType);
       setPreviewUrl(URL.createObjectURL(blob));
     } catch {
       setPreviewUrl(null);
@@ -570,6 +562,7 @@ export default function PurchaseInvoices() {
     }
     setPreviewDoc(null);
     setPreviewUrl(null);
+    setPreviewMimeType(null);
   }
 
   function canReviewDocument(doc: DocumentIntake) {
@@ -864,6 +857,8 @@ export default function PurchaseInvoices() {
       value: documentStats?.byStatus.saved ?? items.length,
     },
   ];
+  const previewDisplayMimeType = previewMimeType ?? previewDoc?.mimeType ?? '';
+  const previewIsPdf = previewDisplayMimeType === 'application/pdf';
 
   return (
     <div className="space-y-4">
@@ -1101,14 +1096,13 @@ export default function PurchaseInvoices() {
           ) : (
             <div className="space-y-2">
               {filteredDocumentLibrary.slice(0, 12).map((doc) => {
-                const isPdf = doc.mimeType === 'application/pdf';
                 const busy = documentActionId === doc.id || doc.status === 'processing';
                 return (
                   <div key={doc.id} className="rounded-lg border border-gray-200 bg-white p-3">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                       <div className="min-w-0 flex flex-1 items-start gap-3">
                         <button type="button" onClick={() => void openPreview(doc)} className="group relative cursor-pointer" title={isThai ? 'ดูตัวอย่าง' : 'Preview'}>
-                          <DocumentThumbnail docId={doc.id} mimeType={doc.mimeType} fileUrl={doc.fileUrl} token={token ?? ''} isPdf={isPdf} />
+                          <DocumentThumbnail docId={doc.id} mimeType={doc.mimeType} token={token ?? ''} />
                           <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 group-hover:bg-black/30 transition-colors">
                             <Eye className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                           </span>
@@ -1791,12 +1785,12 @@ export default function PurchaseInvoices() {
           <div className="relative w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex items-center gap-3 min-w-0">
-                <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${previewDoc.mimeType === 'application/pdf' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
-                  {previewDoc.mimeType === 'application/pdf' ? <FileText className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
+                <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${previewIsPdf ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {previewIsPdf ? <FileText className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">{previewDoc.fileName || previewDoc.id.slice(0, 8)}</p>
-                  <p className="text-xs text-gray-500">{previewDoc.mimeType} · {formatDate(previewDoc.createdAt)}</p>
+                  <p className="text-xs text-gray-500">{previewDisplayMimeType} · {formatDate(previewDoc.createdAt)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1820,7 +1814,7 @@ export default function PurchaseInvoices() {
                   <AlertTriangle className="w-10 h-10" />
                   <p className="text-sm">{isThai ? 'ไม่สามารถโหลดเอกสารได้' : 'Cannot load document'}</p>
                 </div>
-              ) : previewDoc.mimeType === 'application/pdf' ? (
+              ) : previewIsPdf ? (
                 <iframe src={previewUrl} className="w-full h-full rounded-lg border border-gray-200" style={{ minHeight: '60vh' }} title="PDF preview" />
               ) : (
                 <img src={previewUrl} alt="Document preview" className="max-w-full max-h-[75vh] rounded-lg shadow-lg object-contain" />

@@ -10,7 +10,7 @@ import {
   resolveCompanyAccessPolicy,
 } from '../services/accessPolicyService';
 import { logger } from '../config/logger';
-import { downloadFromStorage, getPresignedUrl, isStorageConfigured, uploadToStorage } from '../services/storageService';
+import { downloadFromStorage, isStorageConfigured, uploadToStorage } from '../services/storageService';
 import { checkStorageQuota, incrementStorageUsed } from '../services/storageQuotaService';
 import { migrateDocumentToStorage } from '../services/storageMigrationService';
 import { OcrResult } from '../services/aiService';
@@ -71,8 +71,8 @@ const attachSalesDocumentSchema = z.object({
   message: 'invoiceId is required',
 });
 
-function documentFileUrl(item: { id: string; fileUrl?: string | null }) {
-  return item.fileUrl || `/api/purchase-invoices/document-intakes/${item.id}/file`;
+function documentFileUrl(item: { id: string }) {
+  return `/api/purchase-invoices/document-intakes/${item.id}/file`;
 }
 
 function documentDateRange(days = 30) {
@@ -93,6 +93,28 @@ async function assertProjectBelongsToCompany(
 
 function normalizeUploadFileName(fileName?: string | null) {
   return (fileName ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function detectDocumentMimeType(buffer: Buffer, declaredMimeType: string) {
+  const declared = declaredMimeType.split(';')[0].trim().toLowerCase();
+  if (buffer.subarray(0, 5).toString('utf8') === '%PDF-') return 'application/pdf';
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return declared;
+}
+
+function documentExtensionFromMimeType(mimeType: string) {
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  return 'bin';
+}
+
+function inlineDocumentFileName(fileName: string | null | undefined, mimeType: string) {
+  const fallback = `document.${documentExtensionFromMimeType(mimeType)}`;
+  return (fileName?.trim() || fallback).replace(/[\r\n"]/g, '_');
 }
 
 async function findProjectDocumentDuplicates(input: {
@@ -450,7 +472,11 @@ purchaseInvoicesRouter.get('/document-intakes/:id/file', async (req, res) => {
       return;
     }
     if (item.storageKey) {
-      res.redirect(await getPresignedUrl(item.storageKey, 900));
+      const buffer = await downloadFromStorage(item.storageKey);
+      const responseMimeType = detectDocumentMimeType(buffer, item.mimeType);
+      res.setHeader('Content-Type', responseMimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${inlineDocumentFileName(item.fileName, responseMimeType)}"`);
+      res.send(buffer);
       return;
     }
     if (item.fileUrl) {
@@ -462,8 +488,9 @@ purchaseInvoicesRouter.get('/document-intakes/:id/file', async (req, res) => {
       return;
     }
     const buffer = Buffer.from(item.fileBase64, 'base64');
-    res.setHeader('Content-Type', item.mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${item.fileName || `document.${item.mimeType === 'application/pdf' ? 'pdf' : 'jpg'}`}"`);
+    const responseMimeType = detectDocumentMimeType(buffer, item.mimeType);
+    res.setHeader('Content-Type', responseMimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${inlineDocumentFileName(item.fileName, responseMimeType)}"`);
     res.send(buffer);
   } catch (err) {
     logger.error('Failed to stream document intake file', { error: err });
@@ -475,9 +502,17 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
   try {
     const body = uploadDocumentSchema.parse(req.body);
     const buffer = Buffer.from(body.fileBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
-    if (!supportedDocumentMimeType(body.mimeType)) {
+    const mimeType = detectDocumentMimeType(buffer, body.mimeType);
+    if (!supportedDocumentMimeType(mimeType)) {
       res.status(400).json({ error: 'Unsupported file type' });
       return;
+    }
+    if (mimeType !== body.mimeType.split(';')[0].trim().toLowerCase()) {
+      logger.warn('[DocumentIntake] Upload MIME corrected from file signature', {
+        declaredMimeType: body.mimeType,
+        detectedMimeType: mimeType,
+        fileName: body.fileName,
+      });
     }
     if (buffer.length > 10 * 1024 * 1024) {
       res.status(413).json({ error: 'File is too large' });
@@ -520,9 +555,9 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
     let storageKey: string | undefined;
     const storageReady = isStorageConfigured();
     if (storageReady) {
-      const ext = body.mimeType === 'application/pdf' ? 'pdf' : body.mimeType.split('/')[1] || 'bin';
+      const ext = documentExtensionFromMimeType(mimeType);
       storageKey = `companies/${req.user!.companyId}/document-intakes/web/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      fileUrl = await uploadToStorage(storageKey, buffer, body.mimeType);
+      fileUrl = await uploadToStorage(storageKey, buffer, mimeType);
     }
 
     let created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
@@ -534,7 +569,7 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
           userId: req.user!.userId,
           source: 'web',
           fileName: body.fileName,
-          mimeType: body.mimeType,
+          mimeType,
           fileSize: buffer.length,
           fileBase64: storageReady ? undefined : buffer.toString('base64'),
           fileUrl,
@@ -550,7 +585,7 @@ purchaseInvoicesRouter.post('/document-intakes/upload', requireRole('admin', 'su
     await incrementStorageUsed(req.user!.companyId, buffer.length);
 
     try {
-      const analysis = await analyzeAccountingDocumentBuffer(buffer, body.mimeType, req.user!.companyId);
+      const analysis = await analyzeAccountingDocumentBuffer(buffer, mimeType, req.user!.companyId);
       const result = analysis.result;
       const hasUsefulData = hasUsefulDocumentData(result);
       const status = documentIntakeStatusForOcr(result);
@@ -617,23 +652,23 @@ purchaseInvoicesRouter.post('/document-intakes/:id/analyze', requireRole('admin'
       return;
     }
 
-    if (!supportedDocumentMimeType(item.mimeType)) {
-      res.status(400).json({ error: 'Unsupported file type' });
-      return;
-    }
-
     const buffer = await readDocumentIntakeBuffer(item);
     if (!buffer) {
       res.status(404).json({ error: 'Original file is not available' });
       return;
     }
+    const mimeType = detectDocumentMimeType(buffer, item.mimeType);
+    if (!supportedDocumentMimeType(mimeType)) {
+      res.status(400).json({ error: 'Unsupported file type' });
+      return;
+    }
 
     await prisma.documentIntake.update({
       where: { id: item.id },
-      data: { status: 'processing', error: null },
+      data: { status: 'processing', error: null, mimeType },
     });
 
-    const analysis = await analyzeAccountingDocumentBuffer(buffer, item.mimeType, req.user!.companyId);
+    const analysis = await analyzeAccountingDocumentBuffer(buffer, mimeType, req.user!.companyId);
     const result = analysis.result;
     const hasUsefulData = hasUsefulDocumentData(result);
     const status = documentIntakeStatusForOcr(result);
