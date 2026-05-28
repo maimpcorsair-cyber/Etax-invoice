@@ -107,33 +107,37 @@ export default function DocumentAppearanceCard({
             {isThai ? 'ตัวเลือกท้ายเอกสาร' : 'Document options'}
           </h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            {isThai
-              ? 'ส่วนนี้ดึงค่ามาตรฐานจาก Settings ไว้แล้ว แก้เฉพาะกรณีที่เอกสารฉบับนี้ต้องใช้รูปแบบ บัญชี หรือผู้ลงนามต่างจากปกติ'
-              : 'Defaults are loaded from Settings. Adjust this only when this document needs a different mode, payment account, or signer.'}
+            {canUseElectronicMode
+              ? (isThai
+                  ? 'ส่วนนี้ดึงค่ามาตรฐานจาก Settings ไว้แล้ว แก้เฉพาะกรณีที่เอกสารฉบับนี้ต้องใช้รูปแบบ บัญชี หรือผู้ลงนามต่างจากปกติ'
+                  : 'Defaults are loaded from Settings. Adjust this only when this document needs a different mode, payment account, or signer.')
+              : (isThai
+                  ? 'ตั้งค่าบัญชีรับชำระและผู้ลงนามที่จะแสดงบนเอกสารฉบับนี้'
+                  : 'Choose the payment account and signer shown on this document.')}
           </p>
         </div>
       </div>
 
-      <div className={canUseElectronicMode ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
-        <button
-          type="button"
-          onClick={() => onDocumentModeChange('ordinary')}
-          className={`rounded-xl border p-4 text-left transition ${
-            documentMode === 'ordinary' || !canUseElectronicMode
-              ? 'border-slate-500 bg-slate-50 shadow-sm'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
-        >
-          <div className="text-sm font-semibold text-slate-900">
-            {isThai ? 'เอกสารธรรมดา' : 'Ordinary document'}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            {isThai
-              ? 'ใช้สำหรับพิมพ์หรือส่งเป็นเอกสารทั่วไป ไม่มี QR ตรวจสอบออนไลน์และไม่มีข้อความกำกับ e-Tax'
-              : 'For regular printed/shared documents without online QR verification or e-Tax footer wording.'}
-          </p>
-        </button>
-        {canUseElectronicMode && (
+      {canUseElectronicMode && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => onDocumentModeChange('ordinary')}
+            className={`rounded-xl border p-4 text-left transition ${
+              documentMode === 'ordinary'
+                ? 'border-slate-500 bg-slate-50 shadow-sm'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="text-sm font-semibold text-slate-900">
+              {isThai ? 'เอกสารธรรมดา' : 'Ordinary document'}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {isThai
+                ? 'ใช้สำหรับพิมพ์หรือส่งเป็นเอกสารทั่วไป ไม่มี QR ตรวจสอบออนไลน์และไม่มีข้อความกำกับ e-Tax'
+                : 'For regular printed/shared documents without online QR verification or e-Tax footer wording.'}
+            </p>
+          </button>
           <button
             type="button"
             onClick={() => onDocumentModeChange('electronic')}
@@ -152,8 +156,8 @@ export default function DocumentAppearanceCard({
                 : 'Adds electronic-document footer wording and a QR for online viewing or verification.'}
             </p>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {hasCompanyLogo && (
         <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
