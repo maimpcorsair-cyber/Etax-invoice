@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-28 (purchase document R2 preview/MIME fix pushed; CI green)
+Last updated: 2026-05-29 (post-issue invoice send/pay panel added)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -93,6 +93,7 @@ Last CI:
 - Frontend lint debt cleared 2026-05-27: `npm run lint`, `npm run typecheck`, and `npm run build` pass from `frontend/`; stale Chinese fallback strings were removed from the remaining React pages, and `frontend/src` now has no Han-script matches.
 - R2 production storage configured 2026-05-27: user added R2/S3 env vars on Render; production `/api/health/deep` returned `providers.s3.ok=true` and `notConfigured=[]` at `2026-05-27T16:24:59.213Z`. `npm run render:r2` remains available for future secret sync/deploys without printing values.
 - Purchase document intake R2 preview/MIME fix pushed in `1811f47` on 2026-05-28; GitHub Typecheck, Unit tests, and Prod smoke all green. Frontend thumbnails/previews/open-file now load through authenticated `/api/purchase-invoices/document-intakes/:id/file` instead of private R2 `fileUrl`; backend streams stored objects instead of redirecting to presigned URLs, sniffs PDF/JPEG/PNG/WebP signatures, stores corrected `mimeType` on upload, and corrects `mimeType` on re-analysis. Local verification also passed `frontend` typecheck/build/lint and `backend` typecheck/lint. Next production check after deploy: upload the real `invoice-preview-2026-05-27.pdf` from `/app/purchase-invoices` and confirm the card says PDF, preview opens, and OCR no longer uses image-only `qr_decode` stages for that PDF.
+- First Invoice Winning Path polish added 2026-05-29: after issuing an invoice, `IssuedSuccessModal` now creates the customer share link immediately and presents the customer QR, Copy, Open LINE, View customer page, Download PDF, Verify, optional Email, and Record payment actions in one panel. This closes the biggest gap after the dashboard first-invoice CTA: sellers no longer need to return to the invoice list to find share/payment actions. Verified locally with `frontend` typecheck/lint/build.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
