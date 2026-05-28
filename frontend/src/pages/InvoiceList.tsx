@@ -113,7 +113,7 @@ export default function InvoiceList() {
   const [savingPayment, setSavingPayment] = useState(false);
   const [submittingRD, setSubmittingRD] = useState<string | null>(null);
   // Track which invoice's email is in flight + which were just successfully
-  // sent (for the "Sent ✓" badge that flashes for a few seconds).
+  // sent (for the temporary "Sent" badge that flashes for a few seconds).
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const [emailJustSent, setEmailJustSent] = useState<Record<string, true>>({});
   // LINE share — busy state while creating the magic link, then a modal
@@ -427,7 +427,7 @@ export default function InvoiceList() {
         throw new Error(err.error ?? 'Failed');
       }
       setEmailJustSent((prev) => ({ ...prev, [inv.id]: true }));
-      // Brief "sent ✓" badge then fade back to the normal button so the
+      // Brief "sent" badge then fade back to the normal button so the
       // user can re-send if needed.
       setTimeout(() => setEmailJustSent((prev) => {
         const next = { ...prev };
@@ -482,8 +482,8 @@ export default function InvoiceList() {
   function openShareInLine() {
     if (!shareModal) return;
     const message = isThai
-      ? `📄 ${shareModal.invoiceNumber}\nดูใบกำกับและชำระเงินได้ที่นี่:\n${shareModal.url}`
-      : `📄 ${shareModal.invoiceNumber}\nView invoice and pay here:\n${shareModal.url}`;
+      ? `${shareModal.invoiceNumber}\nดูใบกำกับและชำระเงินได้ที่นี่:\n${shareModal.url}`
+      : `${shareModal.invoiceNumber}\nView invoice and pay here:\n${shareModal.url}`;
     window.open(`https://line.me/R/msg/text/?${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
 
@@ -1273,7 +1273,7 @@ export default function InvoiceList() {
                       shareCopied ? 'bg-emerald-100 text-emerald-700' : 'bg-primary-600 text-white hover:bg-primary-700'
                     }`}
                   >
-                    {shareCopied ? (isThai ? 'คัดลอกแล้ว ✓' : 'Copied ✓') : (isThai ? 'คัดลอก' : 'Copy')}
+                    {shareCopied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
                   </button>
                 </div>
               </div>

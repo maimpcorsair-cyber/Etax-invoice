@@ -57,7 +57,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
       if (!res.ok) throw new Error(json.error ?? 'Failed');
       setState(json.data ?? null);
       setInput('');
-      setMsg({ type: 'ok', text: isThai ? '✅ เพิ่ม domain แล้ว — ก๊อป DNS records ไปตั้งที่ DNS provider ของคุณ' : '✅ Domain added — copy the DNS records below into your DNS provider.' });
+      setMsg({ type: 'ok', text: isThai ? 'เพิ่ม domain แล้ว — ก๊อป DNS records ไปตั้งที่ DNS provider ของคุณ' : 'Domain added — copy the DNS records below into your DNS provider.' });
     } catch (e) { setMsg({ type: 'err', text: (e as Error).message }); }
     finally { setSaving(false); }
   }
@@ -75,7 +75,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
       setMsg({
         type: verified ? 'ok' : 'info',
         text: verified
-          ? (isThai ? '🎉 verify สำเร็จ — ตั้งแต่นี้อีเมลใบกำกับจะส่งจาก noreply@' + (state?.domain ?? '') : '🎉 Verified — invoice emails will now send from noreply@' + (state?.domain ?? ''))
+          ? (isThai ? 'verify สำเร็จ — ตั้งแต่นี้อีเมลใบกำกับจะส่งจาก noreply@' + (state?.domain ?? '') : 'Verified — invoice emails will now send from noreply@' + (state?.domain ?? ''))
           : (isThai ? 'ยังไม่ verify — DNS อาจยัง propagate ไม่เสร็จ ลองรอ 5-15 นาทีแล้วกดอีกครั้ง' : 'Not verified yet — DNS may still be propagating. Wait 5–15 min and try again.'),
       });
     } catch (e) { setMsg({ type: 'err', text: (e as Error).message }); }
@@ -106,7 +106,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
     <div className="space-y-5">
       <div>
         <h2 className="font-semibold text-lg text-gray-900">
-          {isThai ? '📧 ส่งอีเมลจาก domain ของคุณ' : '📧 Send email from your domain'}
+          {isThai ? 'ส่งอีเมลจาก domain ของคุณ' : 'Send email from your domain'}
         </h2>
         <p className="text-sm text-gray-600 mt-1">
           {isThai

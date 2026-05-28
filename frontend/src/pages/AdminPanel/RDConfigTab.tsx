@@ -48,8 +48,8 @@ export default function RDConfigTab({ isThai }: { isThai: boolean; t: (k: string
           <label className="label">{isThai ? 'สภาพแวดล้อม' : 'Environment'}</label>
           <select className="input-field" value={config.environment}
             onChange={e => setConfig(c => ({ ...c, environment: e.target.value }))}>
-            <option value="sandbox">{isThai ? '🧪 ทดสอบ (Sandbox / Mock)' : '🧪 Sandbox (Mock)'}</option>
-            <option value="production">{isThai ? '🚀 จริง (Production)' : '🚀 Production'}</option>
+            <option value="sandbox">{isThai ? 'ทดสอบ (Sandbox / Mock)' : 'Sandbox (Mock)'}</option>
+            <option value="production">{isThai ? 'จริง (Production)' : 'Production'}</option>
           </select>
         </div>
         <div>

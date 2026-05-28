@@ -8,7 +8,7 @@ export default function AiChatWidget() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-20 left-4 z-50 lg:bottom-6 lg:left-auto lg:right-4">
+    <div className="fixed bottom-[calc(56px+env(safe-area-inset-bottom,0px)+88px)] right-4 z-30 lg:bottom-6">
       {open && (
         <div className="mb-3 w-[min(calc(100vw-2rem),390px)] animate-command-panel-in">
           <AiChatPanel heightClass="h-[560px]" />

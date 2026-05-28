@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BriefcaseBusiness, Eye, Download, FileClock, Maximize2, RotateCcw, Trash2 } from 'lucide-react';
+import { BriefcaseBusiness, Eye, Download, FileClock, FileText, Maximize2, RotateCcw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -1075,7 +1075,7 @@ export default function InvoiceBuilder() {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          <span>📝</span>
+          <FileText className="h-4 w-4" />
           <span>{isThai ? 'กรอกข้อมูล' : 'Form'}</span>
         </button>
         <button
@@ -1086,7 +1086,7 @@ export default function InvoiceBuilder() {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          <span>👁</span>
+          <Eye className="h-4 w-4" />
           <span>{isThai ? 'ดูตัวอย่าง' : 'Preview'}</span>
           {validationErrors.length > 0 && (
             <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />

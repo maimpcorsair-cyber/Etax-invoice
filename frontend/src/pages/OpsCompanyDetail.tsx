@@ -185,8 +185,8 @@ export default function OpsCompanyDetail() {
               </div>
               <span className="text-xs">
                 {!certificate.configured && <span className="text-slate-500">not configured</span>}
-                {certificate.configured && certificate.isDev && <span className="text-amber-700">⚠ dev self-signed</span>}
-                {certificate.configured && !certificate.isDev && <span className="text-emerald-700">✓ production cert</span>}
+                {certificate.configured && certificate.isDev && <span className="text-amber-700">dev self-signed</span>}
+                {certificate.configured && !certificate.isDev && <span className="text-emerald-700">production cert</span>}
               </span>
             </div>
             {Object.entries(invoices.byStatus).map(([status, count]) => (

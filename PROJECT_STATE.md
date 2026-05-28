@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-29 (mobile invoice builder mobile actions + PDF preview polish)
+Last updated: 2026-05-29 (mobile invoice builder emoji/customer/chat polish)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -99,6 +99,7 @@ Last CI:
 - Company settings validation UX fixed 2026-05-29: `/app/settings#company` no longer shows raw "Validation error"; frontend validates Thai company name, 13-digit tax ID, 5-digit branch code, Thai address, email, and website before saving, highlights the exact fields, and renders a compact neutral status message. Backend `/api/admin/company` now trims strings, treats blank optional fields as omitted, normalizes bare website domains to `https://...`, and validates tax ID/branch code formats consistently. Verified locally with frontend typecheck/lint/build and backend typecheck/lint.
 - Mobile invoice builder guardrails added 2026-05-29: `/app/invoices/new` no longer uses native `window.confirm` for recoverable drafts; it shows an inline restore/start-fresh panel. Due date now has calendar-day presets (7/15/30/45 days) using local date math. `/api/company/profile` now returns `electronicInvoicingReady` (boolean only, no secrets), and the invoice builder hides the whole Ordinary/Electronic selector until RD credentials + non-dev certificate are ready. The company-logo checkbox is hidden until a Settings logo exists. Verified with frontend typecheck/build, backend typecheck, and Playwright mobile smoke with mocked profile (`dialogCount=0`, e-Tax hidden, logo hidden, due-date chips visible).
 - Mobile invoice builder action/preview/PDF polish added 2026-05-29: mobile now has a fixed Preview/Save/Issue action bar above the bottom nav, so `/app/invoices/new` no longer hides the save/issue actions on phones. The preview modal uses a full-height mobile sheet and scales the A4 iframe instead of cropping it. Standard ordinary PDFs with up to 3 items use a compact one-page layout; ordinary documents no longer show the "Electronic Tax Document" eyebrow, redundant "ORDINARY DOCUMENT" badge, or blank signature boxes. Verified with frontend typecheck/lint/build, backend typecheck/lint/unit tests, and a Puppeteer PDF smoke fixture matching the reported 1-item + bank + PromptPay case (`pages=1`).
+- Mobile invoice builder visual cleanup added 2026-05-29: removed emoji-style UI text from `frontend/src`, replaced invoice mobile Form/Preview tabs with lucide icons, collapsed the selected buyer display to one compact summary card instead of repeating the company name/search result/detail stack, and moved the AI chat launcher to the lower-right above the mobile action/nav area so it no longer blocks Save/Issue. Verified with frontend typecheck/lint/build and an emoji grep over `frontend/src`.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 

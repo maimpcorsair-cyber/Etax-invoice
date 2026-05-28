@@ -1160,7 +1160,7 @@ export default function Landing() {
           </div>
 
           <div className="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
-            <p>© {new Date().getFullYear()} {t('app.name')} • {isThai ? '✓ ตามมาตรฐานกรมสรรพากร' : '✓ Thailand Revenue Department Compliant'}</p>
+            <p>© {new Date().getFullYear()} {t('app.name')} • {isThai ? 'ตามมาตรฐานกรมสรรพากร' : 'Thailand Revenue Department Compliant'}</p>
           </div>
         </div>
       </footer>
@@ -1341,7 +1341,7 @@ export default function Landing() {
                       <label className="label">{isThai ? 'ชื่อบริษัท (ไทย)' : 'Company Name (Thai)'}</label>
                       <input className={guardedInputClass(formValidation.companyNameTh)} value={form.companyNameTh} onChange={(e) => setForm((prev) => ({ ...prev, companyNameTh: thaiTextOnly(e.target.value) }))} required />
                       {formErrors.companyNameTh
-                        ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.companyNameTh}</p>
+                        ? <p className="mt-1 text-xs text-red-600">{formErrors.companyNameTh}</p>
                         : <p className={inputGuide(formValidation.companyNameTh)}>{isThai ? 'มีอักษรไทยอย่างน้อย 1 ตัว — แทรกอังกฤษได้ เช่น บริษัท K&K Logistics จำกัด' : 'At least one Thai character — English allowed, e.g. บริษัท K&K Logistics จำกัด'}</p>
                       }
                     </div>
@@ -1356,11 +1356,11 @@ export default function Landing() {
                       <label className="label">{isThai ? 'เลขประจำตัวผู้เสียภาษี 13 หลัก' : '13-digit Tax ID'}</label>
                       <input className={guardedInputClass(formValidation.taxId, 'font-mono')} value={form.taxId} onChange={(e) => setForm((prev) => ({ ...prev, taxId: digitsOnly(e.target.value, 13) }))} inputMode="numeric" maxLength={13} required />
                       {formErrors.taxId
-                        ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.taxId}</p>
+                        ? <p className="mt-1 text-xs text-red-600">{formErrors.taxId}</p>
                         : juristicLookupState === 'loading'
-                          ? <p className="mt-1 text-xs text-slate-500">🔍 {isThai ? 'กำลังค้นข้อมูลจาก DBD...' : 'Looking up DBD records...'}</p>
+                          ? <p className="mt-1 text-xs text-slate-500">{isThai ? 'กำลังค้นข้อมูลจาก DBD...' : 'Looking up DBD records...'}</p>
                           : juristicLookupState === 'found'
-                            ? <p className="mt-1 text-xs text-emerald-600">✓ {isThai ? 'เติมชื่อบริษัท/ที่อยู่จาก DBD ให้แล้ว — แก้ไขได้' : 'Pre-filled from DBD — editable'}</p>
+                            ? <p className="mt-1 text-xs text-emerald-600">{isThai ? 'เติมชื่อบริษัท/ที่อยู่จาก DBD ให้แล้ว — แก้ไขได้' : 'Pre-filled from DBD — editable'}</p>
                             : juristicLookupState === 'not_found'
                               ? <p className="mt-1 text-xs text-amber-600">{isThai ? 'ไม่พบในระบบ DBD — กรอกเองได้' : 'Not in DBD cache — fill in manually'}</p>
                               : <p className={inputGuide(false)}>{isThai ? `กรอกตัวเลข ${form.taxId.length}/13 หลัก` : `Enter ${form.taxId.length}/13 digits`}</p>
@@ -1394,8 +1394,8 @@ export default function Landing() {
                       <div className="sm:col-span-2 rounded-lg border border-dashed border-slate-300 bg-slate-50/50 px-4 py-3">
                         <p className="text-sm text-slate-700">
                           {isThai
-                            ? '👆 กดปุ่ม "Sign in with Google" ด้านบนเพื่อใช้บัญชี Google ของคุณ — ระบบจะดึงอีเมล+ชื่อให้อัตโนมัติ'
-                            : '👆 Click "Sign in with Google" above — your name and email will be filled automatically.'}
+                            ? 'กดปุ่ม "Sign in with Google" ด้านบนเพื่อใช้บัญชี Google ของคุณ — ระบบจะดึงอีเมล+ชื่อให้อัตโนมัติ'
+                            : 'Click "Sign in with Google" above — your name and email will be filled automatically.'}
                         </p>
                       </div>
                     ) : (
@@ -1444,7 +1444,7 @@ export default function Landing() {
                       <label className="label">{isThai ? 'ที่อยู่บริษัท (ไทย)' : 'Company Address (Thai)'}</label>
                       <textarea className={guardedInputClass(formValidation.addressTh, 'min-h-[96px]')} value={form.addressTh} onChange={(e) => setForm((prev) => ({ ...prev, addressTh: thaiTextOnly(e.target.value) }))} required />
                       {formErrors.addressTh
-                        ? <p className="mt-1 text-xs text-red-600">⚠ {formErrors.addressTh}</p>
+                        ? <p className="mt-1 text-xs text-red-600">{formErrors.addressTh}</p>
                         : <p className={inputGuide(false)}>{isThai ? 'ที่อยู่ภาษาไทย เช่น เลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์' : 'Use Thai address text: street, district, province, postal code.'}</p>
                       }
                     </div>
@@ -1453,7 +1453,6 @@ export default function Landing() {
 
                   {error && (
                     <div data-checkout-error className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-start gap-2">
-                      <span className="shrink-0 font-bold">⚠</span>
                       <span>{error}</span>
                     </div>
                   )}

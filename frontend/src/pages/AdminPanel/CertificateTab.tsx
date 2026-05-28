@@ -37,7 +37,7 @@ export default function CertificateTab({ isThai }: { isThai: boolean; t: (k: str
       const json = await res.json() as { data?: Record<string, unknown>; error?: string };
       if (!res.ok) throw new Error(json.error ?? 'Upload failed');
       setCertInfo(json.data ?? null);
-      setMsg({ type: 'ok', text: isThai ? '✅ อัพโหลด Certificate สำเร็จ' : '✅ Certificate uploaded successfully' });
+      setMsg({ type: 'ok', text: isThai ? 'อัพโหลด Certificate สำเร็จ' : 'Certificate uploaded successfully' });
       setSelectedFile(null);
       setPassword('');
     } catch (e) {
@@ -65,7 +65,7 @@ export default function CertificateTab({ isThai }: { isThai: boolean; t: (k: str
   return (
     <div className="space-y-5">
       <h2 className="font-semibold text-lg text-gray-900">
-        {isThai ? '🔐 ใบรับรองดิจิทัล (Digital Certificate)' : '🔐 Digital Certificate'}
+        {isThai ? 'ใบรับรองดิจิทัล (Digital Certificate)' : 'Digital Certificate'}
       </h2>
 
       {/* Current cert status */}
@@ -94,7 +94,7 @@ export default function CertificateTab({ isThai }: { isThai: boolean; t: (k: str
 
       {isDev && loaded && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 space-y-1">
-          <p className="font-semibold">⚠️ {isThai ? 'ใช้ Self-Signed Certificate (Dev Mode)' : 'Using Self-Signed Certificate (Dev Mode)'}</p>
+          <p className="font-semibold">{isThai ? 'ใช้ Self-Signed Certificate (Dev Mode)' : 'Using Self-Signed Certificate (Dev Mode)'}</p>
           <p>{isThai ? 'Certificate นี้สร้างขึ้นเพื่อทดสอบเท่านั้น สรรพากรจะ reject ถ้าส่งจริง ต้องใช้ Certificate จาก TDID/INET/TOT' : 'This certificate is for testing only. RD will reject it in production. Replace with a TDID/INET/TOT issued certificate.'}</p>
         </div>
       )}
@@ -141,7 +141,7 @@ export default function CertificateTab({ isThai }: { isThai: boolean; t: (k: str
       {/* Signing test */}
       <div className="border-t pt-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-medium text-gray-800">{isThai ? '🧪 ทดสอบระบบ Signing' : '🧪 Signing System Test'}</h3>
+          <h3 className="font-medium text-gray-800">{isThai ? 'ทดสอบระบบ Signing' : 'Signing System Test'}</h3>
           <button className="btn-secondary text-sm flex items-center gap-1.5" onClick={handleTest} disabled={testing || !loaded}>
             {testing ? <Loader2 className="w-4 h-4 animate-spin"/> : <FlaskConical className="w-4 h-4"/>}
             {isThai ? 'ทดสอบเลย' : 'Run Test'}
@@ -156,8 +156,8 @@ export default function CertificateTab({ isThai }: { isThai: boolean; t: (k: str
             <div className={`flex items-center gap-2 font-semibold ${(testResult.success as boolean) ? 'text-green-700' : 'text-red-600'}`}>
               {(testResult.success as boolean) ? <CheckCircle className="w-4 h-4"/> : <XCircle className="w-4 h-4"/>}
               {(testResult.success as boolean)
-                ? (isThai ? 'ทุกขั้นตอนผ่าน ✅' : 'All steps passed ✅')
-                : (isThai ? 'มีขั้นตอนที่ล้มเหลว ❌' : 'Some steps failed ❌')}
+                ? (isThai ? 'ทุกขั้นตอนผ่าน' : 'All steps passed')
+                : (isThai ? 'มีขั้นตอนที่ล้มเหลว' : 'Some steps failed')}
             </div>
             {((testResult.steps ?? []) as { step: string; status: string; detail?: string; ms?: number }[]).map((s, i) => (
               <div key={i} className={`flex items-start gap-2 text-xs ${s.status === 'ok' ? 'text-gray-600' : 'text-red-600'}`}>

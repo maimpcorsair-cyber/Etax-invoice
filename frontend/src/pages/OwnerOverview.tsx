@@ -568,9 +568,9 @@ function OperationalHealthSection({
 
   const healthBadge = (() => {
     if (!health) return { text: 'Unknown', cls: 'bg-slate-100 text-slate-700' };
-    if (health.status === 'ok') return { text: '🟢 All systems operational', cls: 'bg-emerald-100 text-emerald-800' };
-    if (health.status === 'degraded') return { text: '🟡 Degraded', cls: 'bg-amber-100 text-amber-800' };
-    return { text: '🔴 Critical', cls: 'bg-rose-100 text-rose-800' };
+    if (health.status === 'ok') return { text: 'All systems operational', cls: 'bg-emerald-100 text-emerald-800' };
+    if (health.status === 'degraded') return { text: 'Degraded', cls: 'bg-amber-100 text-amber-800' };
+    return { text: 'Critical', cls: 'bg-rose-100 text-rose-800' };
   })();
 
   const failurePct = operational ? (operational.intakeLast24h.failureRate * 100).toFixed(1) : '0';
@@ -597,7 +597,7 @@ function OperationalHealthSection({
             <div className="space-y-1.5 text-sm">
               {Object.entries(health.providers).map(([name, p]) => (
                 <div key={name} className="flex items-center justify-between">
-                  <span className="font-medium capitalize">{p.ok ? '✓' : '✗'} {name}</span>
+                  <span className="font-medium capitalize">{p.ok ? 'OK' : 'Fail'} {name}</span>
                   <span className={p.ok ? 'text-slate-600' : 'text-rose-600'}>
                     {p.ok ? `${p.latencyMs} ms` : (p.detail ?? 'failed').slice(0, 40)}
                   </span>

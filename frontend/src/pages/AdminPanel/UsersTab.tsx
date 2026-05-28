@@ -230,7 +230,7 @@ export default function UsersTab({ isThai, t }: { isThai: boolean; t: (k: string
                 }
               }}
             >
-              {isThai ? '✉️ ส่งคำเชิญทางอีเมล' : '✉️ Send email invite'}
+              {isThai ? 'ส่งคำเชิญทางอีเมล' : 'Send email invite'}
             </button>
             <button type="submit" className="btn-primary" disabled={creating}>
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : (isThai ? '+ เพิ่มทันที' : '+ Add directly')}

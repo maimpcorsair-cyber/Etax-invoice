@@ -340,7 +340,7 @@ export default function IntakeEdit() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
         <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-4" />
-        <h1 className="text-xl font-semibold text-slate-800 mb-2">บันทึกแล้ว ✨</h1>
+        <h1 className="text-xl font-semibold text-slate-800 mb-2">บันทึกแล้ว</h1>
         <p className="text-sm text-slate-600 max-w-sm">เราจะส่งข้อความยืนยันกลับไปใน LINE ให้นะครับ ปิดหน้านี้ได้เลย</p>
       </div>
     );
@@ -382,7 +382,10 @@ export default function IntakeEdit() {
       <div className="md:grid md:grid-cols-2 md:gap-4 md:p-4 md:max-w-6xl md:mx-auto">
         {/* File preview pane */}
         <section className="bg-slate-900 md:rounded-lg md:shadow overflow-hidden">
-          <div className="px-3 py-2 text-xs text-slate-300 bg-slate-800">📄 ไฟล์ต้นฉบับ</div>
+          <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 text-xs text-slate-300">
+            <FileText className="h-3.5 w-3.5" />
+            ไฟล์ต้นฉบับ
+          </div>
           <div className="bg-slate-100 md:h-[70vh] h-64 flex items-center justify-center">
             {isImage ? (
               <img src={fileUrl} alt="document" className="max-w-full max-h-full object-contain" />
@@ -408,14 +411,17 @@ export default function IntakeEdit() {
         <section className="md:bg-white md:rounded-lg md:shadow md:overflow-hidden">
           {r?.confidence && (
             <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
-              🤖 AI อ่านมาแล้ว (ความมั่นใจ: {r.confidence}) — ตรวจให้ถูกแล้วกดบันทึก
+              AI อ่านมาแล้ว (ความมั่นใจ: {r.confidence}) — ตรวจให้ถูกแล้วกดบันทึก
             </div>
           )}
 
           {r?.validationWarnings?.length ? (
             <div className="px-4 py-3 bg-rose-50 border-b border-rose-200 text-sm text-rose-800 space-y-1">
               {r.validationWarnings.slice(0, 3).map((w, i) => (
-                <div key={i}>⚠️ {w}</div>
+                <div key={i} className="flex gap-2">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{w}</span>
+                </div>
               ))}
             </div>
           ) : null}

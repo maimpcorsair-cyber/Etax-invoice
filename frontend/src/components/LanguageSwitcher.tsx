@@ -32,7 +32,6 @@ export default function LanguageSwitcher({ variant = 'toggle', className }: Prop
   }
 
   if (variant === 'button') {
-    const flags: Record<string, string> = { th: '🇹🇭', en: '🇬🇧' };
     const labels: Record<string, string> = { th: 'ไทย', en: 'English' };
     return (
       <button
@@ -42,7 +41,7 @@ export default function LanguageSwitcher({ variant = 'toggle', className }: Prop
           className,
         )}
       >
-        <span className="text-base">{flags[currentLanguage] ?? '🌐'}</span>
+        <span className="text-xs font-bold uppercase">{currentLanguage}</span>
         <span>{labels[currentLanguage] ?? currentLanguage}</span>
       </button>
     );

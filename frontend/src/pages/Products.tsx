@@ -426,7 +426,7 @@ export default function Products() {
                           const low = reorder !== null && reorder !== undefined && stock <= reorder;
                           return (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${low ? 'bg-rose-100 text-rose-700' : stock === 0 ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
-                              📦 {stock}
+                              <Package className="h-3.5 w-3.5" /> {stock}
                               {low && reorder !== null && reorder !== undefined && (
                                 <span className="text-rose-600">≤{reorder}</span>
                               )}
@@ -450,7 +450,7 @@ export default function Products() {
                             className="p-1 text-indigo-600 hover:text-indigo-800"
                             title={isThai ? 'ปรับสต๊อก' : 'Adjust stock'}
                           >
-                            📦
+                            <Package className="h-4 w-4" />
                           </button>
                         )}
                         <button
@@ -663,7 +663,10 @@ export default function Products() {
                   tenants leave this off and never see the stock UI. */}
               <details className="rounded-2xl border border-gray-200 bg-gray-50/60 px-1 sm:px-2">
                 <summary className="cursor-pointer select-none rounded-2xl px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100">
-                  📦 {isThai ? 'ติดตามสต๊อก (Inventory)' : 'Inventory tracking'}
+                  <span className="inline-flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    {isThai ? 'ติดตามสต๊อก (Inventory)' : 'Inventory tracking'}
+                  </span>
                   {form.trackInventory && (
                     <span className="ml-2 text-xs font-normal text-emerald-600">• {isThai ? 'เปิดอยู่' : 'On'}</span>
                   )}
@@ -740,7 +743,10 @@ export default function Products() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="p-5 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">
-                📦 {isThai ? 'ปรับสต๊อก' : 'Adjust stock'} — {stockAdjustProduct.code}
+                <span className="inline-flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary-700" />
+                  {isThai ? 'ปรับสต๊อก' : 'Adjust stock'} — {stockAdjustProduct.code}
+                </span>
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 {isThai ? 'สต๊อกปัจจุบัน:' : 'Current stock:'}{' '}

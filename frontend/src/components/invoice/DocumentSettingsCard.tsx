@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Paperclip } from 'lucide-react';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { InvoiceType, Language } from '../../types';
 import { addCalendarDays } from '../../lib/dateMath';
@@ -163,10 +164,11 @@ export default function DocumentSettingsCard({
 
       {needsRefDoc && (
         <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <label className="label text-amber-800">
+          <label className="label inline-flex items-center gap-1.5 text-amber-800">
+            <Paperclip className="h-3.5 w-3.5" />
             {isThai
-              ? '📎 เลขที่เอกสารอ้างอิง (บังคับสำหรับการส่ง RD)'
-              : '📎 Reference Document Number (required for RD)'}
+              ? 'เลขที่เอกสารอ้างอิง (บังคับสำหรับการส่ง RD)'
+              : 'Reference Document Number (required for RD)'}
           </label>
           <input
             type="text"
