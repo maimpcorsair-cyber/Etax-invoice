@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../hooks/useLanguage';
 import type { InvoiceType, Language } from '../../types';
+import { addCalendarDays } from '../../lib/dateMath';
 
 interface Props {
   docType: InvoiceType;
@@ -31,6 +32,7 @@ export default function DocumentSettingsCard({
   const { isThai } = useLanguage();
   const needsRefDoc =
     docType === 'receipt' || docType === 'credit_note' || docType === 'debit_note';
+  const dueDatePresets = [7, 15, 30, 45];
   const docTypeDescriptions: Record<InvoiceType, { title: string; description: string }> = {
     tax_invoice: {
       title: isThai ? 'ใบกำกับภาษี (T02)' : 'Tax Invoice (T02)',
@@ -135,10 +137,26 @@ export default function DocumentSettingsCard({
             onChange={(e) => onDueDateChange(e.target.value)}
             className="input-field"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {dueDatePresets.map((days) => (
+              <button
+                key={days}
+                type="button"
+                disabled={!invoiceDate}
+                onClick={() => {
+                  const nextDueDate = addCalendarDays(invoiceDate, days);
+                  if (nextDueDate) onDueDateChange(nextDueDate);
+                }}
+                className="min-h-9 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {isThai ? `${days} วัน` : `${days} days`}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs leading-5 text-gray-500">
             {isThai
-              ? 'ใส่เมื่อมีวันครบกำหนดชำระ หากไม่มีก็เว้นว่างได้'
-              : 'Optional. Leave blank if there is no payment due date.'}
+              ? 'นับจากวันที่ออกเอกสารตามจำนวนวันจริงในปฏิทิน หากไม่มีกำหนดชำระให้เว้นว่างได้'
+              : 'Counts real calendar days from the issue date. Leave blank if there is no payment due date.'}
           </p>
         </div>
       </div>

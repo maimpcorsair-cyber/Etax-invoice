@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BriefcaseBusiness, Eye, Download, Maximize2 } from 'lucide-react';
+import { BriefcaseBusiness, Eye, Download, FileClock, Maximize2, RotateCcw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -8,6 +8,7 @@ import { useCustomerSearch } from '../hooks/useCustomerSearch';
 import { formatBankPaymentInfo, useDocumentProfile } from '../hooks/useDocumentProfile';
 import { useInvoiceForm } from '../hooks/useInvoiceForm';
 import { useInvoicePreview } from '../hooks/useInvoicePreview';
+import { addCalendarDays } from '../lib/dateMath';
 import InvoiceBuilderHeader from '../components/invoice/InvoiceBuilderHeader';
 import IssuedSuccessModal from '../components/invoice/IssuedSuccessModal';
 import DocumentSettingsCard from '../components/invoice/DocumentSettingsCard';
@@ -125,9 +126,12 @@ export default function InvoiceBuilder() {
   const [isDraft, setIsDraft] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
+  const [showDraftRecoveryPrompt, setShowDraftRecoveryPrompt] = useState(false);
 
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
+  const hasCompanyLogo = Boolean(company?.logoUrl);
+  const canUseElectronicMode = company?.electronicInvoicingReady === true;
 
   useEffect(() => {
     if (!token) return;
@@ -457,30 +461,19 @@ export default function InvoiceBuilder() {
   /* ── Draft recovery — on new invoice, offer to restore from localStorage ── */
   useEffect(() => {
     if (isEdit || !token || form.recoveredDraft || form.userDismissedDraft) return;
-    if (form.hasRecoverableDraft()) {
-      const recovered = window.confirm(
-        isThai
-          ? 'พบฉบับร่างที่ยังไม่ได้บันทึก ต้องการกู้คืนข้อมูลหรือไม่?'
-          : 'A draft was found. Do you want to restore it?',
-      );
-      if (recovered) {
-        form.loadDraftFromStorage();
-      } else {
-        form.discardRecoveredDraft();
-      }
-    }
+    setShowDraftRecoveryPrompt(form.hasRecoverableDraft());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, token, form.recoveredDraft, form.userDismissedDraft]);
 
   /* ── Auto-save form to localStorage every 5 seconds (new invoices only) ── */
   useEffect(() => {
-    if (isEdit || form.saving || form.recoveredDraft || form.userDismissedDraft) return;
+    if (isEdit || form.saving || form.recoveredDraft || form.userDismissedDraft || showDraftRecoveryPrompt) return;
     const interval = setInterval(() => {
       form.saveDraftToStorage();
     }, 5000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, form.saving, form.recoveredDraft, form.userDismissedDraft]);
+  }, [isEdit, form.saving, form.recoveredDraft, form.userDismissedDraft, showDraftRecoveryPrompt]);
 
   /* ── Auto-clear draft when successfully issued ── */
   useEffect(() => {
@@ -489,6 +482,20 @@ export default function InvoiceBuilder() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issuedInvoiceId, form.clearDraftFromStorage]);
+
+  useEffect(() => {
+    if (company && !canUseElectronicMode && form.documentMode === 'electronic') {
+      form.setDocumentMode('ordinary');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company, canUseElectronicMode, form.documentMode, form.setDocumentMode]);
+
+  useEffect(() => {
+    if (company && !hasCompanyLogo && form.showCompanyLogo) {
+      form.setShowCompanyLogo(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company, hasCompanyLogo, form.showCompanyLogo, form.setShowCompanyLogo]);
 
   useEffect(() => {
     if (!isEdit || !id || !token) return;
@@ -647,11 +654,8 @@ export default function InvoiceBuilder() {
               customer.setCustomerSearch(name);
               customer.clearResults();
               if (!form.dueDate && selectedCustomer.creditDays !== null && selectedCustomer.creditDays !== undefined) {
-                const invoiceDate = new Date(form.invoiceDate);
-                if (!Number.isNaN(invoiceDate.getTime())) {
-                  invoiceDate.setDate(invoiceDate.getDate() + Number(selectedCustomer.creditDays));
-                  form.setDueDate(invoiceDate.toISOString().slice(0, 10));
-                }
+                const nextDueDate = addCalendarDays(form.invoiceDate, Number(selectedCustomer.creditDays));
+                if (nextDueDate) form.setDueDate(nextDueDate);
               }
             }}
             onClearCustomer={customer.clearCustomer}
@@ -690,6 +694,7 @@ export default function InvoiceBuilder() {
           <DocumentAppearanceCard
             documentMode={form.documentMode}
             onDocumentModeChange={form.setDocumentMode}
+            canUseElectronicMode={canUseElectronicMode}
             onBankPaymentInfoChange={form.setBankPaymentInfo}
             bankAccounts={documentProfile.profile.bankAccounts}
             selectedBankAccountId={selectedBankAccountId}
@@ -698,6 +703,7 @@ export default function InvoiceBuilder() {
             bankProfileSaving={documentProfile.saving}
             bankProfileError={documentProfile.error}
             showCompanyLogo={form.showCompanyLogo}
+            hasCompanyLogo={hasCompanyLogo}
             onShowCompanyLogoChange={form.setShowCompanyLogo}
             documentLogoUrl={form.logoUrl}
             onDocumentLogoChange={form.setLogoUrl}
@@ -981,6 +987,52 @@ export default function InvoiceBuilder() {
             setIssuedInvoiceId(issuedId);
           }, projectId)}
         />
+
+        {showDraftRecoveryPrompt && (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                  <FileClock className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {isThai ? 'มีฉบับร่างค้างอยู่' : 'Unsaved draft found'}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {isThai
+                      ? 'กู้คืนข้อมูลเดิมเพื่อทำต่อ หรือเริ่มเอกสารใหม่ได้ทันที'
+                      : 'Restore the previous draft to continue, or start this document fresh.'}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    form.loadDraftFromStorage();
+                    setShowDraftRecoveryPrompt(false);
+                  }}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary-700 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-800"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  {isThai ? 'กู้คืน' : 'Restore'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    form.discardRecoveredDraft();
+                    setShowDraftRecoveryPrompt(false);
+                  }}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {isThai ? 'เริ่มใหม่' : 'Start fresh'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loadingInvoice && (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">

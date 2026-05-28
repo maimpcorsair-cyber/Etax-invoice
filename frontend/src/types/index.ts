@@ -61,6 +61,7 @@ export interface CompanyProfile {
   phone?: string;
   email?: string;
   logoUrl?: string;
+  electronicInvoicingReady?: boolean;
   documentBankAccounts?: BankAccountProfile[];
   documentSignatureProfile?: SignatureProfile | null;
 }

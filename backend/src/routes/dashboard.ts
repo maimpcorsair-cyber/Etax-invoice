@@ -8,6 +8,8 @@ import { logger } from '../config/logger';
 import { rdComplianceQueue } from '../queues/rdComplianceQueue';
 import { enqueueMasterSheetSync, masterSheetQueue } from '../queues/workers/masterSheetWorker';
 import { ensureCompanyDriveFolder, isDriveConfigured, isUserDriveOAuthConfigured } from '../services/googleDriveService';
+import { resolveCompanyRuntimeConfig } from '../services/companyConfigService';
+import { getCertificateInfo } from '../services/signatureService';
 
 export const dashboardRouter = Router();
 
@@ -945,6 +947,12 @@ dashboardRouter.get('/profile', async (req, res) => {
         logoUrl: true,
         documentBankAccounts: true,
         documentSignatureProfile: true,
+        certificateBlob: true,
+        certificatePath: true,
+        certificatePassword: true,
+        rdClientId: true,
+        rdClientSecret: true,
+        rdEnvironment: true,
       },
     });
 
@@ -953,7 +961,38 @@ dashboardRouter.get('/profile', async (req, res) => {
       return;
     }
 
-    res.json({ data: company });
+    const {
+      certificateBlob,
+      certificatePath,
+      certificatePassword,
+      rdClientId,
+      rdClientSecret,
+      rdEnvironment,
+      ...profile
+    } = company;
+    const runtimeConfig = resolveCompanyRuntimeConfig({
+      certificateBlob,
+      certificatePath,
+      certificatePassword,
+      rdClientId,
+      rdClientSecret,
+      rdEnvironment,
+    });
+    const certStatus = getCertificateInfo({
+      certBlob: runtimeConfig.certBlob,
+      certPath: runtimeConfig.certPath,
+      certPassword: runtimeConfig.certPassword,
+      cacheKey: req.user!.companyId,
+    });
+    const electronicInvoicingReady = Boolean(
+      runtimeConfig.rdClientId &&
+      runtimeConfig.rdClientSecret &&
+      certStatus.loaded &&
+      !certStatus.isExpired &&
+      !certStatus.isDev,
+    );
+
+    res.json({ data: { ...profile, electronicInvoicingReady } });
   } catch (err) {
     logger.error('Failed to fetch company profile', { err });
     res.status(500).json({ error: 'Failed to fetch company profile' });

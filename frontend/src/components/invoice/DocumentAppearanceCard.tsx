@@ -6,6 +6,7 @@ import { useLanguage } from '../../hooks/useLanguage';
 interface Props {
   documentMode: 'ordinary' | 'electronic';
   onDocumentModeChange: (value: 'ordinary' | 'electronic') => void;
+  canUseElectronicMode: boolean;
   onBankPaymentInfoChange: (value: string) => void;
   bankAccounts: BankAccountProfile[];
   selectedBankAccountId: string;
@@ -14,6 +15,7 @@ interface Props {
   bankProfileSaving: boolean;
   bankProfileError: string | null;
   showCompanyLogo: boolean;
+  hasCompanyLogo: boolean;
   onShowCompanyLogoChange: (value: boolean) => void;
   documentLogoUrl: string | null;
   onDocumentLogoChange: (value: string | null) => void;
@@ -29,6 +31,7 @@ interface Props {
 export default function DocumentAppearanceCard({
   documentMode,
   onDocumentModeChange,
+  canUseElectronicMode,
   onBankPaymentInfoChange,
   bankAccounts,
   selectedBankAccountId,
@@ -37,6 +40,7 @@ export default function DocumentAppearanceCard({
   bankProfileSaving,
   bankProfileError,
   showCompanyLogo,
+  hasCompanyLogo,
   onShowCompanyLogoChange,
   documentLogoUrl,
   onDocumentLogoChange,
@@ -110,12 +114,12 @@ export default function DocumentAppearanceCard({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className={canUseElectronicMode ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
         <button
           type="button"
           onClick={() => onDocumentModeChange('ordinary')}
           className={`rounded-xl border p-4 text-left transition ${
-            documentMode === 'ordinary'
+            documentMode === 'ordinary' || !canUseElectronicMode
               ? 'border-slate-500 bg-slate-50 shadow-sm'
               : 'border-slate-200 bg-white hover:border-slate-300'
           }`}
@@ -129,44 +133,48 @@ export default function DocumentAppearanceCard({
               : 'For regular printed/shared documents without online QR verification or e-Tax footer wording.'}
           </p>
         </button>
-        <button
-          type="button"
-          onClick={() => onDocumentModeChange('electronic')}
-          className={`rounded-xl border p-4 text-left transition ${
-            documentMode === 'electronic'
-              ? 'border-blue-500 bg-blue-50 shadow-sm'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
-        >
-          <div className="text-sm font-semibold text-slate-900">
-            {isThai ? 'Electronic / e-Tax' : 'Electronic / e-Tax'}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            {isThai
-              ? 'มีข้อความกำกับเอกสารอิเล็กทรอนิกส์ด้านล่าง พร้อม QR สำหรับดู/ตรวจสอบเอกสารออนไลน์'
-              : 'Adds electronic-document footer wording and a QR for online viewing or verification.'}
-          </p>
-        </button>
+        {canUseElectronicMode && (
+          <button
+            type="button"
+            onClick={() => onDocumentModeChange('electronic')}
+            className={`rounded-xl border p-4 text-left transition ${
+              documentMode === 'electronic'
+                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="text-sm font-semibold text-slate-900">
+              {isThai ? 'Electronic / e-Tax' : 'Electronic / e-Tax'}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {isThai
+                ? 'มีข้อความกำกับเอกสารอิเล็กทรอนิกส์ด้านล่าง พร้อม QR สำหรับดู/ตรวจสอบเอกสารออนไลน์'
+                : 'Adds electronic-document footer wording and a QR for online viewing or verification.'}
+            </p>
+          </button>
+        )}
       </div>
 
-      <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          checked={showCompanyLogo}
-          onChange={(e) => onShowCompanyLogoChange(e.target.checked)}
-          className="mt-1"
-        />
-        <span>
-          <span className="block font-medium text-slate-900">
-            {isThai ? 'แสดงโลโก้บริษัทในหัวเอกสาร' : 'Show company logo in document header'}
+      {hasCompanyLogo && (
+        <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={showCompanyLogo}
+            onChange={(e) => onShowCompanyLogoChange(e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <span className="block font-medium text-slate-900">
+              {isThai ? 'แสดงโลโก้บริษัทในหัวเอกสาร' : 'Show company logo in document header'}
+            </span>
+            <span className="mt-1 block text-xs text-slate-500">
+              {isThai
+                ? 'ถ้าปิดไว้ เอกสารจะยังแสดงชื่อบริษัทและข้อมูลภาษีตามปกติ แต่จะไม่มีภาพโลโก้บริษัท'
+                : 'If disabled, the company name and tax identity still show as usual, but the visual company logo will be hidden.'}
+            </span>
           </span>
-          <span className="mt-1 block text-xs text-slate-500">
-            {isThai
-              ? 'ถ้าปิดไว้ เอกสารจะยังแสดงชื่อบริษัทและข้อมูลภาษีตามปกติ แต่จะไม่มีภาพโลโก้บริษัท'
-              : 'If disabled, the company name and tax identity still show as usual, but the visual company logo will be hidden.'}
-          </span>
-        </span>
-      </label>
+        </label>
+      )}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -269,26 +277,34 @@ export default function DocumentAppearanceCard({
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-indigo-700" />
             <h4 className="text-sm font-semibold text-slate-900">
-              {isThai ? 'ลายเซ็นผู้จัดทำที่ตรวจสอบได้' : 'Trusted issuer signature'}
+              {canUseElectronicMode
+                ? (isThai ? 'ลายเซ็นผู้จัดทำที่ตรวจสอบได้' : 'Trusted issuer signature')
+                : (isThai ? 'ผู้ลงนามบนเอกสาร' : 'Document signer')}
             </h4>
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            {isThai
-              ? 'ใช้แสดงผู้จัดทำบน PDF พร้อมโหมด e-Tax/QR ตรวจสอบเอกสาร ระบบยังคงใช้ certificate และ audit trail ฝั่ง backend ตอนออกเอกสารจริง'
-              : 'Shown on PDFs with e-Tax/QR verification. The backend still handles certificate signing and audit trails for issued documents.'}
+            {canUseElectronicMode
+              ? (isThai
+                  ? 'ใช้แสดงผู้จัดทำบน PDF พร้อมโหมด e-Tax/QR ตรวจสอบเอกสาร ระบบยังคงใช้ certificate และ audit trail ฝั่ง backend ตอนออกเอกสารจริง'
+                  : 'Shown on PDFs with e-Tax/QR verification. The backend still handles certificate signing and audit trails for issued documents.')
+              : (isThai
+                  ? 'ใส่ชื่อ ตำแหน่ง และภาพลายเซ็นสำหรับแสดงท้ายเอกสาร PDF'
+                  : 'Add a name, title, and signature image for the PDF footer.')}
           </p>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {(isThai
-            ? ['ล็อกกับบริษัทนี้', 'มี QR ตรวจสอบ', 'บันทึก audit trail']
-            : ['Company scoped', 'QR verifiable', 'Audit logged']
-          ).map((label) => (
-            <div key={label} className="flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700">
-              <LockKeyhole className="h-3.5 w-3.5 text-indigo-600" />
-              {label}
-            </div>
-          ))}
-        </div>
+        {canUseElectronicMode && (
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {(isThai
+              ? ['ล็อกกับบริษัทนี้', 'มี QR ตรวจสอบ', 'บันทึก audit trail']
+              : ['Company scoped', 'QR verifiable', 'Audit logged']
+            ).map((label) => (
+              <div key={label} className="flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700">
+                <LockKeyhole className="h-3.5 w-3.5 text-indigo-600" />
+                {label}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label">{isThai ? 'ชื่อผู้ลงนาม' : 'Signer name'}</label>
