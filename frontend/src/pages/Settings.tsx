@@ -48,6 +48,16 @@ interface CompanyDraft {
   website: string;
 }
 
+type CompanyField = keyof CompanyDraft;
+type CompanyFieldErrors = Partial<Record<CompanyField, string>>;
+
+interface ApiValidationIssue {
+  path?: Array<string | number>;
+  message?: string;
+  code?: string;
+  validation?: string;
+}
+
 interface AdminCompanyProfile extends CompanyDraft {
   id: string;
   logoUrl?: string | null;
@@ -157,6 +167,12 @@ const defaultPreferences: InvoicePreferences = {
   schemaVersion: PREFERENCES_SCHEMA_VERSION,
 };
 
+function normalizeWebsite(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function cleanCompanyPayload(draft: CompanyDraft) {
   return {
     nameTh: draft.nameTh.trim(),
@@ -169,8 +185,95 @@ function cleanCompanyPayload(draft: CompanyDraft) {
     addressEn: draft.addressEn.trim() || undefined,
     phone: draft.phone.trim() || undefined,
     email: draft.email.trim() || undefined,
-    website: draft.website.trim() || undefined,
+    website: normalizeWebsite(draft.website) || undefined,
   };
+}
+
+function companyFieldLabel(field: CompanyField, isThai: boolean) {
+  const labels: Record<CompanyField, { th: string; en: string }> = {
+    nameTh: { th: 'ชื่อบริษัทภาษาไทย', en: 'Thai company name' },
+    nameEn: { th: 'ชื่อบริษัทภาษาอังกฤษ', en: 'English company name' },
+    taxId: { th: 'เลขประจำตัวผู้เสียภาษี', en: 'Tax ID' },
+    branchCode: { th: 'รหัสสาขา', en: 'Branch code' },
+    branchNameTh: { th: 'ชื่อสาขาภาษาไทย', en: 'Thai branch name' },
+    branchNameEn: { th: 'ชื่อสาขาภาษาอังกฤษ', en: 'English branch name' },
+    addressTh: { th: 'ที่อยู่ภาษาไทย', en: 'Thai address' },
+    addressEn: { th: 'ที่อยู่ภาษาอังกฤษ', en: 'English address' },
+    phone: { th: 'โทรศัพท์', en: 'Phone' },
+    email: { th: 'อีเมล', en: 'Email' },
+    website: { th: 'เว็บไซต์', en: 'Website' },
+  };
+  return isThai ? labels[field].th : labels[field].en;
+}
+
+function validateCompanyDraft(draft: CompanyDraft, isThai: boolean): CompanyFieldErrors {
+  const errors: CompanyFieldErrors = {};
+  if (!draft.nameTh.trim()) {
+    errors.nameTh = isThai ? 'กรุณากรอกชื่อบริษัทภาษาไทย' : 'Enter the Thai company name.';
+  }
+  if (!/^\d{13}$/.test(draft.taxId.trim())) {
+    errors.taxId = isThai ? 'เลขผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก' : 'Tax ID must be 13 digits.';
+  }
+  if (!/^\d{5}$/.test(draft.branchCode.trim())) {
+    errors.branchCode = isThai ? 'รหัสสาขาต้องเป็นตัวเลข 5 หลัก เช่น 00000' : 'Branch code must be 5 digits, for example 00000.';
+  }
+  if (!draft.addressTh.trim()) {
+    errors.addressTh = isThai ? 'กรุณากรอกที่อยู่ภาษาไทย' : 'Enter the Thai address.';
+  }
+  if (draft.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) {
+    errors.email = isThai ? 'อีเมลไม่ถูกต้อง' : 'Email is not valid.';
+  }
+  if (draft.website.trim()) {
+    try {
+      new URL(normalizeWebsite(draft.website));
+    } catch {
+      errors.website = isThai ? 'เว็บไซต์ไม่ถูกต้อง เช่น https://example.com' : 'Website is not valid, for example https://example.com.';
+    }
+  }
+  return errors;
+}
+
+function companyErrorsToMessage(errors: CompanyFieldErrors, isThai: boolean) {
+  const messages = Object.values(errors).filter(Boolean);
+  if (messages.length === 0) return '';
+  return [
+    isThai ? `แก้ข้อมูลบริษัท ${messages.length} จุดก่อนบันทึก` : `Fix ${messages.length} company field${messages.length > 1 ? 's' : ''} before saving.`,
+    ...messages.map((message) => `- ${message}`),
+  ].join('\n');
+}
+
+function apiValidationMessage(
+  fallback: string | undefined,
+  details: ApiValidationIssue[] | undefined,
+  isThai: boolean,
+) {
+  if (!details?.length) return fallback ?? (isThai ? 'บันทึกไม่สำเร็จ' : 'Save failed.');
+  const messages = details.map((issue) => {
+    const field = issue.path?.[0];
+    const label = typeof field === 'string' && field in emptyCompanyDraft
+      ? companyFieldLabel(field as CompanyField, isThai)
+      : (isThai ? 'ข้อมูล' : 'Field');
+    if (issue.validation === 'email') {
+      return isThai ? `${label}: รูปแบบอีเมลไม่ถูกต้อง` : `${label}: invalid email format`;
+    }
+    if (issue.validation === 'url') {
+      return isThai ? `${label}: รูปแบบเว็บไซต์ไม่ถูกต้อง` : `${label}: invalid website URL`;
+    }
+    if (issue.code === 'invalid_string' && typeof field === 'string' && field === 'taxId') {
+      return isThai ? `${label}: ต้องเป็นตัวเลข 13 หลัก` : `${label}: must be 13 digits`;
+    }
+    if (issue.code === 'invalid_string' && typeof field === 'string' && field === 'branchCode') {
+      return isThai ? `${label}: ต้องเป็นตัวเลข 5 หลัก` : `${label}: must be 5 digits`;
+    }
+    if (issue.message?.includes('at least 1')) {
+      return isThai ? `${label}: จำเป็นต้องกรอก` : `${label}: required`;
+    }
+    return `${label}: ${issue.message ?? (isThai ? 'ข้อมูลไม่ถูกต้อง' : 'Invalid value')}`;
+  });
+  return [
+    isThai ? `แก้ข้อมูล ${messages.length} จุดก่อนบันทึก` : `Fix ${messages.length} field${messages.length > 1 ? 's' : ''} before saving.`,
+    ...messages.map((message) => `- ${message}`),
+  ].join('\n');
 }
 
 function readInvoicePreferences(): InvoicePreferences {
@@ -261,6 +364,7 @@ export default function Settings() {
   const [lineOtp, setLineOtp] = useState<string | null>(null);
   const [lineOtpCopied, setLineOtpCopied] = useState(false);
   const [rdStatus, setRdStatus] = useState<RdConfigStatus | null>(null);
+  const [companyFieldErrors, setCompanyFieldErrors] = useState<CompanyFieldErrors>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -345,17 +449,39 @@ export default function Settings() {
 
   const saveCompany = async () => {
     if (!token) return;
-    setCompanySaving(true);
     setMessage(null);
     setError(null);
+    const fieldErrors = validateCompanyDraft(companyDraft, isThai);
+    setCompanyFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
+      setError(companyErrorsToMessage(fieldErrors, isThai));
+      return;
+    }
+    setCompanySaving(true);
     try {
       const res = await fetch('/api/admin/company', {
         method: 'PUT',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanCompanyPayload(companyDraft)),
       });
-      const json = await res.json() as { data?: AdminCompanyProfile; error?: string };
-      if (!res.ok) throw new Error(json.error ?? 'Failed to save company');
+      const json = await res.json() as { data?: AdminCompanyProfile; error?: string; details?: ApiValidationIssue[] };
+      if (!res.ok) throw new Error(apiValidationMessage(json.error, json.details, isThai));
+      setCompanyFieldErrors({});
+      if (json.data) {
+        setCompanyDraft({
+          nameTh: json.data.nameTh ?? '',
+          nameEn: json.data.nameEn ?? '',
+          taxId: json.data.taxId ?? '',
+          branchCode: json.data.branchCode ?? '00000',
+          branchNameTh: json.data.branchNameTh ?? '',
+          branchNameEn: json.data.branchNameEn ?? '',
+          addressTh: json.data.addressTh ?? '',
+          addressEn: json.data.addressEn ?? '',
+          phone: json.data.phone ?? '',
+          email: json.data.email ?? '',
+          website: json.data.website ?? '',
+        });
+      }
       setMessage(isThai ? 'บันทึกข้อมูลบริษัทเรียบร้อย' : 'Company profile saved.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save company');
@@ -533,6 +659,12 @@ export default function Settings() {
       ? [{ key: 'audit', to: '/app/audit', label: isThai ? 'Audit Log' : 'Audit Log', icon: ScrollText }]
       : []),
   ];
+  const companyInputClass = (field: CompanyField) => `input-field ${
+    companyFieldErrors[field] ? 'border-rose-300 bg-rose-50/40 focus:ring-rose-500' : ''
+  }`;
+  const renderCompanyFieldError = (field: CompanyField) => (
+    companyFieldErrors[field] ? <p className="mt-1 text-xs text-rose-700">{companyFieldErrors[field]}</p> : null
+  );
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -550,10 +682,17 @@ export default function Settings() {
       />
 
       {(message || error || documentProfile.error) && (
-        <div className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-          error || documentProfile.error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        <div className={`rounded-xl border bg-white px-3 py-2 text-sm shadow-sm ${
+          error || documentProfile.error ? 'border-rose-200 text-rose-800' : 'border-emerald-200 text-emerald-800'
         }`}>
-          {error || documentProfile.error || message}
+          <div className="flex items-start gap-2">
+            {error || documentProfile.error ? (
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <span className="whitespace-pre-line leading-6">{error || documentProfile.error || message}</span>
+          </div>
         </div>
       )}
 
@@ -575,51 +714,57 @@ export default function Settings() {
             title={isThai ? 'ข้อมูลบริษัทและผู้ขาย' : 'Company and seller profile'}
             description={isThai ? 'ข้อมูลนี้ถูกใช้เป็นผู้ขายบนเอกสารและใช้ตรวจสอบความพร้อมด้านภาษี' : 'Used as the seller snapshot on tax documents and readiness checks.'}
           >
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="label">{isThai ? 'ชื่อบริษัทภาษาไทย *' : 'Thai company name *'}</label>
-                <input className="input-field" value={companyDraft.nameTh} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, nameTh: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'ชื่อบริษัทภาษาอังกฤษ' : 'English company name'}</label>
-                <input className="input-field" value={companyDraft.nameEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, nameEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'เลขประจำตัวผู้เสียภาษี *' : 'Tax ID *'}</label>
-                <input className="input-field font-mono" maxLength={13} value={companyDraft.taxId} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, taxId: e.target.value.replace(/\D/g, '') }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'รหัสสาขา' : 'Branch code'}</label>
-                <input className="input-field font-mono" maxLength={5} value={companyDraft.branchCode} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, branchCode: e.target.value.replace(/\D/g, '') }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'ชื่อสาขาภาษาไทย' : 'Thai branch name'}</label>
-                <input className="input-field" value={companyDraft.branchNameTh} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, branchNameTh: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'ชื่อสาขาภาษาอังกฤษ' : 'English branch name'}</label>
-                <input className="input-field" value={companyDraft.branchNameEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, branchNameEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'โทรศัพท์' : 'Phone'}</label>
-                <input className="input-field" value={companyDraft.phone} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, phone: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">Email</label>
-                <input className="input-field" value={companyDraft.email} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, email: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="label">{isThai ? 'เว็บไซต์' : 'Website'}</label>
-                <input className="input-field" value={companyDraft.website} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, website: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'ที่อยู่ภาษาไทย *' : 'Thai address *'}</label>
-                <textarea className="input-field" rows={3} value={companyDraft.addressTh} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, addressTh: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
-              <div>
-                <label className="label">{isThai ? 'ที่อยู่ภาษาอังกฤษ' : 'English address'}</label>
-                <textarea className="input-field" rows={3} value={companyDraft.addressEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, addressEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
-              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="label">{isThai ? 'ชื่อบริษัทภาษาไทย *' : 'Thai company name *'}</label>
+                  <input className={companyInputClass('nameTh')} aria-invalid={Boolean(companyFieldErrors.nameTh)} value={companyDraft.nameTh} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, nameTh: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                  {renderCompanyFieldError('nameTh')}
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ชื่อบริษัทภาษาอังกฤษ' : 'English company name'}</label>
+                  <input className={companyInputClass('nameEn')} value={companyDraft.nameEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, nameEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'เลขประจำตัวผู้เสียภาษี *' : 'Tax ID *'}</label>
+                  <input className={`${companyInputClass('taxId')} font-mono`} aria-invalid={Boolean(companyFieldErrors.taxId)} maxLength={13} value={companyDraft.taxId} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, taxId: e.target.value.replace(/\D/g, '') }))} disabled={!isAdmin || companyLoading} />
+                  {renderCompanyFieldError('taxId')}
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'รหัสสาขา' : 'Branch code'}</label>
+                  <input className={`${companyInputClass('branchCode')} font-mono`} aria-invalid={Boolean(companyFieldErrors.branchCode)} maxLength={5} value={companyDraft.branchCode} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, branchCode: e.target.value.replace(/\D/g, '') }))} disabled={!isAdmin || companyLoading} />
+                  {renderCompanyFieldError('branchCode')}
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ชื่อสาขาภาษาไทย' : 'Thai branch name'}</label>
+                  <input className={companyInputClass('branchNameTh')} value={companyDraft.branchNameTh} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, branchNameTh: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ชื่อสาขาภาษาอังกฤษ' : 'English branch name'}</label>
+                  <input className={companyInputClass('branchNameEn')} value={companyDraft.branchNameEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, branchNameEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'โทรศัพท์' : 'Phone'}</label>
+                  <input className={companyInputClass('phone')} value={companyDraft.phone} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, phone: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                </div>
+                <div>
+                  <label className="label">Email</label>
+                  <input className={companyInputClass('email')} aria-invalid={Boolean(companyFieldErrors.email)} value={companyDraft.email} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, email: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                  {renderCompanyFieldError('email')}
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label">{isThai ? 'เว็บไซต์' : 'Website'}</label>
+                  <input className={companyInputClass('website')} aria-invalid={Boolean(companyFieldErrors.website)} value={companyDraft.website} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, website: e.target.value }))} disabled={!isAdmin || companyLoading} placeholder="https://example.com" />
+                  {renderCompanyFieldError('website')}
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ที่อยู่ภาษาไทย *' : 'Thai address *'}</label>
+                  <textarea className={companyInputClass('addressTh')} aria-invalid={Boolean(companyFieldErrors.addressTh)} rows={3} value={companyDraft.addressTh} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, addressTh: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                  {renderCompanyFieldError('addressTh')}
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ที่อยู่ภาษาอังกฤษ' : 'English address'}</label>
+                  <textarea className={companyInputClass('addressEn')} rows={3} value={companyDraft.addressEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, addressEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
+                </div>
             </div>
             <button type="button" onClick={() => void saveCompany()} disabled={!isAdmin || companySaving} className="btn-primary inline-flex items-center gap-2">
               <Save className="h-4 w-4" />

@@ -66,18 +66,33 @@ adminRouter.get('/company', async (req, res) => {
   }
 });
 
+const optionalTrimmedString = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().optional(),
+);
+
+const optionalUrl = z.preprocess((value) => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}, z.string().url().optional());
+
 const companySchema = z.object({
-  nameTh: z.string().min(1),
-  nameEn: z.string().optional(),
-  taxId: z.string().length(13),
-  branchCode: z.string().default('00000'),
-  branchNameTh: z.string().optional(),
-  branchNameEn: z.string().optional(),
-  addressTh: z.string().min(1),
-  addressEn: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  website: z.string().optional(),
+  nameTh: z.string().trim().min(1),
+  nameEn: optionalTrimmedString,
+  taxId: z.string().trim().regex(/^\d{13}$/),
+  branchCode: z.string().trim().regex(/^\d{5}$/).default('00000'),
+  branchNameTh: optionalTrimmedString,
+  branchNameEn: optionalTrimmedString,
+  addressTh: z.string().trim().min(1),
+  addressEn: optionalTrimmedString,
+  phone: optionalTrimmedString,
+  email: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().email().optional(),
+  ),
+  website: optionalUrl,
 });
 
 adminRouter.put('/company', async (req, res) => {

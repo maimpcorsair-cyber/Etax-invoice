@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-29 (invoice builder UI polish + T01 default)
+Last updated: 2026-05-29 (company settings validation UX fixed)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -96,6 +96,7 @@ Last CI:
 - First Invoice Winning Path polish added 2026-05-29: after issuing an invoice, `IssuedSuccessModal` now creates the customer share link immediately and presents the customer QR, Copy, Open LINE, View customer page, Download PDF, Verify, optional Email, and Record payment actions in one panel. This closes the biggest gap after the dashboard first-invoice CTA: sellers no longer need to return to the invoice list to find share/payment actions. Verified locally with `frontend` typecheck/lint/build.
 - Mobile invoice builder frame fix added 2026-05-29: `/app/invoices/new` no longer wraps the mobile form/preview tabs in a rounded fixed-height bordered panel; the form now uses normal page scroll so Project/Job and later cards are not clipped on phones. Verified locally with `frontend` typecheck/lint/build.
 - Invoice builder polish added 2026-05-29: header helper/validation UI is now compact and neutral instead of large amber/green callout cards; the form section nav is a fixed grid (3 columns on mobile, 6 on larger screens) instead of a horizontal scrolling pill row; document type dropdowns are ordered T01-T05 and fresh invoice creation now defaults to T01 (`tax_invoice_receipt`) with a one-time local preference migration from the old T02 default. Verified locally with `frontend` typecheck/lint/build.
+- Company settings validation UX fixed 2026-05-29: `/app/settings#company` no longer shows raw "Validation error"; frontend validates Thai company name, 13-digit tax ID, 5-digit branch code, Thai address, email, and website before saving, highlights the exact fields, and renders a compact neutral status message. Backend `/api/admin/company` now trims strings, treats blank optional fields as omitted, normalizes bare website domains to `https://...`, and validates tax ID/branch code formats consistently. Verified locally with frontend typecheck/lint/build and backend typecheck/lint.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
