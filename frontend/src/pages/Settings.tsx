@@ -65,6 +65,7 @@ interface InvoicePreferences {
   defaultPaymentMethod: string;
   defaultShowCompanyLogo: boolean;
   defaultWhtRate: string;
+  schemaVersion: number;
 }
 
 interface IntegrationStatus {
@@ -119,6 +120,8 @@ interface ExpenseSettings {
 }
 
 const PREFERENCES_STORAGE_KEY = 'etax_invoice_preferences';
+const PREFERENCES_SCHEMA_VERSION = 2;
+const DEFAULT_DOC_TYPE: InvoiceType = 'tax_invoice_receipt';
 
 const emptyBankDraft: BankDraft = {
   label: '',
@@ -145,12 +148,13 @@ const emptyCompanyDraft: CompanyDraft = {
 };
 
 const defaultPreferences: InvoicePreferences = {
-  defaultDocType: 'tax_invoice',
+  defaultDocType: DEFAULT_DOC_TYPE,
   defaultLanguage: 'th',
   defaultDocumentMode: 'electronic',
   defaultPaymentMethod: '',
   defaultShowCompanyLogo: true,
   defaultWhtRate: '',
+  schemaVersion: PREFERENCES_SCHEMA_VERSION,
 };
 
 function cleanCompanyPayload(draft: CompanyDraft) {
@@ -172,7 +176,18 @@ function cleanCompanyPayload(draft: CompanyDraft) {
 function readInvoicePreferences(): InvoicePreferences {
   try {
     const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
-    return raw ? { ...defaultPreferences, ...JSON.parse(raw) } : defaultPreferences;
+    if (!raw) return defaultPreferences;
+    const stored = JSON.parse(raw) as Partial<InvoicePreferences>;
+    const migrated: InvoicePreferences = {
+      ...defaultPreferences,
+      ...stored,
+      defaultDocType: !stored.schemaVersion && stored.defaultDocType === 'tax_invoice'
+        ? DEFAULT_DOC_TYPE
+        : stored.defaultDocType ?? defaultPreferences.defaultDocType,
+      schemaVersion: PREFERENCES_SCHEMA_VERSION,
+    };
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(migrated));
+    return migrated;
   } catch {
     return defaultPreferences;
   }
@@ -409,7 +424,10 @@ export default function Settings() {
   };
 
   const savePreferences = () => {
-    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({
+      ...preferences,
+      schemaVersion: PREFERENCES_SCHEMA_VERSION,
+    }));
     setMessage(isThai ? 'บันทึกค่าเริ่มต้นการออกเอกสารแล้ว' : 'Invoice defaults saved.');
   };
 
@@ -707,11 +725,11 @@ export default function Settings() {
               <div>
                 <label className="label">{isThai ? 'ประเภทเอกสารเริ่มต้น' : 'Default document type'}</label>
                 <select className="input-field" value={preferences.defaultDocType} onChange={(e) => setPreferences((prev) => ({ ...prev, defaultDocType: e.target.value as InvoiceType }))}>
-                  <option value="tax_invoice">{isThai ? 'ใบกำกับภาษี (T02)' : 'Tax invoice (T02)'}</option>
-                  <option value="tax_invoice_receipt">{isThai ? 'ใบกำกับภาษี/ใบเสร็จ (T01)' : 'Tax invoice/receipt (T01)'}</option>
-                  <option value="receipt">{isThai ? 'ใบเสร็จรับเงิน (T03)' : 'Receipt (T03)'}</option>
-                  <option value="credit_note">{isThai ? 'ใบลดหนี้ (T04)' : 'Credit note (T04)'}</option>
-                  <option value="debit_note">{isThai ? 'ใบเพิ่มหนี้ (T05)' : 'Debit note (T05)'}</option>
+                  <option value="tax_invoice_receipt">{isThai ? 'T01 ใบกำกับภาษี/ใบเสร็จ' : 'T01 Tax invoice / receipt'}</option>
+                  <option value="tax_invoice">{isThai ? 'T02 ใบกำกับภาษี' : 'T02 Tax invoice'}</option>
+                  <option value="receipt">{isThai ? 'T03 ใบเสร็จรับเงิน' : 'T03 Receipt'}</option>
+                  <option value="credit_note">{isThai ? 'T04 ใบลดหนี้' : 'T04 Credit note'}</option>
+                  <option value="debit_note">{isThai ? 'T05 ใบเพิ่มหนี้' : 'T05 Debit note'}</option>
                 </select>
               </div>
               <div>

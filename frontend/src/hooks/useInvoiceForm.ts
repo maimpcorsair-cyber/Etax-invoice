@@ -5,6 +5,8 @@ import { emptyItem, calculateItem, translateZodMessage } from '../utils/invoiceH
 
 const DRAFT_STORAGE_KEY = 'etax_invoice_draft';
 const PREFERENCES_STORAGE_KEY = 'etax_invoice_preferences';
+const PREFERENCES_SCHEMA_VERSION = 2;
+const DEFAULT_DOC_TYPE: InvoiceType = 'tax_invoice_receipt';
 
 interface InvoicePreferences {
   defaultDocType?: InvoiceType;
@@ -13,12 +15,22 @@ interface InvoicePreferences {
   defaultPaymentMethod?: string;
   defaultShowCompanyLogo?: boolean;
   defaultWhtRate?: string;
+  schemaVersion?: number;
 }
 
 function loadInvoicePreferences(): InvoicePreferences {
   try {
     const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) as InvoicePreferences : {};
+    if (!raw) return {};
+    const preferences = JSON.parse(raw) as InvoicePreferences;
+    if (!preferences.schemaVersion && preferences.defaultDocType === 'tax_invoice') {
+      return {
+        ...preferences,
+        defaultDocType: DEFAULT_DOC_TYPE,
+        schemaVersion: PREFERENCES_SCHEMA_VERSION,
+      };
+    }
+    return preferences;
   } catch {
     return {};
   }
@@ -55,7 +67,7 @@ interface Options {
 
 export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) {
   const preferences = loadInvoicePreferences();
-  const [docType, setDocType] = useState<InvoiceType>(preferences.defaultDocType ?? 'tax_invoice');
+  const [docType, setDocType] = useState<InvoiceType>(preferences.defaultDocType ?? DEFAULT_DOC_TYPE);
   const [docLanguage, setDocLanguage] = useState<Language>(preferences.defaultLanguage ?? 'th');
   const [invoiceDate, setInvoiceDate] = useState(
     new Date().toISOString().split('T')[0],

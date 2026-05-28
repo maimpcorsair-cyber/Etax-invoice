@@ -566,7 +566,7 @@ export default function InvoiceBuilder() {
         ? 'flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5'
         : 'sticky top-[84px] z-20 border-b border-gray-200 bg-white/95 px-2 py-2 shadow-sm backdrop-blur lg:rounded-t-3xl'}
       >
-        <div className="flex gap-1 min-w-max overflow-x-auto pb-1 scrollbar-hide">
+        <div className="grid grid-cols-3 gap-1 sm:grid-cols-6">
           {STEPPER_STEPS.map(({ key, labelTh, labelEn }, idx) => {
             const isActive = activeSection === key;
             return (
@@ -574,20 +574,20 @@ export default function InvoiceBuilder() {
                 key={key}
                 onClick={() => scrollToSection(key)}
                 className={`
-                  flex items-center gap-1 h-[30px] px-2.5 rounded-full text-xs font-medium
-                  transition-all whitespace-nowrap flex-shrink-0
+                  flex min-h-8 min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium
+                  transition-colors
                   ${isActive
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                    ? 'bg-primary-700 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
                 `}
               >
                 <span className={`
-                  w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0
-                  ${isActive ? 'bg-white/20 text-white' : 'bg-gray-300 text-gray-600'}
+                  flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
+                  ${isActive ? 'bg-white/20 text-white' : 'bg-slate-300 text-slate-600'}
                 `}>
                   {idx + 1}
                 </span>
-                <span>{isThai ? labelTh : labelEn}</span>
+                <span className="min-w-0 truncate">{isThai ? labelTh : labelEn}</span>
                 {stepperDot(key)}
               </button>
             );

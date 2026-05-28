@@ -28,17 +28,17 @@ export default function InvoiceBuilderHeader({
   const hasValidationErrors = validationErrors.length > 0;
 
   return (
-    <div className="card space-y-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
+    <div className="card space-y-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-2.5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-primary-600" />
+            <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 sm:text-2xl">
+              <FileText className="h-5 w-5 text-primary-700 sm:h-6 sm:w-6" />
               {isEdit
                 ? (isThai ? 'แก้ไขเอกสาร' : 'Edit Document')
                 : (isThai ? 'สร้างเอกสารใหม่' : 'New Document')}
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="mt-0.5 text-sm text-slate-500">
               {isEdit && invoiceId
                 ? `#${invoiceId}${isDraft ? (isThai ? ' · ร่าง (ยังไม่ออกเอกสาร)' : ' · Draft (not yet issued)') : ''}`
                 : isThai
@@ -47,7 +47,7 @@ export default function InvoiceBuilderHeader({
             </p>
           </div>
 
-          <div className="flex items-center gap-0">
+          <div className="hidden items-center gap-0 sm:flex">
             {[
               { label: isThai ? 'กรอกข้อมูล' : 'Fill details', active: true, done: false },
               { label: isThai ? 'ตรวจตัวอย่าง' : 'Preview', active: false, done: false },
@@ -57,20 +57,19 @@ export default function InvoiceBuilderHeader({
               <div key={i} className="flex items-center">
                 <div className="flex items-center gap-1.5">
                   <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                       step.active
-                        ? 'text-white shadow-button'
-                        : 'bg-gray-100 text-gray-400'
+                        ? 'bg-primary-700 text-white'
+                        : 'bg-slate-100 text-slate-400'
                     }`}
-                    style={step.active ? {background:'linear-gradient(135deg,#2563eb,#1e40af)'} : {}}
                   >
                     {i + 1}
                   </div>
-                  <span className={`text-xs font-medium hidden sm:block ${step.active ? 'text-primary-700' : 'text-gray-400'}`}>
+                  <span className={`hidden text-xs font-medium sm:block ${step.active ? 'text-primary-700' : 'text-slate-400'}`}>
                     {step.label}
                   </span>
                 </div>
-                {i < 3 && <div className="w-6 h-px bg-gray-200 mx-1" />}
+                {i < 3 && <div className="mx-1 h-px w-6 bg-slate-200" />}
               </div>
             ))}
           </div>
@@ -95,8 +94,7 @@ export default function InvoiceBuilderHeader({
             {isThai ? 'บันทึกร่าง' : 'Save draft'}
           </button>
           <button
-            className="btn-primary"
-            style={{background:'linear-gradient(135deg,#10b981,#059669)'}}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onIssue}
             disabled={saving || hasValidationErrors}
             title={isThai ? 'ออกเอกสารจริง — ล็อกเลขเอกสาร สร้าง PDF + QR Code' : 'Issue document — lock number, generate PDF & QR Code'}
@@ -113,52 +111,35 @@ export default function InvoiceBuilderHeader({
         </div>
       </div>
 
-      {/* Explanation banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-          <Save className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold text-amber-800">{isThai ? 'บันทึกร่าง' : 'Save draft'}</p>
-            <p className="text-amber-700 leading-relaxed">
-              {isThai
-                ? 'ยังแก้ไขได้ทุกอย่าง ไม่มีเลขเอกสาร ไม่สร้าง PDF ยังไม่ส่ง RD'
-                : 'Fully editable. No document number. No PDF. Not submitted to RD.'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2.5">
-          <FileCheck className="w-3.5 h-3.5 text-green-600 mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold text-green-800">{isThai ? 'ออกเอกสาร' : 'Issue document'}</p>
-            <p className="text-green-700 leading-relaxed">
-              {isThai
-                ? 'ล็อกเลขเอกสาร สร้าง PDF พร้อม QR Code และส่ง RD อัตโนมัติ (ถ้ามีสิทธิ์)'
-                : 'Locks document number. Generates PDF + QR Code. Auto-submits to RD if enabled.'}
-            </p>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1.5">
+          <Save className="h-3.5 w-3.5 text-slate-400" />
+          {isThai ? 'ร่างยังแก้ไขได้และยังไม่ออกเลขเอกสาร' : 'Draft stays editable and has no document number.'}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <FileCheck className="h-3.5 w-3.5 text-slate-400" />
+          {isThai ? 'ออกเอกสารจะล็อกเลข สร้าง PDF/QR และส่ง RD เมื่อเปิดใช้' : 'Issue locks the number, creates PDF/QR, and submits to RD when enabled.'}
+        </span>
       </div>
 
       {hasValidationErrors && (
-        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 px-4 py-3.5">
-          <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-3 h-3 text-white" />
-            </div>
-            <p className="text-sm font-semibold text-amber-900">
+        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm sm:flex-row sm:items-start">
+          <div className="flex shrink-0 items-center gap-2 font-semibold text-slate-800">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <span>
               {isThai
                 ? `ยังขาดข้อมูล ${validationErrors.length} รายการ`
                 : `${validationErrors.length} item${validationErrors.length > 1 ? 's' : ''} need attention`}
-            </p>
+            </span>
           </div>
-          <div className="space-y-1.5 pl-7">
+          <div className="flex min-w-0 flex-wrap gap-1.5 sm:ml-auto sm:justify-end">
             {validationErrors.map((error, i) => (
-              <div key={error} className="flex items-center gap-2 text-sm text-amber-800">
-                <span className="w-4 h-4 rounded-full bg-amber-200 text-amber-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+              <span key={error} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs text-slate-700 ring-1 ring-slate-200">
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
                   {i + 1}
                 </span>
-                {error}
-              </div>
+                <span className="truncate">{error}</span>
+              </span>
             ))}
           </div>
         </div>

@@ -67,14 +67,14 @@ export default function DocumentSettingsCard({
 
   return (
     <div className="card space-y-4">
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-slate-50 px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600">
-          {isThai ? 'Document setup' : 'Document setup'}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          {isThai ? 'ตั้งค่าเอกสาร' : 'Document setup'}
         </p>
         <h2 className="mt-1 text-base font-semibold text-slate-900">
           {currentDocType.title}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">{currentDocType.description}</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">{currentDocType.description}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -87,13 +87,13 @@ export default function DocumentSettingsCard({
             onChange={(e) => onDocTypeChange(e.target.value as InvoiceType)}
             className="input-field"
           >
-            <option value="tax_invoice">{t('invoice.taxInvoice')}</option>
             <option value="tax_invoice_receipt">
-              {isThai ? 'ใบกำกับภาษี/ใบเสร็จ (ขายสด)' : 'Tax Inv/Receipt (Cash)'}
+              {isThai ? 'T01 ใบกำกับภาษี/ใบเสร็จ' : 'T01 Tax invoice / receipt'}
             </option>
-            <option value="receipt">{t('invoice.receipt')}</option>
-            <option value="credit_note">{t('invoice.creditNote')}</option>
-            <option value="debit_note">{t('invoice.debitNote')}</option>
+            <option value="tax_invoice">{isThai ? 'T02 ใบกำกับภาษี' : 'T02 Tax invoice'}</option>
+            <option value="receipt">{isThai ? 'T03 ใบเสร็จรับเงิน' : 'T03 Receipt'}</option>
+            <option value="credit_note">{isThai ? 'T04 ใบลดหนี้' : 'T04 Credit note'}</option>
+            <option value="debit_note">{isThai ? 'T05 ใบเพิ่มหนี้' : 'T05 Debit note'}</option>
           </select>
         </div>
         <div>
