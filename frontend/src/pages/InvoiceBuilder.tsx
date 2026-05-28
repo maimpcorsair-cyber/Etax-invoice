@@ -564,7 +564,7 @@ export default function InvoiceBuilder() {
       {/* Stepper strip */}
       <div className={useInnerScroll
         ? 'flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5'
-        : 'sticky top-[84px] z-20 rounded-t-3xl border-b border-gray-200 bg-white/95 px-2 py-2 shadow-sm backdrop-blur'}
+        : 'sticky top-[84px] z-20 border-b border-gray-200 bg-white/95 px-2 py-2 shadow-sm backdrop-blur lg:rounded-t-3xl'}
       >
         <div className="flex gap-1 min-w-max overflow-x-auto pb-1 scrollbar-hide">
           {STEPPER_STEPS.map(({ key, labelTh, labelEn }, idx) => {
@@ -600,7 +600,7 @@ export default function InvoiceBuilder() {
         ref={formScrollRef}
         className={useInnerScroll
           ? 'flex-1 overflow-y-auto bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'
-          : 'bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'}
+          : 'bg-slate-50 px-0 py-3 space-y-4 sm:px-4 sm:py-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'}
       >
         <div ref={settingsRef} className="xl:col-span-2">
           <DocumentSettingsCard
@@ -1043,13 +1043,13 @@ export default function InvoiceBuilder() {
       </div>
 
       {/* ── Body: tab layout on mobile, split pane on desktop ── */}
-      <div className="px-4 pb-6 sm:px-6">
+      <div className="px-0 pb-6 sm:px-6">
 
         {/* Mobile/tablet: show selected tab panel */}
-        <div className={`lg:hidden w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${mobileTab === 'form' ? 'flex h-[calc(100vh-180px)] min-h-[560px] flex-col' : 'hidden'}`}>
-          {renderFormPanel()}
+        <div className={mobileTab === 'form' ? 'lg:hidden' : 'hidden'}>
+          {renderFormPanel(false)}
         </div>
-        <div className={`lg:hidden w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${mobileTab === 'preview' ? 'flex h-[calc(100vh-180px)] min-h-[560px] flex-col' : 'hidden'}`}>
+        <div className={mobileTab === 'preview' ? 'min-h-[560px] lg:hidden' : 'hidden'}>
           {renderPreviewPanel}
         </div>
 
