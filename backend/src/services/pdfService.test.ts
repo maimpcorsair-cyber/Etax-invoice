@@ -126,6 +126,24 @@ test('all builders accept English language without throwing', () => {
   }
 });
 
+test('standard ordinary document stays compact and does not show e-Tax labels', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    documentMode: 'ordinary',
+    bankPaymentInfo: 'ธนาคาร: Kbank\nเลขที่บัญชี: 0231367705',
+    promptPayQrDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    promptPayTarget: '0819918896',
+    signatureImageUrl: null,
+    signerName: '',
+    signerTitle: '',
+  });
+
+  assert.ok(html.includes('compact-one-page'), 'short ordinary invoice should use compact one-page layout');
+  assert.ok(!html.includes('Electronic Tax Document'), 'ordinary document must not show electronic tax eyebrow');
+  assert.ok(!html.includes('ORDINARY DOCUMENT'), 'ordinary document should not spend space on a redundant ordinary badge');
+  assert.ok(!html.includes('<div class="signature-grid">'), 'blank signature boxes should not render when no signer is configured');
+});
+
 test('all builders accept the 5 document types without throwing', () => {
   const types = ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'];
   for (const t of types) {

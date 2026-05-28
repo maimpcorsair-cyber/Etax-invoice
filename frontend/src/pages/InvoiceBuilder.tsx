@@ -971,7 +971,7 @@ export default function InvoiceBuilder() {
   );
 
   return (
-    <div className="-mx-4 -mt-6 min-h-[calc(100vh-64px)] bg-slate-50 sm:-mx-6 lg:-mx-8">
+    <div className="-mx-4 -mt-6 min-h-[calc(100vh-64px)] bg-slate-50 pb-32 sm:-mx-6 sm:pb-0 lg:-mx-8">
       {/* ── Full-width header ── */}
       <div className="space-y-3 px-4 pb-3 pt-4 sm:px-6 sm:pt-6">
         <InvoiceBuilderHeader

@@ -111,6 +111,46 @@ export default function InvoiceBuilderHeader({
         </div>
       </div>
 
+      <div className="fixed inset-x-3 bottom-[calc(56px+env(safe-area-inset-bottom,0px)+10px)] z-40 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.18)] backdrop-blur sm:hidden">
+        <div className="grid grid-cols-[44px_1fr_1fr] gap-2">
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 disabled:opacity-50"
+            onClick={onPreview}
+            disabled={previewLoading || saving}
+            aria-label={isThai ? 'ดูตัวอย่าง' : 'Preview'}
+          >
+            <Eye className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
+            onClick={onSaveDraft}
+            disabled={saving || hasValidationErrors}
+          >
+            {saving ? (
+              <div className="h-4 w-4 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isThai ? 'บันทึก' : 'Save'}
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
+            onClick={onIssue}
+            disabled={saving || hasValidationErrors}
+          >
+            {saving ? (
+              <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            ) : (
+              <FileCheck className="h-4 w-4" />
+            )}
+            {isThai ? 'ออกเอกสาร' : 'Issue'}
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
           <Save className="h-3.5 w-3.5 text-slate-400" />

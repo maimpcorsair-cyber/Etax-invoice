@@ -131,6 +131,11 @@ export function buildHtml(data: PdfInvoiceData): string {
     ...(data.paymentMethod ? [{ label: labels.paymentMethod, value: data.paymentMethod }] : []),
   ];
   const isElectronicDocument = data.documentMode === 'electronic';
+  const onePageCompact = !customTemplateBlock && data.items.length <= 3;
+  const documentEyebrow = isElectronicDocument
+    ? 'Electronic Tax Document'
+    : (isTh ? 'เอกสาร' : 'Document');
+  const shouldRenderSignature = Boolean(data.signatureImageUrl || data.signerName || data.signerTitle);
 
   return `<!DOCTYPE html>
 <html lang="${isTh ? 'th' : 'en'}">
@@ -548,6 +553,142 @@ export function buildHtml(data: PdfInvoiceData): string {
     color: #778296;
   }
   .footer-right { text-align: right; }
+  .compact-one-page {
+    padding: 8px;
+    font-size: 11.5px;
+  }
+  .compact-one-page .document-shell {
+    border-radius: 18px;
+    box-shadow: 0 10px 32px rgba(15, 23, 42, 0.06);
+  }
+  .compact-one-page .document-body {
+    padding: 18px 22px 16px;
+  }
+  .compact-one-page .hero {
+    grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.85fr);
+    gap: 16px;
+    padding-bottom: 12px;
+  }
+  .compact-one-page .company-name {
+    font-size: 18px;
+    margin-bottom: 5px;
+  }
+  .compact-one-page .company-legal,
+  .compact-one-page .party-detail,
+  .compact-one-page .bank-text {
+    font-size: 10.5px;
+    line-height: 1.45;
+  }
+  .compact-one-page .title-card {
+    border-radius: 16px;
+    padding: 12px 14px;
+  }
+  .compact-one-page .title-card h1 {
+    font-size: 23px;
+    line-height: 1.08;
+  }
+  .compact-one-page .eyebrow {
+    margin-bottom: 5px;
+  }
+  .compact-one-page .template-badge {
+    margin-top: 6px;
+    padding: 4px 9px;
+    font-size: 9.5px;
+  }
+  .compact-one-page .overview-grid {
+    gap: 12px;
+    margin: 13px 0 12px;
+  }
+  .compact-one-page .party-card {
+    padding: 12px;
+  }
+  .compact-one-page .party-column {
+    min-height: 88px;
+    padding: 10px 11px;
+  }
+  .compact-one-page .meta-card {
+    padding: 10px 12px;
+  }
+  .compact-one-page .section-label {
+    margin-bottom: 7px;
+    font-size: 9.5px;
+  }
+  .compact-one-page .meta-list {
+    gap: 5px;
+  }
+  .compact-one-page .meta-row {
+    grid-template-columns: 92px minmax(0, 1fr);
+    padding-bottom: 5px;
+    font-size: 10.5px;
+  }
+  .compact-one-page .meta-value.emphasize {
+    font-size: 13px;
+  }
+  .compact-one-page .items-section {
+    border-radius: 15px;
+  }
+  .compact-one-page .items-header {
+    padding: 9px 13px 8px;
+  }
+  .compact-one-page table {
+    font-size: 10.5px;
+  }
+  .compact-one-page thead th,
+  .compact-one-page tbody td {
+    padding: 7px 6px;
+  }
+  .compact-one-page .summary-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .compact-one-page .notes-card,
+  .compact-one-page .words-card,
+  .compact-one-page .totals-card,
+  .compact-one-page .bank-box,
+  .compact-one-page .online-box {
+    border-radius: 13px;
+  }
+  .compact-one-page .notes-card,
+  .compact-one-page .words-card,
+  .compact-one-page .bank-box,
+  .compact-one-page .online-box {
+    padding: 10px 12px;
+  }
+  .compact-one-page .totals-header {
+    padding: 9px 12px 7px;
+  }
+  .compact-one-page .totals-row {
+    padding: 8px 12px;
+    font-size: 10.5px;
+  }
+  .compact-one-page .totals-row.grand strong {
+    font-size: 14px;
+  }
+  .compact-one-page .signature-grid {
+    margin-top: 12px;
+    grid-template-columns: 1fr;
+  }
+  .compact-one-page .sig-card {
+    padding: 10px 12px;
+  }
+  .compact-one-page .sig-space {
+    height: 34px;
+  }
+  .compact-one-page .document-support {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .compact-one-page .promptpay-row img {
+    width: 74px !important;
+    height: 74px !important;
+  }
+  .compact-one-page .footer {
+    margin-top: 10px;
+    padding-top: 9px;
+    font-size: 9.5px;
+  }
   .theme-paid .document-shell { border-width: 2px; }
   .theme-paid .title-card::after {
     content: 'PAID';
@@ -654,7 +795,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   @media print { body { padding: 0; } }
 </style>
 </head>
-<body class="${theme.className}">
+<body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}">
 <div class="page">
   <div class="document-shell">
     <div class="top-accent"></div>
@@ -676,7 +817,7 @@ export function buildHtml(data: PdfInvoiceData): string {
         <div class="hero-right">
           ${data.documentLogoUrl ? `<img class="doc-logo-right" src="${data.documentLogoUrl}" alt="document logo"/>` : ''}
           <div class="title-card">
-            <div class="eyebrow">Electronic Tax Document</div>
+            <div class="eyebrow">${documentEyebrow}</div>
             <h1>${docTitle}</h1>
             <div class="copy-pill">${labels.origDoc}</div>
             <div class="template-badge">${escapeHtml(data.templateName ?? theme.label)}</div>
@@ -768,7 +909,7 @@ export function buildHtml(data: PdfInvoiceData): string {
         </div>
       </div>
 
-      ${(!isElectronicDocument || data.signatureImageUrl || data.signerName || data.signerTitle) ? `
+      ${shouldRenderSignature ? `
         <div class="signature-grid">
           <div class="sig-card">
             <div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="authorized signature"/>` : ''}</div>
@@ -776,11 +917,6 @@ export function buildHtml(data: PdfInvoiceData): string {
             <div class="sig-title">${labels.preparedBy}</div>
             ${(data.signerName || data.signerTitle) ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>` : ''}
           </div>
-          ${!isElectronicDocument ? `<div class="sig-card">
-            <div class="sig-space"></div>
-            <div class="sig-line"></div>
-            <div class="sig-title">${labels.receivedBy}</div>
-          </div>` : '<div></div>'}
         </div>
       ` : ''}
 
@@ -791,7 +927,7 @@ export function buildHtml(data: PdfInvoiceData): string {
               <div class="section-label">${labels.bankPayment}</div>
               ${data.bankPaymentInfo ? `<div class="bank-text">${escapeHtml(data.bankPaymentInfo)}</div>` : ''}
               ${data.promptPayQrDataUrl ? `
-                <div style="display:flex;gap:12px;align-items:center;margin-top:${data.bankPaymentInfo ? '8px' : '0'};padding-top:${data.bankPaymentInfo ? '8px' : '0'};${data.bankPaymentInfo ? 'border-top:1px dashed #cbd5e1;' : ''}">
+                <div class="promptpay-row" style="display:flex;gap:12px;align-items:center;margin-top:${data.bankPaymentInfo ? '8px' : '0'};padding-top:${data.bankPaymentInfo ? '8px' : '0'};${data.bankPaymentInfo ? 'border-top:1px dashed #cbd5e1;' : ''}">
                   <img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:96px;height:96px;flex-shrink:0"/>
                   <div style="font-size:11px;line-height:1.5;color:#0f172a;">
                     <div style="font-weight:700;color:#0d3b8a;margin-bottom:2px">📱 PromptPay</div>
@@ -813,14 +949,12 @@ export function buildHtml(data: PdfInvoiceData): string {
         </div>
       ` : ''}
 
-      <div class="electronic-cert">
-        <div>
-          ${isElectronicDocument
-            ? `${labels.electronicCertified}`
-            : labels.ordinaryDoc}
+      ${isElectronicDocument ? `
+        <div class="electronic-cert">
+          <div>${labels.electronicCertified}</div>
+          <div class="cert-pill">ELECTRONIC DOCUMENT</div>
         </div>
-        <div class="cert-pill">${isElectronicDocument ? 'ELECTRONIC DOCUMENT' : 'ORDINARY DOCUMENT'}</div>
-      </div>
+      ` : ''}
 
       <div class="footer">
         <div>e-Tax Invoice System &nbsp;|&nbsp; ${isElectronicDocument ? 'e-Tax Electronic Document' : 'Standard Document'}</div>
