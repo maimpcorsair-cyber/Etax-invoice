@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
@@ -18,6 +18,7 @@ import {
   getSuccessUrl,
   isBillingConfigured,
   isPromptPayConfigured,
+  isManualPromptPayQrSelfServeEnabled,
   listBillingPlans,
   listPaymentMethods,
   mapStripeStatus,
@@ -542,7 +543,14 @@ async function syncSubscriptionFromStripeSubscription(subscriptionId: string) {
   }), { role: 'billing-webhook' });
 }
 
-stripeWebhookRouter.post('/stripe/webhook', async (req, res) => {
+// Stripe webhook handler. Registered on BOTH the canonical mount path and
+// the legacy doubled path below — the router is mounted at
+// `/api/billing/stripe/webhook` in index.ts, so a relative `/` here is the
+// canonical endpoint. The old `/stripe/webhook` route produced the doubled
+// path `/api/billing/stripe/webhook/stripe/webhook`; we keep it registered
+// so an existing Stripe dashboard endpoint configured against the old URL
+// does not break while the dashboard is repointed to the canonical path.
+const handleStripeWebhook = async (req: Request, res: Response) => {
   const stripe = getStripeClient();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -788,7 +796,12 @@ stripeWebhookRouter.post('/stripe/webhook', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: (err as Error).message || 'Webhook processing failed' });
   }
-});
+};
+
+// Canonical: POST /api/billing/stripe/webhook
+stripeWebhookRouter.post('/', handleStripeWebhook);
+// Legacy doubled path, kept for backward compatibility: POST /api/billing/stripe/webhook/stripe/webhook
+stripeWebhookRouter.post('/stripe/webhook', handleStripeWebhook);
 
 billingRouter.get('/config', (_req, res) => {
   res.json({
@@ -978,6 +991,14 @@ billingRouter.post('/checkout-session', async (req, res) => {
     }
     if (paymentMethod === 'promptpay_qr' && !isPromptPayConfigured()) {
       res.status(503).json({ error: 'PromptPay QR is not configured' });
+      return;
+    }
+    // When Stripe is configured, route self-serve PromptPay through Stripe
+    // (auto-confirmed via webhook) instead of the manual QR that needs an
+    // owner to approve by hand. Rejects stale/direct clients posting the old
+    // channel so no new signup gets stuck in awaiting_payment.
+    if (paymentMethod === 'promptpay_qr' && !isManualPromptPayQrSelfServeEnabled()) {
+      res.status(400).json({ error: 'Please use Stripe PromptPay for online payment confirmation', usePaymentMethod: 'stripe_promptpay' });
       return;
     }
 

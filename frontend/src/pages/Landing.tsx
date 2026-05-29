@@ -1300,7 +1300,7 @@ export default function Landing() {
                     <div className="sm:col-span-2">
                       <label className="label">{isThai ? 'วิธีชำระเงิน' : 'Payment method'}</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {(config?.paymentMethods ?? []).map((method) => (
+                        {(config?.paymentMethods ?? []).filter((method) => method.enabled).map((method) => (
                           <button
                             key={method.key}
                             type="button"

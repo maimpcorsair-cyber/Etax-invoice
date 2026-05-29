@@ -129,6 +129,18 @@ export function isPromptPayConfigured() {
   return !!getPromptPayTarget();
 }
 
+// Manual PromptPay QR needs the owner to confirm payment by hand in the
+// Owner Plane (no online confirmation). When Stripe is configured, the
+// Stripe PromptPay channel offers the same QR-pay UX but auto-activates
+// the tenant via webhook — so we stop offering the manual QR for self-serve
+// signup and let Stripe PromptPay supersede it. The manual QR + owner
+// "mark paid" path stays available as a fallback only when Stripe is not
+// configured (so PromptPay is still possible without a Stripe account),
+// and the owner mark-paid endpoint keeps working for existing transactions.
+export function isManualPromptPayQrSelfServeEnabled() {
+  return isPromptPayConfigured() && !isBillingConfigured();
+}
+
 export function listPaymentMethods() {
   return [
     {
@@ -148,7 +160,7 @@ export function listPaymentMethods() {
     {
       key: 'promptpay_qr',
       label: 'Manual PromptPay QR',
-      enabled: isPromptPayConfigured(),
+      enabled: isManualPromptPayQrSelfServeEnabled(),
       supportsOnlineConfirmation: false,
       supportsCoupons: true,
     },
