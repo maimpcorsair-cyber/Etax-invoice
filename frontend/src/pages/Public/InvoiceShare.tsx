@@ -28,7 +28,7 @@ interface ShareData {
     pdfUrl: string | null;
   };
   buyer: { nameTh: string; nameEn: string | null; taxId: string };
-  seller: { nameTh: string; nameEn: string | null; taxId: string };
+  seller: { nameTh: string; nameEn: string | null; taxId: string; logoUrl: string | null };
   promptPay: { qrImageDataUrl: string; target: string } | null;
   tokenExp?: number;
 }
@@ -101,6 +101,7 @@ export default function InvoiceShare() {
   const { invoice, buyer, seller, promptPay } = data;
   const docLabel = DOC_TYPE_LABEL[invoice.type] ?? invoice.type;
   const showQr = !!promptPay && !invoice.isPaid;
+  const isOverdue = !invoice.isPaid && !!invoice.dueDate && new Date(invoice.dueDate) < new Date();
 
   return (
     <div className="min-h-screen bg-slate-50 py-6 px-4">
@@ -108,17 +109,27 @@ export default function InvoiceShare() {
         {/* Header card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-slate-500">{docLabel}</p>
-              <h1 className="text-2xl font-bold text-slate-900 mt-1">{invoice.invoiceNumber}</h1>
-              <p className="text-xs text-slate-500 mt-1">ออกเมื่อ {formatThaiDate(invoice.invoiceDate)}</p>
+            <div className="flex items-center gap-3 min-w-0">
+              {seller.logoUrl && (
+                <img
+                  src={seller.logoUrl}
+                  alt={seller.nameTh}
+                  className="h-10 w-10 rounded-lg object-contain border border-slate-100 shrink-0 bg-white"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wider text-slate-500">{docLabel}</p>
+                <h1 className="text-2xl font-bold text-slate-900 mt-1">{invoice.invoiceNumber}</h1>
+                <p className="text-xs text-slate-500 mt-1">ออกเมื่อ {formatThaiDate(invoice.invoiceDate)}</p>
+              </div>
             </div>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+            <span className={`inline-flex items-center shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${
               invoice.isPaid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : invoice.status === 'cancelled' ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                : isOverdue ? 'bg-rose-50 text-rose-700 border border-rose-200'
                 : 'bg-amber-50 text-amber-700 border border-amber-200'
             }`}>
-              {invoice.isPaid ? 'ชำระแล้ว' : invoice.status === 'cancelled' ? 'ยกเลิก' : 'รอชำระ'}
+              {invoice.isPaid ? 'ชำระแล้ว' : invoice.status === 'cancelled' ? 'ยกเลิก' : isOverdue ? 'เกินกำหนด' : 'รอชำระ'}
             </span>
           </div>
 
@@ -136,8 +147,13 @@ export default function InvoiceShare() {
           </div>
 
           {invoice.dueDate && !invoice.isPaid && (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              ครบกำหนดชำระ: <span className="font-semibold">{formatThaiDate(invoice.dueDate)}</span>
+            <div className={`text-xs rounded-lg px-3 py-2 ${
+              isOverdue
+                ? 'text-rose-700 bg-rose-50 border border-rose-100'
+                : 'text-amber-700 bg-amber-50 border border-amber-100'
+            }`}>
+              {isOverdue ? 'เกินกำหนดชำระ: ' : 'ครบกำหนดชำระ: '}
+              <span className="font-semibold">{formatThaiDate(invoice.dueDate)}</span>
             </div>
           )}
         </div>

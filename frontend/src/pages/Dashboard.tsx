@@ -617,10 +617,25 @@ export default function Dashboard() {
                   : 'Start with one sales document, then share a customer link with PDF and payment details.'}
               </p>
             </div>
-            <Link to="/app/invoices/new" className="btn-primary w-full justify-center sm:w-auto">
-              <Plus className="h-4 w-4" />
-              {isThai ? 'สร้างใบแรก' : 'Create first invoice'}
-            </Link>
+            <div className="flex flex-col items-stretch gap-2 sm:items-end sm:w-auto">
+              <Link to="/app/invoices/new" className="btn-primary w-full justify-center sm:w-auto">
+                <Plus className="h-4 w-4" />
+                {isThai ? 'สร้างใบแรก' : 'Create first invoice'}
+              </Link>
+              {stats?.totalInvoices === 0 && (
+                <button
+                  type="button"
+                  onClick={handleSeedDemoData}
+                  disabled={seedingDemo}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2 text-center sm:text-right"
+                >
+                  {seedingDemo
+                    ? (isThai ? 'กำลังสร้าง…' : 'Creating…')
+                    : (isThai ? 'หรือลองด้วยข้อมูลตัวอย่างก่อน' : 'or try with sample data first')}
+                </button>
+              )}
+              {seedError && <p className="text-xs text-rose-600 text-center sm:text-right">{seedError}</p>}
+            </div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {firstInvoiceSteps.map((step, index) => {
@@ -658,34 +673,6 @@ export default function Dashboard() {
             })}
           </div>
         </section>
-      )}
-
-      {stats?.totalInvoices === 0 && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm leading-6 text-emerald-900">
-              <p className="font-semibold">
-                {isThai ? 'ยังไม่มีเอกสาร — อยากทดลองด้วยข้อมูลตัวอย่างไหม?' : 'No documents yet — want to explore with sample data?'}
-              </p>
-              <p className="mt-0.5 text-emerald-800">
-                {isThai
-                  ? 'ระบบจะสร้างลูกค้า สินค้า และใบกำกับตัวอย่าง 2 ใบ ให้ดู (ลบทิ้งภายหลังได้)'
-                  : 'We will create demo customers, products, and 2 sample invoices you can delete later.'}
-              </p>
-              {seedError && <p className="mt-1 text-rose-600">{seedError}</p>}
-            </div>
-            <button
-              type="button"
-              onClick={handleSeedDemoData}
-              disabled={seedingDemo}
-              className="btn-secondary whitespace-nowrap"
-            >
-              {seedingDemo
-                ? (isThai ? 'กำลังสร้าง…' : 'Creating…')
-                : (isThai ? 'ลองด้วยข้อมูลตัวอย่าง' : 'Try with sample data')}
-            </button>
-          </div>
-        </div>
       )}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
