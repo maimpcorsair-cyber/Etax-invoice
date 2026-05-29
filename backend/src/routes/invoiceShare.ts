@@ -4,6 +4,7 @@ import { withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { verifyInvoiceShareToken } from '../services/invoiceShareToken';
 import { buildPromptPayQr } from '../services/promptPayService';
+import { downloadFromStorage, getStorageKeyFromUrl } from '../services/storageService';
 
 // Public viewer for an invoice that the seller shared via LINE / email /
 // SMS using a magic link. Unauthenticated by design — the JWT IS the
@@ -73,7 +74,7 @@ invoiceSharePublicRouter.get('/invoice/:token', async (req, res) => {
         subtotal: invoice.subtotal,
         vatAmount: invoice.vatAmount,
         total: invoice.total,
-        pdfUrl: invoice.pdfUrl,
+        pdfUrl: invoice.pdfUrl ? `/api/share/invoice/${encodeURIComponent(req.params.token)}/pdf` : null,
       },
       buyer: invoice.buyer,
       seller: {
@@ -90,10 +91,9 @@ invoiceSharePublicRouter.get('/invoice/:token', async (req, res) => {
   }
 });
 
-// Public PDF download — same token validates, but we stream the issued
-// PDF blob directly so the buyer can save/share it. If pdfUrl is an S3
-// URL we redirect to a presigned URL; if it's null (cancelled / draft)
-// we 404.
+// Public PDF download — same token validates, then the API streams the
+// private R2/S3 object through our domain. Do not redirect buyers to the
+// stored R2 URL: private buckets return XML auth errors in mobile browsers.
 invoiceSharePublicRouter.get('/invoice/:token/pdf', async (req, res) => {
   const payload = verifyInvoiceShareToken(req.params.token);
   if (!payload) {
@@ -105,17 +105,24 @@ invoiceSharePublicRouter.get('/invoice/:token/pdf', async (req, res) => {
     const invoice = await withSystemRlsContext(prisma, async (tx) => {
       return tx.invoice.findFirst({
         where: { id: payload.invoiceId, companyId: payload.companyId },
-        select: { pdfUrl: true, invoiceNumber: true },
+        select: { companyId: true, pdfUrl: true, invoiceNumber: true },
       });
     });
     if (!invoice?.pdfUrl) {
       res.status(404).json({ error: 'PDF ยังไม่พร้อม กรุณารอสักครู่' });
       return;
     }
-    // If the stored pdfUrl is an absolute URL (Drive / S3 with presigning
-    // already applied or public), redirect. We avoid streaming through
-    // our server for bandwidth reasons.
-    res.redirect(invoice.pdfUrl);
+
+    const storageKey = getStorageKeyFromUrl(invoice.pdfUrl)
+      ?? `invoices/${invoice.companyId}/${invoice.invoiceNumber}.pdf`;
+    const pdf = await downloadFromStorage(storageKey);
+    const safeName = invoice.invoiceNumber.replace(/[^A-Za-z0-9._-]+/g, '_');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', String(pdf.length));
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}.pdf"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(pdf);
   } catch (err) {
     logger.error('[invoiceShare] pdf download failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'โหลด PDF ไม่สำเร็จ' });

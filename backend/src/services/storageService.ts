@@ -42,6 +42,22 @@ export async function uploadToStorage(key: string, body: Buffer, contentType: st
   return `${process.env.S3_ENDPOINT ?? 'https://s3.amazonaws.com'}/${BUCKET}/${key}`;
 }
 
+export function getStorageKeyFromUrl(fileUrl: string): string | null {
+  try {
+    const url = new URL(fileUrl);
+    const endpoint = process.env.S3_ENDPOINT;
+    const bucket = process.env.S3_BUCKET ?? BUCKET;
+    const endpointHost = endpoint ? new URL(endpoint).host : 's3.amazonaws.com';
+    if (url.host !== endpointHost) return null;
+
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts[0] !== bucket || parts.length < 2) return null;
+    return decodeURIComponent(parts.slice(1).join('/'));
+  } catch {
+    return null;
+  }
+}
+
 export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
   return getSignedUrl(s3, command, { expiresIn });

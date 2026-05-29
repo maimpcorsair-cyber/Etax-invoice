@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getStorageServerSideEncryption } from './storageService';
+import { getStorageKeyFromUrl, getStorageServerSideEncryption } from './storageService';
 
 function withEnv(vars: Record<string, string | undefined>, fn: () => void) {
   const original = Object.fromEntries(Object.keys(vars).map((key) => [key, process.env[key]]));
@@ -43,5 +43,27 @@ test('storage SSE can be explicitly configured or disabled', () => {
 
   withEnv({ S3_SERVER_SIDE_ENCRYPTION: 'false' }, () => {
     assert.equal(getStorageServerSideEncryption(), undefined);
+  });
+});
+
+test('storage key parser extracts private R2 object keys from stored file URLs', () => {
+  withEnv({
+    S3_ENDPOINT: 'https://787e4cb5137651c028b17607ba7example.r2.cloudflarestorage.com',
+    S3_BUCKET: 'billboy-documents',
+  }, () => {
+    assert.equal(
+      getStorageKeyFromUrl('https://787e4cb5137651c028b17607ba7example.r2.cloudflarestorage.com/billboy-documents/invoices/company-1/INV-2026-000001.pdf'),
+      'invoices/company-1/INV-2026-000001.pdf',
+    );
+  });
+});
+
+test('storage key parser rejects unrelated public URLs', () => {
+  withEnv({
+    S3_ENDPOINT: 'https://787e4cb5137651c028b17607ba7example.r2.cloudflarestorage.com',
+    S3_BUCKET: 'billboy-documents',
+  }, () => {
+    assert.equal(getStorageKeyFromUrl('https://drive.google.com/file/d/example/view'), null);
+    assert.equal(getStorageKeyFromUrl('not-a-url'), null);
   });
 });
