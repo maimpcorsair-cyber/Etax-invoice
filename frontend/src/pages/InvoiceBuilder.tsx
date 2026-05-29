@@ -372,9 +372,8 @@ export default function InvoiceBuilder() {
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const width = entry.contentRect.width - 64;
-        const height = entry.contentRect.height - 128;
-        const fitScale = Math.min(width / 794, height / 1123);
-        setPreviewScale(Math.min(0.5, Math.max(0.32, fitScale)));
+        const fitScale = width / 794;
+        setPreviewScale(Math.min(0.68, Math.max(0.36, fitScale)));
       }
     });
     observer.observe(previewPanelRef.current);
@@ -914,7 +913,7 @@ export default function InvoiceBuilder() {
         ) : inlinePreviewHtml ? (
           <div className="rounded-3xl bg-white/70 p-4 shadow-inner ring-1 ring-slate-200/70">
             <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
-              <span className="font-medium">{isThai ? 'ตัวอย่างแบบย่อ' : 'Compact preview'}</span>
+              <span className="font-medium">{isThai ? 'ตัวอย่าง A4' : 'A4 preview'}</span>
               <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
                 {Math.round(previewScale * 100)}%
               </span>

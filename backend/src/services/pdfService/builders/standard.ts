@@ -156,9 +156,18 @@ export function buildHtml(data: PdfInvoiceData): string {
     background: #ffffff;
     padding: 20px;
   }
-  .page { max-width: 210mm; margin: 0 auto; }
+  .page {
+    max-width: 210mm;
+    min-height: calc(297mm - 40px);
+    margin: 0 auto;
+    display: flex;
+  }
   .muted-inline { color: #5f6b7a; }
   .document-shell {
+    width: 100%;
+    min-height: inherit;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--accent);
     border-radius: 24px;
     overflow: hidden;
@@ -180,7 +189,14 @@ export function buildHtml(data: PdfInvoiceData): string {
     transform: rotate(-8deg);
     pointer-events: none;
   }
-  .document-body { padding: 28px 30px 24px; position: relative; z-index: 1; }
+  .document-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 30px 24px;
+    position: relative;
+    z-index: 1;
+  }
   .hero {
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr);
@@ -491,7 +507,8 @@ export function buildHtml(data: PdfInvoiceData): string {
     grid-template-columns: minmax(0, 1fr) 170px;
     gap: 16px;
     align-items: stretch;
-    margin-top: 18px;
+    margin-top: auto;
+    padding-top: 18px;
   }
   .bank-box, .online-box {
     border: 1px solid #dde5f0;
@@ -562,7 +579,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     box-shadow: 0 10px 32px rgba(15, 23, 42, 0.06);
   }
   .compact-one-page .document-body {
-    padding: 18px 22px 16px;
+    padding: 20px 22px 18px;
   }
   .compact-one-page .hero {
     grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.85fr);
@@ -678,7 +695,8 @@ export function buildHtml(data: PdfInvoiceData): string {
   .compact-one-page .document-support {
     grid-template-columns: 1fr;
     gap: 10px;
-    margin-top: 12px;
+    margin-top: auto;
+    padding-top: 14px;
   }
   .compact-one-page .promptpay-row img {
     width: 74px !important;
@@ -792,7 +810,10 @@ export function buildHtml(data: PdfInvoiceData): string {
   .theme-minimal-space .hero { border-bottom: 1px solid #e2e8f0; padding-bottom: 28px; }
   .theme-minimal-space .totals-row.grand { background: #f1f5f9; border-radius: 6px; }
 
-  @media print { body { padding: 0; } }
+  @media print {
+    body { padding: 0; }
+    .page { min-height: calc(297mm - 20mm); }
+  }
 </style>
 </head>
 <body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}">

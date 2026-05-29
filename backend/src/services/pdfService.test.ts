@@ -141,6 +141,8 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   });
 
   assert.ok(html.includes('compact-one-page'), 'short ordinary invoice should use compact one-page layout');
+  assert.ok(html.includes('min-height: calc(297mm - 40px)'), 'standard preview should keep an A4-height page frame');
+  assert.ok(html.includes('margin-top: auto'), 'payment/support area should sit toward the bottom on short A4 invoices');
   assert.ok(!html.includes('Electronic Tax Document'), 'ordinary document must not show electronic tax eyebrow');
   assert.ok(!html.includes('ORDINARY DOCUMENT'), 'ordinary document should not spend space on a redundant ordinary badge');
   assert.ok(!html.includes('<div class="signature-grid">'), 'blank signature boxes should not render when no signer is configured');

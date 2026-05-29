@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-29 (invoice template data parity fix)
+Last updated: 2026-05-29 (A4 invoice preview/page fill fix)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -103,6 +103,7 @@ Last CI:
 - Invoice share PDF R2 proxy fix added 2026-05-29: public `/api/share/invoice/:token/pdf` now streams the private R2/S3 PDF object through the backend using the share token instead of redirecting customers to the raw Cloudflare R2 URL (which showed XML `InvalidArgument` / `Authorization` in mobile in-app browsers). `/api/share/invoice/:token` no longer exposes the private R2 URL; it returns the backend PDF endpoint path when ready. Verified with backend typecheck/lint/unit tests, including R2 URL-to-storage-key parsing.
 - T01 due-date UX fix added 2026-05-29: invoice builder now treats T01 (`tax_invoice_receipt`) as cash sale / paid immediately, so the due-date field and 7/15/30/45-day presets show only for T02 (`tax_invoice`). Draft recovery, customer credit-days autofill, preview payload, and save/issue payload no longer carry `dueDate` for T01. Verified with frontend typecheck/lint/build.
 - Invoice template data parity fix added 2026-05-29: marketplace/poster PDF templates now keep seller contact, bank transfer, and PromptPay payment details instead of dropping them versus the standard template, and they hide missing due-date rows for T01 instead of rendering `ครบกำหนด -`. Added a regression test for marketplace T01 payment details/no blank due date. Verified with backend typecheck/lint and focused `pdfService.test.ts`.
+- A4 invoice preview/page fill fix added 2026-05-29: standard invoice HTML now keeps a full A4-height page frame and pushes payment/support content toward the lower page on short one-item invoices, so the PDF no longer looks like content is squeezed into the top half. The invoice builder inline preview now labels the panel "ตัวอย่าง A4" and scales by panel width up to 68% instead of capping at 50%. Verified with backend/frontend typecheck/lint/build and focused `pdfService.test.ts`.
 - Winning Flow Sprint Customer Pay polish added 2026-05-29 (`4f5124d`): InvoiceShare now shows "เกินกำหนด" (rose) badge + rose dueDate row when invoice is past-due and unpaid; backend returns `seller.logoUrl` so the customer share page shows the seller's logo; Dashboard 0-invoice state consolidated — seed-demo moved from a competing green panel to a secondary text link inside the blue first-invoice panel. Verified frontend + backend typecheck clean. IssuedSuccessModal audited: all action grids use `sm:` breakpoints to stack on mobile, `max-h-[92vh] overflow-y-auto` — no layout fix needed.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
