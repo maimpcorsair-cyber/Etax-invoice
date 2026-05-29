@@ -16,11 +16,16 @@ export async function generateInvoiceNumber(companyId: string, type: string): Pr
 
   // Use advisory lock to prevent duplicate invoice numbers under concurrent creation
   return withInvoiceLock(prisma, companyId, async (tx) => {
-    // Find the latest invoice number for this company and type in current year
+    // Find the latest invoice number for this company and type in current year.
+    // Match the exact `PREFIX-YYYY-` shape (with the trailing dash) so a
+    // legacy month-based scheme like `INV-202604-000002` does NOT get caught
+    // by `startsWith('INV-2026')` — that over-match sorts higher than
+    // `INV-2026-000003`, corrupts the parsed sequence, and reissues an
+    // already-used number.
     const latest = await tx.invoice.findFirst({
       where: {
         companyId,
-        invoiceNumber: { startsWith: `${prefix}-${year}` },
+        invoiceNumber: { startsWith: `${prefix}-${year}-` },
       },
       orderBy: { invoiceNumber: 'desc' },
     });

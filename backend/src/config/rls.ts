@@ -92,6 +92,13 @@ export async function withInvoiceLock<T>(
   return prisma.$transaction(async (tx) => {
     // pg_advisory_xact_lock auto-releases at commit/rollback
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+    // Set the tenant RLS context so reads inside the lock (e.g. the
+    // "latest invoice number" lookup) actually see this company's rows.
+    // Without this the transaction has no app.current_company_id, RLS
+    // filters every row out, and the sequence generator restarts from 1 —
+    // colliding with existing numbers on the [companyId, invoiceNumber]
+    // unique constraint and 500ing the issue request.
+    await applyRlsContext(tx, { companyId, systemMode: false });
     return fn(tx);
   }, {
     maxWait: 5000,  // 5s max wait to acquire lock

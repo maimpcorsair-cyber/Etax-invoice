@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
+import { logger } from '../config/logger';
 import { applyInvoiceStockMovements, reverseStockMovementsFor } from '../services/inventoryService';
 import { invoiceQueue, rdSubmissionQueue, enqueueMasterSheetSync } from '../queues';
 import { auditLog } from '../services/auditService';
@@ -554,6 +555,11 @@ invoicesRouter.post('/', async (req, res) => {
     });
   } catch (err) {
     if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('[invoices] create failed', {
+      companyId: req.user?.companyId,
+      type: req.body?.type,
+      err: err instanceof Error ? err.message : String(err),
+    });
     res.status(500).json({ error: 'Failed to create invoice' });
   }
 });
