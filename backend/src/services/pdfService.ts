@@ -251,6 +251,10 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
     promptPayTarget: promptPay?.target ?? null,
   };
 
+  if (mergedData.templateId?.startsWith('builtin:')) {
+    return buildHtml(mergedData);
+  }
+
   const marketplaceTokens = mergedData.templateId ? MARKETPLACE_TEMPLATE_TOKENS[mergedData.templateId] : null;
   if (marketplaceTokens) {
     return buildHtmlMarketplace(mergedData, marketplaceTokens);

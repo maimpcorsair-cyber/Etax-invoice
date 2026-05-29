@@ -148,6 +148,21 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(!html.includes('<div class="signature-grid">'), 'blank signature boxes should not render when no signer is configured');
 });
 
+test('built-in template themes keep the standard accounting document structure', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    templateId: 'builtin:minimal-white',
+    templateName: 'Minimal White',
+    documentMode: 'ordinary',
+    dueDate: null,
+  });
+
+  assert.ok(html.includes('theme-minimal-white'), 'built-in template should map to a standard document theme');
+  assert.ok(html.includes('document-shell'), 'built-in template should keep the standard A4 accounting shell');
+  assert.ok(html.includes('items-section'), 'built-in template should keep the standard line-item section');
+  assert.ok(!html.includes('poster-panel'), 'built-in template should not switch to a different poster/gallery layout');
+});
+
 test('marketplace T01 keeps payment details but hides missing due date', () => {
   const html = buildHtmlMarketplace({
     ...FIXTURE,

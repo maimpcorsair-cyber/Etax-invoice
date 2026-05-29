@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-29 (A4 invoice preview/page fill fix)
+Last updated: 2026-05-29 (invoice template selector + unified A4 accounting layout)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -53,6 +53,7 @@ Last CI:
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml` is modified locally and intentionally not committed.
+- Invoice builder template UX fix is in progress locally: preview toolbar now uses an in-flow dropdown instead of the large gallery panel, and built-in templates render through the standard A4 accounting shell so changing template no longer switches to a different document structure.
 - Day 2 Delivery Note shipped in `f174653`: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
 - Production smoke passed: created `DN-2026-000001`, issued it, marked it delivered, then converted it to draft invoice `DRAFT-202605-112699` (`total=1.07`). A separate diagnostic draft invoice was cancelled after use.
 - Convert fix note: `0cde329` wrapped invoice conversion in tenant RLS context; `9d739f4` makes converted invoices use draft numbering until explicitly issued.

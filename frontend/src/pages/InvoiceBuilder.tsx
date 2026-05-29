@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BriefcaseBusiness, Eye, Download, FileClock, FileText, Maximize2, RotateCcw, Trash2 } from 'lucide-react';
+import { BriefcaseBusiness, ChevronDown, Eye, Download, FileClock, FileText, Maximize2, RotateCcw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -19,9 +19,63 @@ import ItemsTable from '../components/invoice/ItemsTable';
 import NotesPaymentCard from '../components/invoice/NotesPaymentCard';
 import WhtCard from '../components/invoice/WhtCard';
 import PreviewModal from '../components/invoice/PreviewModal';
-import TemplateMarketplace from '../components/invoice/TemplateMarketplace';
 import type { BankAccountProfile, DocumentTemplateOption } from '../types';
-import { builtinDocumentTemplates, supportsDocumentType } from '../lib/documentTemplatePresets';
+import { type BuiltinDocumentTemplate, builtinDocumentTemplates, supportsDocumentType } from '../lib/documentTemplatePresets';
+
+const STANDARD_TEMPLATE_VALUE = '__system_standard__';
+
+const swatchColors: Record<string, string> = {
+  'bg-white': '#fff',
+  'bg-blue-200': '#bfdbfe',
+  'bg-blue-900': '#1e3a8a',
+  'bg-gray-100': '#f3f4f6',
+  'bg-gray-200': '#e5e7eb',
+  'bg-gray-400': '#9ca3af',
+  'bg-gray-800': '#1f2937',
+  'bg-gray-900': '#111827',
+  'bg-slate-100': '#f1f5f9',
+  'bg-slate-300': '#cbd5e1',
+  'bg-slate-400': '#94a3b8',
+  'bg-pink-50': '#fdf2f8',
+  'bg-pink-100': '#fce7f3',
+  'bg-pink-300': '#f9a8d4',
+  'bg-pink-400': '#f472b6',
+  'bg-sky-50': '#f0f9ff',
+  'bg-sky-300': '#7dd3fc',
+  'bg-blue-100': '#dbeafe',
+  'bg-blue-400': '#60a5fa',
+  'bg-yellow-50': '#fefce8',
+  'bg-yellow-100': '#fef9c3',
+  'bg-yellow-300': '#fde047',
+  'bg-yellow-400': '#facc15',
+  'bg-emerald-50': '#ecfdf5',
+  'bg-emerald-100': '#d1fae5',
+  'bg-emerald-300': '#6ee7b7',
+  'bg-emerald-400': '#34d399',
+  'bg-lime-50': '#f7fee7',
+  'bg-lime-300': '#bef264',
+  'bg-violet-50': '#f5f3ff',
+  'bg-violet-100': '#ede9fe',
+  'bg-violet-300': '#c4b5fd',
+  'bg-violet-400': '#a78bfa',
+  'bg-orange-50': '#fff7ed',
+  'bg-amber-300': '#fcd34d',
+};
+
+function renderTemplateSwatches(template?: BuiltinDocumentTemplate | null) {
+  const swatches = template?.swatches ?? ['bg-blue-900', 'bg-blue-200', 'bg-white'];
+  return (
+    <div className="flex shrink-0 gap-1" aria-hidden="true">
+      {swatches.map((cls, index) => (
+        <span
+          key={`${cls}-${index}`}
+          className="h-3 w-3 rounded-full border border-slate-200"
+          style={{ background: swatchColors[cls] ?? '#94a3b8' }}
+        />
+      ))}
+    </div>
+  );
+}
 
 function getInvoiceValidationErrors(params: {
   isThai: boolean;
@@ -128,7 +182,6 @@ export default function InvoiceBuilder() {
   const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
   const [showDraftRecoveryPrompt, setShowDraftRecoveryPrompt] = useState(false);
 
-  const [showMarketplace, setShowMarketplace] = useState(false);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
   const hasCompanyLogo = Boolean(company?.logoUrl);
   const canUseElectronicMode = company?.electronicInvoicingReady === true;
@@ -548,6 +601,9 @@ export default function InvoiceBuilder() {
   const filteredCustomTemplates = templates.filter((t) =>
     t.type === form.docType && (t.language === form.docLanguage || t.language === 'both' || form.docLanguage === 'both'),
   );
+  const selectedBuiltinTemplate = matchingBuiltinTemplates.find((template) => template.id === form.templateId) ?? null;
+  const minimalTemplates = matchingBuiltinTemplates.filter((template) => template.tagEn === 'Minimal');
+  const cuteTemplates = matchingBuiltinTemplates.filter((template) => template.tagEn === 'Cute');
 
   /* ── Stepper dot indicator helper ── */
   function stepperDot(key: SectionKey) {
@@ -729,113 +785,52 @@ export default function InvoiceBuilder() {
     <div ref={previewPanelRef} className="flex h-full min-h-[580px] flex-col overflow-hidden bg-slate-100">
       {/* Preview toolbar */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
-        {/* Template selector button */}
-        <button
-          onClick={() => setShowMarketplace(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 12px 6px 8px',
-            background: '#f8fafc',
-            border: '1.5px solid #e2e8f0',
-            borderRadius: 10,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-            minWidth: 0,
-            flex: 1,
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = '#1e3a8a';
-            (e.currentTarget as HTMLElement).style.background = '#fff';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
-            (e.currentTarget as HTMLElement).style.background = '#f8fafc';
-          }}
-        >
-          {/* Color swatches of current template */}
-          {(() => {
-            const tw: Record<string, string> = {
-              'bg-white': '#fff',
-              'bg-blue-50': '#eff6ff',
-              'bg-blue-100': '#dbeafe',
-              'bg-blue-200': '#bfdbfe',
-              'bg-blue-700': '#1d4ed8',
-              'bg-blue-800': '#1e40af',
-              'bg-blue-900': '#1e3a8a',
-              'bg-blue-950': '#172554',
-              'bg-gray-100': '#f3f4f6',
-              'bg-gray-200': '#e5e7eb',
-              'bg-gray-400': '#9ca3af',
-              'bg-gray-800': '#1f2937',
-              'bg-gray-900': '#111827',
-              'bg-slate-700': '#334155', 'bg-slate-300': '#cbd5e1', 'bg-slate-200': '#e2e8f0',
-              'bg-slate-100': '#f1f5f9',
-              'bg-slate-400': '#94a3b8',
-              'bg-slate-500': '#64748b',
-              'bg-pink-50': '#fdf2f8',
-              'bg-pink-100': '#fce7f3',
-              'bg-pink-300': '#f9a8d4',
-              'bg-pink-400': '#f472b6',
-              'bg-sky-50': '#f0f9ff',
-              'bg-sky-300': '#7dd3fc',
-              'bg-blue-400': '#60a5fa',
-              'bg-yellow-50': '#fefce8',
-              'bg-yellow-100': '#fef9c3',
-              'bg-yellow-300': '#fde047',
-              'bg-yellow-400': '#facc15',
-              'bg-emerald-50': '#ecfdf5',
-              'bg-emerald-100': '#d1fae5',
-              'bg-emerald-300': '#6ee7b7',
-              'bg-emerald-400': '#34d399',
-              'bg-lime-50': '#f7fee7',
-              'bg-lime-300': '#bef264',
-              'bg-violet-50': '#f5f3ff',
-              'bg-violet-100': '#ede9fe',
-              'bg-violet-300': '#c4b5fd',
-              'bg-violet-400': '#a78bfa',
-              'bg-violet-200': '#ddd6fe',
-              'bg-violet-500': '#8b5cf6',
-              'bg-teal-100': '#ccfbf1',
-              'bg-teal-700': '#0f766e',
-              'bg-amber-200': '#fde68a',
-              'bg-amber-500': '#f59e0b',
-              'bg-orange-200': '#fed7aa',
-              'bg-orange-600': '#ea580c',
-              'bg-green-100': '#dcfce7',
-              'bg-green-800': '#166534',
-            };
-            const current = matchingBuiltinTemplates.find(t => t.id === form.templateId);
-            const swatches = current?.swatches ?? ['bg-blue-900', 'bg-blue-200', 'bg-white'];
-            return (
-              <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                {swatches.map((cls, i) => (
-                  <div key={i} style={{
-                    width: 12, height: 12, borderRadius: '50%',
-                    background: tw[cls] ?? '#94a3b8',
-                    border: '1px solid rgba(0,0,0,0.1)',
-                  }} />
-                ))}
-              </div>
-            );
-          })()}
-          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500, lineHeight: 1.2 }}>
-              {isThai ? 'เทมเพลต' : 'Template'}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {form.templateId
-                ? (matchingBuiltinTemplates.find(t => t.id === form.templateId)?.nameTh
-                    ?? filteredCustomTemplates.find(t => t.id === form.templateId)?.name
-                    ?? form.templateId)
-                : (isThai ? 'มาตรฐาน' : 'Standard')}
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-primary-700 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-100">
+          {renderTemplateSwatches(selectedBuiltinTemplate)}
+          <div className="min-w-0 flex-1">
+            <label className="block text-[10px] font-semibold leading-3 text-slate-400">
+              {isThai ? 'เทมเพลตเอกสาร' : 'Document template'}
+            </label>
+            <div className="relative">
+              <select
+                value={form.templateId ?? STANDARD_TEMPLATE_VALUE}
+                onChange={(event) => handleTemplateChange(event.target.value === STANDARD_TEMPLATE_VALUE ? null : event.target.value)}
+                className="w-full appearance-none bg-transparent pr-6 text-xs font-semibold leading-5 text-slate-800 outline-none"
+                aria-label={isThai ? 'เลือกเทมเพลตเอกสาร' : 'Choose document template'}
+              >
+                <option value={STANDARD_TEMPLATE_VALUE}>
+                  {isThai ? 'มาตรฐาน - แบบราชการ A4' : 'Standard - official A4'}
+                </option>
+                {minimalTemplates.length > 0 && (
+                  <optgroup label={isThai ? 'เรียบง่าย / ทางการ' : 'Minimal / official'}>
+                    {minimalTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {isThai ? template.nameTh : template.nameEn}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {cuteTemplates.length > 0 && (
+                  <optgroup label={isThai ? 'สีพาสเทล / ร้านค้า' : 'Pastel / shop'}>
+                    {cuteTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {isThai ? template.nameTh : template.nameEn}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {filteredCustomTemplates.length > 0 && (
+                  <optgroup label={isThai ? 'เทมเพลตบริษัท' : 'Company templates'}>
+                    {filteredCustomTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>{template.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             </div>
           </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-          </svg>
-        </button>
+        </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Updating badge */}
@@ -1132,15 +1127,6 @@ export default function InvoiceBuilder() {
         onClose={preview.closePreview}
       />
 
-      <TemplateMarketplace
-        isOpen={showMarketplace}
-        onClose={() => setShowMarketplace(false)}
-        selectedTemplateId={form.templateId}
-        onSelect={(id) => handleTemplateChange(id)}
-        docType={form.docType}
-        customTemplates={filteredCustomTemplates}
-        isThai={isThai}
-      />
     </div>
   );
 }
