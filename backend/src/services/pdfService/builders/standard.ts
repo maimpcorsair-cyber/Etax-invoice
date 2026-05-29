@@ -2,6 +2,8 @@ import { DOC_TITLE, buildOnlineViewUrl, compileTemplateHtml, escapeHtml, formatC
 import { amountInWordsThai, amountInWordsEnglish } from '../../invoiceService';
 import type { PdfInvoiceData } from '../../pdfService';
 
+const ONE_PAGE_ITEM_LIMIT = 8;
+
 export function buildHtml(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
@@ -131,7 +133,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     ...(data.paymentMethod ? [{ label: labels.paymentMethod, value: data.paymentMethod }] : []),
   ];
   const isElectronicDocument = data.documentMode === 'electronic';
-  const onePageCompact = !customTemplateBlock && data.items.length <= 3;
+  const onePageCompact = !customTemplateBlock && data.items.length <= ONE_PAGE_ITEM_LIMIT;
   const documentEyebrow = isElectronicDocument
     ? 'Electronic Tax Document'
     : (isTh ? 'เอกสาร' : 'Document');
@@ -571,20 +573,20 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
   .footer-right { text-align: right; }
   .compact-one-page {
-    padding: 8px;
-    font-size: 11.5px;
+    padding: 0;
+    font-size: 11px;
   }
   .compact-one-page .document-shell {
-    border-radius: 18px;
-    box-shadow: 0 10px 32px rgba(15, 23, 42, 0.06);
+    border-radius: 2px;
+    box-shadow: none;
   }
   .compact-one-page .document-body {
-    padding: 20px 22px 18px;
+    padding: 16px 18px 12px;
   }
   .compact-one-page .hero {
     grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.85fr);
-    gap: 16px;
-    padding-bottom: 12px;
+    gap: 12px;
+    padding-bottom: 9px;
   }
   .compact-one-page .company-name {
     font-size: 18px;
@@ -593,12 +595,12 @@ export function buildHtml(data: PdfInvoiceData): string {
   .compact-one-page .company-legal,
   .compact-one-page .party-detail,
   .compact-one-page .bank-text {
-    font-size: 10.5px;
-    line-height: 1.45;
+    font-size: 10px;
+    line-height: 1.35;
   }
   .compact-one-page .title-card {
-    border-radius: 16px;
-    padding: 12px 14px;
+    border-radius: 2px;
+    padding: 10px 12px;
   }
   .compact-one-page .title-card h1 {
     font-size: 23px;
@@ -613,18 +615,18 @@ export function buildHtml(data: PdfInvoiceData): string {
     font-size: 9.5px;
   }
   .compact-one-page .overview-grid {
-    gap: 12px;
-    margin: 13px 0 12px;
+    gap: 10px;
+    margin: 10px 0 9px;
   }
   .compact-one-page .party-card {
-    padding: 12px;
+    padding: 10px;
   }
   .compact-one-page .party-column {
-    min-height: 88px;
-    padding: 10px 11px;
+    min-height: 78px;
+    padding: 8px 10px;
   }
   .compact-one-page .meta-card {
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
   .compact-one-page .section-label {
     margin-bottom: 7px;
@@ -642,29 +644,29 @@ export function buildHtml(data: PdfInvoiceData): string {
     font-size: 13px;
   }
   .compact-one-page .items-section {
-    border-radius: 15px;
+    border-radius: 2px;
   }
   .compact-one-page .items-header {
-    padding: 9px 13px 8px;
+    padding: 7px 10px 6px;
   }
   .compact-one-page table {
-    font-size: 10.5px;
+    font-size: 9.8px;
   }
   .compact-one-page thead th,
   .compact-one-page tbody td {
-    padding: 7px 6px;
+    padding: 5px 5px;
   }
   .compact-one-page .summary-grid {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 12px;
-    margin-top: 12px;
+    grid-template-columns: minmax(0, 1fr) 270px;
+    gap: 10px;
+    margin-top: 9px;
   }
   .compact-one-page .notes-card,
   .compact-one-page .words-card,
   .compact-one-page .totals-card,
   .compact-one-page .bank-box,
   .compact-one-page .online-box {
-    border-radius: 13px;
+    border-radius: 2px;
   }
   .compact-one-page .notes-card,
   .compact-one-page .words-card,
@@ -687,25 +689,25 @@ export function buildHtml(data: PdfInvoiceData): string {
     grid-template-columns: 1fr;
   }
   .compact-one-page .sig-card {
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
   .compact-one-page .sig-space {
     height: 34px;
   }
   .compact-one-page .document-support {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
     margin-top: auto;
-    padding-top: 14px;
+    padding-top: 10px;
   }
   .compact-one-page .promptpay-row img {
-    width: 74px !important;
-    height: 74px !important;
+    width: 64px !important;
+    height: 64px !important;
   }
   .compact-one-page .footer {
-    margin-top: 10px;
-    padding-top: 9px;
-    font-size: 9.5px;
+    margin-top: 8px;
+    padding-top: 6px;
+    font-size: 9px;
   }
   .theme-paid .document-shell { border-width: 2px; }
   .theme-paid .title-card::after {
@@ -810,9 +812,43 @@ export function buildHtml(data: PdfInvoiceData): string {
   .theme-minimal-space .hero { border-bottom: 1px solid #e2e8f0; padding-bottom: 28px; }
   .theme-minimal-space .totals-row.grand { background: #f1f5f9; border-radius: 6px; }
 
+  .document-shell,
+  .brand-logo,
+  .doc-logo-right,
+  .title-card,
+  .copy-pill,
+  .template-badge,
+  .template-banner,
+  .party-card,
+  .meta-card,
+  .notes-card,
+  .words-card,
+  .totals-card,
+  .party-column,
+  .items-section,
+  .sig-card,
+  .bank-box,
+  .online-box,
+  .online-qr,
+  .cert-pill {
+    border-radius: 2px !important;
+  }
+
   @media print {
-    body { padding: 0; }
-    .page { min-height: calc(297mm - 20mm); }
+    body,
+    .compact-one-page {
+      padding: 0;
+    }
+
+    .page {
+      width: calc(210mm - 20mm);
+      min-height: calc(297mm - 20mm);
+    }
+
+    .compact-one-page .page {
+      height: calc(297mm - 20mm);
+      overflow: hidden;
+    }
   }
 </style>
 </head>
@@ -951,7 +987,7 @@ export function buildHtml(data: PdfInvoiceData): string {
                 <div class="promptpay-row" style="display:flex;gap:12px;align-items:center;margin-top:${data.bankPaymentInfo ? '8px' : '0'};padding-top:${data.bankPaymentInfo ? '8px' : '0'};${data.bankPaymentInfo ? 'border-top:1px dashed #cbd5e1;' : ''}">
                   <img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:96px;height:96px;flex-shrink:0"/>
                   <div style="font-size:11px;line-height:1.5;color:#0f172a;">
-                    <div style="font-weight:700;color:#0d3b8a;margin-bottom:2px">📱 PromptPay</div>
+                    <div style="font-weight:700;color:#0d3b8a;margin-bottom:2px">PromptPay</div>
                     <div>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} <strong>${formatCurrency(data.total)}</strong></div>
                     ${data.promptPayTarget ? `<div style="color:#64748b;margin-top:2px">${escapeHtml(String(data.promptPayTarget))}</div>` : ''}
                     <div style="color:#94a3b8;margin-top:2px;font-size:10px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</div>

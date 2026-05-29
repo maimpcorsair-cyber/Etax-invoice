@@ -148,6 +148,35 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(!html.includes('<div class="signature-grid">'), 'blank signature boxes should not render when no signer is configured');
 });
 
+test('standard ordinary document keeps up to eight items in compact one-page layout', () => {
+  const eightItems = Array.from({ length: 8 }, (_, idx) => {
+    const base = FIXTURE.items[idx % FIXTURE.items.length]!;
+    return {
+      ...base,
+      nameTh: `รายการทดสอบ ${idx + 1}`,
+      nameEn: `Test line ${idx + 1}`,
+    };
+  });
+
+  const html = buildHtml({
+    ...FIXTURE,
+    items: eightItems,
+    documentMode: 'ordinary',
+    dueDate: null,
+    bankPaymentInfo: 'ธนาคาร: Kbank\nเลขที่บัญชี: 0231367705',
+    promptPayQrDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    promptPayTarget: '0819918896',
+    signatureImageUrl: null,
+    signerName: '',
+    signerTitle: '',
+  });
+
+  assert.ok(html.includes('compact-one-page'), 'up to eight line items should use the tight one-page A4 layout');
+  assert.ok(html.includes('.compact-one-page {\n    padding: 0;'), 'compact one-page layout should not add overflow padding');
+  assert.ok(html.includes('height: calc(297mm - 20mm)'), 'printed compact A4 should have a fixed content-height box');
+  assert.ok(!html.includes('📱'), 'invoice PDFs should not render emoji labels');
+});
+
 test('built-in template themes keep the standard accounting document structure', () => {
   const html = buildHtml({
     ...FIXTURE,
