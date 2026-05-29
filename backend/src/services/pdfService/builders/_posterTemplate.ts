@@ -137,6 +137,7 @@ export function buildHtmlPosterTemplate(data: PdfInvoiceData, tokens: PosterTemp
   const sellerBranch = data.seller.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.seller.branchCode;
   const buyerBranch = data.buyer.branchCode === '00000' ? (isTh ? 'สำนักงานใหญ่' : 'Head Office') : data.buyer.branchCode;
   const isDark = tokens.group === 'dark';
+  const sellerContact = [data.seller.phone, data.seller.email].filter(Boolean).join(' | ');
 
   const itemRows = data.items.map((item, idx) => {
     const name = isTh ? item.nameTh : (item.nameEn ?? item.nameTh);
@@ -219,14 +220,14 @@ export function buildHtmlPosterTemplate(data: PdfInvoiceData, tokens: PosterTemp
       <div class="hero-top">
         <div class="seller-lockup">
           ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="logo-img" src="${data.seller.logoUrl}" alt="logo"/>` : ''}
-          <div><div class="eyebrow">${isTh ? 'ผู้ขาย' : 'Seller'}</div><div class="company-name">${escapeHtml(sellerName)}</div><div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}</div></div>
+          <div><div class="eyebrow">${isTh ? 'ผู้ขาย' : 'Seller'}</div><div class="company-name">${escapeHtml(sellerName)}</div><div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}${sellerContact ? `<br/>${escapeHtml(sellerContact)}` : ''}</div></div>
         </div>
         <div class="doc-head"><div class="doc-title">${escapeHtml(docTitle)}</div><div class="doc-subtitle">${tokens.subtitle}</div><div class="copy-pill">${isTh ? 'ต้นฉบับ' : 'ORIGINAL'}</div></div>
       </div>
       <div class="meta-strip">
         <div class="meta-cell"><div class="meta-label">${isTh ? 'เลขที่' : 'No.'}</div><div class="meta-value">${escapeHtml(data.invoiceNumber)}</div></div>
         <div class="meta-cell"><div class="meta-label">${isTh ? 'วันที่' : 'Date'}</div><div class="meta-value">${escapeHtml(dateStr)}</div></div>
-        <div class="meta-cell"><div class="meta-label">${isTh ? 'ครบกำหนด' : 'Due'}</div><div class="meta-value">${escapeHtml(dueStr || '-')}</div></div>
+        ${dueStr ? `<div class="meta-cell"><div class="meta-label">${isTh ? 'ครบกำหนด' : 'Due'}</div><div class="meta-value">${escapeHtml(dueStr)}</div></div>` : ''}
       </div>
     </div>
     <div class="poster-panel">${tokens.art}</div>
@@ -246,6 +247,7 @@ export function buildHtmlPosterTemplate(data: PdfInvoiceData, tokens: PosterTemp
       <div class="info-box"><div class="section-label">${isTh ? 'จำนวนเงินเป็นตัวอักษร' : 'Amount in Words'}</div><div class="info-text"><strong>${escapeHtml(totalWords)}</strong></div></div>
       ${data.notes ? `<div class="info-box"><div class="section-label">${isTh ? 'หมายเหตุ' : 'Notes'}</div><div class="info-text">${escapeHtml(data.notes)}</div></div>` : ''}
       ${data.bankPaymentInfo ? `<div class="info-box"><div class="section-label">${isTh ? 'ช่องทางชำระเงิน' : 'Payment Details'}</div><div class="info-text">${escapeHtml(data.bankPaymentInfo)}</div></div>` : ''}
+      ${data.promptPayQrDataUrl ? `<div class="info-box" style="display:flex;gap:12px;align-items:center"><img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:88px;height:88px;flex-shrink:0;background:#fff;border:1px solid ${tokens.border};border-radius:10px;padding:4px"/><div class="info-text" style="white-space:normal"><strong>PromptPay</strong><br/>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} ${escapeHtml(formatCurrency(data.total))}${data.promptPayTarget ? `<br/>${escapeHtml(String(data.promptPayTarget))}` : ''}<br/><span style="color:${tokens.muted};font-size:10px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</span></div></div>` : ''}
     </div>
     <div class="total-box"><div class="total-title">${isTh ? 'สรุปยอด' : 'Summary'}</div><div class="total-row"><span>${isTh ? 'ยอดก่อน VAT' : 'Subtotal'}</span><strong>${formatCurrency(data.subtotal)} THB</strong></div><div class="total-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><strong>${formatCurrency(data.vatAmount)} THB</strong></div><div class="total-row grand"><span>${isTh ? 'ยอดรวมสุทธิ' : 'Grand Total'}</span><strong>${formatCurrency(data.total)} THB</strong></div></div>
   </div>
@@ -258,4 +260,3 @@ export function buildHtmlPosterTemplate(data: PdfInvoiceData, tokens: PosterTemp
   <div class="footer"><div>${data.documentMode === 'electronic' ? (isTh ? 'เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax' : 'Electronic e-Tax document') : (isTh ? 'เอกสารฉบับปกติ' : 'Ordinary document')}</div><div>${escapeHtml(docTitle)} · ${escapeHtml(data.invoiceNumber)}</div></div>
 </div></div></body></html>`;
 }
-

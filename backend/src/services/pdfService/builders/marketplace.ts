@@ -291,6 +291,11 @@ export function buildHtmlGeneratedTemplate(data: PdfInvoiceData, tokens: Marketp
   const totalWords = isTh
     ? amountInWordsThai(data.total)
     : isEn ? amountInWordsEnglish(data.total) : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
+  const sellerContact = [data.seller.phone, data.seller.email].filter(Boolean).join(' | ');
+  const paymentInfoBlock = [
+    data.notes ? escapeHtml(data.notes) : '',
+    data.bankPaymentInfo ? escapeHtml(data.bankPaymentInfo) : '',
+  ].filter(Boolean).join('<br/>');
   const layout = resolvePrintTemplateLayout(tokens);
   const cuteTemplateDecor = layout.tone === 'cute';
   const titleColor = cuteTemplateDecor ? tokens.accent : '#1f2937';
@@ -384,6 +389,9 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
 .words{left:${layout.contentLeft}px;top:${layout.wordsTop}px;width:390px;padding:9px 0}
 .words-text{font-size:11px;line-height:1.55;color:${rowText};font-weight:700}
 .notes{left:${layout.contentLeft}px;top:${layout.notesTop}px;width:390px;font-size:10.5px;line-height:1.55;color:${tokens.muted};white-space:pre-line}
+.promptpay-inline{display:flex;gap:10px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(148,163,184,.45);white-space:normal;color:${rowText}}
+.promptpay-inline img{width:68px;height:68px;object-fit:contain;background:#fff;border:1px solid ${tokens.border};border-radius:8px;padding:4px;flex:0 0 auto}
+.promptpay-inline strong{color:${rowText}}
 .totals{right:${layout.contentLeft}px;top:${layout.totalsTop}px;width:282px;border:1px solid ${tokens.border};border-radius:${borderRadius}px;background:rgba(255,255,255,.9);overflow:hidden}
 .total-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 14px;font-size:11.3px;color:${tokens.muted};border-bottom:1px solid rgba(148,163,184,.24)}
 .total-row strong{font-weight:800;color:${rowText}}
@@ -408,18 +416,18 @@ body{font-family:'Sarabun',sans-serif;background:#f5f5f5;color:${rowText};font-s
   <div class="layer seller">
     ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="seller-logo" src="${data.seller.logoUrl}" alt="logo"/>` : ''}
     <div class="company-name">${escapeHtml(sellerName)}</div>
-    <div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}</div>
+    <div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}${sellerContact ? `<br/>${escapeHtml(sellerContact)}` : ''}</div>
   </div>
   <div class="layer doc"><div class="doc-title">${escapeHtml(docTitle)}</div><div class="doc-sub">TAX INVOICE</div><div class="copy">${isTh ? 'ต้นฉบับ' : 'ORIGINAL'}</div></div>
   <div class="layer meta">
     <div class="meta-row"><div class="meta-key">${isTh ? 'เลขที่' : 'No.'}</div><div class="meta-val">${escapeHtml(data.invoiceNumber)}</div></div>
     <div class="meta-row"><div class="meta-key">${isTh ? 'วันที่' : 'Date'}</div><div class="meta-val">${escapeHtml(dateStr)}</div></div>
-    <div class="meta-row"><div class="meta-key">${isTh ? 'ครบกำหนด' : 'Due'}</div><div class="meta-val">${escapeHtml(dueStr || '-')}</div></div>
+    ${dueStr ? `<div class="meta-row"><div class="meta-key">${isTh ? 'ครบกำหนด' : 'Due'}</div><div class="meta-val">${escapeHtml(dueStr)}</div></div>` : ''}
   </div>
   <div class="layer buyer"><div class="label">${isTh ? 'ผู้ซื้อ / Bill To' : 'Bill To'}</div><div class="buyer-name">${escapeHtml(buyerName)}</div><div class="buyer-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: <strong>${escapeHtml(data.buyer.taxId)}</strong><br/>${isTh ? 'สาขา' : 'Branch'}: <strong>${escapeHtml(buyerBranch)}</strong><br/>${escapeHtml(buyerAddr)}</div></div>
   <div class="layer table-wrap"><table class="table"><colgroup><col/><col/><col/><col/><col/><col/></colgroup><thead><tr><th>${isTh ? 'ลำดับ' : 'No.'}</th><th>${isTh ? 'รายการ' : 'Description'}</th><th>${isTh ? 'จำนวน' : 'Qty'}</th><th>${isTh ? 'หน่วย' : 'Unit'}</th><th>${isTh ? 'ราคา/หน่วย' : 'Unit Price'}</th><th>${isTh ? 'จำนวนเงิน' : 'Amount'}</th></tr></thead><tbody>${itemRows}${emptyRows}</tbody></table></div>
   <div class="layer words"><div class="label">${isTh ? 'จำนวนเงินเป็นตัวอักษร' : 'Amount in Words'}</div><div class="words-text">${escapeHtml(totalWords)}</div></div>
-  ${data.notes || data.bankPaymentInfo ? `<div class="layer notes">${data.notes ? escapeHtml(data.notes) : ''}${data.notes && data.bankPaymentInfo ? '<br/>' : ''}${data.bankPaymentInfo ? escapeHtml(data.bankPaymentInfo) : ''}</div>` : ''}
+  ${paymentInfoBlock || data.promptPayQrDataUrl ? `<div class="layer notes">${paymentInfoBlock}${data.promptPayQrDataUrl ? `<div class="promptpay-inline"><img src="${data.promptPayQrDataUrl}" alt="PromptPay QR"/><div><strong>PromptPay</strong><br/>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} ${escapeHtml(formatCurrency(data.total))}${data.promptPayTarget ? `<br/>${escapeHtml(String(data.promptPayTarget))}` : ''}<br/><span style="color:${tokens.muted};font-size:9px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</span></div></div>` : ''}</div>` : ''}
   <div class="layer totals">
     <div class="total-row"><span>${isTh ? 'ยอดรวม' : 'Subtotal'}</span><strong>${formatCurrency(data.subtotal)}</strong></div>
     <div class="total-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><strong>${formatCurrency(data.vatAmount)}</strong></div>
@@ -451,6 +459,7 @@ export function buildHtmlMarketplace(data: PdfInvoiceData, tokens: MarketplaceTe
   const totalWords = isTh
     ? amountInWordsThai(data.total)
     : isEn ? amountInWordsEnglish(data.total) : `${amountInWordsThai(data.total)} / ${amountInWordsEnglish(data.total)}`;
+  const fallbackSellerContact = [data.seller.phone, data.seller.email].filter(Boolean).join(' | ');
   const dark = !!tokens.dark;
   const coloredTableDecor = ['cube', 'leaf', 'seal', 'gradient', 'truck', 'anime', 'line', 'darkAccent', 'bunny', 'cloudBear', 'sunflower', 'leafMascot', 'cat', 'cactus', 'rainbow'];
   const tableHeadText = dark || coloredTableDecor.includes(tokens.decor) ? '#ffffff' : tokens.text;
@@ -517,14 +526,14 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:${tok
   <div class="header">
     <div class="brand">
       ${data.showCompanyLogo !== false && data.seller.logoUrl ? `<img class="logo" src="${data.seller.logoUrl}" alt="logo"/>` : `<div class="logo">${tokens.id}</div>`}
-      <div><div class="company-name">${escapeHtml(sellerName)}</div><div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}</div></div>
+      <div><div class="company-name">${escapeHtml(sellerName)}</div><div class="company-detail">${isTh ? 'เลขประจำตัวผู้เสียภาษี' : 'Tax ID'}: ${escapeHtml(data.seller.taxId)}<br/>${isTh ? 'สาขา' : 'Branch'}: ${escapeHtml(sellerBranch)}<br/>${escapeHtml(sellerAddr)}${fallbackSellerContact ? `<br/>${escapeHtml(fallbackSellerContact)}` : ''}</div></div>
     </div>
     <div class="doc">
       <div class="doc-title">${escapeHtml(docTitle)}</div><div class="doc-sub">TAX INVOICE</div><div class="copy">${isTh ? 'ต้นฉบับ' : 'ORIGINAL'}</div>
       <div class="meta-box">
         <div class="meta-row"><div class="meta-key">${isTh ? 'เลขที่' : 'No.'}</div><div class="meta-val">${escapeHtml(data.invoiceNumber)}</div></div>
         <div class="meta-row"><div class="meta-key">${isTh ? 'วันที่' : 'Date'}</div><div class="meta-val">${escapeHtml(dateStr)}</div></div>
-        <div class="meta-row"><div class="meta-key">${isTh ? 'เครดิต' : 'Credit'}</div><div class="meta-val">${dueStr ? escapeHtml(dueStr) : '-'}</div></div>
+        ${dueStr ? `<div class="meta-row"><div class="meta-key">${isTh ? 'เครดิต' : 'Credit'}</div><div class="meta-val">${escapeHtml(dueStr)}</div></div>` : ''}
       </div>
     </div>
   </div><div class="accent-bar"></div>
@@ -540,6 +549,7 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:${tok
       <div class="info"><div class="label">${isTh ? 'จำนวนเงินเป็นตัวอักษร' : 'Amount in Words'}</div><div class="info-text"><strong>${escapeHtml(totalWords)}</strong></div></div>
       ${data.notes ? `<div class="info"><div class="label">${isTh ? 'หมายเหตุ' : 'Notes'}</div><div class="info-text">${escapeHtml(data.notes ?? '')}</div></div>` : ''}
       ${data.bankPaymentInfo ? `<div class="info"><div class="label">${isTh ? 'ช่องทางชำระเงิน' : 'Payment Details'}</div><div class="info-text">${escapeHtml(data.bankPaymentInfo ?? '')}</div></div>` : ''}
+      ${data.promptPayQrDataUrl ? `<div class="info" style="display:flex;gap:12px;align-items:center"><img src="${data.promptPayQrDataUrl}" alt="PromptPay QR" style="width:88px;height:88px;flex-shrink:0;background:#fff;border:1px solid ${tokens.border};border-radius:10px;padding:4px"/><div class="info-text" style="white-space:normal"><strong>PromptPay</strong><br/>${isTh ? 'สแกนเพื่อชำระยอด' : 'Scan to pay'} ${escapeHtml(formatCurrency(data.total))}${data.promptPayTarget ? `<br/>${escapeHtml(String(data.promptPayTarget))}` : ''}<br/><span style="color:${tokens.muted};font-size:10px">${isTh ? 'อ้างอิง' : 'Ref'}: ${escapeHtml(data.invoiceNumber)}</span></div></div>` : ''}
     </div><div class="totals"><div class="total-title">${isTh ? 'สรุปยอด' : 'Summary'}</div><div class="total-row"><span>${isTh ? 'ยอดรวม' : 'Subtotal'}</span><strong>${formatCurrency(data.subtotal)}</strong></div><div class="total-row"><span>${isTh ? 'ภาษีมูลค่าเพิ่ม 7%' : 'VAT 7%'}</span><strong>${formatCurrency(data.vatAmount)}</strong></div><div class="total-row grand"><span>${isTh ? 'ยอดรวมสุทธิ' : 'Grand Total'}</span><strong>${formatCurrency(data.total)}</strong></div></div></div>
     <div class="support">
       <div class="sig"><div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="signature"/>` : ''}</div><div class="sig-line"></div><div class="sig-label">${isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : 'Prepared by / Issuer'}</div>${(data.signerName || data.signerTitle) ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>` : ''}</div>

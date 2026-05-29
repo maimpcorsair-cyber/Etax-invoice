@@ -21,8 +21,10 @@ import {
   buildHtmlDark,
   buildHtmlAnime,
   buildHtmlCrayon,
+  buildHtmlMarketplace,
   type PdfInvoiceData,
 } from './pdfService';
+import { MARKETPLACE_TEMPLATE_TOKENS } from './pdfService/builders/marketplace';
 
 const FIXTURE: PdfInvoiceData = {
   invoiceNumber: 'IV-2026-000128',
@@ -142,6 +144,22 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(!html.includes('Electronic Tax Document'), 'ordinary document must not show electronic tax eyebrow');
   assert.ok(!html.includes('ORDINARY DOCUMENT'), 'ordinary document should not spend space on a redundant ordinary badge');
   assert.ok(!html.includes('<div class="signature-grid">'), 'blank signature boxes should not render when no signer is configured');
+});
+
+test('marketplace T01 keeps payment details but hides missing due date', () => {
+  const html = buildHtmlMarketplace({
+    ...FIXTURE,
+    type: 'tax_invoice_receipt',
+    dueDate: null,
+    documentMode: 'ordinary',
+    bankPaymentInfo: 'ธนาคาร: Kbank\nเลขที่บัญชี: 0231367705',
+    promptPayQrDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    promptPayTarget: '0819918896',
+  }, MARKETPLACE_TEMPLATE_TOKENS['builtin:minimal-white']);
+
+  assert.ok(html.includes('PromptPay'), 'marketplace template should render PromptPay payment details');
+  assert.ok(html.includes('0231367705'), 'marketplace template should keep bank transfer details');
+  assert.ok(!html.includes('ครบกำหนด</div><div class="meta-val">-'), 'T01 should not render a blank due-date row');
 });
 
 test('all builders accept the 5 document types without throwing', () => {
