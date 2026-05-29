@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import type { Invoice, InvoiceItem, InvoiceType, Language } from '../types';
 import { emptyItem, calculateItem, translateZodMessage } from '../utils/invoiceHelpers';
@@ -94,12 +94,19 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   // Tracks whether user explicitly dismissed (Cancel) the draft recovery prompt —
   // used to suppress the auto-save interval so it doesn't re-create the same draft.
   const [userDismissedDraft, setUserDismissedDraft] = useState(false);
+  const supportsDueDate = docType === 'tax_invoice';
+
+  useEffect(() => {
+    if (!supportsDueDate && dueDate) {
+      setDueDate('');
+    }
+  }, [supportsDueDate, dueDate]);
 
   /* ── Auto-save draft to localStorage ── */
   const saveDraftToStorage = useCallback(() => {
     try {
       const draft = {
-        docType, docLanguage, invoiceDate, dueDate, referenceDocNumber,
+        docType, docLanguage, invoiceDate, dueDate: supportsDueDate ? dueDate : '', referenceDocNumber,
         items, notes, paymentMethod, documentLogoUrl: logoUrl, showCompanyLogo, templateId,
         documentMode, bankPaymentInfo, signatureImageUrl, signerName, signerTitle,
         whtRate,
@@ -109,7 +116,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     } catch {
       // localStorage may be unavailable (private browsing, full quota)
     }
-  }, [docType, docLanguage, invoiceDate, dueDate, referenceDocNumber, items, notes,
+  }, [docType, docLanguage, invoiceDate, dueDate, supportsDueDate, referenceDocNumber, items, notes,
       paymentMethod, logoUrl, showCompanyLogo, templateId, documentMode,
       bankPaymentInfo, signatureImageUrl, signerName, signerTitle, whtRate]);
 
@@ -264,7 +271,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     type: docType,
     language: docLanguage,
     invoiceDate,
-    dueDate: dueDate || undefined,
+    dueDate: supportsDueDate && dueDate ? dueDate : undefined,
     customerId,
     asDraft,
     items: items.map((item) => ({

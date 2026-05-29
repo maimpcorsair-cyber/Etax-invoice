@@ -292,7 +292,7 @@ export default function InvoiceBuilder() {
     type: form.docType,
     language: form.docLanguage,
     invoiceDate: form.invoiceDate,
-    dueDate: form.dueDate || undefined,
+    dueDate: form.docType === 'tax_invoice' && form.dueDate ? form.dueDate : undefined,
     items: form.items.map((item) => ({
       nameTh: item.nameTh,
       nameEn: item.nameEn || '',
@@ -653,7 +653,7 @@ export default function InvoiceBuilder() {
               customer.setSelectedCustomerId(selectedCustomer.id);
               customer.setCustomerSearch(name);
               customer.clearResults();
-              if (!form.dueDate && selectedCustomer.creditDays !== null && selectedCustomer.creditDays !== undefined) {
+              if (form.docType === 'tax_invoice' && !form.dueDate && selectedCustomer.creditDays !== null && selectedCustomer.creditDays !== undefined) {
                 const nextDueDate = addCalendarDays(form.invoiceDate, Number(selectedCustomer.creditDays));
                 if (nextDueDate) form.setDueDate(nextDueDate);
               }

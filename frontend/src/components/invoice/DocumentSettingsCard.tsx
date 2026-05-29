@@ -33,6 +33,7 @@ export default function DocumentSettingsCard({
   const { isThai } = useLanguage();
   const needsRefDoc =
     docType === 'receipt' || docType === 'credit_note' || docType === 'debit_note';
+  const supportsDueDate = docType === 'tax_invoice';
   const dueDatePresets = [7, 15, 30, 45];
   const docTypeDescriptions: Record<InvoiceType, { title: string; description: string }> = {
     tax_invoice: {
@@ -80,7 +81,7 @@ export default function DocumentSettingsCard({
         <p className="mt-1 text-sm leading-6 text-slate-600">{currentDocType.description}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${supportsDueDate ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
         <div>
           <label className="label">
             {isThai ? 'ประเภทเอกสาร' : 'Document Type'}
@@ -130,36 +131,38 @@ export default function DocumentSettingsCard({
               : 'The issue date printed on the tax document.'}
           </p>
         </div>
-        <div>
-          <label className="label">{t('invoice.dueDate')}</label>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => onDueDateChange(e.target.value)}
-            className="input-field"
-          />
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {dueDatePresets.map((days) => (
-              <button
-                key={days}
-                type="button"
-                disabled={!invoiceDate}
-                onClick={() => {
-                  const nextDueDate = addCalendarDays(invoiceDate, days);
-                  if (nextDueDate) onDueDateChange(nextDueDate);
-                }}
-                className="min-h-9 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {isThai ? `${days} วัน` : `${days} days`}
-              </button>
-            ))}
+        {supportsDueDate ? (
+          <div>
+            <label className="label">{t('invoice.dueDate')}</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => onDueDateChange(e.target.value)}
+              className="input-field"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {dueDatePresets.map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  disabled={!invoiceDate}
+                  onClick={() => {
+                    const nextDueDate = addCalendarDays(invoiceDate, days);
+                    if (nextDueDate) onDueDateChange(nextDueDate);
+                  }}
+                  className="min-h-9 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {isThai ? `${days} วัน` : `${days} days`}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs leading-5 text-gray-500">
+              {isThai
+                ? 'ใช้กับเอกสารเครดิตเท่านั้น ระบบนับตามจำนวนวันจริงในปฏิทิน'
+                : 'Only for credit invoices. The system counts real calendar days from the issue date.'}
+            </p>
           </div>
-          <p className="mt-2 text-xs leading-5 text-gray-500">
-            {isThai
-              ? 'นับจากวันที่ออกเอกสารตามจำนวนวันจริงในปฏิทิน หากไม่มีกำหนดชำระให้เว้นว่างได้'
-              : 'Counts real calendar days from the issue date. Leave blank if there is no payment due date.'}
-          </p>
-        </div>
+        ) : null}
       </div>
 
       {needsRefDoc && (

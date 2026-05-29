@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-29 (invoice share PDF R2 proxy fix)
+Last updated: 2026-05-29 (T01 due-date UX fix)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -101,6 +101,7 @@ Last CI:
 - Mobile invoice builder action/preview/PDF polish added 2026-05-29: mobile now has a fixed Preview/Save/Issue action bar above the bottom nav, so `/app/invoices/new` no longer hides the save/issue actions on phones. The preview modal uses a full-height mobile sheet and scales the A4 iframe instead of cropping it. Standard ordinary PDFs with up to 3 items use a compact one-page layout; ordinary documents no longer show the "Electronic Tax Document" eyebrow, redundant "ORDINARY DOCUMENT" badge, or blank signature boxes. Verified with frontend typecheck/lint/build, backend typecheck/lint/unit tests, and a Puppeteer PDF smoke fixture matching the reported 1-item + bank + PromptPay case (`pages=1`).
 - Mobile invoice builder visual cleanup added 2026-05-29: removed emoji-style UI text from `frontend/src`, replaced invoice mobile Form/Preview tabs with lucide icons, collapsed the selected buyer display to one compact summary card instead of repeating the company name/search result/detail stack, and moved the AI chat launcher to the lower-right above the mobile action/nav area so it no longer blocks Save/Issue. Verified with frontend typecheck/lint/build and an emoji grep over `frontend/src`.
 - Invoice share PDF R2 proxy fix added 2026-05-29: public `/api/share/invoice/:token/pdf` now streams the private R2/S3 PDF object through the backend using the share token instead of redirecting customers to the raw Cloudflare R2 URL (which showed XML `InvalidArgument` / `Authorization` in mobile in-app browsers). `/api/share/invoice/:token` no longer exposes the private R2 URL; it returns the backend PDF endpoint path when ready. Verified with backend typecheck/lint/unit tests, including R2 URL-to-storage-key parsing.
+- T01 due-date UX fix added 2026-05-29: invoice builder now treats T01 (`tax_invoice_receipt`) as cash sale / paid immediately, so the due-date field and 7/15/30/45-day presets show only for T02 (`tax_invoice`). Draft recovery, customer credit-days autofill, preview payload, and save/issue payload no longer carry `dueDate` for T01. Verified with frontend typecheck/lint/build.
 
 ## Session handoff (2026-05-26) — what Codex/next-session should pick up
 
