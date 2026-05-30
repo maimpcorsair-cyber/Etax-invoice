@@ -608,11 +608,11 @@ export default function InvoiceBuilder() {
   /* ── Stepper dot indicator helper ── */
   function stepperDot(key: SectionKey) {
     if (key === 'buyer' && !customer.selectedCustomerId) {
-      return <span className="ml-1 w-1.5 h-1.5 rounded-full bg-red-500 inline-block flex-shrink-0" />;
+      return <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-rose-500" />;
     }
     if (key === 'items' && form.items.length > 0) {
       return (
-        <span className="ml-1 min-w-[16px] h-4 rounded-full bg-indigo-500 text-white text-[9px] font-bold inline-flex items-center justify-center px-1 flex-shrink-0">
+        <span className="inline-flex h-4 min-w-[16px] flex-shrink-0 items-center justify-center rounded-full bg-slate-200 px-1 text-[9px] font-bold text-slate-700">
           {form.items.length}
         </span>
       );
@@ -625,10 +625,10 @@ export default function InvoiceBuilder() {
     <div className={useInnerScroll ? 'flex h-full min-h-[580px] flex-col overflow-hidden bg-white' : 'flex flex-col bg-white'}>
       {/* Stepper strip */}
       <div className={useInnerScroll
-        ? 'flex-shrink-0 bg-white border-b border-gray-200 px-2 py-1.5'
-        : 'sticky top-[84px] z-20 border-b border-gray-200 bg-white/95 px-2 py-2 shadow-sm backdrop-blur lg:rounded-t-3xl'}
+        ? 'flex-shrink-0 border-b border-slate-200 bg-white px-3 py-2'
+        : 'border-b border-slate-200 bg-white px-3 py-3 lg:rounded-t-3xl'}
       >
-        <div className="grid grid-cols-3 gap-1 sm:grid-cols-6">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-6 sm:overflow-visible sm:pb-0">
           {STEPPER_STEPS.map(({ key, labelTh, labelEn }, idx) => {
             const isActive = activeSection === key;
             return (
@@ -636,16 +636,17 @@ export default function InvoiceBuilder() {
                 key={key}
                 onClick={() => scrollToSection(key)}
                 className={`
-                  flex min-h-8 min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium
-                  transition-colors
+                  flex min-h-9 min-w-[116px] items-center justify-center gap-1.5 border-b-2 px-2 text-[12px] font-semibold
+                  transition-colors sm:min-w-0
                   ${isActive
-                    ? 'bg-primary-700 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
+                    ? 'border-primary-700 bg-white text-primary-800'
+                    : 'border-transparent bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800'}
                 `}
+                aria-current={isActive ? 'step' : undefined}
               >
                 <span className={`
                   flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
-                  ${isActive ? 'bg-white/20 text-white' : 'bg-slate-300 text-slate-600'}
+                  ${isActive ? 'bg-primary-50 text-primary-800' : 'bg-slate-100 text-slate-500'}
                 `}>
                   {idx + 1}
                 </span>
@@ -664,7 +665,7 @@ export default function InvoiceBuilder() {
           ? 'flex-1 overflow-y-auto bg-slate-50 px-4 py-4 space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'
           : 'bg-slate-50 px-0 py-3 space-y-4 sm:px-4 sm:py-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0'}
       >
-        <div ref={settingsRef} className="xl:col-span-2">
+        <div ref={settingsRef} className="scroll-mt-28 xl:col-span-2">
           <DocumentSettingsCard
             docType={form.docType}
             onDocTypeChange={form.setDocType}
@@ -679,7 +680,7 @@ export default function InvoiceBuilder() {
           />
         </div>
         {projects.length > 0 && (
-          <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="scroll-mt-28 xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <BriefcaseBusiness className="h-4 w-4 text-primary-600" />
               <h2 className="text-sm font-bold text-slate-900">{isThai ? 'โปรเจค / งาน' : 'Project / job'}</h2>
@@ -695,7 +696,7 @@ export default function InvoiceBuilder() {
             </p>
           </div>
         )}
-        <div ref={buyerRef} className="xl:col-span-2">
+        <div ref={buyerRef} className="scroll-mt-28 xl:col-span-2">
           <BuyerCard
             customers={customer.customers}
             customerSearch={customer.customerSearch}
@@ -717,7 +718,7 @@ export default function InvoiceBuilder() {
             onToggleSection={() => setShowBuyerSection((s) => !s)}
           />
         </div>
-        <div ref={itemsRef} className="xl:col-span-2">
+        <div ref={itemsRef} className="scroll-mt-28 xl:col-span-2">
           <ItemsTable
             items={form.items}
             subtotal={form.subtotal}
@@ -730,7 +731,7 @@ export default function InvoiceBuilder() {
             onWhtRateChange={form.setWhtRate}
           />
         </div>
-        <div ref={notesRef} className="xl:col-span-2">
+        <div ref={notesRef} className="scroll-mt-28 xl:col-span-2">
           <NotesPaymentCard
             notes={form.notes}
             onNotesChange={form.setNotes}
@@ -745,7 +746,7 @@ export default function InvoiceBuilder() {
             total={form.total}
           />
         </div>
-        <div ref={appearanceRef} className="xl:col-span-2">
+        <div ref={appearanceRef} className="scroll-mt-28 xl:col-span-2">
           <DocumentAppearanceCard
             documentMode={form.documentMode}
             onDocumentModeChange={form.setDocumentMode}
@@ -771,7 +772,7 @@ export default function InvoiceBuilder() {
             docType={form.docType}
           />
         </div>
-        <div ref={sellerRef} className="xl:col-span-2">
+        <div ref={sellerRef} className="scroll-mt-28 xl:col-span-2">
           <SellerCard company={company} />
         </div>
         {/* bottom padding so last card isn't flush */}

@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-30 (quotation send/PDF flow)
+Last updated: 2026-05-30 (invoice builder stepper UX)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -53,6 +53,7 @@ Last CI:
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml` is modified locally and intentionally not committed.
+- Invoice builder section navigation UX fix added 2026-05-30: the section stepper in `/app/invoices/new` no longer uses a sticky high-z block that can cover section headings while scrolling. Active state is now a restrained underline/text treatment instead of a dark filled rectangle, item count uses a neutral chip, and form sections have scroll margins so desktop and mobile jumps keep headings visible. Verified with frontend typecheck/lint/build.
 - Quotation send/PDF flow added 2026-05-30: authenticated `GET /api/quotations/:id/preview` now renders quotation HTML/PDF using the standard A4 builder with quotation-specific title/valid-until/payment-terms copy. Quotation list has a per-row PDF download action; quotation detail has Open PDF, Download PDF, Copy customer message, and Open LINE actions, and "Save + send" was clarified to "Save and prepare" because the system prepares the PDF/message rather than sending autonomously.
 - Invoice PDF A4 layout fix added 2026-05-29: standard PDFs now use a tighter square-corner compact layout, remove overflow padding that could create a second page, remove emoji PromptPay labels, and keep up to 8 line items in the one-page compact layout before intentionally flowing to more pages.
 - Day 2 Delivery Note shipped in `f174653`: `DeliveryNote` / `DeliveryNoteItem` Prisma models, migration `backend/prisma/migrations/20260522_delivery_notes`, backend `/api/delivery-notes`, and frontend `/app/delivery-notes`.
