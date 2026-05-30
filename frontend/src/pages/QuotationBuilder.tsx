@@ -67,6 +67,17 @@ interface FormState {
     sla: string;
     cancellationTerms: string;
     securityDeposit: number;
+    origin: string;
+    destination: string;
+    incoterms: string;
+    shipmentMode: string;
+    cargoDetails: string;
+    currency: string;
+    exchangeRate: number;
+    freightCharge: number;
+    localCharge: number;
+    customsFee: number;
+    insurance: number;
     milestones: Array<{ title: string; amount: number; dueDate: string; note: string }>;
   };
   templateId: string | null;
@@ -81,13 +92,14 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 const plusDaysIso = (days: number) => new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
 const STANDARD_TEMPLATE_VALUE = '__system_standard__';
 const blankMilestone = () => ({ title: '', amount: 0, dueDate: '', note: '' });
-type QuotationKind = 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental';
+type QuotationKind = 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental' | 'logistics_import_export';
 const QUOTATION_KIND_OPTIONS: Array<{ value: QuotationKind; th: string; en: string; hintTh: string; hintEn: string }> = [
   { value: 'general', th: 'สินค้า / ทั่วไป', en: 'Goods / general', hintTh: 'รายการสินค้า บริการ ค่าขนส่ง และเงื่อนไขส่งของ', hintEn: 'Goods, services, shipping, and delivery terms' },
   { value: 'service', th: 'งานบริการ', en: 'Services', hintTh: 'ขอบเขต สิ่งส่งมอบ สิ่งที่ไม่รวม และรับประกัน', hintEn: 'Scope, deliverables, exclusions, and warranty' },
   { value: 'service_project', th: 'Project / Scope งาน', en: 'Project / scoped work', hintTh: 'มัดจำ งวดงาน ระยะเวลา และเงื่อนไขแก้งาน', hintEn: 'Deposit, milestones, timeline, and revisions' },
   { value: 'boq_contract', th: 'BOQ / งานเหมา', en: 'BOQ / contract work', hintTh: 'แบ่งหมวดวัสดุ ค่าแรง งวดงาน และรับประกัน', hintEn: 'Grouped materials, labor, milestones, and warranty' },
   { value: 'recurring_rental', th: 'รายเดือน / Subscription / เช่า', en: 'Recurring / subscription / rental', hintTh: 'รอบบิล ระยะสัญญา SLA เงินประกัน และการยกเลิก', hintEn: 'Billing cycle, term, SLA, deposit, and cancellation' },
+  { value: 'logistics_import_export', th: 'Logistics / Import-Export', en: 'Logistics / Import-Export', hintTh: 'ต้นทาง ปลายทาง Incoterms สกุลเงิน และค่าใช้จ่ายนำเข้า/ส่งออก', hintEn: 'Origin, destination, Incoterms, currency, and trade charges' },
 ];
 
 interface ProjectOption {
@@ -157,6 +169,17 @@ export default function QuotationBuilder() {
       sla: '',
       cancellationTerms: '',
       securityDeposit: 0,
+      origin: '',
+      destination: '',
+      incoterms: '',
+      shipmentMode: '',
+      cargoDetails: '',
+      currency: 'THB',
+      exchangeRate: 0,
+      freightCharge: 0,
+      localCharge: 0,
+      customsFee: 0,
+      insurance: 0,
       milestones: [],
     },
     templateId: null,
@@ -206,6 +229,17 @@ export default function QuotationBuilder() {
               sla: q.serviceDetails?.sla ?? '',
               cancellationTerms: q.serviceDetails?.cancellationTerms ?? '',
               securityDeposit: q.serviceDetails?.securityDeposit ?? 0,
+              origin: q.serviceDetails?.origin ?? '',
+              destination: q.serviceDetails?.destination ?? '',
+              incoterms: q.serviceDetails?.incoterms ?? '',
+              shipmentMode: q.serviceDetails?.shipmentMode ?? '',
+              cargoDetails: q.serviceDetails?.cargoDetails ?? '',
+              currency: q.serviceDetails?.currency ?? 'THB',
+              exchangeRate: q.serviceDetails?.exchangeRate ?? 0,
+              freightCharge: q.serviceDetails?.freightCharge ?? 0,
+              localCharge: q.serviceDetails?.localCharge ?? 0,
+              customsFee: q.serviceDetails?.customsFee ?? 0,
+              insurance: q.serviceDetails?.insurance ?? 0,
               milestones: (q.serviceDetails?.milestones ?? []).map((milestone) => ({
                 title: milestone.title,
                 amount: milestone.amount,
@@ -253,6 +287,7 @@ export default function QuotationBuilder() {
   const supportsMilestones = form.kind === 'service_project' || form.kind === 'boq_contract';
   const supportsRevisions = form.kind === 'service' || form.kind === 'service_project';
   const supportsRecurringTerms = form.kind === 'recurring_rental';
+  const supportsLogisticsTerms = form.kind === 'logistics_import_export';
   const boqSectionTotals = useMemo(() => {
     const sections = new Map<string, number>();
     form.items.forEach((item) => {
@@ -330,6 +365,17 @@ export default function QuotationBuilder() {
           sla: supportsRecurringTerms ? form.serviceDetails.sla || null : null,
           cancellationTerms: supportsRecurringTerms ? form.serviceDetails.cancellationTerms || null : null,
           securityDeposit: supportsRecurringTerms ? Number(form.serviceDetails.securityDeposit) || 0 : null,
+          origin: supportsLogisticsTerms ? form.serviceDetails.origin || null : null,
+          destination: supportsLogisticsTerms ? form.serviceDetails.destination || null : null,
+          incoterms: supportsLogisticsTerms ? form.serviceDetails.incoterms || null : null,
+          shipmentMode: supportsLogisticsTerms ? form.serviceDetails.shipmentMode || null : null,
+          cargoDetails: supportsLogisticsTerms ? form.serviceDetails.cargoDetails || null : null,
+          currency: supportsLogisticsTerms ? form.serviceDetails.currency || 'THB' : null,
+          exchangeRate: supportsLogisticsTerms ? Number(form.serviceDetails.exchangeRate) || 0 : null,
+          freightCharge: supportsLogisticsTerms ? Number(form.serviceDetails.freightCharge) || 0 : null,
+          localCharge: supportsLogisticsTerms ? Number(form.serviceDetails.localCharge) || 0 : null,
+          customsFee: supportsLogisticsTerms ? Number(form.serviceDetails.customsFee) || 0 : null,
+          insurance: supportsLogisticsTerms ? Number(form.serviceDetails.insurance) || 0 : null,
           milestones: supportsMilestones ? form.serviceDetails.milestones
             .filter((milestone) => milestone.title.trim())
             .map((milestone) => ({
@@ -977,6 +1023,135 @@ export default function QuotationBuilder() {
                 <div>
                   <label className="label">{isThai ? 'เงินประกัน' : 'Security deposit'}</label>
                   <input type="number" min="0" value={form.serviceDetails.securityDeposit} onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, securityDeposit: Number(e.target.value) } }))} className="input-field text-right" disabled={!editable} />
+                </div>
+              </>
+            )}
+            {supportsLogisticsTerms && (
+              <>
+                <div>
+                  <label className="label">{isThai ? 'ต้นทาง' : 'Origin'}</label>
+                  <input
+                    value={form.serviceDetails.origin}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, origin: e.target.value } }))}
+                    className="input-field"
+                    disabled={!editable}
+                    placeholder={isThai ? 'เช่น Bangkok, Thailand' : 'e.g. Bangkok, Thailand'}
+                  />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ปลายทาง' : 'Destination'}</label>
+                  <input
+                    value={form.serviceDetails.destination}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, destination: e.target.value } }))}
+                    className="input-field"
+                    disabled={!editable}
+                    placeholder={isThai ? 'เช่น Osaka, Japan' : 'e.g. Osaka, Japan'}
+                  />
+                </div>
+                <div>
+                  <label className="label">Incoterms</label>
+                  <select
+                    value={form.serviceDetails.incoterms}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, incoterms: e.target.value } }))}
+                    className="input-field"
+                    disabled={!editable}
+                  >
+                    <option value="">{isThai ? 'เลือกหรือพิมพ์ในหมายเหตุเพิ่มเติม' : 'Select or describe in notes'}</option>
+                    {['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'DAP', 'DDP'].map((term) => (
+                      <option key={term} value={term}>{term}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'รูปแบบขนส่ง' : 'Shipment mode'}</label>
+                  <input
+                    value={form.serviceDetails.shipmentMode}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, shipmentMode: e.target.value } }))}
+                    className="input-field"
+                    disabled={!editable}
+                    placeholder={isThai ? 'เช่น Sea freight, Air freight, Truck' : 'e.g. Sea freight, Air freight, Truck'}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">{isThai ? 'รายละเอียดสินค้า/น้ำหนัก' : 'Cargo details'}</label>
+                  <textarea
+                    value={form.serviceDetails.cargoDetails}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, cargoDetails: e.target.value } }))}
+                    className="input-field"
+                    rows={2}
+                    disabled={!editable}
+                    placeholder={isThai ? 'เช่น 2 pallets / 380 kg / HS code ถ้ามี' : 'e.g. 2 pallets / 380 kg / HS code if known'}
+                  />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'สกุลเงิน' : 'Currency'}</label>
+                  <select
+                    value={form.serviceDetails.currency}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, currency: e.target.value } }))}
+                    className="input-field"
+                    disabled={!editable}
+                  >
+                    {['THB', 'USD', 'EUR', 'JPY', 'CNY', 'SGD'].map((currency) => (
+                      <option key={currency} value={currency}>{currency}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'อัตราแลกเปลี่ยน' : 'Exchange rate'}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.000001"
+                    value={form.serviceDetails.exchangeRate}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, exchangeRate: Number(e.target.value) } }))}
+                    className="input-field text-right"
+                    disabled={!editable}
+                    placeholder="0.000000"
+                  />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ค่าขนส่ง' : 'Freight charge'}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.serviceDetails.freightCharge}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, freightCharge: Number(e.target.value) } }))}
+                    className="input-field text-right"
+                    disabled={!editable}
+                  />
+                </div>
+                <div>
+                  <label className="label">Local charge</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.serviceDetails.localCharge}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, localCharge: Number(e.target.value) } }))}
+                    className="input-field text-right"
+                    disabled={!editable}
+                  />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ค่าพิธีการศุลกากร' : 'Customs fee'}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.serviceDetails.customsFee}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, customsFee: Number(e.target.value) } }))}
+                    className="input-field text-right"
+                    disabled={!editable}
+                  />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'ประกันภัย' : 'Insurance'}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.serviceDetails.insurance}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, insurance: Number(e.target.value) } }))}
+                    className="input-field text-right"
+                    disabled={!editable}
+                  />
                 </div>
               </>
             )}

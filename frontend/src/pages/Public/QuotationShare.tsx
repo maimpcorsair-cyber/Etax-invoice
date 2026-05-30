@@ -16,7 +16,7 @@ interface QuotationShareData {
     notes: string | null;
     paymentTerms: string | null;
     deliveryTerms: string | null;
-    kind: 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental';
+    kind: 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental' | 'logistics_import_export';
     serviceDetails: {
       scope?: string | null;
       deliverables?: string | null;
@@ -31,6 +31,17 @@ interface QuotationShareData {
       sla?: string | null;
       cancellationTerms?: string | null;
       securityDeposit?: number | null;
+      origin?: string | null;
+      destination?: string | null;
+      incoterms?: string | null;
+      shipmentMode?: string | null;
+      cargoDetails?: string | null;
+      currency?: string | null;
+      exchangeRate?: number | null;
+      freightCharge?: number | null;
+      localCharge?: number | null;
+      customsFee?: number | null;
+      insurance?: number | null;
       milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>;
     } | null;
     project?: { id: string; code: string; name: string } | null;
@@ -66,6 +77,10 @@ function formatCurrency(amount: number): string {
     currency: 'THB',
     minimumFractionDigits: 2,
   }).format(amount);
+}
+
+function formatAmount(amount: number, currency = 'THB'): string {
+  return `${new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2 }).format(amount)} ${currency}`;
 }
 
 function formatThaiDate(iso: string): string {
@@ -270,6 +285,27 @@ export default function QuotationShare() {
               {quotation.serviceDetails.cancellationTerms && <InfoBlock title="เงื่อนไขยกเลิก" value={quotation.serviceDetails.cancellationTerms} wide />}
               {typeof quotation.serviceDetails.securityDeposit === 'number' && quotation.serviceDetails.securityDeposit > 0 && (
                 <InfoBlock title="เงินประกัน" value={formatCurrency(quotation.serviceDetails.securityDeposit)} />
+              )}
+              {quotation.serviceDetails.origin && <InfoBlock title="ต้นทาง" value={quotation.serviceDetails.origin} />}
+              {quotation.serviceDetails.destination && <InfoBlock title="ปลายทาง" value={quotation.serviceDetails.destination} />}
+              {quotation.serviceDetails.incoterms && <InfoBlock title="Incoterms" value={quotation.serviceDetails.incoterms} />}
+              {quotation.serviceDetails.shipmentMode && <InfoBlock title="รูปแบบขนส่ง" value={quotation.serviceDetails.shipmentMode} />}
+              {quotation.serviceDetails.cargoDetails && <InfoBlock title="รายละเอียดสินค้า/น้ำหนัก" value={quotation.serviceDetails.cargoDetails} wide />}
+              {quotation.serviceDetails.currency && <InfoBlock title="สกุลเงิน" value={quotation.serviceDetails.currency} />}
+              {typeof quotation.serviceDetails.exchangeRate === 'number' && quotation.serviceDetails.exchangeRate > 0 && (
+                <InfoBlock title="อัตราแลกเปลี่ยน" value={new Intl.NumberFormat('th-TH', { maximumFractionDigits: 6 }).format(quotation.serviceDetails.exchangeRate)} />
+              )}
+              {typeof quotation.serviceDetails.freightCharge === 'number' && quotation.serviceDetails.freightCharge > 0 && (
+                <InfoBlock title="ค่าขนส่ง" value={formatAmount(quotation.serviceDetails.freightCharge, quotation.serviceDetails.currency ?? 'THB')} />
+              )}
+              {typeof quotation.serviceDetails.localCharge === 'number' && quotation.serviceDetails.localCharge > 0 && (
+                <InfoBlock title="Local charge" value={formatAmount(quotation.serviceDetails.localCharge, quotation.serviceDetails.currency ?? 'THB')} />
+              )}
+              {typeof quotation.serviceDetails.customsFee === 'number' && quotation.serviceDetails.customsFee > 0 && (
+                <InfoBlock title="ค่าพิธีการศุลกากร" value={formatAmount(quotation.serviceDetails.customsFee, quotation.serviceDetails.currency ?? 'THB')} />
+              )}
+              {typeof quotation.serviceDetails.insurance === 'number' && quotation.serviceDetails.insurance > 0 && (
+                <InfoBlock title="ประกันภัย" value={formatAmount(quotation.serviceDetails.insurance, quotation.serviceDetails.currency ?? 'THB')} />
               )}
             </div>
             {(quotation.serviceDetails.milestones?.length ?? 0) > 0 && (

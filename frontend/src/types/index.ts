@@ -281,7 +281,7 @@ export interface Quotation {
   quotationNumber: string;
   status: QuotationStatus;
   language: Language;
-  kind: 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental';
+  kind: 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental' | 'logistics_import_export';
   serviceDetails?: {
     scope?: string | null;
     deliverables?: string | null;
@@ -296,6 +296,17 @@ export interface Quotation {
     sla?: string | null;
     cancellationTerms?: string | null;
     securityDeposit?: number | null;
+    origin?: string | null;
+    destination?: string | null;
+    incoterms?: string | null;
+    shipmentMode?: string | null;
+    cargoDetails?: string | null;
+    currency?: string | null;
+    exchangeRate?: number | null;
+    freightCharge?: number | null;
+    localCharge?: number | null;
+    customsFee?: number | null;
+    insurance?: number | null;
     milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>;
   } | null;
   quotationDate: string;

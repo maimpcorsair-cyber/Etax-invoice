@@ -143,3 +143,61 @@ test('buildQuotationPdfData renders BOQ section subtotals and structured terms',
   assert.match(pdfData.notes ?? '', /งานไฟฟ้า: 1,000.00 บาท/);
   assert.equal(pdfData.items[0].nameTh, 'งานไฟฟ้า — สายไฟ');
 });
+
+test('buildQuotationPdfData renders logistics import export terms', () => {
+  const quotation = {
+    id: 'qt-logistics',
+    companyId: 'co-1',
+    projectId: null,
+    quotationNumber: 'QT-2026-000003',
+    status: 'draft',
+    language: 'th',
+    kind: 'logistics_import_export',
+    serviceDetails: {
+      origin: 'Bangkok, Thailand',
+      destination: 'Osaka, Japan',
+      incoterms: 'FOB Bangkok',
+      shipmentMode: 'Sea freight',
+      cargoDetails: '2 pallets / 380 kg',
+      currency: 'USD',
+      exchangeRate: 36.25,
+      freightCharge: 450,
+      localCharge: 120,
+      customsFee: 80,
+      insurance: 40,
+    },
+    quotationDate: new Date('2026-05-30T00:00:00Z'),
+    validUntil: null,
+    buyerId: 'cus-1',
+    seller: { nameTh: 'บริษัท ตัวอย่าง จำกัด', taxId: '0100000000000', addressTh: 'กรุงเทพมหานคร' },
+    subtotal: 690,
+    vatAmount: 0,
+    discountAmount: 0,
+    total: 690,
+    notes: null,
+    paymentTerms: null,
+    deliveryTerms: null,
+    buyer: {
+      nameTh: 'ลูกค้าตัวอย่าง',
+      nameEn: null,
+      taxId: '0200000000000',
+      branchCode: '00000',
+      addressTh: 'กรุงเทพมหานคร',
+    },
+    items: [
+      { nameTh: 'Ocean freight', nameEn: null, quantity: 1, unit: 'shipment', unitPrice: 450, discountAmount: 0, vatType: 'vatZero', amount: 450, vatAmount: 0, totalAmount: 450 },
+    ],
+  } as unknown as QuotationPdfRow;
+
+  const pdfData = buildQuotationPdfData(quotation);
+
+  assert.match(pdfData.notes ?? '', /ต้นทาง: Bangkok, Thailand/);
+  assert.match(pdfData.notes ?? '', /ปลายทาง: Osaka, Japan/);
+  assert.match(pdfData.notes ?? '', /Incoterms: FOB Bangkok/);
+  assert.match(pdfData.notes ?? '', /รูปแบบขนส่ง: Sea freight/);
+  assert.match(pdfData.notes ?? '', /สกุลเงิน: USD/);
+  assert.match(pdfData.notes ?? '', /อัตราแลกเปลี่ยน: 36.25/);
+  assert.match(pdfData.notes ?? '', /ค่าขนส่ง: 450.00 USD/);
+  assert.match(pdfData.notes ?? '', /Local charge: 120.00 USD/);
+  assert.match(pdfData.notes ?? '', /ค่าพิธีการศุลกากร: 80.00 USD/);
+});

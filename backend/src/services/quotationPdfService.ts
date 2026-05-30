@@ -20,6 +20,16 @@ function optionalStringField(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
+function optionalNumberField(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function formatMoneyDetail(label: string, value: unknown, currency: string): string | null {
+  const amount = optionalNumberField(value);
+  if (amount === null || amount <= 0) return null;
+  return `${label}: ${amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} ${currency}`;
+}
+
 type ServiceMilestone = {
   title: string;
   amount: number;
@@ -29,6 +39,8 @@ type ServiceMilestone = {
 
 function serviceDetailsNotes(value: unknown): string[] {
   const details = objectRecord(value);
+  const currency = optionalStringField(details.currency) ?? 'THB';
+  const exchangeRate = optionalNumberField(details.exchangeRate);
   const milestones = Array.isArray(details.milestones)
     ? details.milestones.filter((item): item is ServiceMilestone => {
       const row = objectRecord(item);
@@ -51,6 +63,19 @@ function serviceDetailsNotes(value: unknown): string[] {
     typeof details.securityDeposit === 'number' && details.securityDeposit > 0
       ? `เงินประกัน: ${details.securityDeposit.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`
       : null,
+    optionalStringField(details.origin) ? `ต้นทาง: ${String(details.origin).trim()}` : null,
+    optionalStringField(details.destination) ? `ปลายทาง: ${String(details.destination).trim()}` : null,
+    optionalStringField(details.incoterms) ? `Incoterms: ${String(details.incoterms).trim()}` : null,
+    optionalStringField(details.shipmentMode) ? `รูปแบบขนส่ง: ${String(details.shipmentMode).trim()}` : null,
+    optionalStringField(details.cargoDetails) ? `รายละเอียดสินค้า/น้ำหนัก: ${String(details.cargoDetails).trim()}` : null,
+    optionalStringField(details.currency) ? `สกุลเงิน: ${currency}` : null,
+    exchangeRate !== null && exchangeRate > 0
+      ? `อัตราแลกเปลี่ยน: ${exchangeRate.toLocaleString('th-TH', { maximumFractionDigits: 6 })}`
+      : null,
+    formatMoneyDetail('ค่าขนส่ง', details.freightCharge, currency),
+    formatMoneyDetail('Local charge', details.localCharge, currency),
+    formatMoneyDetail('ค่าพิธีการศุลกากร', details.customsFee, currency),
+    formatMoneyDetail('ประกันภัย', details.insurance, currency),
     milestones.length > 0 ? 'งวดงาน:' : null,
     ...milestones.map((milestone, index) => {
       const due = milestone.dueDate ? ` | กำหนด ${milestone.dueDate}` : '';
