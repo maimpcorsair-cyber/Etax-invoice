@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-05-30 (quotation presets + BOQ flow)
+Last updated: 2026-05-31 (logistics quotation preset deployed)
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
@@ -10,15 +10,15 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest feature production deployment: `dpl_FL1tAbwPWrzXKpP7SND6B3FEJXUJ` (`https://etax-invoice-bgxmzhvp1-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
-- Latest checked route: `/share/quotation/not-a-real-token` returned SPA HTML 200 from `etax-invoice.vercel.app`; Vercel inspect shows production `Ready`.
+- Latest feature production deployment: `dpl_79onqPrgRw7Sj1tuYtUGfjgzzJ7r` (`https://etax-invoice-o5yca0egm-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
+- Latest checked route: `/app/quotations/new` returned SPA HTML 200 from `etax-invoice.vercel.app`; Vercel inspect shows production `Ready`.
 
 Backend:
 - Platform: Render
 - Service: `etax-invoice-api` (`srv-d7lkqkvavr4c73a0qqh0`)
 - Plan: Standard ($25)
 - URL: `https://etax-invoice-api.onrender.com`
-- Latest live deploy checked: `5510e1d` via `Deploy to Render` run `26689260845`.
+- Latest live deploy checked: `b446363` via `Deploy to Render` run `26691322861`.
 - Health endpoints:
   - `/api/health` — shallow process liveness (express responding)
   - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
@@ -32,9 +32,9 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Push checks for `5510e1d` green: Typecheck (`26689248096`), Unit tests (`26689248093`), Prod smoke test (`26689248095`), Health Check (`26689368124`).
-- Manual `Deploy to Render` run `26689260845` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
-- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_FL1tAbwPWrzXKpP7SND6B3FEJXUJ`.
+- Push checks for `b446363` green: Typecheck (`26691315772`), Unit tests (`26691315760`), Prod smoke test (`26691315764`).
+- Manual `Deploy to Render` run `26691322861` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
+- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_79onqPrgRw7Sj1tuYtUGfjgzzJ7r`.
 
 ## LINE / OCR pipeline (current)
 
@@ -53,6 +53,7 @@ Last CI:
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml` is modified locally and intentionally not committed.
+- Quotation logistics/import-export preset shipped 2026-05-31 (`b446363`): `/app/quotations/new` now includes `Logistics / Import-Export` in the compact quotation type dropdown. The preset reveals only trade/logistics fields: origin, destination, Incoterms, shipment mode, cargo details/weight, currency, exchange rate, freight charge, local charge, customs fee, and insurance. Backend validation accepts `kind='logistics_import_export'` and stores these in `Quotation.serviceDetails` without a schema migration; quotation PDFs and public quotation share links render the new fields. Verified locally with backend/frontend typecheck, backend/frontend lint, frontend build, focused quotation PDF tests (3), Playwright UI smoke selecting the logistics preset, and `git diff --check`. Production: Vercel `dpl_79onqPrgRw7Sj1tuYtUGfjgzzJ7r` Ready + aliased, Render deploy run `26691322861` green, `/app/quotations/new` returned 200, `/api/health` ok, and `/api/health/deep` returned every provider green with `notConfigured=[]`.
 - Quotation coverage expansion shipped 2026-05-30 (`5510e1d`): `/app/quotations/new` now keeps the fast general flow while exposing one compact preset dropdown for `สินค้า / ทั่วไป`, `งานบริการ`, `Project / Scope งาน`, `BOQ / งานเหมา`, and `รายเดือน / Subscription / เช่า`. Optional sections appear only when relevant: deliverables, exclusions, warranty, project linkage, deposit, milestones, revisions, contract duration, billing cycle, SLA, cancellation terms, and security deposit. BOQ line items persist an optional `sectionTitle` via migration `20260530_quotation_boq_sections`; seller UI, customer share page, and quotation PDF render grouped section context and pre-VAT section subtotals. The quotation-builder preview now calculates per-line discount as percent, matching the backend. Public quotation share validates response shape before rendering instead of crashing on malformed data. Verified locally with backend/frontend typecheck, backend/frontend build, touched-file lint, `git diff --check`, backend unit tests (106), focused quotation PDF tests (2), Playwright desktop/mobile seller flow, and curl public-share contract smoke. Production migration/deploy completed via `Deploy to Render` run `26689260845`; post-deploy `/api/health/deep` returned every provider green and `notConfigured=[]`.
 - Quotation service/project mode added 2026-05-30: `/app/quotations/new` and draft quotation edit now let sellers choose a compact `งานบริการ / โปรเจกต์` mode, optionally link an existing active Project, and capture scope, timeline, deposit percentage, revision rounds/terms, and milestone payments. Existing Project descriptions/date ranges prefill empty quote fields; milestone totals warn when they do not match the quotation total. Structured data persists in `Quotation.kind` + `Quotation.serviceDetails` via migration `20260530_quotation_service_details`, renders into quotation PDFs, and appears on the public customer share page. General quotations remain the default and keep the fast form. Verified locally with backend/frontend typecheck, backend/frontend lint, frontend build, and focused PDF/share tests.
 - Quotation template selection added 2026-05-30: `/app/quotations/new` and draft quotation edit now expose a compact "รูปแบบใบเสนอราคา" dropdown using the same built-in Minimal/Cute template catalog as invoices. The selected `templateId` is stored in the quotation's seller snapshot (`seller.documentPreferences`) so it follows the quotation PDF, customer share PDF, and future reloads without a schema migration. Backend quotation PDF data forwards `templateId` into the standard A4 renderer, and built-in templates now explicitly support `quotation`. Verified with backend/frontend typecheck, backend/frontend lint, frontend build, and focused PDF/quotationPdfService tests.
