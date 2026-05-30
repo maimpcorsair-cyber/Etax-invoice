@@ -177,6 +177,22 @@ test('standard ordinary document keeps up to eight items in compact one-page lay
   assert.ok(!html.includes('📱'), 'invoice PDFs should not render emoji labels');
 });
 
+test('standard quotation document uses quotation copy and valid-until wording', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    type: 'quotation',
+    invoiceNumber: 'QT-2026-000001',
+    dueDate: new Date('2026-06-30T00:00:00Z'),
+    documentMode: 'ordinary',
+    paymentMethod: 'ชำระภายใน 30 วันหลังได้รับใบกำกับภาษี',
+  });
+
+  assert.ok(html.includes('ใบเสนอราคา'), 'quotation PDF should use quotation title');
+  assert.ok(html.includes('Sales Quotation'), 'quotation PDF should identify itself as a quotation');
+  assert.ok(html.includes('ใช้ได้ถึง'), 'quotation PDF should label the expiry date as valid until');
+  assert.ok(html.includes('เงื่อนไขการชำระเงิน'), 'quotation PDF should label payment terms clearly');
+});
+
 test('built-in template themes keep the standard accounting document structure', () => {
   const html = buildHtml({
     ...FIXTURE,

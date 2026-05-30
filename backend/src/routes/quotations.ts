@@ -4,6 +4,8 @@ import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { withInvoiceLock, withRlsContext, tenantRlsContext } from '../config/rls';
 import { generateInvoiceNumber } from '../services/invoiceService';
+import { buildHtmlForCompany, generatePdfFromHtml, type PdfInvoiceData } from '../services/pdfService';
+import type { Customer, Quotation, QuotationItem } from '@prisma/client';
 
 // ใบเสนอราคา (Quotation) — pre-sale offer document.
 // Not a tax document. No e-Tax submission, no VAT remittance obligation.
@@ -74,6 +76,82 @@ async function generateQuotationNumber(companyId: string): Promise<string> {
   });
 }
 
+type QuotationPdfRow = Quotation & {
+  buyer: Customer;
+  items: QuotationItem[];
+};
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function stringField(value: unknown, fallback = ''): string {
+  return typeof value === 'string' && value.trim().length > 0 ? value : fallback;
+}
+
+function optionalStringField(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceData {
+  const seller = objectRecord(quotation.seller);
+  const notes = [
+    quotation.notes,
+    quotation.deliveryTerms ? `เงื่อนไขการส่งของ: ${quotation.deliveryTerms}` : null,
+  ].filter(Boolean).join('\n');
+
+  return {
+    invoiceNumber: quotation.quotationNumber,
+    invoiceDate: quotation.quotationDate,
+    dueDate: quotation.validUntil,
+    type: 'quotation',
+    language: quotation.language === 'en' || quotation.language === 'both' ? quotation.language : 'th',
+    seller: {
+      nameTh: stringField(seller.nameTh, '-'),
+      nameEn: optionalStringField(seller.nameEn),
+      taxId: stringField(seller.taxId, '-'),
+      branchCode: stringField(seller.branchCode, '00000'),
+      branchNameTh: optionalStringField(seller.branchNameTh),
+      addressTh: stringField(seller.addressTh, '-'),
+      addressEn: optionalStringField(seller.addressEn),
+      phone: optionalStringField(seller.phone),
+      email: optionalStringField(seller.email),
+      website: optionalStringField(seller.website),
+      logoUrl: optionalStringField(seller.logoUrl),
+    },
+    buyer: {
+      nameTh: quotation.buyer.nameTh,
+      nameEn: quotation.buyer.nameEn,
+      taxId: quotation.buyer.taxId,
+      branchCode: quotation.buyer.branchCode ?? '00000',
+      addressTh: quotation.buyer.addressTh ?? '-',
+      addressEn: quotation.buyer.addressEn,
+    },
+    items: quotation.items.map((item) => ({
+      nameTh: item.nameTh,
+      nameEn: item.nameEn,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      discountAmount: item.discountAmount,
+      vatType: item.vatType,
+      amount: item.amount,
+      vatAmount: item.vatAmount,
+      totalAmount: item.totalAmount,
+    })),
+    subtotal: quotation.subtotal,
+    vatAmount: quotation.vatAmount,
+    discountAmount: quotation.discountAmount,
+    total: quotation.total,
+    notes: notes || null,
+    paymentMethod: quotation.paymentTerms,
+    showCompanyLogo: true,
+    documentMode: 'ordinary',
+  };
+}
+
 // ── List ──────────────────────────────────────────────────────────────
 
 quotationsRouter.get('/', async (req, res) => {
@@ -142,6 +220,40 @@ quotationsRouter.get('/:id', async (req, res) => {
   } catch (err) {
     logger.error('get quotation failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to get quotation' });
+  }
+});
+
+// ── Preview / PDF ────────────────────────────────────────────────────
+
+quotationsRouter.get('/:id/preview', async (req, res) => {
+  try {
+    const quotation = await prisma.quotation.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      include: {
+        buyer: true,
+        items: { orderBy: { id: 'asc' } },
+      },
+    });
+    if (!quotation) {
+      res.status(404).json({ error: 'Quotation not found' });
+      return;
+    }
+
+    const pdfData = buildQuotationPdfData(quotation);
+    const html = await buildHtmlForCompany(pdfData, req.user!.companyId);
+    if (req.query.format === 'html') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+      return;
+    }
+
+    const pdf = await generatePdfFromHtml(html);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${quotation.quotationNumber}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    logger.error('quotation preview failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to generate quotation PDF' });
   }
 });
 

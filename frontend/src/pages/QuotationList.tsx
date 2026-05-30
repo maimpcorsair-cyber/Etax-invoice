@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileText, Loader2, ArrowRight, CalendarClock, CheckCircle, XCircle, Clock, Receipt, Truck } from 'lucide-react';
+import { Plus, Search, FileText, Loader2, ArrowRight, CalendarClock, CheckCircle, XCircle, Clock, Receipt, Truck, Download } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
@@ -25,6 +25,7 @@ export default function QuotationList() {
   const navigate = useNavigate();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadId, setDownloadId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<QuotationStatus | 'all'>('all');
 
@@ -48,6 +49,26 @@ export default function QuotationList() {
   }, [token, search, statusFilter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  async function downloadPdf(quotation: Quotation) {
+    if (!token) return;
+    setDownloadId(quotation.id);
+    try {
+      const res = await fetch(`/api/quotations/${quotation.id}/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('PDF failed');
+      const blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${quotation.quotationNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadId(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -131,6 +152,7 @@ export default function QuotationList() {
                 <th className="table-header">{isThai ? 'หมดอายุ' : 'Valid until'}</th>
                 <th className="table-header text-right">{isThai ? 'ยอดรวม' : 'Total'}</th>
                 <th className="table-header text-center">{isThai ? 'สถานะ' : 'Status'}</th>
+                <th className="table-header text-right">{isThai ? 'ไฟล์' : 'File'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -156,6 +178,20 @@ export default function QuotationList() {
                         <Icon className="w-3 h-3" />
                         {isThai ? meta.th : meta.en}
                       </span>
+                    </td>
+                    <td className="table-cell text-right">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void downloadPdf(q);
+                        }}
+                        disabled={downloadId === q.id}
+                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {downloadId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        PDF
+                      </button>
                     </td>
                   </tr>
                 );

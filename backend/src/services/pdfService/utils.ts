@@ -32,6 +32,7 @@ export function escapeHtml(value: string): string {
 // ── Document type / built-in template registry ───────────────────────
 
 export const DOC_TITLE: Record<string, Record<Language | 'both', string>> = {
+  quotation: { th: 'ใบเสนอราคา', en: 'Quotation', both: 'ใบเสนอราคา / Quotation' },
   tax_invoice: { th: 'ใบกำกับภาษี', en: 'Tax Invoice', both: 'ใบกำกับภาษี / Tax Invoice' },
   tax_invoice_receipt: { th: 'ใบกำกับภาษี/ใบเสร็จรับเงิน', en: 'Tax Invoice / Receipt', both: 'ใบกำกับภาษี/ใบเสร็จรับเงิน / Tax Invoice / Receipt' },
   receipt: { th: 'ใบเสร็จรับเงิน', en: 'Receipt', both: 'ใบเสร็จรับเงิน / Receipt' },

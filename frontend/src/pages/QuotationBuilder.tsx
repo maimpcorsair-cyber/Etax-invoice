@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
   Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt, Truck,
+  Download, Copy, ExternalLink, Eye,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -79,6 +80,8 @@ export default function QuotationBuilder() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [acting, setActing] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<'open' | 'download' | null>(null);
+  const [copying, setCopying] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const [form, setForm] = useState<FormState>({
@@ -284,6 +287,76 @@ export default function QuotationBuilder() {
     }
   }
 
+  const customerName = useMemo(() => {
+    const selected = customers.find((c) => c.id === form.buyerId);
+    return selected?.nameTh || selected?.nameEn || existing?.buyer?.nameTh || existing?.buyer?.nameEn || (isThai ? 'ลูกค้า' : 'customer');
+  }, [customers, existing?.buyer?.nameEn, existing?.buyer?.nameTh, form.buyerId, isThai]);
+
+  const sendMessage = useMemo(() => {
+    const number = existing?.quotationNumber ?? (isThai ? 'ใบเสนอราคา' : 'quotation');
+    const totalText = formatCurrency(totals.total);
+    if (isThai) {
+      return [
+        `เรียน ${customerName}`,
+        `ส่งใบเสนอราคาเลขที่ ${number} ยอดรวม ${totalText}`,
+        form.validUntil ? `ราคาใช้ได้ถึง ${form.validUntil}` : null,
+        'รายละเอียดอยู่ในไฟล์ PDF ที่แนบมาด้วยครับ/ค่ะ',
+      ].filter(Boolean).join('\n');
+    }
+    return [
+      `Dear ${customerName},`,
+      `Please find quotation ${number} for ${totalText}.`,
+      form.validUntil ? `Valid until ${form.validUntil}.` : null,
+      'The PDF is attached for your review.',
+    ].filter(Boolean).join('\n');
+  }, [customerName, existing?.quotationNumber, form.validUntil, formatCurrency, isThai, totals.total]);
+
+  async function openQuotationPdf(mode: 'open' | 'download') {
+    if (!token || !existing) return;
+    setPdfBusy(mode);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/quotations/${existing.id}/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(isThai ? 'สร้างไฟล์ PDF ไม่สำเร็จ' : 'Could not create the PDF');
+      const blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      if (mode === 'open') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${existing.quotationNumber}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setPdfBusy(null);
+    }
+  }
+
+  async function copySendMessage() {
+    setCopying(true);
+    setMsg(null);
+    try {
+      await navigator.clipboard.writeText(sendMessage);
+      setMsg({ type: 'ok', text: isThai ? 'คัดลอกข้อความส่งลูกค้าแล้ว' : 'Customer message copied' });
+    } catch {
+      setMsg({ type: 'err', text: isThai ? 'คัดลอกไม่ได้ กรุณาคัดลอกข้อความเอง' : 'Could not copy. Please copy it manually.' });
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  function openLineShare() {
+    const url = `https://social-plugins.line.me/lineit/share?text=${encodeURIComponent(sendMessage)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   if (loading) {
     return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>;
   }
@@ -316,11 +389,27 @@ export default function QuotationBuilder() {
             </button>
             <button onClick={() => save('send')} disabled={saving} className="btn-primary">
               <Send className="w-4 h-4" />
-              {isThai ? 'บันทึก + ส่ง' : 'Save + send'}
+              {isThai ? 'บันทึกและไปหน้าส่ง' : 'Save and prepare'}
             </button>
           </div>
         ) : existing && (
           <div className="flex gap-2 flex-wrap">
+            <button onClick={() => openQuotationPdf('open')} disabled={pdfBusy !== null} className="btn-secondary">
+              {pdfBusy === 'open' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+              {isThai ? 'เปิด PDF' : 'Open PDF'}
+            </button>
+            <button onClick={() => openQuotationPdf('download')} disabled={pdfBusy !== null} className="btn-secondary">
+              {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {isThai ? 'ดาวน์โหลด' : 'Download'}
+            </button>
+            <button onClick={copySendMessage} disabled={copying} className="btn-secondary">
+              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+              {isThai ? 'คัดลอกข้อความ' : 'Copy message'}
+            </button>
+            <button onClick={openLineShare} className="btn-primary">
+              <ExternalLink className="w-4 h-4" />
+              LINE
+            </button>
             {existing.status === 'sent' && (
               <>
                 <button onClick={() => changeStatus('accepted')} disabled={acting} className="btn-secondary">
@@ -361,6 +450,43 @@ export default function QuotationBuilder() {
         <div className={`flex items-start gap-2 text-sm p-3 rounded-lg ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
           {msg.type === 'ok' ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
           <span>{msg.text}</span>
+        </div>
+      )}
+
+      {existing && !editable && existing.status !== 'cancelled' && (
+        <div className="border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">
+                {isThai ? 'ส่งใบเสนอราคาให้ลูกค้า' : 'Send this quotation to the customer'}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {isThai
+                  ? 'ดาวน์โหลด PDF แล้วแนบไฟล์ใน LINE หรืออีเมล ระบบจะคัดลอกข้อความพร้อมเลขที่และยอดรวมให้'
+                  : 'Download the PDF, attach it in LINE or email, and copy the prepared message with number and total.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              <button onClick={() => openQuotationPdf('download')} disabled={pdfBusy !== null} className="btn-secondary">
+                {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
+              </button>
+              <button onClick={copySendMessage} disabled={copying} className="btn-secondary">
+                {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                {isThai ? 'คัดลอกข้อความ' : 'Copy message'}
+              </button>
+              <button onClick={openLineShare} className="btn-primary col-span-2 sm:col-span-1">
+                <ExternalLink className="w-4 h-4" />
+                {isThai ? 'เปิด LINE' : 'Open LINE'}
+              </button>
+            </div>
+          </div>
+          <textarea
+            className="mt-3 w-full border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
+            rows={isThai ? 4 : 5}
+            readOnly
+            value={sendMessage}
+          />
         </div>
       )}
 

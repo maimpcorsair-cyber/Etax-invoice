@@ -8,6 +8,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
   const isBoth = data.language === 'both';
+  const isQuotation = data.type === 'quotation';
 
   const docTitle = DOC_TITLE[data.type]?.[data.language] ?? 'ใบกำกับภาษี';
   const dateStr = isTh ? formatDateTh(data.invoiceDate) : formatDateEn(data.invoiceDate);
@@ -67,8 +68,12 @@ export function buildHtml(data: PdfInvoiceData): string {
     invoiceNo: isTh ? 'เลขที่' : isEn ? 'Invoice No.' : 'No.',
     date: isTh ? 'วันที่' : isEn ? 'Date' : 'Date',
     origDoc: isTh ? 'ต้นฉบับ' : isEn ? 'ORIGINAL' : 'ต้นฉบับ / ORIGINAL',
-    dueDate: isTh ? 'วันครบกำหนด' : isEn ? 'Due Date' : 'วันครบกำหนด / Due Date',
-    paymentMethod: isTh ? 'วิธีชำระเงิน' : isEn ? 'Payment Method' : 'วิธีชำระเงิน / Payment Method',
+    dueDate: isQuotation
+      ? (isTh ? 'ใช้ได้ถึง' : isEn ? 'Valid Until' : 'ใช้ได้ถึง / Valid Until')
+      : (isTh ? 'วันครบกำหนด' : isEn ? 'Due Date' : 'วันครบกำหนด / Due Date'),
+    paymentMethod: isQuotation
+      ? (isTh ? 'เงื่อนไขการชำระเงิน' : isEn ? 'Payment Terms' : 'เงื่อนไขการชำระเงิน / Payment Terms')
+      : (isTh ? 'วิธีชำระเงิน' : isEn ? 'Payment Method' : 'วิธีชำระเงิน / Payment Method'),
     notes: isTh ? 'หมายเหตุ' : isEn ? 'Notes' : 'หมายเหตุ / Notes',
     preparedBy: isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : isEn ? 'Prepared by / Issuer' : 'ผู้จัดทำ / Prepared by',
     receivedBy: isTh ? 'ผู้รับสินค้า / ลูกค้า' : isEn ? 'Received by / Customer' : 'ผู้รับ / Customer',
@@ -134,7 +139,9 @@ export function buildHtml(data: PdfInvoiceData): string {
   ];
   const isElectronicDocument = data.documentMode === 'electronic';
   const onePageCompact = !customTemplateBlock && data.items.length <= ONE_PAGE_ITEM_LIMIT;
-  const documentEyebrow = isElectronicDocument
+  const documentEyebrow = isQuotation
+    ? 'Sales Quotation'
+    : isElectronicDocument
     ? 'Electronic Tax Document'
     : (isTh ? 'เอกสาร' : 'Document');
   const shouldRenderSignature = Boolean(data.signatureImageUrl || data.signerName || data.signerTitle);
