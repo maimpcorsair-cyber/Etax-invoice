@@ -27,6 +27,7 @@ const STATUS_META: Record<QuotationStatus, { th: string; en: string; tone: strin
 
 interface ItemDraft {
   productId?: string | null;
+  sectionTitle?: string | null;
   nameTh: string;
   nameEn?: string | null;
   quantity: number;
@@ -51,13 +52,21 @@ interface FormState {
   quotationDate: string; // YYYY-MM-DD
   validUntil: string;    // YYYY-MM-DD or ''
   language: 'th' | 'en' | 'both';
-  kind: 'general' | 'service_project';
+  kind: QuotationKind;
   serviceDetails: {
     scope: string;
+    deliverables: string;
+    exclusions: string;
     duration: string;
+    warranty: string;
     depositPercent: number;
     revisionRounds: number;
     revisionTerms: string;
+    contractDuration: string;
+    billingCycle: string;
+    sla: string;
+    cancellationTerms: string;
+    securityDeposit: number;
     milestones: Array<{ title: string; amount: number; dueDate: string; note: string }>;
   };
   templateId: string | null;
@@ -72,6 +81,14 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 const plusDaysIso = (days: number) => new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
 const STANDARD_TEMPLATE_VALUE = '__system_standard__';
 const blankMilestone = () => ({ title: '', amount: 0, dueDate: '', note: '' });
+type QuotationKind = 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental';
+const QUOTATION_KIND_OPTIONS: Array<{ value: QuotationKind; th: string; en: string; hintTh: string; hintEn: string }> = [
+  { value: 'general', th: 'สินค้า / ทั่วไป', en: 'Goods / general', hintTh: 'รายการสินค้า บริการ ค่าขนส่ง และเงื่อนไขส่งของ', hintEn: 'Goods, services, shipping, and delivery terms' },
+  { value: 'service', th: 'งานบริการ', en: 'Services', hintTh: 'ขอบเขต สิ่งส่งมอบ สิ่งที่ไม่รวม และรับประกัน', hintEn: 'Scope, deliverables, exclusions, and warranty' },
+  { value: 'service_project', th: 'Project / Scope งาน', en: 'Project / scoped work', hintTh: 'มัดจำ งวดงาน ระยะเวลา และเงื่อนไขแก้งาน', hintEn: 'Deposit, milestones, timeline, and revisions' },
+  { value: 'boq_contract', th: 'BOQ / งานเหมา', en: 'BOQ / contract work', hintTh: 'แบ่งหมวดวัสดุ ค่าแรง งวดงาน และรับประกัน', hintEn: 'Grouped materials, labor, milestones, and warranty' },
+  { value: 'recurring_rental', th: 'รายเดือน / Subscription / เช่า', en: 'Recurring / subscription / rental', hintTh: 'รอบบิล ระยะสัญญา SLA เงินประกัน และการยกเลิก', hintEn: 'Billing cycle, term, SLA, deposit, and cancellation' },
+];
 
 interface ProjectOption {
   id: string;
@@ -93,7 +110,7 @@ function projectDuration(project: ProjectOption): string {
 
 function computeLine(item: ItemDraft) {
   const gross = item.quantity * item.unitPrice;
-  const amount = Math.max(0, gross - item.discountAmount);
+  const amount = Math.max(0, gross - ((gross * item.discountAmount) / 100));
   const vatRate = item.vatType === 'vat7' ? 0.07 : 0;
   const vatAmount = +(amount * vatRate).toFixed(2);
   const totalAmount = +(amount + vatAmount).toFixed(2);
@@ -128,10 +145,18 @@ export default function QuotationBuilder() {
     kind: 'general',
     serviceDetails: {
       scope: '',
+      deliverables: '',
+      exclusions: '',
       duration: '',
+      warranty: '',
       depositPercent: 0,
       revisionRounds: 0,
       revisionTerms: '',
+      contractDuration: '',
+      billingCycle: '',
+      sla: '',
+      cancellationTerms: '',
+      securityDeposit: 0,
       milestones: [],
     },
     templateId: null,
@@ -169,10 +194,18 @@ export default function QuotationBuilder() {
             kind: q.kind ?? 'general',
             serviceDetails: {
               scope: q.serviceDetails?.scope ?? '',
+              deliverables: q.serviceDetails?.deliverables ?? '',
+              exclusions: q.serviceDetails?.exclusions ?? '',
               duration: q.serviceDetails?.duration ?? '',
+              warranty: q.serviceDetails?.warranty ?? '',
               depositPercent: q.serviceDetails?.depositPercent ?? 0,
               revisionRounds: q.serviceDetails?.revisionRounds ?? 0,
               revisionTerms: q.serviceDetails?.revisionTerms ?? '',
+              contractDuration: q.serviceDetails?.contractDuration ?? '',
+              billingCycle: q.serviceDetails?.billingCycle ?? '',
+              sla: q.serviceDetails?.sla ?? '',
+              cancellationTerms: q.serviceDetails?.cancellationTerms ?? '',
+              securityDeposit: q.serviceDetails?.securityDeposit ?? 0,
               milestones: (q.serviceDetails?.milestones ?? []).map((milestone) => ({
                 title: milestone.title,
                 amount: milestone.amount,
@@ -183,6 +216,7 @@ export default function QuotationBuilder() {
             templateId: q.templateId ?? null,
             items: q.items.map((it) => ({
               productId: it.productId ?? null,
+              sectionTitle: it.sectionTitle ?? '',
               nameTh: it.nameTh,
               nameEn: it.nameEn ?? null,
               quantity: it.quantity,
@@ -214,6 +248,20 @@ export default function QuotationBuilder() {
     () => +form.serviceDetails.milestones.reduce((sum, milestone) => sum + (Number(milestone.amount) || 0), 0).toFixed(2),
     [form.serviceDetails.milestones],
   );
+  const hasStructuredDetails = form.kind !== 'general';
+  const supportsProject = form.kind === 'service_project' || form.kind === 'boq_contract';
+  const supportsMilestones = form.kind === 'service_project' || form.kind === 'boq_contract';
+  const supportsRevisions = form.kind === 'service' || form.kind === 'service_project';
+  const supportsRecurringTerms = form.kind === 'recurring_rental';
+  const boqSectionTotals = useMemo(() => {
+    const sections = new Map<string, number>();
+    form.items.forEach((item) => {
+      const title = item.sectionTitle?.trim();
+      if (!title) return;
+      sections.set(title, (sections.get(title) ?? 0) + computeLine(item).amount);
+    });
+    return [...sections.entries()];
+  }, [form.items]);
 
   function setItem(idx: number, patch: Partial<ItemDraft>) {
     setForm((prev) => ({ ...prev, items: prev.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }));
@@ -240,7 +288,6 @@ export default function QuotationBuilder() {
     setForm((prev) => ({
       ...prev,
       projectId,
-      kind: projectId ? 'service_project' : prev.kind,
       serviceDetails: project ? {
         ...prev.serviceDetails,
         scope: prev.serviceDetails.scope || project.description || '',
@@ -264,29 +311,38 @@ export default function QuotationBuilder() {
     try {
       const payload = {
         buyerId: form.buyerId,
-        projectId: form.projectId || null,
+        projectId: supportsProject ? form.projectId || null : null,
         quotationDate: form.quotationDate,
         validUntil: form.validUntil || null,
         language: form.language,
         kind: form.kind,
-        serviceDetails: form.kind === 'service_project' ? {
+        serviceDetails: form.kind !== 'general' ? {
           scope: form.serviceDetails.scope || null,
+          deliverables: form.serviceDetails.deliverables || null,
+          exclusions: form.serviceDetails.exclusions || null,
           duration: form.serviceDetails.duration || null,
-          depositPercent: Number(form.serviceDetails.depositPercent) || 0,
-          revisionRounds: Number(form.serviceDetails.revisionRounds) || 0,
-          revisionTerms: form.serviceDetails.revisionTerms || null,
-          milestones: form.serviceDetails.milestones
+          warranty: form.serviceDetails.warranty || null,
+          depositPercent: supportsMilestones ? Number(form.serviceDetails.depositPercent) || 0 : null,
+          revisionRounds: supportsRevisions ? Number(form.serviceDetails.revisionRounds) || 0 : null,
+          revisionTerms: supportsRevisions ? form.serviceDetails.revisionTerms || null : null,
+          contractDuration: supportsRecurringTerms ? form.serviceDetails.contractDuration || null : null,
+          billingCycle: supportsRecurringTerms ? form.serviceDetails.billingCycle || null : null,
+          sla: supportsRecurringTerms ? form.serviceDetails.sla || null : null,
+          cancellationTerms: supportsRecurringTerms ? form.serviceDetails.cancellationTerms || null : null,
+          securityDeposit: supportsRecurringTerms ? Number(form.serviceDetails.securityDeposit) || 0 : null,
+          milestones: supportsMilestones ? form.serviceDetails.milestones
             .filter((milestone) => milestone.title.trim())
             .map((milestone) => ({
               title: milestone.title,
               amount: Number(milestone.amount) || 0,
               dueDate: milestone.dueDate || null,
               note: milestone.note || null,
-            })),
+            })) : [],
         } : null,
         templateId: form.templateId,
         items: form.items.map((it) => ({
           productId: it.productId ?? null,
+          sectionTitle: form.kind === 'boq_contract' ? it.sectionTitle || null : null,
           nameTh: it.nameTh,
           nameEn: it.nameEn ?? null,
           quantity: Number(it.quantity),
@@ -408,6 +464,7 @@ export default function QuotationBuilder() {
   const minimalTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Minimal');
   const cuteTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Cute');
   const selectedTemplate = builtinDocumentTemplates.find((template) => template.id === form.templateId) ?? null;
+  const selectedKind = QUOTATION_KIND_OPTIONS.find((option) => option.value === form.kind) ?? QUOTATION_KIND_OPTIONS[0];
 
   const buildCustomerMessage = useCallback((link?: string) => {
     const number = existing?.quotationNumber ?? (isThai ? 'ใบเสนอราคา' : 'quotation');
@@ -677,25 +734,23 @@ export default function QuotationBuilder() {
           <BriefcaseBusiness className="h-4 w-4 text-indigo-700" />
           <h3 className="font-semibold text-gray-900">{isThai ? 'ลักษณะใบเสนอราคา' : 'Quotation type'}</h3>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
+        <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)]">
+          <select
+            value={form.kind}
+            onChange={(e) => {
+              const kind = e.target.value as QuotationKind;
+              setForm((prev) => ({ ...prev, kind, projectId: kind === 'service_project' || kind === 'boq_contract' ? prev.projectId : '' }));
+            }}
+            className="input-field"
             disabled={!editable}
-            onClick={() => setForm((prev) => ({ ...prev, kind: 'general', projectId: '' }))}
-            className={`border p-3 text-left transition ${form.kind === 'general' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'} disabled:cursor-not-allowed`}
           >
-            <span className="block text-sm font-semibold text-slate-900">{isThai ? 'ขายสินค้า / บริการทั่วไป' : 'General goods / services'}</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">{isThai ? 'กรอกเร็ว เหมาะกับใบเสนอราคาทั่วไป' : 'Fast entry for everyday quotations.'}</span>
-          </button>
-          <button
-            type="button"
-            disabled={!editable}
-            onClick={() => setForm((prev) => ({ ...prev, kind: 'service_project' }))}
-            className={`border p-3 text-left transition ${form.kind === 'service_project' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'} disabled:cursor-not-allowed`}
-          >
-            <span className="block text-sm font-semibold text-slate-900">{isThai ? 'งานบริการ / โปรเจกต์' : 'Service / project work'}</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">{isThai ? 'มี scope งาน ระยะเวลา มัดจำ งวดงาน และเงื่อนไขแก้งาน' : 'Includes scope, timeline, deposit, milestones, and revision terms.'}</span>
-          </button>
+            {QUOTATION_KIND_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{isThai ? option.th : option.en}</option>
+            ))}
+          </select>
+          <p className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+            {isThai ? selectedKind.hintTh : selectedKind.hintEn}
+          </p>
         </div>
       </div>
 
@@ -777,36 +832,38 @@ export default function QuotationBuilder() {
         </div>
       </div>
 
-      {form.kind === 'service_project' && (
+      {hasStructuredDetails && (
         <div className="card space-y-4">
           <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
             <BriefcaseBusiness className="mt-0.5 h-5 w-5 text-indigo-700" />
             <div>
-              <h3 className="font-semibold text-slate-900">{isThai ? 'ขอบเขตงานบริการ / โปรเจกต์' : 'Service / project scope'}</h3>
+              <h3 className="font-semibold text-slate-900">{isThai ? 'รายละเอียดเพิ่มเติม' : 'Additional details'}</h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                {isThai ? 'เลือกโปรเจกต์ที่มีอยู่เพื่อดึงรายละเอียดและช่วงเวลามาใช้ หรือกรอกเฉพาะใบเสนอราคานี้ได้' : 'Reuse an existing project or enter details for this quotation only.'}
+                {isThai ? selectedKind.hintTh : selectedKind.hintEn}
               </p>
             </div>
           </div>
 
-          <div>
-            <label className="label">{isThai ? 'ผูกกับโปรเจกต์' : 'Linked project'}</label>
-            <select value={form.projectId} onChange={(e) => selectProject(e.target.value)} className="input-field" disabled={!editable}>
-              <option value="">{isThai ? 'ไม่ผูกโปรเจกต์' : 'No linked project'}</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">
-              {projects.length === 0
-                ? (isThai ? 'ยังไม่มีโปรเจกต์ คุณยังกรอกใบเสนอราคาได้' : 'No projects yet. You can still complete this quotation.')
-                : (isThai ? 'เลือกโปรเจกต์เดิม หรือกรอกเฉพาะใบเสนอราคานี้' : 'Reuse an existing project or enter quote-only details.')}
-              {' '}
-              <Link to="/app/projects" className="font-medium text-indigo-700 hover:underline">
-                {isThai ? 'ไปที่โปรเจกต์' : 'Open projects'}
-              </Link>
-            </p>
-          </div>
+          {supportsProject && (
+            <div>
+              <label className="label">{isThai ? 'ผูกกับโปรเจกต์' : 'Linked project'}</label>
+              <select value={form.projectId} onChange={(e) => selectProject(e.target.value)} className="input-field" disabled={!editable}>
+                <option value="">{isThai ? 'ไม่ผูกโปรเจกต์' : 'No linked project'}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500">
+                {projects.length === 0
+                  ? (isThai ? 'ยังไม่มีโปรเจกต์ คุณยังกรอกใบเสนอราคาได้' : 'No projects yet. You can still complete this quotation.')
+                  : (isThai ? 'เลือกโปรเจกต์เดิม หรือกรอกเฉพาะใบเสนอราคานี้' : 'Reuse an existing project or enter quote-only details.')}
+                {' '}
+                <Link to="/app/projects" className="font-medium text-indigo-700 hover:underline">
+                  {isThai ? 'ไปที่โปรเจกต์' : 'Open projects'}
+                </Link>
+              </p>
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -820,6 +877,28 @@ export default function QuotationBuilder() {
                 placeholder={isThai ? 'ระบุสิ่งที่จะส่งมอบ ขอบเขตที่รวม และสิ่งที่ไม่รวมในราคา' : 'Describe deliverables, included work, and exclusions.'}
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="label">{isThai ? 'สิ่งส่งมอบ' : 'Deliverables'}</label>
+              <textarea
+                value={form.serviceDetails.deliverables}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, deliverables: e.target.value } }))}
+                className="input-field"
+                rows={3}
+                disabled={!editable}
+                placeholder={isThai ? 'เช่น ติดตั้งระบบพร้อมทดสอบ และส่งคู่มือใช้งาน' : 'e.g. installed and tested system with user guide'}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">{isThai ? 'สิ่งที่ไม่รวมในราคา' : 'Exclusions'}</label>
+              <textarea
+                value={form.serviceDetails.exclusions}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, exclusions: e.target.value } }))}
+                className="input-field"
+                rows={2}
+                disabled={!editable}
+                placeholder={isThai ? 'เช่น ไม่รวมงานแก้ผนังและค่าเดินทางนอกพื้นที่' : 'e.g. excludes wall repair and out-of-area travel'}
+              />
+            </div>
             <div>
               <label className="label">{isThai ? 'ระยะเวลาดำเนินงาน' : 'Timeline'}</label>
               <input
@@ -831,6 +910,16 @@ export default function QuotationBuilder() {
               />
             </div>
             <div>
+              <label className="label">{isThai ? 'การรับประกัน' : 'Warranty'}</label>
+              <input
+                value={form.serviceDetails.warranty}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, warranty: e.target.value } }))}
+                className="input-field"
+                disabled={!editable}
+                placeholder={isThai ? 'เช่น รับประกันงานติดตั้ง 1 ปี' : 'e.g. 1-year installation warranty'}
+              />
+            </div>
+            {supportsMilestones && <div>
               <label className="label">{isThai ? 'มัดจำก่อนเริ่มงาน (%)' : 'Deposit before start (%)'}</label>
               <input
                 type="number"
@@ -844,8 +933,8 @@ export default function QuotationBuilder() {
               {form.serviceDetails.depositPercent > 0 && (
                 <p className="mt-1 text-xs text-slate-500">{isThai ? 'คิดเป็น' : 'Amount'} {formatCurrency((totals.total * form.serviceDetails.depositPercent) / 100)}</p>
               )}
-            </div>
-            <div>
+            </div>}
+            {supportsRevisions && <div>
               <label className="label">{isThai ? 'แก้ไขงานได้ (รอบ)' : 'Included revision rounds'}</label>
               <input
                 type="number"
@@ -856,8 +945,8 @@ export default function QuotationBuilder() {
                 className="input-field"
                 disabled={!editable}
               />
-            </div>
-            <div>
+            </div>}
+            {supportsRevisions && <div>
               <label className="label">{isThai ? 'เงื่อนไขแก้ไขงาน' : 'Revision terms'}</label>
               <input
                 value={form.serviceDetails.revisionTerms}
@@ -866,10 +955,34 @@ export default function QuotationBuilder() {
                 disabled={!editable}
                 placeholder={isThai ? 'เช่น เกินจำนวนรอบคิดเพิ่มตามจริง' : 'e.g. extra rounds are quoted separately'}
               />
-            </div>
+            </div>}
+            {supportsRecurringTerms && (
+              <>
+                <div>
+                  <label className="label">{isThai ? 'ระยะสัญญา' : 'Contract duration'}</label>
+                  <input value={form.serviceDetails.contractDuration} onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, contractDuration: e.target.value } }))} className="input-field" disabled={!editable} placeholder={isThai ? 'เช่น 12 เดือน' : 'e.g. 12 months'} />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'รอบเรียกเก็บเงิน' : 'Billing cycle'}</label>
+                  <input value={form.serviceDetails.billingCycle} onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, billingCycle: e.target.value } }))} className="input-field" disabled={!editable} placeholder={isThai ? 'เช่น ทุกวันที่ 1 ของเดือน' : 'e.g. first day of each month'} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">{isThai ? 'ระดับการให้บริการ (SLA)' : 'Service level (SLA)'}</label>
+                  <textarea value={form.serviceDetails.sla} onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, sla: e.target.value } }))} className="input-field" rows={2} disabled={!editable} placeholder={isThai ? 'เช่น ตอบกลับภายใน 4 ชั่วโมงทำการ' : 'e.g. response within 4 business hours'} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">{isThai ? 'เงื่อนไขยกเลิก' : 'Cancellation terms'}</label>
+                  <textarea value={form.serviceDetails.cancellationTerms} onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, cancellationTerms: e.target.value } }))} className="input-field" rows={2} disabled={!editable} placeholder={isThai ? 'เช่น แจ้งล่วงหน้า 30 วัน' : 'e.g. 30 days notice'} />
+                </div>
+                <div>
+                  <label className="label">{isThai ? 'เงินประกัน' : 'Security deposit'}</label>
+                  <input type="number" min="0" value={form.serviceDetails.securityDeposit} onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, securityDeposit: Number(e.target.value) } }))} className="input-field text-right" disabled={!editable} />
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="border-t border-slate-100 pt-4">
+          {supportsMilestones && <div className="border-t border-slate-100 pt-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h4 className="text-sm font-semibold text-slate-900">{isThai ? 'งวดงาน' : 'Milestones'}</h4>
@@ -914,7 +1027,7 @@ export default function QuotationBuilder() {
                 )}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       )}
 
@@ -928,14 +1041,20 @@ export default function QuotationBuilder() {
             </button>
           )}
         </div>
-        <table className="w-full text-sm">
+        {form.kind === 'boq_contract' && (
+          <p className="mb-3 border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+            {isThai ? 'ใส่หมวดงานในแต่ละรายการ เช่น งานวัสดุ ค่าแรง หรืองานระบบ ระบบจะรวมยอดย่อยตามหมวดให้อัตโนมัติ' : 'Assign each line to a BOQ section such as materials, labor, or systems. Section subtotals update automatically.'}
+          </p>
+        )}
+        <div className="overflow-x-auto">
+        <table className="min-w-[860px] w-full text-sm">
           <thead className="text-xs text-gray-500 uppercase">
             <tr>
               <th className="text-left pb-2">{isThai ? 'ชื่อ' : 'Name'}</th>
               <th className="text-right pb-2 w-20">{isThai ? 'จำนวน' : 'Qty'}</th>
               <th className="text-left pb-2 w-24">{isThai ? 'หน่วย' : 'Unit'}</th>
               <th className="text-right pb-2 w-28">{isThai ? 'ราคา/หน่วย' : 'Unit price'}</th>
-              <th className="text-right pb-2 w-24">{isThai ? 'ส่วนลด' : 'Discount'}</th>
+              <th className="text-right pb-2 w-24">{isThai ? 'ส่วนลด %' : 'Discount %'}</th>
               <th className="text-left pb-2 w-24">VAT</th>
               <th className="text-right pb-2 w-28">{isThai ? 'รวม' : 'Total'}</th>
               {editable && <th className="w-8" />}
@@ -947,6 +1066,9 @@ export default function QuotationBuilder() {
               return (
                 <tr key={idx} className="border-t border-gray-100">
                   <td className="py-2 pr-2">
+                    {form.kind === 'boq_contract' && (
+                      <input value={item.sectionTitle ?? ''} onChange={(e) => setItem(idx, { sectionTitle: e.target.value })} placeholder={isThai ? 'หมวดงาน เช่น งานไฟฟ้า' : 'Section e.g. electrical'} className="input-field mb-2 text-xs" disabled={!editable} />
+                    )}
                     <input value={item.nameTh} onChange={(e) => setItem(idx, { nameTh: e.target.value })} placeholder={isThai ? 'ชื่อรายการ' : 'Item name'} className="input-field text-sm" disabled={!editable} />
                   </td>
                   <td className="py-2 pr-2">
@@ -981,6 +1103,21 @@ export default function QuotationBuilder() {
             })}
           </tbody>
         </table>
+        </div>
+
+        {form.kind === 'boq_contract' && boqSectionTotals.length > 0 && (
+          <div className="mt-4 border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-xs font-semibold text-slate-700">{isThai ? 'ยอดย่อยตามหมวด BOQ (ก่อน VAT)' : 'BOQ section subtotals (before VAT)'}</p>
+            <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+              {boqSectionTotals.map(([title, amount]) => (
+                <div key={title} className="flex justify-between gap-3 border-b border-slate-200 py-1 last:border-b-0">
+                  <span className="text-slate-600">{title}</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-gray-200 mt-4 pt-3 space-y-1 text-sm">
           <div className="flex justify-between"><span className="text-gray-500">{isThai ? 'ยอดรวมก่อน VAT' : 'Subtotal'}</span><span>{formatCurrency(totals.subtotal)}</span></div>

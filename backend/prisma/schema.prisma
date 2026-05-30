@@ -775,6 +775,7 @@ model QuotationItem {
   id             String  @id @default(cuid())
   quotationId    String
   productId      String?
+  sectionTitle   String? @map("section_title")
   nameTh         String
   nameEn         String?
   descriptionTh  String?

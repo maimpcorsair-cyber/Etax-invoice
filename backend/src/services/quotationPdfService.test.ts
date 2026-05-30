@@ -96,3 +96,50 @@ test('buildQuotationPdfData forwards quotation template preference from seller s
   assert.match(pdfData.notes ?? '', /ขอบเขตงาน: ออกแบบเว็บไซต์บริษัท/);
   assert.match(pdfData.notes ?? '', /งวดงาน:/);
 });
+
+test('buildQuotationPdfData renders BOQ section subtotals and structured terms', () => {
+  const quotation = {
+    id: 'qt-boq',
+    companyId: 'co-1',
+    projectId: null,
+    quotationNumber: 'QT-2026-000002',
+    status: 'draft',
+    language: 'th',
+    kind: 'boq_contract',
+    serviceDetails: {
+      deliverables: 'ติดตั้งระบบไฟพร้อมทดสอบ',
+      exclusions: 'ไม่รวมงานแก้ผนัง',
+      warranty: 'รับประกันงานติดตั้ง 1 ปี',
+    },
+    quotationDate: new Date('2026-05-30T00:00:00Z'),
+    validUntil: null,
+    buyerId: 'cus-1',
+    seller: { nameTh: 'บริษัท ตัวอย่าง จำกัด', taxId: '0100000000000', addressTh: 'กรุงเทพมหานคร' },
+    subtotal: 1500,
+    vatAmount: 105,
+    discountAmount: 0,
+    total: 1605,
+    notes: null,
+    paymentTerms: null,
+    deliveryTerms: null,
+    buyer: {
+      nameTh: 'ลูกค้าตัวอย่าง',
+      nameEn: null,
+      taxId: '0200000000000',
+      branchCode: '00000',
+      addressTh: 'กรุงเทพมหานคร',
+    },
+    items: [
+      { sectionTitle: 'งานไฟฟ้า', nameTh: 'สายไฟ', nameEn: null, quantity: 1, unit: 'ชุด', unitPrice: 1000, discountAmount: 0, vatType: 'vat7', amount: 1000, vatAmount: 70, totalAmount: 1070 },
+      { sectionTitle: 'ค่าแรง', nameTh: 'ติดตั้ง', nameEn: null, quantity: 1, unit: 'งาน', unitPrice: 500, discountAmount: 0, vatType: 'vat7', amount: 500, vatAmount: 35, totalAmount: 535 },
+    ],
+  } as unknown as QuotationPdfRow;
+
+  const pdfData = buildQuotationPdfData(quotation);
+
+  assert.match(pdfData.notes ?? '', /สิ่งส่งมอบ: ติดตั้งระบบไฟพร้อมทดสอบ/);
+  assert.match(pdfData.notes ?? '', /การรับประกัน: รับประกันงานติดตั้ง 1 ปี/);
+  assert.match(pdfData.notes ?? '', /สรุป BOQ ตามหมวดงาน \(ก่อน VAT\):/);
+  assert.match(pdfData.notes ?? '', /งานไฟฟ้า: 1,000.00 บาท/);
+  assert.equal(pdfData.items[0].nameTh, 'งานไฟฟ้า — สายไฟ');
+});

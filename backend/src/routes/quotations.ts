@@ -21,6 +21,7 @@ export const quotationsRouter = Router();
 
 const itemSchema = z.object({
   productId: z.string().optional().nullable(),
+  sectionTitle: z.string().trim().max(160).optional().nullable(),
   nameTh: z.string().min(1).max(200),
   nameEn: z.string().max(200).optional().nullable(),
   descriptionTh: z.string().max(500).optional().nullable(),
@@ -39,13 +40,21 @@ const quotationCreateSchema = z.object({
   quotationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   language: z.enum(['th', 'en', 'both']).default('th'),
-  kind: z.enum(['general', 'service_project']).default('general'),
+  kind: z.enum(['general', 'service', 'service_project', 'boq_contract', 'recurring_rental']).default('general'),
   serviceDetails: z.object({
     scope: z.string().trim().max(3000).optional().nullable(),
+    deliverables: z.string().trim().max(3000).optional().nullable(),
+    exclusions: z.string().trim().max(2000).optional().nullable(),
     duration: z.string().trim().max(500).optional().nullable(),
+    warranty: z.string().trim().max(1000).optional().nullable(),
     depositPercent: z.number().min(0).max(100).optional().nullable(),
     revisionRounds: z.number().int().min(0).max(99).optional().nullable(),
     revisionTerms: z.string().trim().max(1000).optional().nullable(),
+    contractDuration: z.string().trim().max(500).optional().nullable(),
+    billingCycle: z.string().trim().max(500).optional().nullable(),
+    sla: z.string().trim().max(1000).optional().nullable(),
+    cancellationTerms: z.string().trim().max(1000).optional().nullable(),
+    securityDeposit: z.number().min(0).optional().nullable(),
     milestones: z.array(z.object({
       title: z.string().trim().min(1).max(160),
       amount: z.number().min(0),
@@ -318,7 +327,7 @@ quotationsRouter.post('/', async (req, res) => {
         quotationNumber,
         language: body.language,
         kind: body.kind,
-        serviceDetails: body.kind === 'service_project' ? body.serviceDetails ?? {} : Prisma.JsonNull,
+        serviceDetails: body.kind !== 'general' ? body.serviceDetails ?? {} : Prisma.JsonNull,
         quotationDate: new Date(`${body.quotationDate}T00:00:00.000Z`),
         validUntil: body.validUntil ? new Date(`${body.validUntil}T23:59:59.000Z`) : null,
         buyerId: body.buyerId,
@@ -334,6 +343,7 @@ quotationsRouter.post('/', async (req, res) => {
         items: {
           create: enrichedItems.map((item) => ({
             productId: item.productId ?? null,
+            sectionTitle: item.sectionTitle ?? null,
             nameTh: item.nameTh,
             nameEn: item.nameEn ?? null,
             descriptionTh: item.descriptionTh ?? null,
@@ -411,6 +421,7 @@ quotationsRouter.patch('/:id', async (req, res) => {
         deleteMany: {},
         create: enrichedItems.map((item) => ({
           productId: item.productId ?? null,
+          sectionTitle: item.sectionTitle ?? null,
           nameTh: item.nameTh,
           nameEn: item.nameEn ?? null,
           descriptionTh: item.descriptionTh ?? null,

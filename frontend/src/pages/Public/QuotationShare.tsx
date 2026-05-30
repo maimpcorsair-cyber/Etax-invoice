@@ -16,13 +16,21 @@ interface QuotationShareData {
     notes: string | null;
     paymentTerms: string | null;
     deliveryTerms: string | null;
-    kind: 'general' | 'service_project';
+    kind: 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental';
     serviceDetails: {
       scope?: string | null;
+      deliverables?: string | null;
+      exclusions?: string | null;
       duration?: string | null;
+      warranty?: string | null;
       depositPercent?: number | null;
       revisionRounds?: number | null;
       revisionTerms?: string | null;
+      contractDuration?: string | null;
+      billingCycle?: string | null;
+      sla?: string | null;
+      cancellationTerms?: string | null;
+      securityDeposit?: number | null;
       milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>;
     } | null;
     project?: { id: string; code: string; name: string } | null;
@@ -32,11 +40,13 @@ interface QuotationShareData {
   seller: { nameTh: string; nameEn: string | null; taxId: string; logoUrl: string | null; phone?: string | null; email?: string | null };
   items: Array<{
     id: string;
+    sectionTitle?: string | null;
     nameTh: string;
     nameEn: string | null;
     quantity: number;
     unit: string;
     unitPrice: number;
+    amount: number;
     totalAmount: number;
   }>;
 }
@@ -82,6 +92,9 @@ export default function QuotationShare() {
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+        if (!body?.quotation || !body?.buyer || !body?.seller || !Array.isArray(body?.items)) {
+          throw new Error('ข้อมูลใบเสนอราคาไม่สมบูรณ์ กรุณาติดต่อผู้ส่งให้ออกลิงก์ใหม่');
+        }
         setData(body as QuotationShareData);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'))
@@ -138,6 +151,13 @@ export default function QuotationShare() {
   }
 
   const { quotation, buyer, seller, items } = data;
+  const boqSectionTotals = quotation.kind === 'boq_contract'
+    ? [...items.reduce((sections, item) => {
+        const title = item.sectionTitle?.trim();
+        if (title) sections.set(title, (sections.get(title) ?? 0) + item.amount);
+        return sections;
+      }, new Map<string, number>()).entries()]
+    : [];
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-6">
@@ -186,9 +206,12 @@ export default function QuotationShare() {
         <section className="border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-base font-semibold text-slate-950">รายการ</h2>
           <div className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <div key={item.id} className="grid gap-2 py-3 text-sm sm:grid-cols-[1fr_auto]">
                 <div>
+                  {item.sectionTitle && item.sectionTitle !== items[index - 1]?.sectionTitle && (
+                    <p className="mb-2 border-b border-slate-100 pb-2 text-xs font-semibold text-slate-500">{item.sectionTitle}</p>
+                  )}
                   <p className="font-medium text-slate-900">{item.nameTh}</p>
                   <p className="text-xs text-slate-500">{item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}</p>
                 </div>
@@ -196,6 +219,19 @@ export default function QuotationShare() {
               </div>
             ))}
           </div>
+          {boqSectionTotals.length > 0 && (
+            <div className="mt-4 border border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="text-xs font-semibold text-slate-700">ยอดย่อยตามหมวด BOQ (ก่อน VAT)</p>
+              <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+                {boqSectionTotals.map(([title, amount]) => (
+                  <div key={title} className="flex justify-between gap-3 border-b border-slate-200 py-1 last:border-b-0">
+                    <span className="text-slate-600">{title}</span>
+                    <span className="font-semibold text-slate-900">{formatCurrency(amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-slate-600">มูลค่าก่อนภาษี</span><span>{formatCurrency(quotation.subtotal)}</span></div>
             <div className="flex justify-between"><span className="text-slate-600">VAT</span><span>{formatCurrency(quotation.vatAmount)}</span></div>
@@ -209,15 +245,18 @@ export default function QuotationShare() {
           </div>
         </section>
 
-        {quotation.kind === 'service_project' && quotation.serviceDetails && (
+        {quotation.kind !== 'general' && quotation.serviceDetails && (
           <section className="border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-base font-semibold text-slate-950">รายละเอียดงานบริการ / โปรเจกต์</h2>
+              <h2 className="text-base font-semibold text-slate-950">รายละเอียดเพิ่มเติม</h2>
               {quotation.project && <span className="text-xs font-medium text-slate-500">{quotation.project.code} · {quotation.project.name}</span>}
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {quotation.serviceDetails.scope && <InfoBlock title="Scope งาน" value={quotation.serviceDetails.scope} wide />}
+              {quotation.serviceDetails.deliverables && <InfoBlock title="สิ่งส่งมอบ" value={quotation.serviceDetails.deliverables} wide />}
+              {quotation.serviceDetails.exclusions && <InfoBlock title="สิ่งที่ไม่รวมในราคา" value={quotation.serviceDetails.exclusions} wide />}
               {quotation.serviceDetails.duration && <InfoBlock title="ระยะเวลาดำเนินงาน" value={quotation.serviceDetails.duration} />}
+              {quotation.serviceDetails.warranty && <InfoBlock title="การรับประกัน" value={quotation.serviceDetails.warranty} />}
               {typeof quotation.serviceDetails.depositPercent === 'number' && quotation.serviceDetails.depositPercent > 0 && (
                 <InfoBlock title="มัดจำก่อนเริ่มงาน" value={`${quotation.serviceDetails.depositPercent}% · ${formatCurrency((quotation.total * quotation.serviceDetails.depositPercent) / 100)}`} />
               )}
@@ -225,6 +264,13 @@ export default function QuotationShare() {
                 <InfoBlock title="จำนวนรอบแก้ไขงาน" value={`${quotation.serviceDetails.revisionRounds} รอบ`} />
               )}
               {quotation.serviceDetails.revisionTerms && <InfoBlock title="เงื่อนไขแก้ไขงาน" value={quotation.serviceDetails.revisionTerms} />}
+              {quotation.serviceDetails.contractDuration && <InfoBlock title="ระยะสัญญา" value={quotation.serviceDetails.contractDuration} />}
+              {quotation.serviceDetails.billingCycle && <InfoBlock title="รอบเรียกเก็บเงิน" value={quotation.serviceDetails.billingCycle} />}
+              {quotation.serviceDetails.sla && <InfoBlock title="ระดับการให้บริการ (SLA)" value={quotation.serviceDetails.sla} wide />}
+              {quotation.serviceDetails.cancellationTerms && <InfoBlock title="เงื่อนไขยกเลิก" value={quotation.serviceDetails.cancellationTerms} wide />}
+              {typeof quotation.serviceDetails.securityDeposit === 'number' && quotation.serviceDetails.securityDeposit > 0 && (
+                <InfoBlock title="เงินประกัน" value={formatCurrency(quotation.serviceDetails.securityDeposit)} />
+              )}
             </div>
             {(quotation.serviceDetails.milestones?.length ?? 0) > 0 && (
               <div className="mt-5 border-t border-slate-100 pt-4">

@@ -259,6 +259,7 @@ export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'converted' | 'rej
 export interface QuotationItem {
   id?: string;
   productId?: string | null;
+  sectionTitle?: string | null;
   nameTh: string;
   nameEn?: string | null;
   descriptionTh?: string | null;
@@ -280,13 +281,21 @@ export interface Quotation {
   quotationNumber: string;
   status: QuotationStatus;
   language: Language;
-  kind: 'general' | 'service_project';
+  kind: 'general' | 'service' | 'service_project' | 'boq_contract' | 'recurring_rental';
   serviceDetails?: {
     scope?: string | null;
+    deliverables?: string | null;
+    exclusions?: string | null;
     duration?: string | null;
+    warranty?: string | null;
     depositPercent?: number | null;
     revisionRounds?: number | null;
     revisionTerms?: string | null;
+    contractDuration?: string | null;
+    billingCycle?: string | null;
+    sla?: string | null;
+    cancellationTerms?: string | null;
+    securityDeposit?: number | null;
     milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>;
   } | null;
   quotationDate: string;

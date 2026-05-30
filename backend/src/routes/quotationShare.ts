@@ -77,6 +77,7 @@ quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
       },
       items: quotation.items.map((item) => ({
         id: item.id,
+        sectionTitle: item.sectionTitle,
         nameTh: item.nameTh,
         nameEn: item.nameEn,
         quantity: item.quantity,

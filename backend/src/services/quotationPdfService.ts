@@ -37,10 +37,20 @@ function serviceDetailsNotes(value: unknown): string[] {
     : [];
   const lines = [
     optionalStringField(details.scope) ? `ขอบเขตงาน: ${String(details.scope).trim()}` : null,
+    optionalStringField(details.deliverables) ? `สิ่งส่งมอบ: ${String(details.deliverables).trim()}` : null,
+    optionalStringField(details.exclusions) ? `สิ่งที่ไม่รวมในราคา: ${String(details.exclusions).trim()}` : null,
     optionalStringField(details.duration) ? `ระยะเวลาดำเนินงาน: ${String(details.duration).trim()}` : null,
+    optionalStringField(details.warranty) ? `การรับประกัน: ${String(details.warranty).trim()}` : null,
     typeof details.depositPercent === 'number' ? `มัดจำก่อนเริ่มงาน: ${details.depositPercent}%` : null,
     typeof details.revisionRounds === 'number' ? `แก้ไขงานได้: ${details.revisionRounds} รอบ` : null,
     optionalStringField(details.revisionTerms) ? `เงื่อนไขแก้ไขงาน: ${String(details.revisionTerms).trim()}` : null,
+    optionalStringField(details.contractDuration) ? `ระยะสัญญา: ${String(details.contractDuration).trim()}` : null,
+    optionalStringField(details.billingCycle) ? `รอบเรียกเก็บเงิน: ${String(details.billingCycle).trim()}` : null,
+    optionalStringField(details.sla) ? `ระดับการให้บริการ (SLA): ${String(details.sla).trim()}` : null,
+    optionalStringField(details.cancellationTerms) ? `เงื่อนไขยกเลิก: ${String(details.cancellationTerms).trim()}` : null,
+    typeof details.securityDeposit === 'number' && details.securityDeposit > 0
+      ? `เงินประกัน: ${details.securityDeposit.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`
+      : null,
     milestones.length > 0 ? 'งวดงาน:' : null,
     ...milestones.map((milestone, index) => {
       const due = milestone.dueDate ? ` | กำหนด ${milestone.dueDate}` : '';
@@ -51,11 +61,26 @@ function serviceDetailsNotes(value: unknown): string[] {
   return lines.filter((line): line is string => Boolean(line));
 }
 
+function boqSummaryNotes(items: QuotationItem[]): string[] {
+  const sections = new Map<string, number>();
+  for (const item of items) {
+    const title = item.sectionTitle?.trim();
+    if (!title) continue;
+    sections.set(title, (sections.get(title) ?? 0) + item.amount);
+  }
+  if (sections.size === 0) return [];
+  return [
+    'สรุป BOQ ตามหมวดงาน (ก่อน VAT):',
+    ...[...sections.entries()].map(([title, total]) => `${title}: ${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`),
+  ];
+}
+
 export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceData {
   const seller = objectRecord(quotation.seller);
   const documentPreferences = objectRecord(seller.documentPreferences);
   const notes = [
-    ...(quotation.kind === 'service_project' ? serviceDetailsNotes(quotation.serviceDetails) : []),
+    ...(quotation.kind !== 'general' ? serviceDetailsNotes(quotation.serviceDetails) : []),
+    ...(quotation.kind === 'boq_contract' ? boqSummaryNotes(quotation.items) : []),
     quotation.notes,
     quotation.deliveryTerms ? `เงื่อนไขการส่งของ: ${quotation.deliveryTerms}` : null,
   ].filter(Boolean).join('\n');
@@ -88,8 +113,8 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
       addressEn: quotation.buyer.addressEn,
     },
     items: quotation.items.map((item) => ({
-      nameTh: item.nameTh,
-      nameEn: item.nameEn,
+      nameTh: item.sectionTitle ? `${item.sectionTitle} — ${item.nameTh}` : item.nameTh,
+      nameEn: item.sectionTitle ? `${item.sectionTitle} — ${item.nameEn ?? item.nameTh}` : item.nameEn,
       quantity: item.quantity,
       unit: item.unit,
       unitPrice: item.unitPrice,
