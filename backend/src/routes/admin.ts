@@ -103,10 +103,25 @@ const companySchema = z.object({
 adminRouter.put('/company', async (req, res) => {
   try {
     const body = companySchema.partial().parse(req.body);
-    const company = await prisma.company.update({ where: { id: req.user!.companyId }, data: body });
+    // Return an explicit safe field set — never the full row, which would
+    // leak certificateBlob / certificatePassword and also forces Prisma to
+    // RETURNING every schema scalar (brittle if any column drifts).
+    const company = await prisma.company.update({
+      where: { id: req.user!.companyId },
+      data: body,
+      select: {
+        id: true, nameTh: true, nameEn: true, taxId: true,
+        branchCode: true, branchNameTh: true, branchNameEn: true,
+        addressTh: true, addressEn: true, phone: true, email: true,
+        website: true, logoUrl: true, documentFooterNote: true,
+        rdEnvironment: true, lineNotifyEnabled: true, overdueReminderDays: true,
+        updatedAt: true,
+      },
+    });
     res.json({ data: company });
   } catch (err) {
     if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('[admin] company update failed', { companyId: req.user?.companyId, err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to update company' });
   }
 });
