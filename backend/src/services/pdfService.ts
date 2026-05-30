@@ -74,6 +74,7 @@ export interface PdfInvoiceData {
   discountAmount: number;
   total: number;
   isPaid?: boolean | null; // suppresses the "scan to pay" PromptPay QR when already settled
+  documentFooterNote?: string | null; // company-wide fine-print at the very bottom
   notes?: string | null;
   paymentMethod?: string | null;
   documentLogoUrl?: string | null;
@@ -246,11 +247,25 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
   const enrichedData = await enrichElectronicDocument(data);
   const promptPay = await enrichPromptPayQr(enrichedData, companyId);
 
+  // Company-wide footer fine-print, resolved at render time (not snapshotted)
+  // since it is boilerplate terms, not invoice-specific data. Prefer an
+  // explicit value already on `data` (e.g. a preview override) when present.
+  let documentFooterNote = data.documentFooterNote ?? null;
+  if (documentFooterNote == null) {
+    try {
+      const company = await prisma.company.findUnique({ where: { id: companyId }, select: { documentFooterNote: true } });
+      documentFooterNote = company?.documentFooterNote ?? null;
+    } catch {
+      documentFooterNote = null;
+    }
+  }
+
   const mergedData = {
     ...enrichedData,
     templateName: data.templateName ?? template?.name ?? null,
     templateHtml: data.templateHtml ?? template?.html ?? null,
     templateNote: null,
+    documentFooterNote,
     promptPayQrDataUrl: promptPay?.url ?? null,
     promptPayTarget: promptPay?.target ?? null,
   };

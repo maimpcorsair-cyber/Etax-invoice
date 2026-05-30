@@ -53,6 +53,7 @@ adminRouter.get('/company', async (req, res) => {
         email: true,
         website: true,
         logoUrl: true,
+        documentFooterNote: true,
         rdEnvironment: true,
         lineNotifyEnabled: true,
         overdueReminderDays: true,
@@ -93,6 +94,10 @@ const companySchema = z.object({
     z.string().trim().email().optional(),
   ),
   website: optionalUrl,
+  documentFooterNote: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
+    z.string().trim().max(2000).nullable().optional(),
+  ),
 });
 
 adminRouter.put('/company', async (req, res) => {

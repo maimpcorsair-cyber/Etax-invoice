@@ -609,6 +609,16 @@ export function buildHtml(data: PdfInvoiceData): string {
     color: #778296;
   }
   .footer-right { text-align: right; }
+  .legal-footer {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid #e6edf6;
+    font-size: 9px;
+    line-height: 1.5;
+    color: #8a95a5;
+    white-space: pre-line;
+  }
+  .compact-one-page .legal-footer { margin-top: 8px; padding-top: 6px; font-size: 8px; }
   .compact-one-page {
     padding: 0;
     font-size: 11px;
@@ -1091,6 +1101,8 @@ export function buildHtml(data: PdfInvoiceData): string {
           <div class="cert-pill">ELECTRONIC DOCUMENT</div>
         </div>
       ` : ''}
+
+      ${data.documentFooterNote ? `<div class="legal-footer">${escapeHtml(data.documentFooterNote)}</div>` : ''}
 
       <div class="footer">
         <div>${escapeHtml(docTitle)} &nbsp;·&nbsp; ${labels.origDoc} &nbsp;|&nbsp; ${isElectronicDocument ? labels.electronicCertified : labels.ordinaryDoc}</div>

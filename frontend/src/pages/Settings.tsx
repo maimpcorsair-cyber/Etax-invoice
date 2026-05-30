@@ -46,6 +46,7 @@ interface CompanyDraft {
   phone: string;
   email: string;
   website: string;
+  documentFooterNote: string;
 }
 
 type CompanyField = keyof CompanyDraft;
@@ -155,6 +156,7 @@ const emptyCompanyDraft: CompanyDraft = {
   phone: '',
   email: '',
   website: '',
+  documentFooterNote: '',
 };
 
 const defaultPreferences: InvoicePreferences = {
@@ -186,6 +188,7 @@ function cleanCompanyPayload(draft: CompanyDraft) {
     phone: draft.phone.trim() || undefined,
     email: draft.email.trim() || undefined,
     website: normalizeWebsite(draft.website) || undefined,
+    documentFooterNote: draft.documentFooterNote.trim() || null,
   };
 }
 
@@ -202,6 +205,7 @@ function companyFieldLabel(field: CompanyField, isThai: boolean) {
     phone: { th: 'โทรศัพท์', en: 'Phone' },
     email: { th: 'อีเมล', en: 'Email' },
     website: { th: 'เว็บไซต์', en: 'Website' },
+    documentFooterNote: { th: 'ข้อความท้ายเอกสาร', en: 'Document footer note' },
   };
   return isThai ? labels[field].th : labels[field].en;
 }
@@ -401,6 +405,7 @@ export default function Settings() {
           phone: json.data.phone ?? '',
           email: json.data.email ?? '',
           website: json.data.website ?? '',
+          documentFooterNote: json.data.documentFooterNote ?? '',
         });
       }
 
@@ -480,6 +485,7 @@ export default function Settings() {
           phone: json.data.phone ?? '',
           email: json.data.email ?? '',
           website: json.data.website ?? '',
+          documentFooterNote: json.data.documentFooterNote ?? '',
         });
       }
       setMessage(isThai ? 'บันทึกข้อมูลบริษัทเรียบร้อย' : 'Company profile saved.');
@@ -765,6 +771,38 @@ export default function Settings() {
                   <label className="label">{isThai ? 'ที่อยู่ภาษาอังกฤษ' : 'English address'}</label>
                   <textarea className={companyInputClass('addressEn')} rows={3} value={companyDraft.addressEn} onChange={(e) => setCompanyDraft((prev) => ({ ...prev, addressEn: e.target.value }))} disabled={!isAdmin || companyLoading} />
                 </div>
+            </div>
+            <div className="mt-4">
+              <label className="label">{isThai ? 'ข้อความท้ายเอกสาร (เงื่อนไข / หมายเหตุประจำบริษัท)' : 'Document footer note (terms / standard notes)'}</label>
+              <textarea
+                className="input-field"
+                rows={4}
+                value={companyDraft.documentFooterNote}
+                onChange={(e) => setCompanyDraft((prev) => ({ ...prev, documentFooterNote: e.target.value }))}
+                disabled={!isAdmin || companyLoading}
+                placeholder={isThai ? 'เช่น ชำระเงินภายในวันที่ครบกำหนด · กรณีชำระล่าช้าคิดดอกเบี้ย 1.5% ต่อเดือน' : 'e.g. Payment due by the due date; overdue interest 1.5%/month'}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {isThai ? 'แสดงเป็นตัวอักษรเล็กท้ายเอกสารทุกใบ (ขึ้นบรรทัดใหม่ได้)' : 'Shown as fine print at the bottom of every document (line breaks preserved).'}
+              </p>
+              {isAdmin && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    { label: isThai ? '+ เงื่อนไขชำระเงิน' : '+ Payment terms', text: isThai ? 'ชำระเงินภายในวันที่ครบกำหนด กรณีชำระล่าช้าคิดดอกเบี้ยในอัตราร้อยละ 1.5 ต่อเดือน' : 'Payment is due by the due date. Overdue payments incur interest of 1.5% per month.' },
+                    { label: isThai ? '+ เอกสารอิเล็กทรอนิกส์' : '+ Electronic notice', text: isThai ? 'เอกสารนี้จัดทำและส่งมอบด้วยวิธีการทางอิเล็กทรอนิกส์ตามพระราชบัญญัติว่าด้วยธุรกรรมทางอิเล็กทรอนิกส์' : 'This document is issued and delivered electronically under the Electronic Transactions Act.' },
+                    { label: isThai ? '+ แจ้งข้อผิดพลาด' : '+ Verify notice', text: isThai ? 'กรุณาตรวจสอบความถูกต้องของเอกสาร หากมีข้อผิดพลาดโปรดแจ้งภายใน 7 วันนับจากวันที่ได้รับ' : 'Please verify this document and report any errors within 7 days of receipt.' },
+                  ].map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                      onClick={() => setCompanyDraft((prev) => ({ ...prev, documentFooterNote: prev.documentFooterNote.trim() ? `${prev.documentFooterNote.trim()}\n${s.text}` : s.text }))}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button type="button" onClick={() => void saveCompany()} disabled={!isAdmin || companySaving} className="btn-primary inline-flex items-center gap-2">
               <Save className="h-4 w-4" />
