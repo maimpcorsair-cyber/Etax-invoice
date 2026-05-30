@@ -76,7 +76,11 @@ export function buildHtml(data: PdfInvoiceData): string {
       : (isTh ? 'วิธีชำระเงิน' : isEn ? 'Payment Method' : 'วิธีชำระเงิน / Payment Method'),
     notes: isTh ? 'หมายเหตุ' : isEn ? 'Notes' : 'หมายเหตุ / Notes',
     preparedBy: isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : isEn ? 'Prepared by / Issuer' : 'ผู้จัดทำ / Prepared by',
-    receivedBy: isTh ? 'ผู้รับสินค้า / ลูกค้า' : isEn ? 'Received by / Customer' : 'ผู้รับ / Customer',
+    receivedBy: isQuotation
+      ? (isTh ? 'ผู้อนุมัติ / ลูกค้า' : isEn ? 'Approved by / Customer' : 'ผู้อนุมัติ / Approved by')
+      : data.type === 'receipt'
+        ? (isTh ? 'ผู้จ่ายเงิน / ลูกค้า' : isEn ? 'Paid by / Customer' : 'ผู้จ่ายเงิน / Paid by')
+        : (isTh ? 'ผู้รับสินค้า / ลูกค้า' : isEn ? 'Received by / Customer' : 'ผู้รับ / Customer'),
     authorizedBy: isTh ? 'ผู้มีอำนาจลงนาม / ออกโดย' : isEn ? 'Authorized Signature' : 'ผู้มีอำนาจลงนาม / Authorized Signature',
     receivedGoods: isQuotation
       ? ''

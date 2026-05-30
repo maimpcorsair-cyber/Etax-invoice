@@ -73,6 +73,7 @@ export interface PdfInvoiceData {
   vatAmount: number;
   discountAmount: number;
   total: number;
+  isPaid?: boolean | null; // suppresses the "scan to pay" PromptPay QR when already settled
   notes?: string | null;
   paymentMethod?: string | null;
   documentLogoUrl?: string | null;
@@ -219,6 +220,9 @@ export async function generatePdf(data: PdfInvoiceData): Promise<Buffer> {
 // fails — we never want PromptPay to block PDF rendering.
 async function enrichPromptPayQr(data: PdfInvoiceData, companyId: string): Promise<{ url: string; target: string } | null> {
   if (!data.total || data.total <= 0) return null;
+  // No "scan to pay" QR on a quotation (nothing to pay yet) or on a document
+  // that is already settled — it would confuse the recipient.
+  if (data.type === 'quotation' || data.isPaid) return null;
   try {
     const { buildPromptPayQr } = await import('./promptPayService');
     const company = await prisma.company.findUnique({

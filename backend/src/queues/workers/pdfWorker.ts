@@ -97,6 +97,7 @@ export const pdfWorker = new Worker<PdfJobData>(
       vatAmount: invoice.vatAmount,
       discountAmount: invoice.discountAmount,
       total: invoice.total,
+      isPaid: invoice.isPaid,
       notes: invoice.notes,
       paymentMethod: invoice.paymentMethod,
       templateId: sellerSnap?.documentPreferences?.templateId ?? null,
