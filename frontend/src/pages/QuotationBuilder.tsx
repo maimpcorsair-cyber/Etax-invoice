@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
   Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt, Truck,
-  Download, Copy, ExternalLink, Eye,
+  Download, Copy, ExternalLink, Eye, Share2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -82,6 +82,8 @@ export default function QuotationBuilder() {
   const [acting, setActing] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<'open' | 'download' | null>(null);
   const [copying, setCopying] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const [form, setForm] = useState<FormState>({
@@ -292,24 +294,27 @@ export default function QuotationBuilder() {
     return selected?.nameTh || selected?.nameEn || existing?.buyer?.nameTh || existing?.buyer?.nameEn || (isThai ? 'ลูกค้า' : 'customer');
   }, [customers, existing?.buyer?.nameEn, existing?.buyer?.nameTh, form.buyerId, isThai]);
 
-  const sendMessage = useMemo(() => {
+  const buildCustomerMessage = useCallback((link?: string) => {
     const number = existing?.quotationNumber ?? (isThai ? 'ใบเสนอราคา' : 'quotation');
     const totalText = formatCurrency(totals.total);
+    const resolvedLink = link ?? shareUrl;
     if (isThai) {
       return [
         `เรียน ${customerName}`,
         `ส่งใบเสนอราคาเลขที่ ${number} ยอดรวม ${totalText}`,
         form.validUntil ? `ราคาใช้ได้ถึง ${form.validUntil}` : null,
-        'รายละเอียดอยู่ในไฟล์ PDF ที่แนบมาด้วยครับ/ค่ะ',
+        resolvedLink ? `เปิดดูและตอบรับได้ที่: ${resolvedLink}` : 'รายละเอียดอยู่ในไฟล์ PDF ที่แนบมาด้วยครับ/ค่ะ',
       ].filter(Boolean).join('\n');
     }
     return [
       `Dear ${customerName},`,
       `Please find quotation ${number} for ${totalText}.`,
       form.validUntil ? `Valid until ${form.validUntil}.` : null,
-      'The PDF is attached for your review.',
+      resolvedLink ? `Review and respond here: ${resolvedLink}` : 'The PDF is attached for your review.',
     ].filter(Boolean).join('\n');
-  }, [customerName, existing?.quotationNumber, form.validUntil, formatCurrency, isThai, totals.total]);
+  }, [customerName, existing?.quotationNumber, form.validUntil, formatCurrency, isThai, shareUrl, totals.total]);
+
+  const sendMessage = useMemo(() => buildCustomerMessage(), [buildCustomerMessage]);
 
   async function openQuotationPdf(mode: 'open' | 'download') {
     if (!token || !existing) return;
@@ -340,10 +345,12 @@ export default function QuotationBuilder() {
   }
 
   async function copySendMessage() {
+    const url = await ensureShareLink();
+    if (!url && existing?.status === 'sent') return;
     setCopying(true);
     setMsg(null);
     try {
-      await navigator.clipboard.writeText(sendMessage);
+      await navigator.clipboard.writeText(buildCustomerMessage(url ?? undefined));
       setMsg({ type: 'ok', text: isThai ? 'คัดลอกข้อความส่งลูกค้าแล้ว' : 'Customer message copied' });
     } catch {
       setMsg({ type: 'err', text: isThai ? 'คัดลอกไม่ได้ กรุณาคัดลอกข้อความเอง' : 'Could not copy. Please copy it manually.' });
@@ -352,9 +359,49 @@ export default function QuotationBuilder() {
     }
   }
 
-  function openLineShare() {
-    const url = `https://social-plugins.line.me/lineit/share?text=${encodeURIComponent(sendMessage)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  async function ensureShareLink(): Promise<string | null> {
+    if (!token || !existing) return null;
+    if (shareUrl) return shareUrl;
+    setShareBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/quotations/${existing.id}/share-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !body.url) throw new Error(body.error ?? 'Failed to create link');
+      setShareUrl(body.url);
+      return body.url;
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+      return null;
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function copyShareLink() {
+    const url = await ensureShareLink();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setMsg({ type: 'ok', text: isThai ? 'คัดลอกลิงก์ใบเสนอราคาแล้ว' : 'Quotation link copied' });
+    } catch {
+      setMsg({ type: 'err', text: isThai ? 'คัดลอกลิงก์ไม่ได้ กรุณาคัดลอกจากช่องข้อความ' : 'Could not copy the link.' });
+    }
+  }
+
+  async function openLineShare() {
+    const url = await ensureShareLink();
+    if (!url) return;
+    const message = buildCustomerMessage(url);
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  }
+
+  async function openCustomerPage() {
+    const url = await ensureShareLink();
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   if (loading) {
@@ -405,6 +452,10 @@ export default function QuotationBuilder() {
             <button onClick={copySendMessage} disabled={copying} className="btn-secondary">
               {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
               {isThai ? 'คัดลอกข้อความ' : 'Copy message'}
+            </button>
+            <button onClick={copyShareLink} disabled={shareBusy} className="btn-secondary">
+              {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+              {isThai ? 'คัดลอกลิงก์' : 'Copy link'}
             </button>
             <button onClick={openLineShare} className="btn-primary">
               <ExternalLink className="w-4 h-4" />
@@ -462,11 +513,19 @@ export default function QuotationBuilder() {
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 {isThai
-                  ? 'ดาวน์โหลด PDF แล้วแนบไฟล์ใน LINE หรืออีเมล ระบบจะคัดลอกข้อความพร้อมเลขที่และยอดรวมให้'
-                  : 'Download the PDF, attach it in LINE or email, and copy the prepared message with number and total.'}
+                  ? 'สร้างลิงก์ให้ลูกค้าเปิดดู PDF และกดยอมรับหรือปฏิเสธได้ ไม่ต้องให้ลูกค้า login'
+                  : 'Create a customer link so they can review the PDF and accept or reject without logging in.'}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              <button onClick={copyShareLink} disabled={shareBusy} className="btn-secondary">
+                {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                {isThai ? 'คัดลอกลิงก์' : 'Copy link'}
+              </button>
+              <button onClick={openCustomerPage} disabled={shareBusy} className="btn-secondary">
+                {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                {isThai ? 'เปิดหน้าลูกค้า' : 'Open customer page'}
+              </button>
               <button onClick={() => openQuotationPdf('download')} disabled={pdfBusy !== null} className="btn-secondary">
                 {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
@@ -481,6 +540,14 @@ export default function QuotationBuilder() {
               </button>
             </div>
           </div>
+          {shareUrl && (
+            <input
+              className="mt-3 w-full border border-slate-200 bg-white p-3 text-sm text-slate-700"
+              readOnly
+              value={shareUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          )}
           <textarea
             className="mt-3 w-full border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
             rows={isThai ? 4 : 5}

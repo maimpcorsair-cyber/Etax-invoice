@@ -1,0 +1,168 @@
+import { Router } from 'express';
+import prisma from '../config/database';
+import { withSystemRlsContext } from '../config/rls';
+import { logger } from '../config/logger';
+import { buildHtmlForCompany, generatePdfFromHtml } from '../services/pdfService';
+import { buildQuotationPdfData } from '../services/quotationPdfService';
+import { verifyQuotationShareToken } from '../services/quotationShareToken';
+
+export const quotationSharePublicRouter = Router();
+
+function isPastValidUntil(validUntil: Date | null): boolean {
+  if (!validUntil) return false;
+  const inclusiveEnd = new Date(validUntil);
+  inclusiveEnd.setHours(23, 59, 59, 999);
+  return inclusiveEnd < new Date();
+}
+
+async function findSharedQuotation(token: string) {
+  const payload = verifyQuotationShareToken(token);
+  if (!payload) return { payload: null, quotation: null };
+
+  const quotation = await withSystemRlsContext(prisma, async (tx) => {
+    return tx.quotation.findFirst({
+      where: { id: payload.quotationId, companyId: payload.companyId },
+      include: {
+        buyer: true,
+        items: true,
+        company: { select: { nameTh: true, nameEn: true, taxId: true, logoUrl: true, phone: true, email: true } },
+      },
+    });
+  });
+
+  return { payload, quotation };
+}
+
+quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
+  try {
+    const { payload, quotation } = await findSharedQuotation(req.params.token);
+    if (!payload) {
+      res.status(401).json({ error: 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว' });
+      return;
+    }
+    if (!quotation) {
+      res.status(404).json({ error: 'ไม่พบใบเสนอราคานี้' });
+      return;
+    }
+
+    res.json({
+      quotation: {
+        id: quotation.id,
+        quotationNumber: quotation.quotationNumber,
+        status: quotation.status,
+        language: quotation.language,
+        quotationDate: quotation.quotationDate,
+        validUntil: quotation.validUntil,
+        subtotal: quotation.subtotal,
+        vatAmount: quotation.vatAmount,
+        discountAmount: quotation.discountAmount,
+        total: quotation.total,
+        notes: quotation.notes,
+        paymentTerms: quotation.paymentTerms,
+        deliveryTerms: quotation.deliveryTerms,
+        pdfUrl: `/api/share/quotation/${encodeURIComponent(req.params.token)}/pdf`,
+      },
+      buyer: quotation.buyer,
+      seller: {
+        nameTh: quotation.company.nameTh,
+        nameEn: quotation.company.nameEn,
+        taxId: quotation.company.taxId,
+        logoUrl: quotation.company.logoUrl ?? null,
+        phone: quotation.company.phone ?? null,
+        email: quotation.company.email ?? null,
+      },
+      items: quotation.items.map((item) => ({
+        id: item.id,
+        nameTh: item.nameTh,
+        nameEn: item.nameEn,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount,
+        vatType: item.vatType,
+        amount: item.amount,
+        vatAmount: item.vatAmount,
+        totalAmount: item.totalAmount,
+      })),
+      tokenExp: payload.exp,
+    });
+  } catch (err) {
+    logger.error('[quotationShare] fetch failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง' });
+  }
+});
+
+quotationSharePublicRouter.get('/quotation/:token/pdf', async (req, res) => {
+  try {
+    const { payload, quotation } = await findSharedQuotation(req.params.token);
+    if (!payload) {
+      res.status(401).json({ error: 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว' });
+      return;
+    }
+    if (!quotation) {
+      res.status(404).json({ error: 'ไม่พบใบเสนอราคานี้' });
+      return;
+    }
+
+    const pdfData = buildQuotationPdfData(quotation);
+    const html = await buildHtmlForCompany(pdfData, payload.companyId);
+    const pdf = await generatePdfFromHtml(html);
+    const safeName = quotation.quotationNumber.replace(/[^A-Za-z0-9._-]+/g, '_');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', String(pdf.length));
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}.pdf"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(pdf);
+  } catch (err) {
+    logger.error('[quotationShare] pdf download failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'โหลด PDF ไม่สำเร็จ' });
+  }
+});
+
+quotationSharePublicRouter.post('/quotation/:token/respond', async (req, res) => {
+  const action = req.body?.action;
+  if (action !== 'accept' && action !== 'reject') {
+    res.status(400).json({ error: 'กรุณาเลือกยอมรับหรือปฏิเสธใบเสนอราคา' });
+    return;
+  }
+
+  try {
+    const payload = verifyQuotationShareToken(req.params.token);
+    if (!payload) {
+      res.status(401).json({ error: 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว' });
+      return;
+    }
+
+    const updated = await withSystemRlsContext(prisma, async (tx) => {
+      const quotation = await tx.quotation.findFirst({
+        where: { id: payload.quotationId, companyId: payload.companyId },
+        select: { id: true, status: true, validUntil: true },
+      });
+      if (!quotation) return null;
+      if (quotation.status === 'accepted' || quotation.status === 'rejected') return quotation;
+      if (quotation.status !== 'sent') {
+        throw new Error(`Cannot respond to a ${quotation.status} quotation`);
+      }
+      if (isPastValidUntil(quotation.validUntil)) {
+        throw new Error('Cannot respond to an expired quotation');
+      }
+      return tx.quotation.update({
+        where: { id: quotation.id },
+        data: { status: action === 'accept' ? 'accepted' : 'rejected' },
+        select: { id: true, status: true },
+      });
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: 'ไม่พบใบเสนอราคานี้' });
+      return;
+    }
+
+    res.json({ data: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'ตอบกลับใบเสนอราคาไม่สำเร็จ';
+    const status = message.startsWith('Cannot respond') ? 409 : 500;
+    res.status(status).json({ error: message });
+  }
+});

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileText, Loader2, ArrowRight, CalendarClock, CheckCircle, XCircle, Clock, Receipt, Truck, Download } from 'lucide-react';
+import { Plus, Search, FileText, Loader2, ArrowRight, CalendarClock, CheckCircle, XCircle, Clock, Receipt, Truck, Download, Share2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
@@ -26,6 +26,8 @@ export default function QuotationList() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadId, setDownloadId] = useState<string | null>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [listMsg, setListMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<QuotationStatus | 'all'>('all');
 
@@ -67,6 +69,26 @@ export default function QuotationList() {
       URL.revokeObjectURL(url);
     } finally {
       setDownloadId(null);
+    }
+  }
+
+  async function shareQuotation(quotation: Quotation) {
+    if (!token || quotation.status === 'draft' || quotation.status === 'cancelled' || quotation.status === 'converted') return;
+    setShareId(quotation.id);
+    setListMsg(null);
+    try {
+      const res = await fetch(`/api/quotations/${quotation.id}/share-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !body.url) throw new Error(body.error ?? 'Failed');
+      await navigator.clipboard.writeText(body.url);
+      setListMsg({ type: 'ok', text: isThai ? 'คัดลอกลิงก์ใบเสนอราคาแล้ว ส่งให้ลูกค้าได้เลย' : 'Quotation link copied' });
+    } catch (err) {
+      setListMsg({ type: 'err', text: isThai ? `สร้างลิงก์ไม่สำเร็จ: ${(err as Error).message}` : `Could not create link: ${(err as Error).message}` });
+    } finally {
+      setShareId(null);
     }
   }
 
@@ -125,6 +147,16 @@ export default function QuotationList() {
       </div>
 
       {/* Table */}
+      {listMsg && (
+        <div className={`border px-4 py-3 text-sm ${
+          listMsg.type === 'ok'
+            ? 'border-indigo-100 bg-indigo-50 text-indigo-800'
+            : 'border-rose-200 bg-rose-50 text-rose-800'
+        }`}>
+          {listMsg.text}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
       ) : quotations.length === 0 ? (
@@ -152,7 +184,7 @@ export default function QuotationList() {
                 <th className="table-header">{isThai ? 'หมดอายุ' : 'Valid until'}</th>
                 <th className="table-header text-right">{isThai ? 'ยอดรวม' : 'Total'}</th>
                 <th className="table-header text-center">{isThai ? 'สถานะ' : 'Status'}</th>
-                <th className="table-header text-right">{isThai ? 'ไฟล์' : 'File'}</th>
+                <th className="table-header text-right">{isThai ? 'ส่ง / ไฟล์' : 'Send / File'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -180,18 +212,34 @@ export default function QuotationList() {
                       </span>
                     </td>
                     <td className="table-cell text-right">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void downloadPdf(q);
-                        }}
-                        disabled={downloadId === q.id}
-                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                      >
-                        {downloadId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                        PDF
-                      </button>
+                      <div className="flex justify-end gap-1.5">
+                        {q.status !== 'draft' && q.status !== 'cancelled' && q.status !== 'converted' && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void shareQuotation(q);
+                            }}
+                            disabled={shareId === q.id}
+                            className="inline-flex items-center gap-1 border border-indigo-100 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                          >
+                            {shareId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
+                            {isThai ? 'ลิงก์' : 'Link'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void downloadPdf(q);
+                          }}
+                          disabled={downloadId === q.id}
+                          className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          {downloadId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                          PDF
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
