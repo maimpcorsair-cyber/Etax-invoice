@@ -10,7 +10,7 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest feature production deployment: `dpl_9yEaBdq96rweVaUrzswXFNKBdbND` (`https://etax-invoice-9cuszppd7-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
+- Latest feature production deployment: `dpl_FL1tAbwPWrzXKpP7SND6B3FEJXUJ` (`https://etax-invoice-bgxmzhvp1-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
 - Latest checked route: `/share/quotation/not-a-real-token` returned SPA HTML 200 from `etax-invoice.vercel.app`; Vercel inspect shows production `Ready`.
 
 Backend:
@@ -18,7 +18,7 @@ Backend:
 - Service: `etax-invoice-api` (`srv-d7lkqkvavr4c73a0qqh0`)
 - Plan: Standard ($25)
 - URL: `https://etax-invoice-api.onrender.com`
-- Latest live deploy checked: `0754bd7` via `Deploy to Render` run `26687108830`.
+- Latest live deploy checked: `5510e1d` via `Deploy to Render` run `26689260845`.
 - Health endpoints:
   - `/api/health` — shallow process liveness (express responding)
   - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
@@ -32,9 +32,9 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Push checks for `0754bd7` green: Typecheck (`26687098540`), Unit tests (`26687098521`), Prod smoke test (`26687098531`).
-- Manual `Deploy to Render` run `26687108830` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
-- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_9yEaBdq96rweVaUrzswXFNKBdbND`.
+- Push checks for `5510e1d` green: Typecheck (`26689248096`), Unit tests (`26689248093`), Prod smoke test (`26689248095`), Health Check (`26689368124`).
+- Manual `Deploy to Render` run `26689260845` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
+- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_FL1tAbwPWrzXKpP7SND6B3FEJXUJ`.
 
 ## LINE / OCR pipeline (current)
 
@@ -53,7 +53,7 @@ Last CI:
 
 - `.claude/settings.local.json` is modified locally and intentionally not committed.
 - `.serena/project.yml` is modified locally and intentionally not committed.
-- Quotation coverage expansion added 2026-05-30: `/app/quotations/new` now keeps the fast general flow while exposing one compact preset dropdown for `สินค้า / ทั่วไป`, `งานบริการ`, `Project / Scope งาน`, `BOQ / งานเหมา`, and `รายเดือน / Subscription / เช่า`. Optional sections appear only when relevant: deliverables, exclusions, warranty, project linkage, deposit, milestones, revisions, contract duration, billing cycle, SLA, cancellation terms, and security deposit. BOQ line items persist an optional `sectionTitle` via migration `20260530_quotation_boq_sections`; seller UI, customer share page, and quotation PDF render grouped section context and pre-VAT section subtotals. The quotation-builder preview now calculates per-line discount as percent, matching the backend. Public quotation share validates response shape before rendering instead of crashing on malformed data. Verified locally with backend/frontend typecheck, backend/frontend build, touched-file lint, `git diff --check`, backend unit tests (106), focused quotation PDF tests (2), Playwright desktop/mobile seller flow, and curl public-share contract smoke. Production migration/deploy still pending.
+- Quotation coverage expansion shipped 2026-05-30 (`5510e1d`): `/app/quotations/new` now keeps the fast general flow while exposing one compact preset dropdown for `สินค้า / ทั่วไป`, `งานบริการ`, `Project / Scope งาน`, `BOQ / งานเหมา`, and `รายเดือน / Subscription / เช่า`. Optional sections appear only when relevant: deliverables, exclusions, warranty, project linkage, deposit, milestones, revisions, contract duration, billing cycle, SLA, cancellation terms, and security deposit. BOQ line items persist an optional `sectionTitle` via migration `20260530_quotation_boq_sections`; seller UI, customer share page, and quotation PDF render grouped section context and pre-VAT section subtotals. The quotation-builder preview now calculates per-line discount as percent, matching the backend. Public quotation share validates response shape before rendering instead of crashing on malformed data. Verified locally with backend/frontend typecheck, backend/frontend build, touched-file lint, `git diff --check`, backend unit tests (106), focused quotation PDF tests (2), Playwright desktop/mobile seller flow, and curl public-share contract smoke. Production migration/deploy completed via `Deploy to Render` run `26689260845`; post-deploy `/api/health/deep` returned every provider green and `notConfigured=[]`.
 - Quotation service/project mode added 2026-05-30: `/app/quotations/new` and draft quotation edit now let sellers choose a compact `งานบริการ / โปรเจกต์` mode, optionally link an existing active Project, and capture scope, timeline, deposit percentage, revision rounds/terms, and milestone payments. Existing Project descriptions/date ranges prefill empty quote fields; milestone totals warn when they do not match the quotation total. Structured data persists in `Quotation.kind` + `Quotation.serviceDetails` via migration `20260530_quotation_service_details`, renders into quotation PDFs, and appears on the public customer share page. General quotations remain the default and keep the fast form. Verified locally with backend/frontend typecheck, backend/frontend lint, frontend build, and focused PDF/share tests.
 - Quotation template selection added 2026-05-30: `/app/quotations/new` and draft quotation edit now expose a compact "รูปแบบใบเสนอราคา" dropdown using the same built-in Minimal/Cute template catalog as invoices. The selected `templateId` is stored in the quotation's seller snapshot (`seller.documentPreferences`) so it follows the quotation PDF, customer share PDF, and future reloads without a schema migration. Backend quotation PDF data forwards `templateId` into the standard A4 renderer, and built-in templates now explicitly support `quotation`. Verified with backend/frontend typecheck, backend/frontend lint, frontend build, and focused PDF/quotationPdfService tests.
 - Invoice builder section navigation UX fix added 2026-05-30: the section stepper in `/app/invoices/new` no longer uses a sticky high-z block that can cover section headings while scrolling. Active state is now a restrained underline/text treatment instead of a dark filled rectangle, item count uses a neutral chip, and form sections have scroll margins so desktop and mobile jumps keep headings visible. Verified with frontend typecheck/lint/build.
