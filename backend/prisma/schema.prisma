@@ -715,6 +715,8 @@ model Quotation {
   quotationNumber String
   status          QuotationStatus @default(draft)
   language        String          @default("th")
+  kind            String          @default("general")
+  serviceDetails  Json?
 
   quotationDate DateTime
   validUntil    DateTime? // วันที่สิ้นสุดราคา — หลังจากนี้ status auto → expired

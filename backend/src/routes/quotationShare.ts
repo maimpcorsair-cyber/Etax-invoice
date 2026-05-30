@@ -25,6 +25,7 @@ async function findSharedQuotation(token: string) {
       include: {
         buyer: true,
         items: true,
+        project: { select: { id: true, code: true, name: true, description: true, startDate: true, endDate: true } },
         company: { select: { nameTh: true, nameEn: true, taxId: true, logoUrl: true, phone: true, email: true } },
       },
     });
@@ -60,6 +61,9 @@ quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
         notes: quotation.notes,
         paymentTerms: quotation.paymentTerms,
         deliveryTerms: quotation.deliveryTerms,
+        kind: quotation.kind,
+        serviceDetails: quotation.serviceDetails,
+        project: quotation.project,
         pdfUrl: `/api/share/quotation/${encodeURIComponent(req.params.token)}/pdf`,
       },
       buyer: quotation.buyer,

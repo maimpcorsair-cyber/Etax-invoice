@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
   Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt, Truck,
-  Download, Copy, ExternalLink, Eye, Share2,
+  Download, Copy, ExternalLink, Eye, Share2, BriefcaseBusiness,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -47,9 +47,19 @@ const blankItem: ItemDraft = {
 
 interface FormState {
   buyerId: string;
+  projectId: string;
   quotationDate: string; // YYYY-MM-DD
   validUntil: string;    // YYYY-MM-DD or ''
   language: 'th' | 'en' | 'both';
+  kind: 'general' | 'service_project';
+  serviceDetails: {
+    scope: string;
+    duration: string;
+    depositPercent: number;
+    revisionRounds: number;
+    revisionTerms: string;
+    milestones: Array<{ title: string; amount: number; dueDate: string; note: string }>;
+  };
   templateId: string | null;
   items: ItemDraft[];
   discountAmount: number;
@@ -61,6 +71,25 @@ interface FormState {
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const plusDaysIso = (days: number) => new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
 const STANDARD_TEMPLATE_VALUE = '__system_standard__';
+const blankMilestone = () => ({ title: '', amount: 0, dueDate: '', note: '' });
+
+interface ProjectOption {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+function projectDuration(project: ProjectOption): string {
+  const start = project.startDate?.slice(0, 10);
+  const end = project.endDate?.slice(0, 10);
+  if (start && end) return `${start} ถึง ${end}`;
+  if (start) return `เริ่ม ${start}`;
+  if (end) return `สิ้นสุด ${end}`;
+  return '';
+}
 
 function computeLine(item: ItemDraft) {
   const gross = item.quantity * item.unitPrice;
@@ -80,6 +109,7 @@ export default function QuotationBuilder() {
 
   const [existing, setExisting] = useState<Quotation | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [acting, setActing] = useState(false);
@@ -91,9 +121,19 @@ export default function QuotationBuilder() {
 
   const [form, setForm] = useState<FormState>({
     buyerId: '',
+    projectId: '',
     quotationDate: todayIso(),
     validUntil: plusDaysIso(30),
     language: 'th',
+    kind: 'general',
+    serviceDetails: {
+      scope: '',
+      duration: '',
+      depositPercent: 0,
+      revisionRounds: 0,
+      revisionTerms: '',
+      milestones: [],
+    },
     templateId: null,
     items: [blankItem],
     discountAmount: 0,
@@ -106,9 +146,14 @@ export default function QuotationBuilder() {
   useEffect(() => {
     if (!token) return;
     (async () => {
-      const custRes = await fetch('/api/customers?limit=200', { headers: { Authorization: `Bearer ${token}` } });
-      const custJson = await custRes.json();
+      const headers = { Authorization: `Bearer ${token}` };
+      const [custRes, projectRes] = await Promise.all([
+        fetch('/api/customers?limit=200', { headers }),
+        fetch('/api/projects?status=active', { headers }),
+      ]);
+      const [custJson, projectJson] = await Promise.all([custRes.json(), projectRes.json()]);
       setCustomers(custJson.data ?? []);
+      setProjects(projectJson.data ?? []);
       if (!isNew && id) {
         const res = await fetch(`/api/quotations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
@@ -117,9 +162,24 @@ export default function QuotationBuilder() {
           setExisting(q);
           setForm({
             buyerId: q.buyerId,
+            projectId: q.projectId ?? '',
             quotationDate: q.quotationDate.slice(0, 10),
             validUntil: q.validUntil ? q.validUntil.slice(0, 10) : '',
             language: q.language,
+            kind: q.kind ?? 'general',
+            serviceDetails: {
+              scope: q.serviceDetails?.scope ?? '',
+              duration: q.serviceDetails?.duration ?? '',
+              depositPercent: q.serviceDetails?.depositPercent ?? 0,
+              revisionRounds: q.serviceDetails?.revisionRounds ?? 0,
+              revisionTerms: q.serviceDetails?.revisionTerms ?? '',
+              milestones: (q.serviceDetails?.milestones ?? []).map((milestone) => ({
+                title: milestone.title,
+                amount: milestone.amount,
+                dueDate: milestone.dueDate ?? '',
+                note: milestone.note ?? '',
+              })),
+            },
             templateId: q.templateId ?? null,
             items: q.items.map((it) => ({
               productId: it.productId ?? null,
@@ -150,6 +210,10 @@ export default function QuotationBuilder() {
     const total = +(subtotal + vatAmount - form.discountAmount).toFixed(2);
     return { lines, subtotal, vatAmount, total };
   }, [form.items, form.discountAmount]);
+  const milestoneTotal = useMemo(
+    () => +form.serviceDetails.milestones.reduce((sum, milestone) => sum + (Number(milestone.amount) || 0), 0).toFixed(2),
+    [form.serviceDetails.milestones],
+  );
 
   function setItem(idx: number, patch: Partial<ItemDraft>) {
     setForm((prev) => ({ ...prev, items: prev.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }));
@@ -159,6 +223,30 @@ export default function QuotationBuilder() {
   }
   function removeItem(idx: number) {
     setForm((prev) => ({ ...prev, items: prev.items.length > 1 ? prev.items.filter((_, i) => i !== idx) : prev.items }));
+  }
+
+  function setMilestone(idx: number, patch: Partial<FormState['serviceDetails']['milestones'][number]>) {
+    setForm((prev) => ({
+      ...prev,
+      serviceDetails: {
+        ...prev.serviceDetails,
+        milestones: prev.serviceDetails.milestones.map((milestone, index) => index === idx ? { ...milestone, ...patch } : milestone),
+      },
+    }));
+  }
+
+  function selectProject(projectId: string) {
+    const project = projects.find((item) => item.id === projectId);
+    setForm((prev) => ({
+      ...prev,
+      projectId,
+      kind: projectId ? 'service_project' : prev.kind,
+      serviceDetails: project ? {
+        ...prev.serviceDetails,
+        scope: prev.serviceDetails.scope || project.description || '',
+        duration: prev.serviceDetails.duration || projectDuration(project),
+      } : prev.serviceDetails,
+    }));
   }
 
   const surfaceError = useCallback((errJson: { error?: string; details?: Array<{ path?: (string|number)[]; message?: string }> }) => {
@@ -176,9 +264,26 @@ export default function QuotationBuilder() {
     try {
       const payload = {
         buyerId: form.buyerId,
+        projectId: form.projectId || null,
         quotationDate: form.quotationDate,
         validUntil: form.validUntil || null,
         language: form.language,
+        kind: form.kind,
+        serviceDetails: form.kind === 'service_project' ? {
+          scope: form.serviceDetails.scope || null,
+          duration: form.serviceDetails.duration || null,
+          depositPercent: Number(form.serviceDetails.depositPercent) || 0,
+          revisionRounds: Number(form.serviceDetails.revisionRounds) || 0,
+          revisionTerms: form.serviceDetails.revisionTerms || null,
+          milestones: form.serviceDetails.milestones
+            .filter((milestone) => milestone.title.trim())
+            .map((milestone) => ({
+              title: milestone.title,
+              amount: Number(milestone.amount) || 0,
+              dueDate: milestone.dueDate || null,
+              note: milestone.note || null,
+            })),
+        } : null,
         templateId: form.templateId,
         items: form.items.map((it) => ({
           productId: it.productId ?? null,
@@ -567,6 +672,33 @@ export default function QuotationBuilder() {
         </div>
       )}
 
+      <div className="card">
+        <div className="flex items-center gap-2">
+          <BriefcaseBusiness className="h-4 w-4 text-indigo-700" />
+          <h3 className="font-semibold text-gray-900">{isThai ? 'ลักษณะใบเสนอราคา' : 'Quotation type'}</h3>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={!editable}
+            onClick={() => setForm((prev) => ({ ...prev, kind: 'general', projectId: '' }))}
+            className={`border p-3 text-left transition ${form.kind === 'general' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'} disabled:cursor-not-allowed`}
+          >
+            <span className="block text-sm font-semibold text-slate-900">{isThai ? 'ขายสินค้า / บริการทั่วไป' : 'General goods / services'}</span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500">{isThai ? 'กรอกเร็ว เหมาะกับใบเสนอราคาทั่วไป' : 'Fast entry for everyday quotations.'}</span>
+          </button>
+          <button
+            type="button"
+            disabled={!editable}
+            onClick={() => setForm((prev) => ({ ...prev, kind: 'service_project' }))}
+            className={`border p-3 text-left transition ${form.kind === 'service_project' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'} disabled:cursor-not-allowed`}
+          >
+            <span className="block text-sm font-semibold text-slate-900">{isThai ? 'งานบริการ / โปรเจกต์' : 'Service / project work'}</span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500">{isThai ? 'มี scope งาน ระยะเวลา มัดจำ งวดงาน และเงื่อนไขแก้งาน' : 'Includes scope, timeline, deposit, milestones, and revision terms.'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Customer + dates */}
       <div className="card grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="sm:col-span-3">
@@ -605,13 +737,13 @@ export default function QuotationBuilder() {
             <option value="both">ไทย + English</option>
           </select>
         </div>
-        <div className="sm:col-span-3">
+        <div className="min-w-0 sm:col-span-3">
           <label className="label">{isThai ? 'รูปแบบใบเสนอราคา' : 'Quotation template'}</label>
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
             <select
               value={form.templateId ?? STANDARD_TEMPLATE_VALUE}
               onChange={(e) => setForm({ ...form, templateId: e.target.value === STANDARD_TEMPLATE_VALUE ? null : e.target.value })}
-              className="input-field"
+              className="input-field min-w-0 max-w-full"
               disabled={!editable}
             >
               <option value={STANDARD_TEMPLATE_VALUE}>
@@ -628,7 +760,7 @@ export default function QuotationBuilder() {
                 ))}
               </optgroup>
             </select>
-            <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
               {(selectedTemplate?.swatches ?? ['bg-white', 'bg-blue-200', 'bg-blue-800']).map((swatch, index) => (
                 <span key={`${swatch}-${index}`} className={`h-4 w-4 border border-slate-200 ${swatch}`} />
               ))}
@@ -644,6 +776,147 @@ export default function QuotationBuilder() {
           </p>
         </div>
       </div>
+
+      {form.kind === 'service_project' && (
+        <div className="card space-y-4">
+          <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
+            <BriefcaseBusiness className="mt-0.5 h-5 w-5 text-indigo-700" />
+            <div>
+              <h3 className="font-semibold text-slate-900">{isThai ? 'ขอบเขตงานบริการ / โปรเจกต์' : 'Service / project scope'}</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {isThai ? 'เลือกโปรเจกต์ที่มีอยู่เพื่อดึงรายละเอียดและช่วงเวลามาใช้ หรือกรอกเฉพาะใบเสนอราคานี้ได้' : 'Reuse an existing project or enter details for this quotation only.'}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">{isThai ? 'ผูกกับโปรเจกต์' : 'Linked project'}</label>
+            <select value={form.projectId} onChange={(e) => selectProject(e.target.value)} className="input-field" disabled={!editable}>
+              <option value="">{isThai ? 'ไม่ผูกโปรเจกต์' : 'No linked project'}</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.code} · {project.name}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              {projects.length === 0
+                ? (isThai ? 'ยังไม่มีโปรเจกต์ คุณยังกรอกใบเสนอราคาได้' : 'No projects yet. You can still complete this quotation.')
+                : (isThai ? 'เลือกโปรเจกต์เดิม หรือกรอกเฉพาะใบเสนอราคานี้' : 'Reuse an existing project or enter quote-only details.')}
+              {' '}
+              <Link to="/app/projects" className="font-medium text-indigo-700 hover:underline">
+                {isThai ? 'ไปที่โปรเจกต์' : 'Open projects'}
+              </Link>
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="label">{isThai ? 'Scope งาน' : 'Scope of work'}</label>
+              <textarea
+                value={form.serviceDetails.scope}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, scope: e.target.value } }))}
+                className="input-field"
+                rows={4}
+                disabled={!editable}
+                placeholder={isThai ? 'ระบุสิ่งที่จะส่งมอบ ขอบเขตที่รวม และสิ่งที่ไม่รวมในราคา' : 'Describe deliverables, included work, and exclusions.'}
+              />
+            </div>
+            <div>
+              <label className="label">{isThai ? 'ระยะเวลาดำเนินงาน' : 'Timeline'}</label>
+              <input
+                value={form.serviceDetails.duration}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, duration: e.target.value } }))}
+                className="input-field"
+                disabled={!editable}
+                placeholder={isThai ? 'เช่น 30 วันหลังได้รับมัดจำ' : 'e.g. 30 days after deposit'}
+              />
+            </div>
+            <div>
+              <label className="label">{isThai ? 'มัดจำก่อนเริ่มงาน (%)' : 'Deposit before start (%)'}</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={form.serviceDetails.depositPercent}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, depositPercent: Number(e.target.value) } }))}
+                className="input-field"
+                disabled={!editable}
+              />
+              {form.serviceDetails.depositPercent > 0 && (
+                <p className="mt-1 text-xs text-slate-500">{isThai ? 'คิดเป็น' : 'Amount'} {formatCurrency((totals.total * form.serviceDetails.depositPercent) / 100)}</p>
+              )}
+            </div>
+            <div>
+              <label className="label">{isThai ? 'แก้ไขงานได้ (รอบ)' : 'Included revision rounds'}</label>
+              <input
+                type="number"
+                min="0"
+                max="99"
+                value={form.serviceDetails.revisionRounds}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, revisionRounds: Number(e.target.value) } }))}
+                className="input-field"
+                disabled={!editable}
+              />
+            </div>
+            <div>
+              <label className="label">{isThai ? 'เงื่อนไขแก้ไขงาน' : 'Revision terms'}</label>
+              <input
+                value={form.serviceDetails.revisionTerms}
+                onChange={(e) => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, revisionTerms: e.target.value } }))}
+                className="input-field"
+                disabled={!editable}
+                placeholder={isThai ? 'เช่น เกินจำนวนรอบคิดเพิ่มตามจริง' : 'e.g. extra rounds are quoted separately'}
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">{isThai ? 'งวดงาน' : 'Milestones'}</h4>
+                <p className="mt-1 text-xs text-slate-500">{isThai ? 'เพิ่มเมื่อมีการแบ่งส่งงานหรือแบ่งชำระหลายครั้ง' : 'Add when delivery or payment is split into stages.'}</p>
+              </div>
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, milestones: [...prev.serviceDetails.milestones, blankMilestone()] } }))}
+                  className="btn-secondary text-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" /> {isThai ? 'เพิ่มงวด' : 'Add milestone'}
+                </button>
+              )}
+            </div>
+            <div className="mt-3 space-y-2">
+              {form.serviceDetails.milestones.length === 0 ? (
+                <p className="border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">{isThai ? 'ยังไม่มีงวดงาน' : 'No milestones added'}</p>
+              ) : form.serviceDetails.milestones.map((milestone, index) => (
+                <div key={index} className="grid gap-2 border border-slate-200 bg-slate-50 p-3 md:grid-cols-[32px_minmax(0,1fr)_140px_150px_32px]">
+                  <span className="pt-2 text-center text-xs font-semibold text-slate-400">{index + 1}</span>
+                  <input value={milestone.title} onChange={(e) => setMilestone(index, { title: e.target.value })} className="input-field" placeholder={isThai ? 'ชื่องวดงาน' : 'Milestone title'} disabled={!editable} />
+                  <input type="number" min="0" value={milestone.amount} onChange={(e) => setMilestone(index, { amount: Number(e.target.value) })} className="input-field text-right" placeholder={isThai ? 'จำนวนเงิน' : 'Amount'} disabled={!editable} />
+                  <input type="date" value={milestone.dueDate} onChange={(e) => setMilestone(index, { dueDate: e.target.value })} className="input-field" disabled={!editable} />
+                  {editable && (
+                    <button type="button" onClick={() => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, milestones: prev.serviceDetails.milestones.filter((_, itemIndex) => itemIndex !== index) } }))} className="flex items-center justify-center text-slate-400 hover:text-rose-600">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  <input value={milestone.note} onChange={(e) => setMilestone(index, { note: e.target.value })} className="input-field md:col-start-2 md:col-span-3" placeholder={isThai ? 'หมายเหตุงวดงาน (ถ้ามี)' : 'Milestone note (optional)'} disabled={!editable} />
+                </div>
+              ))}
+            </div>
+            {form.serviceDetails.milestones.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
+                <span className="font-medium text-slate-600">{isThai ? 'รวมงวดงาน' : 'Milestone total'}</span>
+                <span className="font-semibold text-slate-900">{formatCurrency(milestoneTotal)}</span>
+                {Math.abs(milestoneTotal - totals.total) > 0.009 && (
+                  <span className="w-full text-amber-700">
+                    {isThai ? 'ยอดงวดยังต่างจากยอดสุทธิ' : 'Milestones do not match the quote total'} {formatCurrency(Math.abs(milestoneTotal - totals.total))}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Items */}
       <div className="card">

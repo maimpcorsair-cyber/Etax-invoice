@@ -280,6 +280,15 @@ export interface Quotation {
   quotationNumber: string;
   status: QuotationStatus;
   language: Language;
+  kind: 'general' | 'service_project';
+  serviceDetails?: {
+    scope?: string | null;
+    duration?: string | null;
+    depositPercent?: number | null;
+    revisionRounds?: number | null;
+    revisionTerms?: string | null;
+    milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>;
+  } | null;
   quotationDate: string;
   validUntil?: string | null;
   buyerId: string;

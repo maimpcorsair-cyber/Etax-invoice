@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { logger } from '../config/logger';
 import { withInvoiceLock, withRlsContext, tenantRlsContext } from '../config/rls';
@@ -38,6 +39,20 @@ const quotationCreateSchema = z.object({
   quotationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   language: z.enum(['th', 'en', 'both']).default('th'),
+  kind: z.enum(['general', 'service_project']).default('general'),
+  serviceDetails: z.object({
+    scope: z.string().trim().max(3000).optional().nullable(),
+    duration: z.string().trim().max(500).optional().nullable(),
+    depositPercent: z.number().min(0).max(100).optional().nullable(),
+    revisionRounds: z.number().int().min(0).max(99).optional().nullable(),
+    revisionTerms: z.string().trim().max(1000).optional().nullable(),
+    milestones: z.array(z.object({
+      title: z.string().trim().min(1).max(160),
+      amount: z.number().min(0),
+      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+      note: z.string().trim().max(300).optional().nullable(),
+    })).max(20).default([]),
+  }).optional().nullable(),
   templateId: z.string().max(120).optional().nullable(),
   items: z.array(itemSchema).min(1).max(200),
   discountAmount: z.number().nonnegative().default(0),
@@ -263,6 +278,16 @@ quotationsRouter.post('/', async (req, res) => {
       res.status(400).json({ error: 'Buyer (customer) not found in your company' });
       return;
     }
+    if (body.projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: body.projectId, companyId: req.user!.companyId },
+        select: { id: true },
+      });
+      if (!project) {
+        res.status(400).json({ error: 'Project not found in your company' });
+        return;
+      }
+    }
 
     // Snapshot the seller (company) at issue time so future renames don't
     // mutate the historical document
@@ -292,6 +317,8 @@ quotationsRouter.post('/', async (req, res) => {
         projectId: body.projectId ?? null,
         quotationNumber,
         language: body.language,
+        kind: body.kind,
+        serviceDetails: body.kind === 'service_project' ? body.serviceDetails ?? {} : Prisma.JsonNull,
         quotationDate: new Date(`${body.quotationDate}T00:00:00.000Z`),
         validUntil: body.validUntil ? new Date(`${body.validUntil}T23:59:59.000Z`) : null,
         buyerId: body.buyerId,
@@ -356,6 +383,16 @@ quotationsRouter.patch('/:id', async (req, res) => {
     }
 
     const body = quotationCreateSchema.partial().parse(req.body);
+    if (body.projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: body.projectId, companyId: req.user!.companyId },
+        select: { id: true },
+      });
+      if (!project) {
+        res.status(400).json({ error: 'Project not found in your company' });
+        return;
+      }
+    }
 
     // Build the update — items are replaced wholesale to keep totals in sync
     let itemsUpdate: object | undefined;
@@ -398,6 +435,12 @@ quotationsRouter.patch('/:id', async (req, res) => {
         ...(body.quotationDate ? { quotationDate: new Date(`${body.quotationDate}T00:00:00.000Z`) } : {}),
         ...(body.validUntil !== undefined ? { validUntil: body.validUntil ? new Date(`${body.validUntil}T23:59:59.000Z`) : null } : {}),
         ...(body.language ? { language: body.language } : {}),
+        ...(body.kind ? { kind: body.kind } : {}),
+        ...(body.kind === 'general'
+          ? { serviceDetails: Prisma.JsonNull }
+          : body.serviceDetails !== undefined
+            ? { serviceDetails: body.serviceDetails ?? Prisma.JsonNull }
+            : {}),
         ...(body.discountAmount !== undefined ? { discountAmount: body.discountAmount } : {}),
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.paymentTerms !== undefined ? { paymentTerms: body.paymentTerms ?? null } : {}),

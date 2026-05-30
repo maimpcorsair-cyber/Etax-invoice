@@ -16,6 +16,16 @@ interface QuotationShareData {
     notes: string | null;
     paymentTerms: string | null;
     deliveryTerms: string | null;
+    kind: 'general' | 'service_project';
+    serviceDetails: {
+      scope?: string | null;
+      duration?: string | null;
+      depositPercent?: number | null;
+      revisionRounds?: number | null;
+      revisionTerms?: string | null;
+      milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>;
+    } | null;
+    project?: { id: string; code: string; name: string } | null;
     pdfUrl: string;
   };
   buyer: { nameTh: string; nameEn: string | null; taxId: string; email?: string | null };
@@ -198,6 +208,42 @@ export default function QuotationShare() {
             </div>
           </div>
         </section>
+
+        {quotation.kind === 'service_project' && quotation.serviceDetails && (
+          <section className="border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-base font-semibold text-slate-950">รายละเอียดงานบริการ / โปรเจกต์</h2>
+              {quotation.project && <span className="text-xs font-medium text-slate-500">{quotation.project.code} · {quotation.project.name}</span>}
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {quotation.serviceDetails.scope && <InfoBlock title="Scope งาน" value={quotation.serviceDetails.scope} wide />}
+              {quotation.serviceDetails.duration && <InfoBlock title="ระยะเวลาดำเนินงาน" value={quotation.serviceDetails.duration} />}
+              {typeof quotation.serviceDetails.depositPercent === 'number' && quotation.serviceDetails.depositPercent > 0 && (
+                <InfoBlock title="มัดจำก่อนเริ่มงาน" value={`${quotation.serviceDetails.depositPercent}% · ${formatCurrency((quotation.total * quotation.serviceDetails.depositPercent) / 100)}`} />
+              )}
+              {typeof quotation.serviceDetails.revisionRounds === 'number' && (
+                <InfoBlock title="จำนวนรอบแก้ไขงาน" value={`${quotation.serviceDetails.revisionRounds} รอบ`} />
+              )}
+              {quotation.serviceDetails.revisionTerms && <InfoBlock title="เงื่อนไขแก้ไขงาน" value={quotation.serviceDetails.revisionTerms} />}
+            </div>
+            {(quotation.serviceDetails.milestones?.length ?? 0) > 0 && (
+              <div className="mt-5 border-t border-slate-100 pt-4">
+                <h3 className="text-sm font-semibold text-slate-900">งวดงาน</h3>
+                <div className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
+                  {quotation.serviceDetails.milestones?.map((milestone, index) => (
+                    <div key={`${milestone.title}-${index}`} className="grid gap-1 py-3 text-sm sm:grid-cols-[1fr_auto]">
+                      <div>
+                        <p className="font-medium text-slate-900">{index + 1}. {milestone.title}</p>
+                        {(milestone.dueDate || milestone.note) && <p className="mt-1 text-xs text-slate-500">{[milestone.dueDate ? `กำหนด ${formatThaiDate(milestone.dueDate)}` : null, milestone.note].filter(Boolean).join(' · ')}</p>}
+                      </div>
+                      <p className="font-semibold text-slate-900 sm:text-right">{formatCurrency(milestone.amount)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         {(quotation.paymentTerms || quotation.deliveryTerms || quotation.notes) && (
           <section className="grid gap-3 sm:grid-cols-2">

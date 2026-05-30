@@ -10,6 +10,15 @@ test('buildQuotationPdfData forwards quotation template preference from seller s
     quotationNumber: 'QT-2026-000001',
     status: 'sent',
     language: 'th',
+    kind: 'service_project',
+    serviceDetails: {
+      scope: 'ออกแบบเว็บไซต์บริษัท',
+      duration: '30 วันหลังได้รับมัดจำ',
+      depositPercent: 50,
+      revisionRounds: 2,
+      revisionTerms: 'เกินจำนวนรอบคิดเพิ่มตามจริง',
+      milestones: [{ title: 'ส่งแบบร่าง', amount: 535, dueDate: '2026-06-15', note: null }],
+    },
     quotationDate: new Date('2026-05-30T00:00:00Z'),
     validUntil: new Date('2026-06-30T00:00:00Z'),
     buyerId: 'cus-1',
@@ -84,4 +93,6 @@ test('buildQuotationPdfData forwards quotation template preference from seller s
   assert.equal(pdfData.type, 'quotation');
   assert.equal(pdfData.templateId, 'builtin:minimal-sans');
   assert.equal(pdfData.documentMode, 'ordinary');
+  assert.match(pdfData.notes ?? '', /ขอบเขตงาน: ออกแบบเว็บไซต์บริษัท/);
+  assert.match(pdfData.notes ?? '', /งวดงาน:/);
 });
