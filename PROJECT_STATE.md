@@ -10,15 +10,15 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest production deployment: `dpl_9UjVgJYzAkLuHz7fP1Ft9uuTmUCm` (`https://etax-invoice-264ofvxqh-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
-- Latest checked route: `/app/invoices` returned 200; production `InvoiceList-BryrLTMy.js` contains the new recurring-from-invoice UI (`/from-invoice/`, `Repeat`/`ทำซ้ำ`, modal copy).
+- Latest production deployment: `dpl_Hb5AdnbRwCXECXSXSJksNhYmAin4` (`https://etax-invoice-fbzcfepz8-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
+- Latest checked route: `/share/quotation/not-a-real-token` returned SPA HTML 200 from `etax-invoice.vercel.app`; Vercel inspect shows production `Ready`.
 
 Backend:
 - Platform: Render
 - Service: `etax-invoice-api` (`srv-d7lkqkvavr4c73a0qqh0`)
 - Plan: Standard ($25)
 - URL: `https://etax-invoice-api.onrender.com`
-- Latest live deploy checked: `537166f` via `Deploy to Render` run `26253961989`.
+- Latest live deploy checked: `242bf73` via `Deploy to Render` run `26683847363`.
 - Health endpoints:
   - `/api/health` — shallow process liveness (express responding)
   - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
@@ -32,9 +32,9 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Push checks for `7ea2eae` green: Typecheck (`26265452309`), Unit tests (`26265452332`), Prod smoke test (`26265452314`).
-- Manual `Deploy to Render` run `26253961989` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
-- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_9UjVgJYzAkLuHz7fP1Ft9uuTmUCm`.
+- Push checks for `242bf73` green: Typecheck (`26683798028`), Unit tests (`26683798042`), Prod smoke test (`26683798031`).
+- Manual `Deploy to Render` run `26683847363` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
+- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_Hb5AdnbRwCXECXSXSJksNhYmAin4`.
 
 ## LINE / OCR pipeline (current)
 
