@@ -145,7 +145,12 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(html.includes('margin-top: auto'), 'payment/support area should sit toward the bottom on short A4 invoices');
   assert.ok(!html.includes('Electronic Tax Document'), 'ordinary document must not show electronic tax eyebrow');
   assert.ok(!html.includes('ORDINARY DOCUMENT'), 'ordinary document should not spend space on a redundant ordinary badge');
-  assert.ok(!html.includes('<div class="signature-grid">'), 'blank signature boxes should not render when no signer is configured');
+  // Accounting standard: signature LINES are always present so the document
+  // can be signed by hand, even when no signature image/name is configured.
+  assert.ok(html.includes('<div class="signature-grid">'), 'signature lines should always render for manual signing');
+  assert.ok(html.includes('ผู้รับสินค้า / ลูกค้า'), 'received-by signature line should render');
+  assert.ok(html.includes('ผู้มีอำนาจลงนาม'), 'authorized signatory line should render');
+  assert.ok(html.includes('ได้รับสินค้า/บริการ'), 'received-goods acknowledgement statement should render on non-quotation docs');
 });
 
 test('standard ordinary document keeps up to eight items in compact one-page layout', () => {

@@ -152,6 +152,57 @@ export function frontendPublicAssetUrl(path: string) {
 
 // ── Document theme map (color + label per built-in template) ─────────
 
+// Parse a #rrggbb hex into [r,g,b] (0–255). Falls back to mid-gray.
+function hexToRgb(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return [128, 128, 128];
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+// Linear mix of two hex colors. amount=0 → a, amount=1 → b.
+function mixHex(a: string, b: string, amount: number): string {
+  const [ar, ag, ab] = hexToRgb(a);
+  const [br, bg, bb] = hexToRgb(b);
+  const t = Math.max(0, Math.min(1, amount));
+  return rgbToHex(ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t);
+}
+
+export interface DocumentSurfaceTokens {
+  isDark: boolean;
+  surface: string;       // solid "paper" the content sits on (always legible)
+  onSurface: string;     // body text color on the paper
+  surfaceMuted: string;  // secondary labels / hairline borders on the paper
+  pageBg: string;        // decorative page background (wallpaper layer) behind the paper
+}
+
+// Derive the "decorative page + clean paper" surface tokens from the theme's
+// existing accent/soft/ink colors. The paper stays high-contrast and formal
+// regardless of how decorative the page background is, so content text is
+// always readable (the core rule of the template unification).
+export function deriveSurfaceTokens(base: { accent: string; accent2: string; soft: string; ink: string }): DocumentSurfaceTokens {
+  // Formality + legibility first: the "paper" the content sits on is ALWAYS a
+  // clean white surface with dark, high-contrast text — for every theme,
+  // including the Dark / Anime / Cute families. A theme expresses itself
+  // through its accent color (top rule, borders, title, grand-total bar) and a
+  // gentle accent-tinted page wash behind the paper — never by darkening the
+  // content area, which would make text hard to read on a tax document.
+  return {
+    isDark: false,
+    surface: '#ffffff',
+    onSurface: '#172033',
+    surfaceMuted: '#64748b',
+    // Soft accent-tinted wash → white. Subtle wallpaper feel at the page edges;
+    // the paper itself stays white so content is always formal and readable.
+    pageBg: `linear-gradient(160deg, ${mixHex(base.accent, '#ffffff', 0.9)} 0%, #ffffff 55%)`,
+  };
+}
+
 export function resolveDocumentTheme(templateId?: string | null) {
   const themes: Record<string, {
     className: string;
@@ -222,5 +273,6 @@ export function resolveDocumentTheme(templateId?: string | null) {
     'builtin:anime-pastel':  { className: 'theme-anime-pastel',  accent: '#b794f4', accent2: '#9f7aea', soft: '#f5f0ff', ink: '#553c7b', label: 'Anime Pastel',  mark: '♡' },
   };
 
-  return themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
+  const base = themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
+  return { ...base, ...deriveSurfaceTokens(base) };
 }

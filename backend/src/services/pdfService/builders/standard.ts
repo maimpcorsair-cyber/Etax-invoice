@@ -77,6 +77,13 @@ export function buildHtml(data: PdfInvoiceData): string {
     notes: isTh ? 'หมายเหตุ' : isEn ? 'Notes' : 'หมายเหตุ / Notes',
     preparedBy: isTh ? 'ผู้จัดทำ / ผู้ออกเอกสาร' : isEn ? 'Prepared by / Issuer' : 'ผู้จัดทำ / Prepared by',
     receivedBy: isTh ? 'ผู้รับสินค้า / ลูกค้า' : isEn ? 'Received by / Customer' : 'ผู้รับ / Customer',
+    authorizedBy: isTh ? 'ผู้มีอำนาจลงนาม / ออกโดย' : isEn ? 'Authorized Signature' : 'ผู้มีอำนาจลงนาม / Authorized Signature',
+    receivedGoods: isQuotation
+      ? ''
+      : (isTh ? 'ข้าพเจ้าได้รับสินค้า/บริการตามรายการข้างต้นไว้ถูกต้องครบถ้วนแล้ว'
+        : isEn ? 'Received the above goods/services correctly and in full.'
+        : 'ได้รับสินค้า/บริการตามรายการข้างต้นถูกต้องครบถ้วน / Received the above goods/services in full.'),
+    dateLine: isTh ? 'วันที่' : isEn ? 'Date' : 'วันที่ / Date',
     electronicDoc: isTh ? 'เอกสารนี้สร้างและจัดเก็บในรูปแบบอิเล็กทรอนิกส์' : isEn ? 'This document is generated and stored electronically.' : 'เอกสารนี้สร้างและจัดเก็บในรูปแบบอิเล็กทรอนิกส์ / This document is generated and stored electronically.',
     ordinaryDoc: isTh ? 'เอกสารฉบับปกติ' : isEn ? 'Ordinary document' : 'เอกสารฉบับปกติ / Ordinary document',
     electronicCertified: isTh ? 'เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax' : isEn ? 'Electronic e-Tax document' : 'เอกสารอิเล็กทรอนิกส์ตามรูปแบบ e-Tax / Electronic e-Tax document',
@@ -144,7 +151,6 @@ export function buildHtml(data: PdfInvoiceData): string {
     : isElectronicDocument
     ? 'Electronic Tax Document'
     : (isTh ? 'เอกสาร' : 'Document');
-  const shouldRenderSignature = Boolean(data.signatureImageUrl || data.signerName || data.signerTitle);
 
   return `<!DOCTYPE html>
 <html lang="${isTh ? 'th' : 'en'}">
@@ -159,10 +165,14 @@ export function buildHtml(data: PdfInvoiceData): string {
     --accent-2: ${theme.accent2};
     --accent-soft: ${theme.soft};
     --theme-ink: ${theme.ink};
+    --surface: ${theme.surface};
+    --on-surface: ${theme.onSurface};
+    --surface-muted: ${theme.surfaceMuted};
+    --page-bg: ${theme.pageBg};
     font-family: 'Sarabun', sans-serif;
     font-size: 13px;
-    color: #172033;
-    background: #ffffff;
+    color: var(--on-surface);
+    background: var(--page-bg);
     padding: 20px;
   }
   .page {
@@ -178,13 +188,13 @@ export function buildHtml(data: PdfInvoiceData): string {
     display: flex;
     flex-direction: column;
     border: 1px solid var(--accent);
-    border-radius: 24px;
+    border-radius: 8px;
     overflow: hidden;
-    background: #ffffff;
+    background: var(--surface);
     box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
     position: relative;
   }
-  .top-accent { height: 10px; background: linear-gradient(90deg, var(--accent-2) 0%, var(--accent) 52%, var(--accent-soft) 100%); }
+  .top-accent { height: 3px; background: var(--accent-2); }
   .watermark {
     position: absolute;
     right: 24px;
@@ -216,14 +226,14 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
   .brand-area { display: flex; gap: 16px; align-items: flex-start; }
   .brand-logo {
-    width: 78px;
-    height: 78px;
+    width: 72px;
+    height: 72px;
     object-fit: contain;
     flex-shrink: 0;
     border: 1px solid var(--accent);
-    border-radius: 18px;
-    padding: 10px;
-    background: #f8fbff;
+    border-radius: 8px;
+    padding: 8px;
+    background: #ffffff;
   }
   .company-name {
     font-size: 22px;
@@ -245,20 +255,20 @@ export function buildHtml(data: PdfInvoiceData): string {
     justify-items: end;
   }
   .doc-logo-right {
-    width: 88px;
-    height: 88px;
+    width: 80px;
+    height: 80px;
     object-fit: contain;
     border: 1px solid var(--accent);
-    border-radius: 18px;
+    border-radius: 8px;
     padding: 8px;
-    background: #f8fbff;
+    background: #ffffff;
   }
   .title-card {
     width: 100%;
-    border: 1px solid #dbe4f2;
-    border-radius: 20px;
-    background: linear-gradient(180deg, #ffffff 0%, var(--accent-soft) 100%);
-    padding: 16px 18px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 14px 18px 12px;
     text-align: right;
   }
   .eyebrow {
@@ -511,6 +521,22 @@ export function buildHtml(data: PdfInvoiceData): string {
     font-size: 10px;
     color: #6b7280;
   }
+  .sig-date {
+    margin-top: 4px;
+    font-size: 9.5px;
+    color: #94a3b8;
+  }
+  .ack-statement {
+    margin-top: 22px;
+    padding: 9px 14px;
+    border: 1px dashed var(--accent);
+    border-radius: 8px;
+    background: #f8fafc;
+    color: var(--on-surface);
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+  .ack-statement + .signature-grid { margin-top: 12px; }
   .document-support {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 170px;
@@ -533,7 +559,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
   .online-box {
     text-align: center;
-    background: linear-gradient(180deg, var(--accent-soft) 0%, #ffffff 100%);
+    background: #ffffff;
   }
   .online-qr {
     width: 112px;
@@ -560,7 +586,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
-    background: var(--accent-soft);
+    background: #f1f5f9;
     color: var(--accent-2);
     border: 1px solid var(--accent);
     padding: 5px 10px;
@@ -692,8 +718,13 @@ export function buildHtml(data: PdfInvoiceData): string {
     font-size: 14px;
   }
   .compact-one-page .signature-grid {
-    margin-top: 12px;
-    grid-template-columns: 1fr;
+    margin-top: 10px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .compact-one-page .ack-statement {
+    margin-top: 10px;
+    padding: 6px 12px;
+    font-size: 9.5px;
   }
   .compact-one-page .sig-card {
     padding: 8px 10px;
@@ -856,6 +887,36 @@ export function buildHtml(data: PdfInvoiceData): string {
       height: calc(297mm - 20mm);
       overflow: hidden;
     }
+
+    /* Multi-page documents (more than one page of items). The compact
+       one-page layout is locked to a single page above; everything else
+       must paginate cleanly. The base layout is a flex column with a
+       full-page min-height and an auto-margin footer — great for a single
+       page, but it makes Chromium fragment badly (blank gaps, extra pages)
+       once content overflows. For the multi-page case switch the shell to
+       normal block flow so pages break naturally, repeat the table header
+       on every page, and keep rows / summary blocks from splitting across
+       a page boundary. */
+    body:not(.compact-one-page) .page { min-height: 0; }
+    body:not(.compact-one-page) .document-shell {
+      display: block;
+      overflow: visible;
+      min-height: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    body:not(.compact-one-page) .document-body { display: block; }
+    body:not(.compact-one-page) .document-support { margin-top: 24px; }
+    body:not(.compact-one-page) thead { display: table-header-group; }
+    body:not(.compact-one-page) tr { break-inside: avoid; }
+    body:not(.compact-one-page) .totals-card,
+    body:not(.compact-one-page) .signature-grid,
+    body:not(.compact-one-page) .sig-card,
+    body:not(.compact-one-page) .party-card,
+    body:not(.compact-one-page) .meta-card,
+    body:not(.compact-one-page) .notes-card,
+    body:not(.compact-one-page) .words-card,
+    body:not(.compact-one-page) .ack-statement { break-inside: avoid; }
   }
 </style>
 </head>
@@ -884,7 +945,6 @@ export function buildHtml(data: PdfInvoiceData): string {
             <div class="eyebrow">${documentEyebrow}</div>
             <h1>${docTitle}</h1>
             <div class="copy-pill">${labels.origDoc}</div>
-            <div class="template-badge">${escapeHtml(data.templateName ?? theme.label)}</div>
           </div>
         </div>
       </div>
@@ -973,16 +1033,24 @@ export function buildHtml(data: PdfInvoiceData): string {
         </div>
       </div>
 
-      ${shouldRenderSignature ? `
-        <div class="signature-grid">
-          <div class="sig-card">
-            <div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="authorized signature"/>` : ''}</div>
-            <div class="sig-line"></div>
-            <div class="sig-title">${labels.preparedBy}</div>
-            ${(data.signerName || data.signerTitle) ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>` : ''}
-          </div>
+      ${labels.receivedGoods ? `<div class="ack-statement">${labels.receivedGoods}</div>` : ''}
+
+      <div class="signature-grid">
+        <div class="sig-card">
+          <div class="sig-space"></div>
+          <div class="sig-line"></div>
+          <div class="sig-title">${labels.receivedBy}</div>
+          <div class="sig-date">${labels.dateLine} ......../......../........</div>
         </div>
-      ` : ''}
+        <div class="sig-card">
+          <div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="authorized signature"/>` : ''}</div>
+          <div class="sig-line"></div>
+          <div class="sig-title">${labels.authorizedBy}</div>
+          ${(data.signerName || data.signerTitle)
+            ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>`
+            : `<div class="sig-date">${labels.dateLine} ......../......../........</div>`}
+        </div>
+      </div>
 
       ${(data.bankPaymentInfo || isElectronicDocument || data.promptPayQrDataUrl) ? `
         <div class="document-support">
@@ -1021,8 +1089,8 @@ export function buildHtml(data: PdfInvoiceData): string {
       ` : ''}
 
       <div class="footer">
-        <div>e-Tax Invoice System &nbsp;|&nbsp; ${isElectronicDocument ? 'e-Tax Electronic Document' : 'Standard Document'}</div>
-        <div class="footer-right">${docTitle} &nbsp;·&nbsp; ${new Date().getFullYear()}</div>
+        <div>${escapeHtml(docTitle)} &nbsp;·&nbsp; ${labels.origDoc} &nbsp;|&nbsp; ${isElectronicDocument ? labels.electronicCertified : labels.ordinaryDoc}</div>
+        <div class="footer-right">${isTh ? 'ออกโดยระบบ Billboy' : 'Issued via Billboy'} &nbsp;·&nbsp; ${new Date().getFullYear()}</div>
       </div>
     </div>
   </div>
