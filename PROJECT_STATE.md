@@ -10,7 +10,7 @@ Frontend:
 - Platform: Vercel
 - Project: `etax-invoice`
 - URL: `https://etax-invoice.vercel.app`
-- Latest production deployment: `dpl_Hb5AdnbRwCXECXSXSJksNhYmAin4` (`https://etax-invoice-fbzcfepz8-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
+- Latest feature production deployment: `dpl_9yEaBdq96rweVaUrzswXFNKBdbND` (`https://etax-invoice-9cuszppd7-maimpcorsair-1177s-projects.vercel.app`) aliased to `etax-invoice.vercel.app`.
 - Latest checked route: `/share/quotation/not-a-real-token` returned SPA HTML 200 from `etax-invoice.vercel.app`; Vercel inspect shows production `Ready`.
 
 Backend:
@@ -18,7 +18,7 @@ Backend:
 - Service: `etax-invoice-api` (`srv-d7lkqkvavr4c73a0qqh0`)
 - Plan: Standard ($25)
 - URL: `https://etax-invoice-api.onrender.com`
-- Latest live deploy checked: `242bf73` via `Deploy to Render` run `26683847363`.
+- Latest live deploy checked: `0754bd7` via `Deploy to Render` run `26687108830`.
 - Health endpoints:
   - `/api/health` — shallow process liveness (express responding)
   - `/api/health/workers` — BullMQ queue stats; 503 if `line-ocr` queue is stuck > 5min
@@ -32,9 +32,9 @@ Worker:
 - Status: healthy, processes `line-ocr` + signing queues
 
 Last CI:
-- Push checks for `242bf73` green: Typecheck (`26683798028`), Unit tests (`26683798042`), Prod smoke test (`26683798031`).
-- Manual `Deploy to Render` run `26683847363` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
-- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_Hb5AdnbRwCXECXSXSJksNhYmAin4`.
+- Push checks for `0754bd7` green: Typecheck (`26687098540`), Unit tests (`26687098521`), Prod smoke test (`26687098531`).
+- Manual `Deploy to Render` run `26687108830` green: backend typecheck, production Prisma migrate deploy, Render deploy, backend health smoke.
+- Frontend Vercel production deploy from `frontend/` completed and aliased: `dpl_9yEaBdq96rweVaUrzswXFNKBdbND`.
 
 ## LINE / OCR pipeline (current)
 
