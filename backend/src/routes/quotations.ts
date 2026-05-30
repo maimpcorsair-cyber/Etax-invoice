@@ -38,6 +38,7 @@ const quotationCreateSchema = z.object({
   quotationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   language: z.enum(['th', 'en', 'both']).default('th'),
+  templateId: z.string().max(120).optional().nullable(),
   items: z.array(itemSchema).min(1).max(200),
   discountAmount: z.number().nonnegative().default(0),
   notes: z.string().max(1000).optional().nullable(),
@@ -87,6 +88,25 @@ function resolveFrontendUrl(req: import('express').Request): string {
     }
   }
   return (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',')[0].trim();
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function sellerSnapshotWithTemplate(seller: unknown, templateId: string | null | undefined): object {
+  const snap = objectRecord(seller);
+  const documentPreferences = objectRecord(snap.documentPreferences);
+  return {
+    ...snap,
+    documentPreferences: {
+      ...documentPreferences,
+      templateId: templateId ?? null,
+      documentMode: 'ordinary',
+    },
+  };
 }
 
 // ── List ──────────────────────────────────────────────────────────────
@@ -153,7 +173,13 @@ quotationsRouter.get('/:id', async (req, res) => {
       res.status(404).json({ error: 'Quotation not found' });
       return;
     }
-    res.json({ data: quotation });
+    const documentPreferences = objectRecord(objectRecord(quotation.seller).documentPreferences);
+    res.json({
+      data: {
+        ...quotation,
+        templateId: typeof documentPreferences.templateId === 'string' ? documentPreferences.templateId : null,
+      },
+    });
   } catch (err) {
     logger.error('get quotation failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to get quotation' });
@@ -269,7 +295,7 @@ quotationsRouter.post('/', async (req, res) => {
         quotationDate: new Date(`${body.quotationDate}T00:00:00.000Z`),
         validUntil: body.validUntil ? new Date(`${body.validUntil}T23:59:59.000Z`) : null,
         buyerId: body.buyerId,
-        seller: (company ?? {}) as object,
+        seller: sellerSnapshotWithTemplate(company ?? {}, body.templateId),
         subtotal,
         vatAmount,
         discountAmount: body.discountAmount,
@@ -376,6 +402,7 @@ quotationsRouter.patch('/:id', async (req, res) => {
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.paymentTerms !== undefined ? { paymentTerms: body.paymentTerms ?? null } : {}),
         ...(body.deliveryTerms !== undefined ? { deliveryTerms: body.deliveryTerms ?? null } : {}),
+        ...(body.templateId !== undefined ? { seller: sellerSnapshotWithTemplate(existing.seller, body.templateId) } : {}),
         ...(recomputedTotals ? recomputedTotals : {}),
         ...(itemsUpdate ? { items: itemsUpdate } : {}),
       },

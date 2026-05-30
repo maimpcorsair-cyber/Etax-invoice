@@ -40,7 +40,7 @@ export const DOC_TITLE: Record<string, Record<Language | 'both', string>> = {
   debit_note: { th: 'ใบเพิ่มหนี้', en: 'Debit Note', both: 'ใบเพิ่มหนี้ / Debit Note' },
 };
 
-export const ALL_DOCUMENT_TYPES = ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'];
+export const ALL_DOCUMENT_TYPES = ['quotation', 'tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'];
 
 export const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   name: string;

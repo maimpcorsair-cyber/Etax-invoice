@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import type { Customer, Quotation, QuotationStatus } from '../types';
+import { builtinDocumentTemplates } from '../lib/documentTemplatePresets';
 
 // ใบเสนอราคา — Build (new/edit draft) + view (non-draft) + status actions
 // in one page. Routed as:
@@ -49,6 +50,7 @@ interface FormState {
   quotationDate: string; // YYYY-MM-DD
   validUntil: string;    // YYYY-MM-DD or ''
   language: 'th' | 'en' | 'both';
+  templateId: string | null;
   items: ItemDraft[];
   discountAmount: number;
   notes: string;
@@ -58,6 +60,7 @@ interface FormState {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const plusDaysIso = (days: number) => new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
+const STANDARD_TEMPLATE_VALUE = '__system_standard__';
 
 function computeLine(item: ItemDraft) {
   const gross = item.quantity * item.unitPrice;
@@ -91,6 +94,7 @@ export default function QuotationBuilder() {
     quotationDate: todayIso(),
     validUntil: plusDaysIso(30),
     language: 'th',
+    templateId: null,
     items: [blankItem],
     discountAmount: 0,
     notes: '',
@@ -116,6 +120,7 @@ export default function QuotationBuilder() {
             quotationDate: q.quotationDate.slice(0, 10),
             validUntil: q.validUntil ? q.validUntil.slice(0, 10) : '',
             language: q.language,
+            templateId: q.templateId ?? null,
             items: q.items.map((it) => ({
               productId: it.productId ?? null,
               nameTh: it.nameTh,
@@ -174,6 +179,7 @@ export default function QuotationBuilder() {
         quotationDate: form.quotationDate,
         validUntil: form.validUntil || null,
         language: form.language,
+        templateId: form.templateId,
         items: form.items.map((it) => ({
           productId: it.productId ?? null,
           nameTh: it.nameTh,
@@ -293,6 +299,10 @@ export default function QuotationBuilder() {
     const selected = customers.find((c) => c.id === form.buyerId);
     return selected?.nameTh || selected?.nameEn || existing?.buyer?.nameTh || existing?.buyer?.nameEn || (isThai ? 'ลูกค้า' : 'customer');
   }, [customers, existing?.buyer?.nameEn, existing?.buyer?.nameTh, form.buyerId, isThai]);
+
+  const minimalTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Minimal');
+  const cuteTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Cute');
+  const selectedTemplate = builtinDocumentTemplates.find((template) => template.id === form.templateId) ?? null;
 
   const buildCustomerMessage = useCallback((link?: string) => {
     const number = existing?.quotationNumber ?? (isThai ? 'ใบเสนอราคา' : 'quotation');
@@ -594,6 +604,44 @@ export default function QuotationBuilder() {
             <option value="en">English</option>
             <option value="both">ไทย + English</option>
           </select>
+        </div>
+        <div className="sm:col-span-3">
+          <label className="label">{isThai ? 'รูปแบบใบเสนอราคา' : 'Quotation template'}</label>
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+            <select
+              value={form.templateId ?? STANDARD_TEMPLATE_VALUE}
+              onChange={(e) => setForm({ ...form, templateId: e.target.value === STANDARD_TEMPLATE_VALUE ? null : e.target.value })}
+              className="input-field"
+              disabled={!editable}
+            >
+              <option value={STANDARD_TEMPLATE_VALUE}>
+                {isThai ? 'มาตรฐาน - แบบราชการ A4' : 'Standard - official A4'}
+              </option>
+              <optgroup label={isThai ? 'เรียบง่าย / ทางการ' : 'Minimal / official'}>
+                {minimalTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{isThai ? template.nameTh : template.nameEn}</option>
+                ))}
+              </optgroup>
+              <optgroup label={isThai ? 'สีพาสเทล / ร้านค้า' : 'Pastel / shop'}>
+                {cuteTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{isThai ? template.nameTh : template.nameEn}</option>
+                ))}
+              </optgroup>
+            </select>
+            <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
+              {(selectedTemplate?.swatches ?? ['bg-white', 'bg-blue-200', 'bg-blue-800']).map((swatch, index) => (
+                <span key={`${swatch}-${index}`} className={`h-4 w-4 border border-slate-200 ${swatch}`} />
+              ))}
+              <span className="min-w-0 truncate text-xs font-medium text-slate-600">
+                {selectedTemplate
+                  ? (isThai ? selectedTemplate.descriptionTh : selectedTemplate.descriptionEn)
+                  : (isThai ? 'เอกสารทางการ อ่านง่าย เหมาะกับการเสนอราคาทั่วไป' : 'Official, readable A4 layout for everyday quotations')}
+              </span>
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {isThai ? 'รูปแบบนี้จะใช้ทั้ง PDF และลิงก์ที่ส่งให้ลูกค้า' : 'This template is used for both the PDF and the customer share link.'}
+          </p>
         </div>
       </div>
 

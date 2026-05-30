@@ -22,6 +22,7 @@ function optionalStringField(value: unknown): string | null {
 
 export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceData {
   const seller = objectRecord(quotation.seller);
+  const documentPreferences = objectRecord(seller.documentPreferences);
   const notes = [
     quotation.notes,
     quotation.deliveryTerms ? `เงื่อนไขการส่งของ: ${quotation.deliveryTerms}` : null,
@@ -72,6 +73,8 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
     total: quotation.total,
     notes: notes || null,
     paymentMethod: quotation.paymentTerms,
+    templateId: optionalStringField(documentPreferences.templateId),
+    templateName: optionalStringField(documentPreferences.templateName),
     showCompanyLogo: true,
     documentMode: 'ordinary',
   };

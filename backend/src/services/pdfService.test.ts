@@ -208,6 +208,21 @@ test('built-in template themes keep the standard accounting document structure',
   assert.ok(!html.includes('poster-panel'), 'built-in template should not switch to a different poster/gallery layout');
 });
 
+test('built-in quotation template keeps quotation copy and applies the selected theme', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    type: 'quotation',
+    invoiceNumber: 'QT-2026-000009',
+    dueDate: new Date('2026-06-30T00:00:00Z'),
+    templateId: 'builtin:minimal-sans',
+    documentMode: 'ordinary',
+  });
+
+  assert.ok(html.includes('ใบเสนอราคา'), 'quotation template should keep quotation title');
+  assert.ok(html.includes('theme-minimal-sans'), 'quotation template should apply selected built-in theme');
+  assert.ok(html.includes('ใช้ได้ถึง'), 'quotation template should keep valid-until wording');
+});
+
 test('marketplace T01 keeps payment details but hides missing due date', () => {
   const html = buildHtmlMarketplace({
     ...FIXTURE,

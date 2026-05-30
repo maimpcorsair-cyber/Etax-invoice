@@ -292,6 +292,7 @@ export interface Quotation {
   notes?: string | null;
   paymentTerms?: string | null;
   deliveryTerms?: string | null;
+  templateId?: string | null;
   convertedToInvoiceId?: string | null;
   convertedAt?: string | null;
   createdBy: string;
