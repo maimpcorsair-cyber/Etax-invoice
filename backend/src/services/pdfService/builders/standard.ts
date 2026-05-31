@@ -155,6 +155,39 @@ export function buildHtml(data: PdfInvoiceData): string {
   const whtBase = data.subtotal + (data.feeAmount ?? 0);
   const whtAmount = whtRateNum > 0 ? +((whtBase * whtRateNum) / 100).toFixed(2) : 0;
   const whtNetPayable = +(data.total - whtAmount).toFixed(2);
+  // Milestone payment schedule (project / contract quotations) — rendered as a
+  // proper table rather than flattened note text.
+  const milestones = data.milestones ?? [];
+  const milestoneSum = +milestones.reduce((s, m) => s + (m.amount ?? 0), 0).toFixed(2);
+  const milestoneTableHtml = milestones.length > 0 ? `
+      <div class="schedule-card">
+        <h2>${isTh ? 'งวดการชำระเงิน' : 'Payment Schedule'}</h2>
+        <table class="schedule-table">
+          <thead>
+            <tr>
+              <th style="width:46px;text-align:center">${isTh ? 'งวด' : 'No.'}</th>
+              <th>${isTh ? 'รายละเอียด' : 'Description'}</th>
+              <th style="width:120px;text-align:center">${isTh ? 'กำหนดชำระ' : 'Due date'}</th>
+              <th style="width:130px;text-align:right">${isTh ? 'จำนวนเงิน' : 'Amount'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${milestones.map((m, i) => `<tr>
+              <td style="text-align:center">${i + 1}</td>
+              <td>${escapeHtml(m.title)}${m.note ? `<div class="schedule-note">${escapeHtml(m.note)}</div>` : ''}</td>
+              <td style="text-align:center">${m.dueDate ? escapeHtml(isTh ? formatDateTh(new Date(m.dueDate)) : formatDateEn(new Date(m.dueDate))) : '-'}</td>
+              <td style="text-align:right">${formatCurrency(m.amount)} THB</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right">${isTh ? 'รวมทุกงวด' : 'Schedule total'}</td>
+              <td style="text-align:right"><strong>${formatCurrency(milestoneSum)} THB</strong></td>
+            </tr>
+            ${Math.abs(milestoneSum - data.total) > 0.009 ? `<tr class="schedule-mismatch"><td colspan="4" style="text-align:right">${isTh ? 'ยอดรวมงวดต่างจากยอดสุทธิ' : 'Schedule total differs from quote total'} ${formatCurrency(Math.abs(milestoneSum - data.total))} THB</td></tr>` : ''}
+          </tfoot>
+        </table>
+      </div>` : '';
   const isElectronicDocument = data.documentMode === 'electronic';
   const onePageCompact = !customTemplateBlock && data.items.length <= ONE_PAGE_ITEM_LIMIT;
   const documentEyebrow = isQuotation
@@ -497,6 +530,25 @@ export function buildHtml(data: PdfInvoiceData): string {
   .totals-row.wht strong { color: #9a3412; font-weight: 600; }
   .totals-row.net { background: #f1f5f9; }
   .totals-row.net strong { color: #162444; font-size: 14px; }
+  .schedule-card { margin-top: 22px; }
+  .schedule-card h2 {
+    font-size: 13px; font-weight: 700; color: #162444;
+    margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--accent);
+  }
+  .schedule-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .schedule-table thead th {
+    background: var(--surface-muted, #eef2f8); color: #435065;
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    padding: 8px 10px; text-align: left; border-bottom: 1px solid #d9e2ef;
+  }
+  .schedule-table tbody td {
+    padding: 9px 10px; color: #2b3650; border-bottom: 1px solid #eef2f8; vertical-align: top;
+  }
+  .schedule-note { font-size: 10.5px; color: #7a869a; margin-top: 2px; }
+  .schedule-table tfoot td {
+    padding: 9px 10px; font-weight: 600; color: #162444; border-top: 2px solid #d9e2ef;
+  }
+  .schedule-mismatch td { color: #9a3412; font-weight: 600; border-top: none; padding-top: 2px; }
   .signature-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1061,6 +1113,8 @@ export function buildHtml(data: PdfInvoiceData): string {
           <div class="totals-row net"><span>${isTh ? 'ยอดชำระสุทธิ' : 'Net payable'}</span><strong>${formatCurrency(whtNetPayable)} THB</strong></div>` : ''}
         </div>
       </div>
+
+      ${milestoneTableHtml}
 
       ${labels.receivedGoods ? `<div class="ack-statement">${labels.receivedGoods}</div>` : ''}
 

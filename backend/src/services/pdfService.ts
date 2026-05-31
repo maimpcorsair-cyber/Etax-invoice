@@ -60,6 +60,7 @@ export interface PdfInvoiceData {
   feeLabel?: string | null; // label for the fee row, e.g. "ค่าบริหารงาน" / "Agency fee"
   feePercent?: number | null; // the percent used to derive feeAmount, shown next to the label
   whtRate?: string | null; // "1"|"3"|"5" — informational WHT estimate; shows หัก ณ ที่จ่าย + net payable, does not change total
+  milestones?: Array<{ title: string; amount: number; dueDate?: string | null; note?: string | null }>; // payment schedule (project/contract quotations)
   total: number;
   isPaid?: boolean | null; // suppresses the "scan to pay" PromptPay QR when already settled
   promptPayId?: string | null; // the bank account selected on THIS document; QR uses it when it matches a company account

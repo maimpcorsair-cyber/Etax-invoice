@@ -87,14 +87,28 @@ function serviceDetailsNotes(value: unknown, total = 0): string[] {
     formatMoneyDetail('Local charge', details.localCharge, currency),
     formatMoneyDetail('ค่าพิธีการศุลกากร', details.customsFee, currency),
     formatMoneyDetail('ประกันภัย', details.insurance, currency),
-    milestones.length > 0 ? 'งวดงาน:' : null,
-    ...milestones.map((milestone, index) => {
-      const due = milestone.dueDate ? ` | กำหนด ${milestone.dueDate}` : '';
-      const note = milestone.note ? ` | ${milestone.note}` : '';
-      return `${index + 1}. ${milestone.title}: ${milestone.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท${due}${note}`;
-    }),
+    // Milestones are no longer flattened into note text — they render as a
+    // proper payment-schedule table (see extractMilestones + standard.ts).
   ];
   return lines.filter((line): line is string => Boolean(line));
+}
+
+// Pull the milestone payment schedule out as structured rows for the PDF
+// table. Mirrors the filter used in serviceDetailsNotes.
+function extractMilestones(value: unknown): Array<{ title: string; amount: number; dueDate: string | null; note: string | null }> {
+  const details = objectRecord(value);
+  if (!Array.isArray(details.milestones)) return [];
+  return details.milestones
+    .filter((item): item is ServiceMilestone => {
+      const row = objectRecord(item);
+      return typeof row.title === 'string' && typeof row.amount === 'number';
+    })
+    .map((m) => ({
+      title: m.title,
+      amount: m.amount,
+      dueDate: m.dueDate ?? null,
+      note: m.note ?? null,
+    }));
 }
 
 function boqSummaryNotes(items: QuotationItem[]): string[] {
@@ -169,6 +183,7 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
     feeLabel: quotation.feeLabel,
     feePercent: quotation.feePercent,
     whtRate: quotation.whtRate,
+    milestones: quotation.kind !== 'general' ? extractMilestones(quotation.serviceDetails) : [],
     total: quotation.total,
     notes: notes || null,
     paymentMethod: quotation.paymentTerms,
