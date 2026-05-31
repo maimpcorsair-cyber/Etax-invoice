@@ -1,6 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-05-31 (document template unification deployed)
+Last updated: 2026-06-01 (quotation management/agency fee + auto-expiry deployed)
+
+## Latest work (2026-06-01)
+
+Quotation system hardening — shipped and verified live on prod:
+- **Management/agency fee %** (`97a47bf`, preview fix `ef653ec`) — `Quotation.feePercent`/`feeLabel` (migration `20260601_quotation_management_fee`). VATable fee on item subtotal before VAT: `feeAmount=subtotal*pct/100; feeVat=fee*0.07; vat=itemVat+feeVat; total=subtotal+fee+vat-discount`. Verified `361000 +15% → 444210.50` (matches ShowWorks/CRW example PDFs). Fee row + "รวมก่อน VAT" line in `standard.ts`; inputs in `QuotationBuilder.tsx`.
+- **Convert-to-invoice fee carry** (`b805d81`) — convert now materializes the fee as a synthetic VATable line item and lifts invoice subtotal to (item subtotal + fee), so subtotal+VAT reconciles to total (previously the fee vanished → invoice totals didn't balance, would fail e-Tax XML). Verified live: 2-line invoice 415150+29060.50=444210.50.
+- **Auto-expiry** (`3b8347d`) — `quotationExpiryWorker` nightly cron (00:05) flips `sent`→`expired` where `validUntil<now` (draft/accepted never expire). Core in side-effect-free `quotationExpiryService.runQuotationExpiry()`. Manual trigger `POST /api/quotations/run-expiry` (company-scoped) verified live: sent→run→expired. Cron activates via worker `autoDeployTrigger: commit`.
+
+Known small gaps (not blocking): fee assumes 7% VAT even if items are exempt; deposit/milestones are note-text not a computed schedule; no WHT; deleting an invoice leaves its source quotation stuck in `converted`. Test data left on siamtech demo tenant: 1 `converted` + 1 `expired` quotation (can't delete non-draft via API).
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
