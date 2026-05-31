@@ -240,6 +240,8 @@ export function resolveDocumentTheme(templateId?: string | null) {
     'builtin:cute-yellow': { className: 'theme-cute-yellow', accent: '#fbbf24', accent2: '#d97706', soft: '#fffbeb', ink: '#78350f', label: 'Cute Yellow', mark: '' },
     'builtin:cute-green':  { className: 'theme-cute-green',  accent: '#34d399', accent2: '#059669', soft: '#ecfdf5', ink: '#064e3b', label: 'Cute Green',  mark: '' },
     'builtin:cute-kawaii': { className: 'theme-cute-kawaii', accent: '#a78bfa', accent2: '#7c3aed', soft: '#f5f3ff', ink: '#4c1d95', label: 'Cute Kawaii', mark: '' },
+    'builtin:cute-pastel-pink': { className: 'theme-cute-pastel-pink', accent: '#ec6b9d', accent2: '#be185d', soft: '#fff1f6', ink: '#642945', label: 'Soft Pink', mark: '' },
+    'builtin:cute-baby-blue': { className: 'theme-cute-baby-blue', accent: '#5aaee0', accent2: '#1d4ed8', soft: '#f0f9ff', ink: '#264863', label: 'Soft Blue', mark: '' },
     'builtin:pro-blue-modern':   { className: 'theme-pro-blue-modern',   accent: '#1e40af', accent2: '#1e3a8a', soft: '#dbeafe', ink: '#1e40af', label: 'Pro สีน้ำเงิน',    mark: '' },
     'builtin:pro-bw':            { className: 'theme-pro-bw',            accent: '#111827', accent2: '#111827', soft: '#f3f4f6', ink: '#111827', label: 'Pro ขาวดำ',        mark: '' },
     'builtin:pro-navy':          { className: 'theme-pro-navy',          accent: '#1e3a5f', accent2: '#1e3a5f', soft: '#e8edf5', ink: '#1e3a5f', label: 'Pro กรมท่า',       mark: '' },
