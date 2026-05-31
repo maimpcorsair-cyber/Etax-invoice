@@ -15,6 +15,7 @@ import {
   Calculator,
   Banknote,
   Settings,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -55,6 +56,7 @@ export default function MobileBottomNav() {
     { key: 'expenses', href: '/app/expenses', icon: Wallet, labelKey: 'nav.expenses' },
     { key: 'products', href: '/app/products', icon: Package, labelKey: 'nav.products' },
     { key: 'settings', href: '/app/settings', icon: Settings, labelKey: 'nav.settings' },
+    { key: 'privacy', href: '/app/account/privacy', icon: ShieldCheck, labelKey: 'nav.privacy' },
     ...(user?.role === 'super_admin' || user?.role === 'admin'
       ? [{ key: 'admin', href: '/app/admin', icon: Shield, labelKey: 'nav.admin' }]
       : []),

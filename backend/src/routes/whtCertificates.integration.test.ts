@@ -74,6 +74,33 @@ async function createApprovedInvoice(companyId: string, customerId: string, user
   );
 }
 
+async function createApprovedVatInvoice(companyId: string, customerId: string, userId: string, subtotal = 100000) {
+  const invNum = 'WHT-VAT-' + uniqueDigits(6);
+  const vatAmount = Math.round(subtotal * 0.07 * 100) / 100;
+  const total = Math.round((subtotal + vatAmount) * 100) / 100;
+  return withSystemRlsContext(prisma, (tx) =>
+    tx.invoice.create({
+      data: {
+        companyId,
+        invoiceNumber: invNum,
+        type: 'tax_invoice',
+        status: 'approved',
+        language: 'th',
+        invoiceDate: new Date(),
+        buyerId: customerId,
+        seller: { nameTh: 'บริษัท สยามเทคฯ', taxId: '0105560123456', branchCode: '00000' },
+        subtotal,
+        vatAmount,
+        discountAmount: 0,
+        total,
+        whtAmount: 0,
+        isPaid: false,
+        createdBy: userId,
+      },
+    }), { role: 'system' }
+  );
+}
+
 function paymentDateStr() {
   return new Date().toISOString().split('T')[0];
 }
@@ -112,6 +139,38 @@ test('TC-WHT-001: POST /api/invoices/:id/wht-certificate creates linked WHT cert
   await withSystemRlsContext(prisma, (tx) => tx.whtCertificate.deleteMany({ where: { invoiceId: invoice.id } }), { role: 'system' });
   // Delete ALL invoices for this customer first (to clear buyerId FK), then the specific invoice
   await withSystemRlsContext(prisma, (tx) => tx.invoice.deleteMany({ where: { buyerId: customer.id } }), { role: 'system' });
+  await withSystemRlsContext(prisma, (tx) => tx.customer.deleteMany({ where: { id: customer.id } }), { role: 'system' });
+});
+
+// TC-WHT-001B
+test('TC-WHT-001B: invoice WHT uses pre-VAT subtotal as withholding base', async () => {
+  const auth = await adminAuth();
+  const h = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth.token };
+
+  const customer = await createCustomer(auth.user.companyId, 'Customer WHT-001B', '0105569999012');
+  const invoice = await createApprovedVatInvoice(auth.user.companyId, customer.id, auth.user.id, 100000);
+
+  const certResp = await api<any>(
+    '/api/invoices/' + invoice.id + '/wht-certificate',
+    { method: 'POST', headers: h, body: JSON.stringify({ whtRate: '3', paymentDate: paymentDateStr(), incomeType: '1' }) }
+  );
+  const cert = certResp.data ?? certResp;
+
+  assert.equal(invoice.subtotal, 100000, 'invoice subtotal = 100000');
+  assert.equal(invoice.total, 107000, 'invoice total includes VAT');
+  assert.equal(cert.whtAmount, 3000, '3% WHT must be calculated from pre-VAT subtotal');
+  assert.equal(cert.totalAmount, 107000, 'certificate keeps the VAT-inclusive invoice total');
+  assert.equal(cert.netAmount, 104000, 'net payment = VAT-inclusive total - pre-VAT WHT');
+
+  const updated = await withSystemRlsContext(prisma, (tx) =>
+    tx.invoice.findUnique({ where: { id: invoice.id }, select: { whtAmount: true, whtRate: true } }),
+    { role: 'system' }
+  );
+  assert.equal(updated?.whtRate, '3', 'invoice stores WHT rate');
+  assert.equal(updated?.whtAmount, 3000, 'invoice stores pre-VAT WHT amount');
+
+  await withSystemRlsContext(prisma, (tx) => tx.whtCertificate.deleteMany({ where: { invoiceId: invoice.id } }), { role: 'system' });
+  await withSystemRlsContext(prisma, (tx) => tx.invoice.deleteMany({ where: { id: invoice.id } }), { role: 'system' });
   await withSystemRlsContext(prisma, (tx) => tx.customer.deleteMany({ where: { id: customer.id } }), { role: 'system' });
 });
 

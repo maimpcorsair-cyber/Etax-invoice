@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (quotation management/agency fee + auto-expiry deployed)
+Last updated: 2026-06-01 (WHT certificate base fix + payroll/privacy audit)
 
 ## Latest work (2026-06-01)
 
@@ -17,7 +17,9 @@ Remaining gaps closed (`9f39d51`), all verified live on prod:
 **Payment-schedule table** (`69bf0df`) — milestones (service_project / boq_contract) now render as a proper table on the PDF (งวด / รายละเอียด / กำหนดชำระ / จำนวนเงิน + schedule-total row + mismatch warning when sum ≠ total), instead of flattened note text. `extractMilestones` + `PdfInvoiceData.milestones` + `standard.ts` table. Form editor + validation already existed (no frontend change). Verified live: sums-match → no warning; sum 50000 vs 107000 → "ต่างจากยอดสุทธิ 57,000.00".
 
 **Known non-bug (by design):** management/agency fee is always VAT 7% (ค่าบริการ is VATable regardless of underlying items) — correct per Thai law.
-**Flagged for separate fix:** existing WHT-cert calc (`invoices.ts:1052`) computes WHT on VAT-inclusive `total` — non-standard (should be pre-VAT base); left untouched to avoid touching the live cert/ภงด flow.
+**Local follow-up ready for deploy:** invoice-linked WHT certificate now calculates withholding from pre-VAT `Invoice.subtotal` while keeping `totalAmount`/net payment based on the VAT-inclusive invoice total. Regression added: 100,000 + VAT 7% + WHT 3% => WHT 3,000, net 104,000. Backend typecheck passes; focused integration test cannot run locally until Postgres + backend API are running (`localhost:5432`/`:4000` currently unavailable).
+**Privacy entry audit:** `/app/account/privacy` route and desktop account menu already existed; mobile More drawer now includes the Privacy/data-rights entry.
+**Payroll audit:** existing payroll unit tests pass (tax calculator, SSO calculator, PND.1 CSV, SSO 1-10 CSV). Current module covers employee CRUD, payroll runs, payslip rows, finalize, and CSV government exports. Remaining product gaps are likely payslip PDF per employee and any native/macro government filing formats beyond CSV, not new payroll calculation logic.
 Test data left on siamtech demo tenant: several `ทดสอบ`/`PREVIEW` quotations + draft/cancelled invoices (non-draft quotations can't be deleted via API). Demo tenant only.
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.

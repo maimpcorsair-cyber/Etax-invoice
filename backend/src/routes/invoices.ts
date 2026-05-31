@@ -1061,7 +1061,9 @@ invoicesRouter.post('/:id/wht-certificate', requireRole('admin', 'accountant'), 
     }
 
     const rate = parseFloat(whtRate) / 100;
-    const whtAmount = Math.round(invoice.total * rate * 100) / 100;
+    // Thai WHT is withheld from the pre-VAT income base, then deducted from the VAT-inclusive payment.
+    const whtBaseAmount = invoice.subtotal;
+    const whtAmount = Math.round(whtBaseAmount * rate * 100) / 100;
     const netAmount = Math.round((invoice.total - whtAmount) * 100) / 100;
 
     const company = invoice.company ?? await prisma.company.findUnique({ where: { id: req.user!.companyId } });
