@@ -37,9 +37,20 @@ type ServiceMilestone = {
   note?: string | null;
 };
 
-function serviceDetailsNotes(value: unknown): string[] {
+function serviceDetailsNotes(value: unknown, total = 0): string[] {
   const details = objectRecord(value);
   const currency = optionalStringField(details.currency) ?? 'THB';
+  // Compute the actual deposit / balance baht figures from the percent so the
+  // customer sees "มัดจำ 30% = ฿X (คงเหลือ ฿Y)" instead of a bare percent.
+  const depositLine = typeof details.depositPercent === 'number' && details.depositPercent > 0 && total > 0
+    ? (() => {
+      const deposit = +((total * details.depositPercent) / 100).toFixed(2);
+      const balance = +(total - deposit).toFixed(2);
+      return `มัดจำก่อนเริ่มงาน: ${details.depositPercent}% = ${deposit.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (คงเหลือ ${balance.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท)`;
+    })()
+    : typeof details.depositPercent === 'number' && details.depositPercent > 0
+      ? `มัดจำก่อนเริ่มงาน: ${details.depositPercent}%`
+      : null;
   const exchangeRate = optionalNumberField(details.exchangeRate);
   const milestones = Array.isArray(details.milestones)
     ? details.milestones.filter((item): item is ServiceMilestone => {
@@ -53,7 +64,7 @@ function serviceDetailsNotes(value: unknown): string[] {
     optionalStringField(details.exclusions) ? `สิ่งที่ไม่รวมในราคา: ${String(details.exclusions).trim()}` : null,
     optionalStringField(details.duration) ? `ระยะเวลาดำเนินงาน: ${String(details.duration).trim()}` : null,
     optionalStringField(details.warranty) ? `การรับประกัน: ${String(details.warranty).trim()}` : null,
-    typeof details.depositPercent === 'number' ? `มัดจำก่อนเริ่มงาน: ${details.depositPercent}%` : null,
+    depositLine,
     typeof details.revisionRounds === 'number' ? `แก้ไขงานได้: ${details.revisionRounds} รอบ` : null,
     optionalStringField(details.revisionTerms) ? `เงื่อนไขแก้ไขงาน: ${String(details.revisionTerms).trim()}` : null,
     optionalStringField(details.contractDuration) ? `ระยะสัญญา: ${String(details.contractDuration).trim()}` : null,
@@ -104,7 +115,7 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
   const seller = objectRecord(quotation.seller);
   const documentPreferences = objectRecord(seller.documentPreferences);
   const notes = [
-    ...(quotation.kind !== 'general' ? serviceDetailsNotes(quotation.serviceDetails) : []),
+    ...(quotation.kind !== 'general' ? serviceDetailsNotes(quotation.serviceDetails, quotation.total) : []),
     ...(quotation.kind === 'boq_contract' ? boqSummaryNotes(quotation.items) : []),
     quotation.notes,
     quotation.deliveryTerms ? `เงื่อนไขการส่งของ: ${quotation.deliveryTerms}` : null,
@@ -157,6 +168,7 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
       : null,
     feeLabel: quotation.feeLabel,
     feePercent: quotation.feePercent,
+    whtRate: quotation.whtRate,
     total: quotation.total,
     notes: notes || null,
     paymentMethod: quotation.paymentTerms,

@@ -59,6 +59,7 @@ export interface PdfInvoiceData {
   feeAmount?: number | null; // management / agency fee added on top of subtotal, before VAT (agency quotations)
   feeLabel?: string | null; // label for the fee row, e.g. "ค่าบริหารงาน" / "Agency fee"
   feePercent?: number | null; // the percent used to derive feeAmount, shown next to the label
+  whtRate?: string | null; // "1"|"3"|"5" — informational WHT estimate; shows หัก ณ ที่จ่าย + net payable, does not change total
   total: number;
   isPaid?: boolean | null; // suppresses the "scan to pay" PromptPay QR when already settled
   promptPayId?: string | null; // the bank account selected on THIS document; QR uses it when it matches a company account

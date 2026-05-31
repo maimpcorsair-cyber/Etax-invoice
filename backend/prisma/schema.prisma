@@ -737,6 +737,11 @@ model Quotation {
   feePercent     Float?
   feeLabel       String?
   total          Float
+  // Optional withholding-tax estimate shown on the quotation (informational —
+  // WHT does not change `total`; it is withheld by the buyer at payment).
+  // "1" | "3" | "5" (%). Base is the pre-VAT service value (subtotal + fee).
+  // Carried into Invoice.whtRate on convert-to-invoice.
+  whtRate        String? @map("wht_rate")
 
   notes         String?
   paymentTerms  String? // เงื่อนไขการชำระเงิน — placeholder string ที่ขึ้นบน PDF

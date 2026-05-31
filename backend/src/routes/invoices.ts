@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
@@ -24,6 +25,17 @@ import {
 } from '../services/accessPolicyService';
 
 export const invoicesRouter = Router();
+
+// When an invoice created from a quotation is cancelled, release the source
+// quotation from 'converted' back to 'accepted' so it can be re-converted.
+// Without this the quotation is stuck — convert-to-invoice refuses a
+// 'converted' quotation, leaving no way to re-bill it.
+async function releaseSourceQuotation(tx: Prisma.TransactionClient, invoiceId: string, companyId: string) {
+  await tx.quotation.updateMany({
+    where: { convertedToInvoiceId: invoiceId, companyId, status: 'converted' },
+    data: { status: 'accepted', convertedToInvoiceId: null, convertedAt: null },
+  });
+}
 
 const itemSchema = z.object({
   productId: z.string().optional(),
@@ -1236,6 +1248,7 @@ invoicesRouter.delete('/:id', requireRole('admin'), async (req, res) => {
       // Reverse inventory impact so the stock ledger reflects only
       // documents that still exist as billable.
       await reverseStockMovementsFor(tx, 'invoice', invoice.id, req.user!.userId);
+      await releaseSourceQuotation(tx, invoice.id, req.user!.companyId);
       return null;
     });
 
@@ -1283,7 +1296,7 @@ invoicesRouter.post('/:id/cancel', requireRole('admin', 'super_admin', 'accounta
     // Draft invoice — just cancel locally, no RD call needed
     if (invoice.status === 'draft') {
       const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-        return tx.invoice.update({
+        const u = await tx.invoice.update({
           where: { id: invoice.id },
           data: {
             status: 'cancelled',
@@ -1292,6 +1305,8 @@ invoicesRouter.post('/:id/cancel', requireRole('admin', 'super_admin', 'accounta
             cancelReason,
           },
         });
+        await releaseSourceQuotation(tx, invoice.id, req.user!.companyId);
+        return u;
       });
 
       await auditLog({
@@ -1322,7 +1337,7 @@ invoicesRouter.post('/:id/cancel', requireRole('admin', 'super_admin', 'accounta
       );
 
       const updated = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
-        return tx.invoice.update({
+        const u = await tx.invoice.update({
           where: { id: invoice.id },
           data: {
             status: 'cancelled',
@@ -1331,6 +1346,8 @@ invoicesRouter.post('/:id/cancel', requireRole('admin', 'super_admin', 'accounta
             cancelReason,
           },
         });
+        await releaseSourceQuotation(tx, invoice.id, req.user!.companyId);
+        return u;
       });
 
       await auditLog({

@@ -85,6 +85,7 @@ interface FormState {
   discountAmount: number;
   feePercent: number;
   feeLabel: string;
+  whtRate: '' | '1' | '3' | '5';
   notes: string;
   paymentTerms: string;
   deliveryTerms: string;
@@ -190,6 +191,7 @@ export default function QuotationBuilder() {
     discountAmount: 0,
     feePercent: 0,
     feeLabel: '',
+    whtRate: '',
     notes: '',
     paymentTerms: 'ชำระภายใน 30 วันหลังได้รับใบกำกับภาษี',
     deliveryTerms: '',
@@ -267,6 +269,7 @@ export default function QuotationBuilder() {
             discountAmount: q.discountAmount,
             feePercent: q.feePercent ?? 0,
             feeLabel: q.feeLabel ?? '',
+            whtRate: (q.whtRate as FormState['whtRate']) ?? '',
             notes: q.notes ?? '',
             paymentTerms: q.paymentTerms ?? '',
             deliveryTerms: q.deliveryTerms ?? '',
@@ -287,8 +290,11 @@ export default function QuotationBuilder() {
     const feeVat = +(feeAmount * 0.07).toFixed(2);
     const vatAmount = +(itemVat + feeVat).toFixed(2);
     const total = +(subtotal + feeAmount + vatAmount - form.discountAmount).toFixed(2);
-    return { lines, subtotal, feeAmount, vatAmount, total };
-  }, [form.items, form.discountAmount, form.feePercent]);
+    const whtRateNum = form.whtRate ? parseFloat(form.whtRate) : 0;
+    const whtAmount = whtRateNum > 0 ? +(((subtotal + feeAmount) * whtRateNum) / 100).toFixed(2) : 0;
+    const netPayable = +(total - whtAmount).toFixed(2);
+    return { lines, subtotal, feeAmount, vatAmount, total, whtAmount, netPayable };
+  }, [form.items, form.discountAmount, form.feePercent, form.whtRate]);
   const milestoneTotal = useMemo(
     () => +form.serviceDetails.milestones.reduce((sum, milestone) => sum + (Number(milestone.amount) || 0), 0).toFixed(2),
     [form.serviceDetails.milestones],
@@ -427,6 +433,7 @@ export default function QuotationBuilder() {
         discountAmount: Number(form.discountAmount),
         feePercent: form.feePercent > 0 ? Number(form.feePercent) : null,
         feeLabel: form.feePercent > 0 ? (form.feeLabel.trim() || null) : null,
+        whtRate: form.whtRate || null,
         notes: form.notes || null,
         paymentTerms: form.paymentTerms || null,
         deliveryTerms: form.deliveryTerms || null,
@@ -1374,6 +1381,26 @@ export default function QuotationBuilder() {
             <span>{isThai ? 'ยอดสุทธิ' : 'Total'}</span>
             <span className="text-indigo-700">{formatCurrency(totals.total)}</span>
           </div>
+          <div className="flex justify-between items-center pt-1">
+            <span className="text-gray-500">{isThai ? 'หัก ณ ที่จ่าย' : 'Withholding tax'}</span>
+            <select
+              value={form.whtRate}
+              onChange={(e) => setForm({ ...form, whtRate: e.target.value as FormState['whtRate'] })}
+              className="input-field text-sm w-32"
+              disabled={!editable}
+            >
+              <option value="">{isThai ? 'ไม่หัก' : 'None'}</option>
+              <option value="1">1% {isThai ? '(ขนส่ง)' : '(transport)'}</option>
+              <option value="3">3% {isThai ? '(บริการ)' : '(service)'}</option>
+              <option value="5">5% {isThai ? '(เช่า)' : '(rental)'}</option>
+            </select>
+          </div>
+          {totals.whtAmount > 0 && (
+            <>
+              <div className="flex justify-between text-amber-700 text-sm"><span>{isThai ? `หัก ณ ที่จ่าย (${form.whtRate}%)` : `WHT (${form.whtRate}%)`}</span><span>-{formatCurrency(totals.whtAmount)}</span></div>
+              <div className="flex justify-between font-semibold"><span>{isThai ? 'ยอดชำระสุทธิ' : 'Net payable'}</span><span>{formatCurrency(totals.netPayable)}</span></div>
+            </>
+          )}
         </div>
       </div>
 

@@ -80,6 +80,8 @@ const quotationCreateSchema = z.object({
   // Management / agency fee added on top of the item subtotal, before VAT.
   feePercent: z.number().min(0).max(100).optional().nullable(),
   feeLabel: z.string().trim().max(80).optional().nullable(),
+  // Informational withholding-tax estimate ("1" | "3" | "5" %).
+  whtRate: z.enum(['1', '3', '5']).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
   paymentTerms: z.string().max(500).optional().nullable(),
   deliveryTerms: z.string().max(500).optional().nullable(),
@@ -304,6 +306,7 @@ quotationsRouter.post('/preview', async (req, res) => {
       discountAmount: body.discountAmount,
       feePercent: body.feePercent ?? null,
       feeLabel: body.feeLabel ?? null,
+      whtRate: body.whtRate ?? null,
       total,
       notes: body.notes ?? null,
       paymentTerms: body.paymentTerms ?? null,
@@ -461,6 +464,7 @@ quotationsRouter.post('/', async (req, res) => {
         discountAmount: body.discountAmount,
         feePercent: body.feePercent ?? null,
         feeLabel: body.feeLabel ?? null,
+        whtRate: body.whtRate ?? null,
         total,
         notes: body.notes ?? null,
         paymentTerms: body.paymentTerms ?? null,
@@ -580,6 +584,7 @@ quotationsRouter.patch('/:id', async (req, res) => {
         ...(body.discountAmount !== undefined ? { discountAmount: body.discountAmount } : {}),
         ...(body.feePercent !== undefined ? { feePercent: body.feePercent ?? null } : {}),
         ...(body.feeLabel !== undefined ? { feeLabel: body.feeLabel ?? null } : {}),
+        ...(body.whtRate !== undefined ? { whtRate: body.whtRate ?? null } : {}),
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.paymentTerms !== undefined ? { paymentTerms: body.paymentTerms ?? null } : {}),
         ...(body.deliveryTerms !== undefined ? { deliveryTerms: body.deliveryTerms ?? null } : {}),
@@ -711,6 +716,7 @@ quotationsRouter.post('/:id/convert-to-invoice', async (req, res) => {
           vatAmount: existing.vatAmount,
           discountAmount: existing.discountAmount,
           total: existing.total,
+          whtRate: existing.whtRate,
           notes: existing.notes,
           createdBy: req.user!.userId,
           items: {

@@ -148,6 +148,13 @@ export function buildHtml(data: PdfInvoiceData): string {
     ...(data.dueDate ? [{ label: labels.dueDate, value: isTh ? formatDateTh(data.dueDate) : formatDateEn(data.dueDate) }] : []),
     ...(data.paymentMethod ? [{ label: labels.paymentMethod, value: data.paymentMethod }] : []),
   ];
+  // WHT (หัก ณ ที่จ่าย) — informational. Base is the pre-VAT service value
+  // (subtotal + fee). It does not change `total`; it shows what the buyer
+  // withholds and the resulting net cash to the seller.
+  const whtRateNum = data.whtRate ? parseFloat(data.whtRate) : 0;
+  const whtBase = data.subtotal + (data.feeAmount ?? 0);
+  const whtAmount = whtRateNum > 0 ? +((whtBase * whtRateNum) / 100).toFixed(2) : 0;
+  const whtNetPayable = +(data.total - whtAmount).toFixed(2);
   const isElectronicDocument = data.documentMode === 'electronic';
   const onePageCompact = !customTemplateBlock && data.items.length <= ONE_PAGE_ITEM_LIMIT;
   const documentEyebrow = isQuotation
@@ -486,6 +493,10 @@ export function buildHtml(data: PdfInvoiceData): string {
     border-bottom: none;
   }
   .totals-row.grand strong { color: #ffffff; font-size: 16px; }
+  .totals-row.wht { color: #9a3412; border-top: 1px dashed #e9eff7; }
+  .totals-row.wht strong { color: #9a3412; font-weight: 600; }
+  .totals-row.net { background: #f1f5f9; }
+  .totals-row.net strong { color: #162444; font-size: 14px; }
   .signature-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1046,6 +1057,8 @@ export function buildHtml(data: PdfInvoiceData): string {
           <div class="totals-row"><span>${isTh ? 'รวมก่อน VAT' : 'Sub Total'}</span><strong>${formatCurrency(data.subtotal + data.feeAmount)} THB</strong></div>` : ''}
           <div class="totals-row"><span>${labels.vatTotal}</span><strong>${formatCurrency(data.vatAmount)} THB</strong></div>
           <div class="totals-row grand"><span>${labels.grandTotal}</span><strong>${formatCurrency(data.total)} THB</strong></div>
+          ${whtAmount > 0 ? `<div class="totals-row wht"><span>${isTh ? 'หัก ณ ที่จ่าย' : 'Withholding tax'} (${whtRateNum}%)</span><strong>-${formatCurrency(whtAmount)} THB</strong></div>
+          <div class="totals-row net"><span>${isTh ? 'ยอดชำระสุทธิ' : 'Net payable'}</span><strong>${formatCurrency(whtNetPayable)} THB</strong></div>` : ''}
         </div>
       </div>
 

@@ -319,6 +319,7 @@ export interface Quotation {
   discountAmount: number;
   feePercent?: number | null;
   feeLabel?: string | null;
+  whtRate?: string | null;
   total: number;
   notes?: string | null;
   paymentTerms?: string | null;
