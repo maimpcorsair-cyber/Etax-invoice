@@ -36,12 +36,17 @@ export function formatBankPaymentInfo(account: BankAccountProfile, isThai: boole
 
 export function useDocumentProfile({ token }: Options) {
   const [profile, setProfile] = useState<DocumentProfile>(emptyProfile);
-  const [loading, setLoading] = useState(false);
+  // Starts true: loadProfile runs on mount, and consumers (e.g. the invoice
+  // builder's "apply default signature/bank" effect) gate on loading=false.
+  // If this started false, that effect would fire once against the empty
+  // initial profile and latch its run-once guard before the real profile
+  // arrived — so saved defaults never applied.
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
-    if (!token) return;
+    if (!token) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
