@@ -4,9 +4,9 @@ Last updated: 2026-06-01 (quotation item detail lines)
 
 ## Latest work (2026-06-01)
 
-Quotation item detail lines — ready to deploy:
+Quotation item detail lines — shipped and verified live on prod (`5e8fbcd`):
 - **Multi-line detail per quotation item** — the quotation builder now exposes a textarea under each line-item name for per-item details (scope, model, conditions, notes). The existing `QuotationItem.descriptionTh/descriptionEn` fields are used, so no schema migration is needed.
-- **PDF + customer share rendering** — quotation PDF rows render detail text under the item name and preserve line breaks; public quotation share pages show the same detail. Regression coverage added in `pdfService.test.ts` and `quotationPdfService.test.ts`.
+- **PDF + customer share rendering** — quotation PDF rows render detail text under the item name and preserve line breaks; public quotation share pages show the same detail. Regression coverage added in `pdfService.test.ts` and `quotationPdfService.test.ts`. Verified: GitHub Typecheck + Unit tests + Prod smoke green, Vercel `dpl_WNAmUPx6cDFq8wFsUfXV155dTUSe` Ready + aliased to `etax-invoice.vercel.app`, Render deploy run `26725602268` green, backend `/api/health` 200.
 
 Quotation detail UX polish — ready to deploy:
 - **A4 live preview fit** — quotation detail now renders the right-side live preview inside a scaled A4 frame (794×1123) with a visible zoom percent, matching the actual generated PDF shape instead of a tall free-form iframe.
