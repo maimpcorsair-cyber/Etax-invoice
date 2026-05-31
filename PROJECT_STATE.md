@@ -14,6 +14,8 @@ Remaining gaps closed (`9f39d51`), all verified live on prod:
 - **Deposit baht figures** — `serviceDetailsNotes` now renders "มัดจำ 30% = ฿32,100 (คงเหลือ ฿74,900)" computed from total, not a bare percent.
 - **Re-convert after cancel** — cancelling an invoice (all 4 paths in invoices.ts) now releases its source quotation `converted`→`accepted` + clears convertedToInvoiceId via `releaseSourceQuotation()`. Verified: convert→cancel→quotation accepted→re-convert OK.
 
+**Payment-schedule table** (`69bf0df`) — milestones (service_project / boq_contract) now render as a proper table on the PDF (งวด / รายละเอียด / กำหนดชำระ / จำนวนเงิน + schedule-total row + mismatch warning when sum ≠ total), instead of flattened note text. `extractMilestones` + `PdfInvoiceData.milestones` + `standard.ts` table. Form editor + validation already existed (no frontend change). Verified live: sums-match → no warning; sum 50000 vs 107000 → "ต่างจากยอดสุทธิ 57,000.00".
+
 **Known non-bug (by design):** management/agency fee is always VAT 7% (ค่าบริการ is VATable regardless of underlying items) — correct per Thai law.
 **Flagged for separate fix:** existing WHT-cert calc (`invoices.ts:1052`) computes WHT on VAT-inclusive `total` — non-standard (should be pre-VAT base); left untouched to avoid touching the live cert/ภงด flow.
 Test data left on siamtech demo tenant: several `ทดสอบ`/`PREVIEW` quotations + draft/cancelled invoices (non-draft quotations can't be deleted via API). Demo tenant only.
