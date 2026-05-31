@@ -18,6 +18,7 @@ async function startWorkers() {
     import('./queues/workers/billingRenewalWorker'),
     import('./queues/workers/recurringInvoiceWorker'),
     import('./queues/workers/overdueReminderWorker'),
+    import('./queues/workers/quotationExpiryWorker'),
     import('./queues/workers/dbdOpenDataSyncWorker'),
     import('./queues/workers/lineOcrWorker'),
   ]);

@@ -8,6 +8,7 @@ import { generateInvoiceNumber } from '../services/invoiceService';
 import { buildHtmlForCompany, generatePdfFromHtml } from '../services/pdfService';
 import { buildQuotationPdfData } from '../services/quotationPdfService';
 import { buildQuotationShareUrl, signQuotationShareToken } from '../services/quotationShareToken';
+import { runQuotationExpiry } from '../services/quotationExpiryService';
 
 // ใบเสนอราคา (Quotation) — pre-sale offer document.
 // Not a tax document. No e-Tax submission, no VAT remittance obligation.
@@ -174,6 +175,18 @@ function sellerSnapshotWithTemplate(seller: unknown, templateId: string | null |
 }
 
 // ── List ──────────────────────────────────────────────────────────────
+
+// Force-expire this company's overdue `sent` quotations now, rather than
+// waiting for the nightly cron (quotationExpiryWorker). Company-scoped.
+quotationsRouter.post('/run-expiry', async (req, res) => {
+  try {
+    const expired = await runQuotationExpiry(req.user!.companyId);
+    res.json({ data: { expired } });
+  } catch (err) {
+    logger.error('manual quotation expiry failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to run quotation expiry' });
+  }
+});
 
 quotationsRouter.get('/', async (req, res) => {
   try {
