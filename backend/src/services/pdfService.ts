@@ -12,23 +12,7 @@ import {
   type Language,
 } from './pdfService/utils';
 import { buildHtml } from './pdfService/builders/standard';
-import { buildHtmlCrayon } from './pdfService/builders/crayon';
-import { buildHtmlMinimal } from './pdfService/builders/minimal';
-import { buildHtmlCute } from './pdfService/builders/cute';
-import { buildHtmlProfessional } from './pdfService/builders/professional';
-import { buildHtmlDark } from './pdfService/builders/dark';
-import { buildHtmlAnime } from './pdfService/builders/anime';
-import { buildHtmlMarketplace, MARKETPLACE_TEMPLATE_TOKENS } from './pdfService/builders/marketplace';
-export {
-  buildHtml,
-  buildHtmlCrayon,
-  buildHtmlMinimal,
-  buildHtmlCute,
-  buildHtmlProfessional,
-  buildHtmlDark,
-  buildHtmlAnime,
-  buildHtmlMarketplace,
-};
+export { buildHtml };
 
 export interface PdfInvoiceData {
   invoiceNumber: string;
@@ -231,7 +215,11 @@ async function enrichPromptPayQr(data: PdfInvoiceData, companyId: string): Promi
       select: { documentBankAccounts: true },
     });
     const accounts = Array.isArray(company?.documentBankAccounts) ? (company!.documentBankAccounts as Array<Record<string, unknown>>) : [];
-    const ppAccount = accounts.find((a) => typeof a.promptPayId === 'string' && a.promptPayId.trim().length > 0);
+    const withPromptPay = accounts.filter((a) => typeof a.promptPayId === 'string' && (a.promptPayId as string).trim().length > 0);
+    // Prefer the company's designated default account over array order, so a
+    // company with several PromptPay accounts gets the QR for the one they
+    // marked default rather than whichever happens to be first.
+    const ppAccount = withPromptPay.find((a) => a.isDefault === true) ?? withPromptPay[0];
     if (!ppAccount) return null;
     const target = String(ppAccount.promptPayId).trim();
     const qr = await buildPromptPayQr(target, data.total, data.invoiceNumber);
@@ -270,45 +258,10 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
     promptPayTarget: promptPay?.target ?? null,
   };
 
-  if (mergedData.templateId?.startsWith('builtin:')) {
-    return buildHtml(mergedData);
-  }
-
-  const marketplaceTokens = mergedData.templateId ? MARKETPLACE_TEMPLATE_TOKENS[mergedData.templateId] : null;
-  if (marketplaceTokens) {
-    return buildHtmlMarketplace(mergedData, marketplaceTokens);
-  }
-
-  // Route to specialized builders
-  if (mergedData.templateId?.startsWith('builtin:minimal-')) {
-    const variant = mergedData.templateId.replace('builtin:minimal-', '');
-    return buildHtmlMinimal(mergedData, variant);
-  }
-
-  if (mergedData.templateId?.startsWith('builtin:cute-')) {
-    const variant = mergedData.templateId.replace('builtin:cute-', '');
-    return buildHtmlCute(mergedData, variant);
-  }
-
-  if (mergedData.templateId?.startsWith('builtin:pro-')) {
-    const variant = mergedData.templateId.replace('builtin:pro-', '');
-    return buildHtmlProfessional(mergedData, variant);
-  }
-
-  if (mergedData.templateId === 'builtin:crayon') {
-    return buildHtmlCrayon(mergedData);
-  }
-
-  if (mergedData.templateId?.startsWith('builtin:dark-')) {
-    const variant = mergedData.templateId.replace('builtin:dark-', '');
-    return buildHtmlDark(mergedData, variant);
-  }
-
-  if (mergedData.templateId?.startsWith('builtin:anime-')) {
-    const variant = mergedData.templateId.replace('builtin:anime-', '');
-    return buildHtmlAnime(mergedData, variant);
-  }
-
+  // Every template — built-in or custom — renders through the single formal
+  // base builder, themed per templateId via resolveDocumentTheme. (The old
+  // per-variant builders were unreachable behind this early return and have
+  // been removed.)
   return buildHtml(mergedData);
 }
 

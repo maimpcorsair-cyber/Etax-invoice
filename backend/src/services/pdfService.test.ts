@@ -15,16 +15,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildHtml,
-  buildHtmlMinimal,
-  buildHtmlCute,
-  buildHtmlProfessional,
-  buildHtmlDark,
-  buildHtmlAnime,
-  buildHtmlCrayon,
-  buildHtmlMarketplace,
   type PdfInvoiceData,
 } from './pdfService';
-import { MARKETPLACE_TEMPLATE_TOKENS } from './pdfService/builders/marketplace';
 
 const FIXTURE: PdfInvoiceData = {
   invoiceNumber: 'IV-2026-000128',
@@ -91,14 +83,16 @@ const FIXTURE: PdfInvoiceData = {
 
 // Each entry is a name + a () => string callable so we don't fight TS
 // over union types of (data) vs (data, variant) signatures.
+// All built-in templates render through the single formal base builder,
+// themed per templateId. Exercise a representative theme from each family
+// (professional / cute / dark / anime) to confirm the base renders them all.
 const builders: Array<[name: string, render: (d: PdfInvoiceData) => string]> = [
-  ['buildHtml (standard)', (d) => buildHtml(d)],
-  ['buildHtmlMinimal', (d) => buildHtmlMinimal(d, 'minimal-white')],
-  ['buildHtmlCute', (d) => buildHtmlCute(d, 'cute-pink')],
-  ['buildHtmlProfessional', (d) => buildHtmlProfessional(d, 'pro-blue-modern')],
-  ['buildHtmlDark', (d) => buildHtmlDark(d, 'dark-king')],
-  ['buildHtmlAnime', (d) => buildHtmlAnime(d, 'anime-ink')],
-  ['buildHtmlCrayon', (d) => buildHtmlCrayon(d)],
+  ['standard', (d) => buildHtml(d)],
+  ['minimal-white', (d) => buildHtml({ ...d, templateId: 'builtin:minimal-white' })],
+  ['cute-pink', (d) => buildHtml({ ...d, templateId: 'builtin:cute-pink' })],
+  ['pro-blue-modern', (d) => buildHtml({ ...d, templateId: 'builtin:pro-blue-modern' })],
+  ['dark-king', (d) => buildHtml({ ...d, templateId: 'builtin:dark-king' })],
+  ['anime-tokyo', (d) => buildHtml({ ...d, templateId: 'builtin:anime-tokyo' })],
 ];
 
 for (const [name, render] of builders) {
@@ -228,19 +222,20 @@ test('built-in quotation template keeps quotation copy and applies the selected 
   assert.ok(html.includes('ใช้ได้ถึง'), 'quotation template should keep valid-until wording');
 });
 
-test('marketplace T01 keeps payment details but hides missing due date', () => {
-  const html = buildHtmlMarketplace({
+test('built-in template T01 keeps payment details but hides missing due date', () => {
+  const html = buildHtml({
     ...FIXTURE,
+    templateId: 'builtin:minimal-white',
     type: 'tax_invoice_receipt',
     dueDate: null,
     documentMode: 'ordinary',
     bankPaymentInfo: 'ธนาคาร: Kbank\nเลขที่บัญชี: 0231367705',
     promptPayQrDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
     promptPayTarget: '0819918896',
-  }, MARKETPLACE_TEMPLATE_TOKENS['builtin:minimal-white']);
+  });
 
-  assert.ok(html.includes('PromptPay'), 'marketplace template should render PromptPay payment details');
-  assert.ok(html.includes('0231367705'), 'marketplace template should keep bank transfer details');
+  assert.ok(html.includes('PromptPay'), 'template should render PromptPay payment details');
+  assert.ok(html.includes('0231367705'), 'template should keep bank transfer details');
   assert.ok(!html.includes('ครบกำหนด</div><div class="meta-val">-'), 'T01 should not render a blank due-date row');
 });
 
