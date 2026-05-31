@@ -44,6 +44,8 @@ export interface PdfInvoiceData {
   items: {
     nameTh: string;
     nameEn?: string | null;
+    descriptionTh?: string | null;
+    descriptionEn?: string | null;
     quantity: number;
     unit: string;
     unitPrice: number;

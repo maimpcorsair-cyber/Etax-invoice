@@ -1,8 +1,12 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (quotation detail UI + A4 live preview)
+Last updated: 2026-06-01 (quotation item detail lines)
 
 ## Latest work (2026-06-01)
+
+Quotation item detail lines — ready to deploy:
+- **Multi-line detail per quotation item** — the quotation builder now exposes a textarea under each line-item name for per-item details (scope, model, conditions, notes). The existing `QuotationItem.descriptionTh/descriptionEn` fields are used, so no schema migration is needed.
+- **PDF + customer share rendering** — quotation PDF rows render detail text under the item name and preserve line breaks; public quotation share pages show the same detail. Regression coverage added in `pdfService.test.ts` and `quotationPdfService.test.ts`.
 
 Quotation detail UX polish — ready to deploy:
 - **A4 live preview fit** — quotation detail now renders the right-side live preview inside a scaled A4 frame (794×1123) with a visible zoom percent, matching the actual generated PDF shape instead of a tall free-form iframe.

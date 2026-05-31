@@ -54,6 +54,8 @@ interface QuotationShareData {
     sectionTitle?: string | null;
     nameTh: string;
     nameEn: string | null;
+    descriptionTh?: string | null;
+    descriptionEn?: string | null;
     quantity: number;
     unit: string;
     unitPrice: number;
@@ -228,6 +230,9 @@ export default function QuotationShare() {
                     <p className="mb-2 border-b border-slate-100 pb-2 text-xs font-semibold text-slate-500">{item.sectionTitle}</p>
                   )}
                   <p className="font-medium text-slate-900">{item.nameTh}</p>
+                  {item.descriptionTh && (
+                    <p className="mt-1 whitespace-pre-line text-xs leading-5 text-slate-500">{item.descriptionTh}</p>
+                  )}
                   <p className="text-xs text-slate-500">{item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}</p>
                 </div>
                 <p className="font-semibold text-slate-900 sm:text-right">{formatCurrency(item.totalAmount)}</p>

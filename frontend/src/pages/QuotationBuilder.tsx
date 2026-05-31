@@ -30,6 +30,8 @@ interface ItemDraft {
   sectionTitle?: string | null;
   nameTh: string;
   nameEn?: string | null;
+  descriptionTh?: string | null;
+  descriptionEn?: string | null;
   quantity: number;
   unit: string;
   unitPrice: number;
@@ -39,6 +41,7 @@ interface ItemDraft {
 
 const blankItem: ItemDraft = {
   nameTh: '',
+  descriptionTh: '',
   quantity: 1,
   unit: 'รายการ',
   unitPrice: 0,
@@ -262,6 +265,8 @@ export default function QuotationBuilder() {
               sectionTitle: it.sectionTitle ?? '',
               nameTh: it.nameTh,
               nameEn: it.nameEn ?? null,
+              descriptionTh: it.descriptionTh ?? '',
+              descriptionEn: it.descriptionEn ?? null,
               quantity: it.quantity,
               unit: it.unit,
               unitPrice: it.unitPrice,
@@ -440,6 +445,8 @@ export default function QuotationBuilder() {
           sectionTitle: form.kind === 'boq_contract' ? it.sectionTitle || null : null,
           nameTh: it.nameTh,
           nameEn: it.nameEn ?? null,
+          descriptionTh: it.descriptionTh?.trim() || null,
+          descriptionEn: it.descriptionEn?.trim() || null,
           quantity: Number(it.quantity),
           unit: it.unit,
           unitPrice: Number(it.unitPrice),
@@ -1314,6 +1321,24 @@ export default function QuotationBuilder() {
                       <input value={item.sectionTitle ?? ''} onChange={(e) => setItem(idx, { sectionTitle: e.target.value })} placeholder={isThai ? 'หมวดงาน เช่น งานไฟฟ้า' : 'Section e.g. electrical'} className="input-field mb-2 text-xs" disabled={!editable} />
                     )}
                     <input value={item.nameTh} onChange={(e) => setItem(idx, { nameTh: e.target.value })} placeholder={isThai ? 'ชื่อรายการ' : 'Item name'} className="input-field text-sm" disabled={!editable} />
+                    <textarea
+                      value={item.descriptionTh ?? ''}
+                      onChange={(e) => setItem(idx, { descriptionTh: e.target.value })}
+                      placeholder={isThai ? 'รายละเอียดบรรทัดย่อย เช่น ขอบเขต รุ่น เงื่อนไข หรือหมายเหตุของรายการนี้' : 'Line details such as scope, model, conditions, or notes'}
+                      className="input-field mt-2 min-h-[70px] resize-y text-xs leading-5"
+                      rows={2}
+                      disabled={!editable}
+                    />
+                    {form.language !== 'th' && (
+                      <textarea
+                        value={item.descriptionEn ?? ''}
+                        onChange={(e) => setItem(idx, { descriptionEn: e.target.value })}
+                        placeholder={isThai ? 'รายละเอียดภาษาอังกฤษ (ถ้าต้องใช้ในเอกสารสองภาษา)' : 'English line details'}
+                        className="input-field mt-2 min-h-[58px] resize-y text-xs leading-5"
+                        rows={2}
+                        disabled={!editable}
+                      />
+                    )}
                   </td>
                   <td className="py-2 pr-2">
                     <input type="number" min="0" step="0.01" value={item.quantity} onChange={(e) => setItem(idx, { quantity: Number(e.target.value) })} className="input-field text-sm text-right" disabled={!editable} />

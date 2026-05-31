@@ -75,7 +75,7 @@ test('buildQuotationPdfData forwards quotation template preference from seller s
       productId: null,
       nameTh: 'ค่าบริการ',
       nameEn: null,
-      descriptionTh: null,
+      descriptionTh: 'ออกแบบหน้าแรก\nรองรับมือถือและเดสก์ท็อป',
       descriptionEn: null,
       quantity: 1,
       unit: 'รายการ',
@@ -93,8 +93,9 @@ test('buildQuotationPdfData forwards quotation template preference from seller s
   assert.equal(pdfData.type, 'quotation');
   assert.equal(pdfData.templateId, 'builtin:minimal-sans');
   assert.equal(pdfData.documentMode, 'ordinary');
+  assert.equal(pdfData.items[0].descriptionTh, 'ออกแบบหน้าแรก\nรองรับมือถือและเดสก์ท็อป');
   assert.match(pdfData.notes ?? '', /ขอบเขตงาน: ออกแบบเว็บไซต์บริษัท/);
-  assert.match(pdfData.notes ?? '', /งวดงาน:/);
+  assert.equal(pdfData.milestones?.[0]?.title, 'ส่งแบบร่าง');
 });
 
 test('buildQuotationPdfData renders BOQ section subtotals and structured terms', () => {

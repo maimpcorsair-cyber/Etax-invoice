@@ -49,6 +49,8 @@ const FIXTURE: PdfInvoiceData = {
     {
       nameTh: 'พัฒนาเว็บไซต์',
       nameEn: 'Website development',
+      descriptionTh: 'ออกแบบ UX/UI\nรองรับมือถือและเดสก์ท็อป',
+      descriptionEn: 'UX/UI design\nResponsive desktop and mobile',
       quantity: 1,
       unit: 'งาน',
       unitPrice: 30_000,
@@ -188,6 +190,8 @@ test('standard quotation document uses quotation copy and valid-until wording', 
 
   assert.ok(html.includes('ใบเสนอราคา'), 'quotation PDF should use quotation title');
   assert.ok(html.includes('Sales Quotation'), 'quotation PDF should identify itself as a quotation');
+  assert.ok(html.includes('ออกแบบ UX/UI'), 'quotation PDF should render line-item detail text');
+  assert.ok(html.includes('รองรับมือถือและเดสก์ท็อป'), 'quotation PDF should preserve multi-line item details');
   assert.ok(html.includes('ใช้ได้ถึง'), 'quotation PDF should label the expiry date as valid until');
   assert.ok(html.includes('เงื่อนไขการชำระเงิน'), 'quotation PDF should label payment terms clearly');
 });

@@ -4,6 +4,15 @@ import type { PdfInvoiceData } from '../../pdfService';
 
 const ONE_PAGE_ITEM_LIMIT = 8;
 
+function renderItemDetail(value?: string | null): string {
+  return (value ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<span>${escapeHtml(line)}</span>`)
+    .join('');
+}
+
 export function buildHtml(data: PdfInvoiceData): string {
   const isTh = data.language === 'th';
   const isEn = data.language === 'en';
@@ -24,12 +33,14 @@ export function buildHtml(data: PdfInvoiceData): string {
   const itemRows = data.items.map((item, idx) => {
     const nameThEsc = escapeHtml(item.nameTh ?? '');
     const nameEnEsc = item.nameEn ? escapeHtml(item.nameEn) : '';
+    const detailTh = renderItemDetail(item.descriptionTh);
+    const detailEn = renderItemDetail(item.descriptionEn);
     const unitEsc = escapeHtml(item.unit ?? '');
     const nameLine = isBoth
-      ? `<span class="item-name">${nameThEsc}</span>${nameEnEsc ? `<span class="item-subname">${nameEnEsc}</span>` : ''}`
+      ? `<span class="item-name">${nameThEsc}</span>${nameEnEsc ? `<span class="item-subname">${nameEnEsc}</span>` : ''}${detailTh || detailEn ? `<span class="item-detail">${detailTh}${detailEn ? `<span class="item-detail-en">${detailEn}</span>` : ''}</span>` : ''}`
       : isTh
-        ? `<span class="item-name">${nameThEsc}</span>`
-        : `<span class="item-name">${nameEnEsc || nameThEsc}</span>`;
+        ? `<span class="item-name">${nameThEsc}</span>${detailTh ? `<span class="item-detail">${detailTh}</span>` : ''}`
+        : `<span class="item-name">${nameEnEsc || nameThEsc}</span>${(detailEn || detailTh) ? `<span class="item-detail">${detailEn || detailTh}</span>` : ''}`;
     return `
       <tr>
         <td style="text-align:center">${idx + 1}</td>
@@ -477,6 +488,21 @@ export function buildHtml(data: PdfInvoiceData): string {
   tbody tr:last-child td { border-bottom: none; }
   .item-name { font-weight: 600; color: #162444; line-height: 1.45; }
   .item-subname { display: block; margin-top: 2px; font-size: 10.5px; color: #72809a; }
+  .item-detail {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #536176;
+    white-space: normal;
+  }
+  .item-detail span {
+    display: block;
+  }
+  .item-detail-en {
+    margin-top: 2px;
+    color: #72809a;
+  }
   .summary-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;

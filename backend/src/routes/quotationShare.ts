@@ -80,6 +80,8 @@ quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
         sectionTitle: item.sectionTitle,
         nameTh: item.nameTh,
         nameEn: item.nameEn,
+        descriptionTh: item.descriptionTh,
+        descriptionEn: item.descriptionEn,
         quantity: item.quantity,
         unit: item.unit,
         unitPrice: item.unitPrice,

@@ -165,6 +165,8 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
     items: quotation.items.map((item) => ({
       nameTh: item.sectionTitle ? `${item.sectionTitle} — ${item.nameTh}` : item.nameTh,
       nameEn: item.sectionTitle ? `${item.sectionTitle} — ${item.nameEn ?? item.nameTh}` : item.nameEn,
+      descriptionTh: item.descriptionTh,
+      descriptionEn: item.descriptionEn,
       quantity: item.quantity,
       unit: item.unit,
       unitPrice: item.unitPrice,
