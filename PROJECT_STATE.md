@@ -9,7 +9,14 @@ Quotation system hardening — shipped and verified live on prod:
 - **Convert-to-invoice fee carry** (`b805d81`) — convert now materializes the fee as a synthetic VATable line item and lifts invoice subtotal to (item subtotal + fee), so subtotal+VAT reconciles to total (previously the fee vanished → invoice totals didn't balance, would fail e-Tax XML). Verified live: 2-line invoice 415150+29060.50=444210.50.
 - **Auto-expiry** (`3b8347d`) — `quotationExpiryWorker` nightly cron (00:05) flips `sent`→`expired` where `validUntil<now` (draft/accepted never expire). Core in side-effect-free `quotationExpiryService.runQuotationExpiry()`. Manual trigger `POST /api/quotations/run-expiry` (company-scoped) verified live: sent→run→expired. Cron activates via worker `autoDeployTrigger: commit`.
 
-Known small gaps (not blocking): fee assumes 7% VAT even if items are exempt; deposit/milestones are note-text not a computed schedule; no WHT; deleting an invoice leaves its source quotation stuck in `converted`. Test data left on siamtech demo tenant: 1 `converted` + 1 `expired` quotation (can't delete non-draft via API).
+Remaining gaps closed (`9f39d51`), all verified live on prod:
+- **WHT estimate** — `Quotation.whtRate` ('1'|'3'|'5'%) + migration `20260601_quotation_wht_rate`. Informational, does not change total; shows "หัก ณ ที่จ่าย (X%)" + "ยอดชำระสุทธิ" below grand total in `standard.ts`. Base = pre-VAT (subtotal+fee). Carried into `Invoice.whtRate` on convert. Verified: 415150 × 3% = 12454.50 → net 431756.00.
+- **Deposit baht figures** — `serviceDetailsNotes` now renders "มัดจำ 30% = ฿32,100 (คงเหลือ ฿74,900)" computed from total, not a bare percent.
+- **Re-convert after cancel** — cancelling an invoice (all 4 paths in invoices.ts) now releases its source quotation `converted`→`accepted` + clears convertedToInvoiceId via `releaseSourceQuotation()`. Verified: convert→cancel→quotation accepted→re-convert OK.
+
+**Known non-bug (by design):** management/agency fee is always VAT 7% (ค่าบริการ is VATable regardless of underlying items) — correct per Thai law.
+**Flagged for separate fix:** existing WHT-cert calc (`invoices.ts:1052`) computes WHT on VAT-inclusive `total` — non-standard (should be pre-VAT base); left untouched to avoid touching the live cert/ภงด flow.
+Test data left on siamtech demo tenant: several `ทดสอบ`/`PREVIEW` quotations + draft/cancelled invoices (non-draft quotations can't be deleted via API). Demo tenant only.
 
 Short current-state snapshot for Codex, Claude, and other agents. Start from `AI_HANDOFF.md`, then use this file for the latest status. Full historical notes were archived to `docs/state/PROJECT_HISTORY_2026-05.md`.
 
