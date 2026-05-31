@@ -1352,4 +1352,34 @@ const catalogCss = `
 @media (min-width: 761px) and (max-width: 1180px) {
   .catalogGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ── Unified formal preview ──────────────────────────────────────────
+   The production PDF renders every template on a clean white "paper" with
+   a thin accent rule and accent-only theming (no mascots / wallpaper). The
+   picker thumbnails must reflect that, otherwise customers pick by a look
+   they will not receive. These overrides formalize all thumbnails: white
+   paper + accent-tinted page wash, a 3px solid accent top rule, accent
+   table header, and no decorative mascots. The accent color stays the
+   per-template identity. */
+.invoiceTemplate.invoiceTemplate-structured {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, #fff) 0%, #fff 55%) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, #e2e8f0) !important;
+  position: relative;
+}
+.invoiceTemplate .templateAssets,
+.invoiceTemplate .invoiceGlow,
+.invoiceTemplate .decorSvg { display: none !important; }
+.invoiceTemplate-structured::before { content: none !important; background: none !important; }
+.invoiceTemplate-structured::after {
+  content: '' !important; display: block !important;
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent) !important; background-image: none !important;
+  border-radius: 14px 14px 0 0;
+}
+.invoiceTemplate-structured .invoiceMeta > div,
+.invoiceTemplate-structured .invoiceTable,
+.invoiceTemplate-structured .totalCard { background: #fff !important; }
+.invoiceTemplate-structured .tableHead { background: var(--accent) !important; color: #fff !important; }
+.invoiceTemplate-structured .logoMark { background: var(--accent) !important; color: #fff !important; }
+.invoiceTemplate-structured .totalCard strong:last-of-type { color: var(--accent) !important; }
 `;
