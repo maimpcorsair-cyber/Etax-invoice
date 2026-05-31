@@ -152,6 +152,11 @@ export function buildQuotationPdfData(quotation: QuotationPdfRow): PdfInvoiceDat
     subtotal: quotation.subtotal,
     vatAmount: quotation.vatAmount,
     discountAmount: quotation.discountAmount,
+    feeAmount: quotation.feePercent && quotation.feePercent > 0
+      ? +((quotation.subtotal * quotation.feePercent) / 100).toFixed(2)
+      : null,
+    feeLabel: quotation.feeLabel,
+    feePercent: quotation.feePercent,
     total: quotation.total,
     notes: notes || null,
     paymentMethod: quotation.paymentTerms,

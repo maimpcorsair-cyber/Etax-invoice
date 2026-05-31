@@ -76,6 +76,9 @@ const quotationCreateSchema = z.object({
   templateId: z.string().max(120).optional().nullable(),
   items: z.array(itemSchema).min(1).max(200),
   discountAmount: z.number().nonnegative().default(0),
+  // Management / agency fee added on top of the item subtotal, before VAT.
+  feePercent: z.number().min(0).max(100).optional().nullable(),
+  feeLabel: z.string().trim().max(80).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
   paymentTerms: z.string().max(500).optional().nullable(),
   deliveryTerms: z.string().max(500).optional().nullable(),
@@ -100,6 +103,25 @@ function computeLineTotals(input: z.infer<typeof itemSchema>) {
   const vatAmount = +(amount * vatRate).toFixed(2);
   const totalAmount = +(amount + vatAmount).toFixed(2);
   return { amount: +amount.toFixed(2), vatAmount, totalAmount };
+}
+
+// Roll up quotation totals including an optional management/agency fee added
+// on top of the item subtotal, before VAT. The fee itself is a VATable
+// service (vat7), so VAT = per-item VAT + fee VAT — which equals VAT on
+// (subtotal + fee) when every line is vat7, matching agency quotations.
+function computeQuotationTotals(
+  items: Array<{ amount: number; vatAmount: number }>,
+  discountAmount: number,
+  feePercent?: number | null,
+) {
+  const subtotal = +items.reduce((s, i) => s + i.amount, 0).toFixed(2);
+  const itemVat = items.reduce((s, i) => s + i.vatAmount, 0);
+  const pct = feePercent && feePercent > 0 ? feePercent : 0;
+  const feeAmount = +((subtotal * pct) / 100).toFixed(2);
+  const feeVat = +(feeAmount * 0.07).toFixed(2);
+  const vatAmount = +(itemVat + feeVat).toFixed(2);
+  const total = +(subtotal + feeAmount + vatAmount - discountAmount).toFixed(2);
+  return { subtotal, feeAmount, vatAmount, total };
 }
 
 // ── Quotation number ──────────────────────────────────────────────────
@@ -254,9 +276,7 @@ quotationsRouter.post('/preview', async (req, res) => {
       descriptionTh: item.descriptionTh ?? null,
       descriptionEn: item.descriptionEn ?? null,
     }));
-    const subtotal = +enrichedItems.reduce((s, i) => s + i.amount, 0).toFixed(2);
-    const vatAmount = +enrichedItems.reduce((s, i) => s + i.vatAmount, 0).toFixed(2);
-    const total = +(subtotal + vatAmount - body.discountAmount).toFixed(2);
+    const { subtotal, vatAmount, total } = computeQuotationTotals(enrichedItems, body.discountAmount, body.feePercent);
 
     const previewQuotation = {
       quotationNumber: 'PREVIEW-001',
@@ -405,9 +425,7 @@ quotationsRouter.post('/', async (req, res) => {
       const totals = computeLineTotals(item);
       return { ...item, ...totals };
     });
-    const subtotal = +enrichedItems.reduce((s, i) => s + i.amount, 0).toFixed(2);
-    const vatAmount = +enrichedItems.reduce((s, i) => s + i.vatAmount, 0).toFixed(2);
-    const total = +(subtotal + vatAmount - body.discountAmount).toFixed(2);
+    const { subtotal, vatAmount, total } = computeQuotationTotals(enrichedItems, body.discountAmount, body.feePercent);
 
     const quotationNumber = await generateQuotationNumber(req.user!.companyId);
 
@@ -426,6 +444,8 @@ quotationsRouter.post('/', async (req, res) => {
         subtotal,
         vatAmount,
         discountAmount: body.discountAmount,
+        feePercent: body.feePercent ?? null,
+        feeLabel: body.feeLabel ?? null,
         total,
         notes: body.notes ?? null,
         paymentTerms: body.paymentTerms ?? null,
@@ -503,10 +523,9 @@ quotationsRouter.patch('/:id', async (req, res) => {
         const totals = computeLineTotals(item);
         return { ...item, ...totals };
       });
-      const subtotal = +enrichedItems.reduce((s, i) => s + i.amount, 0).toFixed(2);
-      const vatAmount = +enrichedItems.reduce((s, i) => s + i.vatAmount, 0).toFixed(2);
       const discount = body.discountAmount ?? existing.discountAmount;
-      const total = +(subtotal + vatAmount - discount).toFixed(2);
+      const feePercent = body.feePercent !== undefined ? body.feePercent : existing.feePercent;
+      const { subtotal, vatAmount, total } = computeQuotationTotals(enrichedItems, discount, feePercent);
       recomputedTotals = { subtotal, vatAmount, total };
       itemsUpdate = {
         deleteMany: {},
@@ -544,6 +563,8 @@ quotationsRouter.patch('/:id', async (req, res) => {
             ? { serviceDetails: body.serviceDetails ?? Prisma.JsonNull }
             : {}),
         ...(body.discountAmount !== undefined ? { discountAmount: body.discountAmount } : {}),
+        ...(body.feePercent !== undefined ? { feePercent: body.feePercent ?? null } : {}),
+        ...(body.feeLabel !== undefined ? { feeLabel: body.feeLabel ?? null } : {}),
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.paymentTerms !== undefined ? { paymentTerms: body.paymentTerms ?? null } : {}),
         ...(body.deliveryTerms !== undefined ? { deliveryTerms: body.deliveryTerms ?? null } : {}),

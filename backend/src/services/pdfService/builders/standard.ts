@@ -1042,6 +1042,8 @@ export function buildHtml(data: PdfInvoiceData): string {
         <div class="totals-card">
           <div class="totals-header">${labels.grandTotal}</div>
           <div class="totals-row"><span>${labels.subtotal}</span><strong>${formatCurrency(data.subtotal)} THB</strong></div>
+          ${data.feeAmount && data.feeAmount > 0 ? `<div class="totals-row"><span>${escapeHtml(data.feeLabel || (isTh ? 'ค่าบริหารงาน' : 'Management fee'))}${data.feePercent ? ` (${data.feePercent}%)` : ''}</span><strong>${formatCurrency(data.feeAmount)} THB</strong></div>
+          <div class="totals-row"><span>${isTh ? 'รวมก่อน VAT' : 'Sub Total'}</span><strong>${formatCurrency(data.subtotal + data.feeAmount)} THB</strong></div>` : ''}
           <div class="totals-row"><span>${labels.vatTotal}</span><strong>${formatCurrency(data.vatAmount)} THB</strong></div>
           <div class="totals-row grand"><span>${labels.grandTotal}</span><strong>${formatCurrency(data.total)} THB</strong></div>
         </div>

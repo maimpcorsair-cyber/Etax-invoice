@@ -317,6 +317,8 @@ export interface Quotation {
   subtotal: number;
   vatAmount: number;
   discountAmount: number;
+  feePercent?: number | null;
+  feeLabel?: string | null;
   total: number;
   notes?: string | null;
   paymentTerms?: string | null;

@@ -83,6 +83,8 @@ interface FormState {
   templateId: string | null;
   items: ItemDraft[];
   discountAmount: number;
+  feePercent: number;
+  feeLabel: string;
   notes: string;
   paymentTerms: string;
   deliveryTerms: string;
@@ -186,6 +188,8 @@ export default function QuotationBuilder() {
     templateId: null,
     items: [blankItem],
     discountAmount: 0,
+    feePercent: 0,
+    feeLabel: '',
     notes: '',
     paymentTerms: 'ชำระภายใน 30 วันหลังได้รับใบกำกับภาษี',
     deliveryTerms: '',
@@ -261,6 +265,8 @@ export default function QuotationBuilder() {
               vatType: it.vatType,
             })),
             discountAmount: q.discountAmount,
+            feePercent: q.feePercent ?? 0,
+            feeLabel: q.feeLabel ?? '',
             notes: q.notes ?? '',
             paymentTerms: q.paymentTerms ?? '',
             deliveryTerms: q.deliveryTerms ?? '',
@@ -275,10 +281,14 @@ export default function QuotationBuilder() {
   const totals = useMemo(() => {
     const lines = form.items.map(computeLine);
     const subtotal = +lines.reduce((s, l) => s + l.amount, 0).toFixed(2);
-    const vatAmount = +lines.reduce((s, l) => s + l.vatAmount, 0).toFixed(2);
-    const total = +(subtotal + vatAmount - form.discountAmount).toFixed(2);
-    return { lines, subtotal, vatAmount, total };
-  }, [form.items, form.discountAmount]);
+    const itemVat = lines.reduce((s, l) => s + l.vatAmount, 0);
+    const pct = form.feePercent > 0 ? form.feePercent : 0;
+    const feeAmount = +((subtotal * pct) / 100).toFixed(2);
+    const feeVat = +(feeAmount * 0.07).toFixed(2);
+    const vatAmount = +(itemVat + feeVat).toFixed(2);
+    const total = +(subtotal + feeAmount + vatAmount - form.discountAmount).toFixed(2);
+    return { lines, subtotal, feeAmount, vatAmount, total };
+  }, [form.items, form.discountAmount, form.feePercent]);
   const milestoneTotal = useMemo(
     () => +form.serviceDetails.milestones.reduce((sum, milestone) => sum + (Number(milestone.amount) || 0), 0).toFixed(2),
     [form.serviceDetails.milestones],
@@ -415,6 +425,8 @@ export default function QuotationBuilder() {
           vatType: it.vatType,
         })),
         discountAmount: Number(form.discountAmount),
+        feePercent: form.feePercent > 0 ? Number(form.feePercent) : null,
+        feeLabel: form.feePercent > 0 ? (form.feeLabel.trim() || null) : null,
         notes: form.notes || null,
         paymentTerms: form.paymentTerms || null,
         deliveryTerms: form.deliveryTerms || null,
@@ -1323,6 +1335,30 @@ export default function QuotationBuilder() {
 
         <div className="border-t border-gray-200 mt-4 pt-3 space-y-1 text-sm">
           <div className="flex justify-between"><span className="text-gray-500">{isThai ? 'ยอดรวมก่อน VAT' : 'Subtotal'}</span><span>{formatCurrency(totals.subtotal)}</span></div>
+          <div className="flex justify-between items-center gap-2">
+            <input
+              type="text"
+              value={form.feeLabel}
+              onChange={(e) => setForm({ ...form, feeLabel: e.target.value })}
+              placeholder={isThai ? 'ค่าบริหารงาน' : 'Management fee'}
+              className="input-field text-sm flex-1 min-w-0"
+              disabled={!editable}
+            />
+            <div className="flex items-center gap-1 shrink-0">
+              <input
+                type="number" min="0" max="100" step="0.01"
+                value={form.feePercent}
+                onChange={(e) => setForm({ ...form, feePercent: Number(e.target.value) })}
+                className="input-field text-sm text-right w-20"
+                disabled={!editable}
+              />
+              <span className="text-gray-400 text-sm">%</span>
+            </div>
+            <span className="w-24 text-right shrink-0">{formatCurrency(totals.feeAmount)}</span>
+          </div>
+          {form.feePercent > 0 && (
+            <div className="flex justify-between text-gray-400 text-xs"><span>{isThai ? 'รวมก่อน VAT' : 'Sub Total'}</span><span>{formatCurrency(totals.subtotal + totals.feeAmount)}</span></div>
+          )}
           <div className="flex justify-between"><span className="text-gray-500">VAT</span><span>{formatCurrency(totals.vatAmount)}</span></div>
           <div className="flex justify-between items-center">
             <span className="text-gray-500">{isThai ? 'ส่วนลดรวม' : 'Discount'}</span>

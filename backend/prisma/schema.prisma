@@ -730,6 +730,12 @@ model Quotation {
   subtotal       Float
   vatAmount      Float
   discountAmount Float @default(0) @map("discount")
+  // Optional management / agency fee added on top of the item subtotal,
+  // before VAT (common for event / PR / agency quotations). feePercent is
+  // 0–100; feeLabel is the line label shown on the PDF (e.g. "ค่าบริหารงาน",
+  // "Agency fee").
+  feePercent     Float?
+  feeLabel       String?
   total          Float
 
   notes         String?
