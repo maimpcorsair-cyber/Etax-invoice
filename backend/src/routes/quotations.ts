@@ -81,6 +81,13 @@ const quotationCreateSchema = z.object({
   deliveryTerms: z.string().max(500).optional().nullable(),
 });
 
+// Live preview from un-saved form data (no buyer required — uses a sample
+// buyer, like the invoice builder's preview). Same fields as create minus the
+// buyerId requirement, with quotationDate optional.
+const quotationPreviewSchema = quotationCreateSchema
+  .omit({ buyerId: true })
+  .extend({ quotationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+
 function computeLineTotals(input: z.infer<typeof itemSchema>) {
   // discountAmount is treated as a PERCENT (0-100) to match Invoice +
   // RecurringInvoice conventions. Without this, converting a quotation
@@ -222,6 +229,79 @@ quotationsRouter.get('/:id', async (req, res) => {
 });
 
 // ── Preview / PDF ────────────────────────────────────────────────────
+
+// Live preview from current form data (before saving), mirroring the invoice
+// builder. Returns HTML (?format=html) for the inline iframe, or a PDF.
+quotationsRouter.post('/preview', async (req, res) => {
+  try {
+    const body = quotationPreviewSchema.parse(req.body);
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: {
+        nameTh: true, nameEn: true, taxId: true, branchCode: true,
+        branchNameTh: true, branchNameEn: true,
+        addressTh: true, addressEn: true,
+        phone: true, email: true, website: true, logoUrl: true,
+      },
+    });
+
+    const enrichedItems = body.items.map((item) => ({
+      ...item,
+      ...computeLineTotals(item),
+      productId: item.productId ?? null,
+      sectionTitle: item.sectionTitle ?? null,
+      nameEn: item.nameEn ?? null,
+      descriptionTh: item.descriptionTh ?? null,
+      descriptionEn: item.descriptionEn ?? null,
+    }));
+    const subtotal = +enrichedItems.reduce((s, i) => s + i.amount, 0).toFixed(2);
+    const vatAmount = +enrichedItems.reduce((s, i) => s + i.vatAmount, 0).toFixed(2);
+    const total = +(subtotal + vatAmount - body.discountAmount).toFixed(2);
+
+    const previewQuotation = {
+      quotationNumber: 'PREVIEW-001',
+      quotationDate: body.quotationDate ? new Date(`${body.quotationDate}T00:00:00.000Z`) : new Date(),
+      validUntil: body.validUntil ? new Date(`${body.validUntil}T23:59:59.000Z`) : null,
+      language: body.language,
+      kind: body.kind,
+      serviceDetails: body.kind !== 'general' ? (body.serviceDetails ?? {}) : null,
+      seller: sellerSnapshotWithTemplate(company ?? {}, body.templateId),
+      subtotal,
+      vatAmount,
+      discountAmount: body.discountAmount,
+      total,
+      notes: body.notes ?? null,
+      paymentTerms: body.paymentTerms ?? null,
+      deliveryTerms: body.deliveryTerms ?? null,
+      buyer: {
+        nameTh: 'ลูกค้าตัวอย่าง',
+        nameEn: 'Sample Customer',
+        taxId: '0000000000000',
+        branchCode: '00000',
+        addressTh: 'ที่อยู่ตัวอย่าง',
+        addressEn: 'Sample Address',
+      },
+      items: enrichedItems,
+    };
+
+    const pdfData = buildQuotationPdfData(previewQuotation as Parameters<typeof buildQuotationPdfData>[0]);
+    const html = await buildHtmlForCompany(pdfData, req.user!.companyId);
+    if (req.query.format === 'html') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Length', Buffer.byteLength(html, 'utf8'));
+      res.send(html);
+      return;
+    }
+    const pdf = await generatePdfFromHtml(html);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="quotation-preview.pdf"');
+    res.send(pdf);
+  } catch (err) {
+    if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('quotation preview (form) failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to generate preview' });
+  }
+});
 
 quotationsRouter.get('/:id/preview', async (req, res) => {
   try {
