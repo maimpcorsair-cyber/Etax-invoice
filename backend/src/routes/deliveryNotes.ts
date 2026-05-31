@@ -44,6 +44,12 @@ const deliveryNoteCreateSchema = z.object({
   deliveryTerms: z.string().max(500).optional().nullable(),
 });
 
+// Live preview from un-saved form data (sample buyer, no buyerId required),
+// mirroring the invoice + quotation builders.
+const deliveryNotePreviewSchema = deliveryNoteCreateSchema
+  .omit({ buyerId: true })
+  .extend({ deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+
 function computeAmount(input: z.infer<typeof itemSchema>) {
   if (input.unitPrice === undefined || input.unitPrice === null) return null;
   return +(input.quantity * input.unitPrice).toFixed(2);
@@ -388,6 +394,71 @@ deliveryNotesRouter.get('/:id', async (req, res) => {
   } catch (err) {
     logger.error('get delivery note failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to get delivery note' });
+  }
+});
+
+// Live preview from current form data (before saving), mirroring invoice +
+// quotation builders. Returns HTML (default) for the inline iframe, or a PDF.
+deliveryNotesRouter.post('/preview', async (req, res) => {
+  try {
+    const body = deliveryNotePreviewSchema.parse(req.body);
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+      select: {
+        nameTh: true, nameEn: true, taxId: true, branchCode: true,
+        branchNameTh: true, branchNameEn: true,
+        addressTh: true, addressEn: true,
+        phone: true, email: true, website: true, logoUrl: true,
+      },
+    });
+    const note = {
+      deliveryNoteNumber: 'PREVIEW-001',
+      language: body.language,
+      deliveryDate: body.deliveryDate ? new Date(`${body.deliveryDate}T00:00:00.000Z`) : new Date(),
+      expectedDate: body.expectedDate ? new Date(`${body.expectedDate}T00:00:00.000Z`) : null,
+      deliveredAt: null,
+      seller: (company ?? {}) as object,
+      buyer: {
+        nameTh: 'ลูกค้าตัวอย่าง', nameEn: 'Sample Customer', taxId: '0000000000000',
+        branchCode: '00000', addressTh: 'ที่อยู่ตัวอย่าง', addressEn: 'Sample Address',
+      },
+      items: body.items.map((it) => ({
+        nameTh: it.nameTh,
+        nameEn: it.nameEn ?? null,
+        descriptionTh: it.descriptionTh ?? null,
+        descriptionEn: it.descriptionEn ?? null,
+        quantity: it.quantity,
+        deliveredQty: it.deliveredQty ?? it.quantity,
+        unit: it.unit,
+        unitPrice: it.unitPrice ?? null,
+        amount: computeAmount(it),
+      })),
+      status: 'draft',
+      shippingAddress: body.shippingAddress ?? null,
+      contactName: body.contactName ?? null,
+      contactPhone: body.contactPhone ?? null,
+      vehicleNo: body.vehicleNo ?? null,
+      trackingNo: body.trackingNo ?? null,
+      notes: body.notes ?? null,
+      deliveryTerms: body.deliveryTerms ?? null,
+      quotation: null,
+      invoice: null,
+    };
+    const html = buildDeliveryNoteHtml(note);
+    if (req.query.format === 'pdf') {
+      const pdf = await generatePdfFromHtml(html);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="delivery-note-preview.pdf"');
+      res.send(pdf);
+      return;
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Length', Buffer.byteLength(html, 'utf8'));
+    res.send(html);
+  } catch (err) {
+    if (err instanceof z.ZodError) { res.status(400).json({ error: 'Validation error', details: err.errors }); return; }
+    logger.error('delivery note preview (form) failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to generate preview' });
   }
 });
 

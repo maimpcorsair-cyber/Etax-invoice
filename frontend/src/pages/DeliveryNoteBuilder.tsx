@@ -72,6 +72,7 @@ export default function DeliveryNoteBuilder() {
   const [acting, setActing] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<'open' | 'download' | null>(null);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [dnPreviewHtml, setDnPreviewHtml] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState>({
     buyerId: '',
@@ -154,13 +155,29 @@ export default function DeliveryNoteBuilder() {
     return errJson.error ?? 'Save failed';
   }, []);
 
-  async function save(action: 'draft' | 'issue') {
+  // Live preview: re-render the delivery-note HTML from current form data
+  // (debounced) whenever the form changes, like the invoice/quotation builder.
+  useEffect(() => {
     if (!token) return;
-    setSaving(true);
-    setMsg(null);
-    try {
-      const payload = {
-        buyerId: form.buyerId,
+    if (!form.items.some((it) => it.nameTh.trim())) { setDnPreviewHtml(null); return; }
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await fetch('/api/delivery-notes/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(buildBody()),
+        });
+        if (res.ok) setDnPreviewHtml(await res.text());
+      } catch { /* preview is best-effort, never blocks editing */ }
+    }, 600);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, form]);
+
+  // Body shared by save + live preview (excludes buyerId; preview uses a
+  // sample buyer, save adds the real buyerId).
+  function buildBody() {
+    return {
         deliveryDate: form.deliveryDate,
         expectedDate: form.expectedDate || null,
         language: form.language,
@@ -181,7 +198,15 @@ export default function DeliveryNoteBuilder() {
         trackingNo: form.trackingNo || null,
         notes: form.notes || null,
         deliveryTerms: form.deliveryTerms || null,
-      };
+    };
+  }
+
+  async function save(action: 'draft' | 'issue') {
+    if (!token) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const payload = { buyerId: form.buyerId, ...buildBody() };
 
       const url = isNew ? '/api/delivery-notes' : `/api/delivery-notes/${id}`;
       const method = isNew ? 'POST' : 'PATCH';
@@ -293,7 +318,9 @@ export default function DeliveryNoteBuilder() {
   }
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto">
+    <div className="max-w-7xl mx-auto">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,460px)] lg:items-start">
+    <div className="space-y-4 min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-center gap-3">
           <Link to="/app/delivery-notes" className="text-gray-500 hover:text-gray-800"><ArrowLeft className="w-5 h-5" /></Link>
@@ -488,6 +515,29 @@ export default function DeliveryNoteBuilder() {
           ? 'ใบส่งของเป็นเอกสารปฏิบัติการ ไม่ใช่เอกสารภาษี — ออกใบกำกับภาษีเมื่อปิดยอดขาย'
           : 'Delivery notes are operational documents, not tax documents — convert to a tax invoice when the sale is ready.'}
       </div>
+    </div>{/* left column */}
+
+      <aside className="hidden lg:block lg:sticky lg:top-4 self-start">
+        <div className="card p-0 overflow-hidden">
+          <div className="px-3 py-2 text-xs font-semibold text-slate-500 border-b border-slate-100">
+            {isThai ? 'ตัวอย่างเอกสาร (สด)' : 'Live preview'}
+          </div>
+          {dnPreviewHtml ? (
+            <iframe
+              srcDoc={dnPreviewHtml}
+              title={isThai ? 'ตัวอย่างใบส่งของ' : 'Delivery note preview'}
+              sandbox="allow-same-origin allow-scripts"
+              className="block w-full border-0 bg-white"
+              style={{ height: 900 }}
+            />
+          ) : (
+            <div className="p-6 text-sm text-slate-400">
+              {isThai ? 'กรอกรายการอย่างน้อย 1 รายการเพื่อดูตัวอย่าง' : 'Add at least one item to see the preview.'}
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>{/* grid */}
     </div>
   );
 }
