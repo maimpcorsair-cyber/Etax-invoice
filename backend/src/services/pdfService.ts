@@ -58,6 +58,7 @@ export interface PdfInvoiceData {
   discountAmount: number;
   total: number;
   isPaid?: boolean | null; // suppresses the "scan to pay" PromptPay QR when already settled
+  promptPayId?: string | null; // the bank account selected on THIS document; QR uses it when it matches a company account
   documentFooterNote?: string | null; // company-wide fine-print at the very bottom
   notes?: string | null;
   paymentMethod?: string | null;
@@ -216,10 +217,17 @@ async function enrichPromptPayQr(data: PdfInvoiceData, companyId: string): Promi
     });
     const accounts = Array.isArray(company?.documentBankAccounts) ? (company!.documentBankAccounts as Array<Record<string, unknown>>) : [];
     const withPromptPay = accounts.filter((a) => typeof a.promptPayId === 'string' && (a.promptPayId as string).trim().length > 0);
-    // Prefer the company's designated default account over array order, so a
-    // company with several PromptPay accounts gets the QR for the one they
-    // marked default rather than whichever happens to be first.
-    const ppAccount = withPromptPay.find((a) => a.isDefault === true) ?? withPromptPay[0];
+    // Account-selection priority:
+    //  1. the account chosen ON THIS document — but only if its PromptPay id is
+    //     actually one of the company's configured accounts (never trust an
+    //     arbitrary id from the request: that would redirect payment).
+    //  2. the company's designated default account.
+    //  3. first account that has a PromptPay id.
+    const requested = typeof data.promptPayId === 'string' ? data.promptPayId.trim() : '';
+    const ppAccount =
+      (requested ? withPromptPay.find((a) => String(a.promptPayId).trim() === requested) : undefined)
+      ?? withPromptPay.find((a) => a.isDefault === true)
+      ?? withPromptPay[0];
     if (!ppAccount) return null;
     const target = String(ppAccount.promptPayId).trim();
     const qr = await buildPromptPayQr(target, data.total, data.invoiceNumber);

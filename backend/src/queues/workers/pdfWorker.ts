@@ -47,6 +47,7 @@ export const pdfWorker = new Worker<PdfJobData>(
         templateId?: string | null;
         documentMode?: 'ordinary' | 'electronic' | null;
         bankPaymentInfo?: string | null;
+        promptPayId?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
         signatureImageUrl?: string | null;
@@ -103,6 +104,7 @@ export const pdfWorker = new Worker<PdfJobData>(
       templateId: sellerSnap?.documentPreferences?.templateId ?? null,
       documentMode: sellerSnap?.documentPreferences?.documentMode ?? 'electronic',
       bankPaymentInfo: sellerSnap?.documentPreferences?.bankPaymentInfo ?? null,
+      promptPayId: sellerSnap?.documentPreferences?.promptPayId ?? null,
       showCompanyLogo: sellerSnap?.documentPreferences?.showCompanyLogo ?? true,
       documentLogoUrl: sellerSnap?.documentPreferences?.documentLogoUrl ?? null,
       signatureImageUrl: sellerSnap?.documentPreferences?.signatureImageUrl ?? null,

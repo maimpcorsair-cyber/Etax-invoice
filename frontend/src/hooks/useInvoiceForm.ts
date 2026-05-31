@@ -51,6 +51,7 @@ interface DraftPayload {
   templateId: string | null;
   documentMode: 'ordinary' | 'electronic';
   bankPaymentInfo: string;
+  promptPayId: string;
   signatureImageUrl: string | null;
   signerName: string;
   signerTitle: string;
@@ -83,6 +84,9 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [documentMode, setDocumentMode] = useState<'ordinary' | 'electronic'>(preferences.defaultDocumentMode ?? 'electronic');
   const [bankPaymentInfo, setBankPaymentInfo] = useState('');
+  // PromptPay id of the bank account selected ON THIS document, so the QR
+  // points at the account shown (not just the company default).
+  const [promptPayId, setPromptPayId] = useState('');
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null);
   const [signerName, setSignerName] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
@@ -108,7 +112,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       const draft = {
         docType, docLanguage, invoiceDate, dueDate: supportsDueDate ? dueDate : '', referenceDocNumber,
         items, notes, paymentMethod, documentLogoUrl: logoUrl, showCompanyLogo, templateId,
-        documentMode, bankPaymentInfo, signatureImageUrl, signerName, signerTitle,
+        documentMode, bankPaymentInfo, promptPayId, signatureImageUrl, signerName, signerTitle,
         whtRate,
         savedAt: Date.now(),
       };
@@ -118,7 +122,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     }
   }, [docType, docLanguage, invoiceDate, dueDate, supportsDueDate, referenceDocNumber, items, notes,
       paymentMethod, logoUrl, showCompanyLogo, templateId, documentMode,
-      bankPaymentInfo, signatureImageUrl, signerName, signerTitle, whtRate]);
+      bankPaymentInfo, promptPayId, signatureImageUrl, signerName, signerTitle, whtRate]);
 
   const clearDraftFromStorage = useCallback(() => {
     try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* ignore */ }
@@ -153,6 +157,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       if (draft.templateId != null) setTemplateId(draft.templateId);
       if (draft.documentMode != null) setDocumentMode(draft.documentMode);
       if (draft.bankPaymentInfo != null) setBankPaymentInfo(draft.bankPaymentInfo);
+      if (draft.promptPayId != null) setPromptPayId(draft.promptPayId);
       if (draft.showCompanyLogo != null) setShowCompanyLogo(draft.showCompanyLogo);
       if (draft.documentLogoUrl != null) setLogoUrl(draft.documentLogoUrl);
       if (draft.signatureImageUrl != null) setSignatureImageUrl(draft.signatureImageUrl);
@@ -289,6 +294,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     templateId: templateId || undefined,
     documentMode,
     bankPaymentInfo: bankPaymentInfo || undefined,
+    promptPayId: promptPayId || undefined,
     showCompanyLogo,
     documentLogoUrl: logoUrl || undefined,
     signatureImageUrl: signatureImageUrl || undefined,
@@ -410,6 +416,8 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setDocumentMode,
     bankPaymentInfo,
     setBankPaymentInfo,
+    promptPayId,
+    setPromptPayId,
     signatureImageUrl,
     setSignatureImageUrl,
     signerName,

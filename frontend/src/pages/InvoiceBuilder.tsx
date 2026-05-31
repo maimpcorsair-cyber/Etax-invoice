@@ -286,8 +286,9 @@ export default function InvoiceBuilder() {
     setSelectedBankAccountId(bankAccountId);
     const account = documentProfile.profile.bankAccounts.find((item) => item.id === bankAccountId);
     form.setBankPaymentInfo(account ? formatBankPaymentInfo(account, isThai) : '');
+    form.setPromptPayId(account?.promptPayId ?? '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentProfile.profile.bankAccounts, form.setBankPaymentInfo, isThai]);
+  }, [documentProfile.profile.bankAccounts, form.setBankPaymentInfo, form.setPromptPayId, isThai]);
 
   const handleAddBankAccount = useCallback(async (account: Omit<BankAccountProfile, 'id'>) => {
     const nextAccounts = [...documentProfile.profile.bankAccounts, account];
@@ -298,6 +299,7 @@ export default function InvoiceBuilder() {
     if (newAccount) {
       setSelectedBankAccountId(newAccount.id);
       form.setBankPaymentInfo(formatBankPaymentInfo(newAccount, isThai));
+      form.setPromptPayId(newAccount.promptPayId ?? '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentProfile.profile.bankAccounts, documentProfile.saveProfile, form.setBankPaymentInfo, isThai]);
@@ -309,6 +311,7 @@ export default function InvoiceBuilder() {
     if (!form.bankPaymentInfo && defaultAccount) {
       setSelectedBankAccountId(defaultAccount.id);
       form.setBankPaymentInfo(formatBankPaymentInfo(defaultAccount, isThai));
+      form.setPromptPayId(defaultAccount.promptPayId ?? '');
     }
 
     const signatureProfile = documentProfile.profile.signatureProfile;
@@ -360,6 +363,7 @@ export default function InvoiceBuilder() {
     templateId: (overrides?.templateId !== undefined ? overrides.templateId : form.templateId) || undefined,
     documentMode: form.documentMode,
     bankPaymentInfo: form.bankPaymentInfo || undefined,
+    promptPayId: form.promptPayId || undefined,
     showCompanyLogo: form.showCompanyLogo,
     signatureImageUrl: form.signatureImageUrl || undefined,
     signerName: form.signerName || undefined,

@@ -52,6 +52,7 @@ const createInvoiceSchema = z.object({
   templateId: z.string().optional(),
   documentMode: z.enum(['ordinary', 'electronic']).optional(),
   bankPaymentInfo: z.string().optional(),
+  promptPayId: z.string().optional(),
   showCompanyLogo: z.boolean().optional(),
   documentLogoUrl: z.string().optional(),
   signatureImageUrl: z.string().optional(),
@@ -74,6 +75,7 @@ const previewInvoiceSchema = z.object({
   templateId: z.string().optional(),
   documentMode: z.enum(['ordinary', 'electronic']).optional(),
   bankPaymentInfo: z.string().optional(),
+  promptPayId: z.string().optional(),
   showCompanyLogo: z.boolean().optional(),
   signatureImageUrl: z.string().optional(),
   signerName: z.string().optional(),
@@ -445,6 +447,7 @@ invoicesRouter.post('/', async (req, res) => {
         templateId: body.templateId ?? null,
         documentMode: body.documentMode ?? 'electronic',
         bankPaymentInfo: body.bankPaymentInfo ?? null,
+        promptPayId: body.promptPayId ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
         signatureImageUrl: body.signatureImageUrl ?? null,
@@ -611,6 +614,7 @@ invoicesRouter.get('/:id', async (req, res) => {
         templateId?: string | null;
         documentMode?: 'ordinary' | 'electronic' | null;
         bankPaymentInfo?: string | null;
+        promptPayId?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
         signatureImageUrl?: string | null;
@@ -681,6 +685,7 @@ invoicesRouter.patch('/:id', async (req, res) => {
         templateId: body.templateId ?? null,
         documentMode: body.documentMode ?? 'electronic',
         bankPaymentInfo: body.bankPaymentInfo ?? null,
+        promptPayId: body.promptPayId ?? null,
         showCompanyLogo: body.showCompanyLogo ?? true,
         documentLogoUrl: body.documentLogoUrl ?? null,
         signatureImageUrl: body.signatureImageUrl ?? null,
@@ -1410,6 +1415,7 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
         templateId?: string | null;
         documentMode?: 'ordinary' | 'electronic' | null;
         bankPaymentInfo?: string | null;
+        promptPayId?: string | null;
         showCompanyLogo?: boolean | null;
         documentLogoUrl?: string | null;
         signatureImageUrl?: string | null;
@@ -1465,6 +1471,7 @@ invoicesRouter.get('/:id/preview', async (req, res) => {
       templateId: documentPrefs.templateId ?? null,
       documentMode: documentPrefs.documentMode ?? 'electronic',
       bankPaymentInfo: documentPrefs.bankPaymentInfo ?? null,
+      promptPayId: documentPrefs.promptPayId ?? null,
       showCompanyLogo: documentPrefs.showCompanyLogo ?? true,
       documentLogoUrl: documentPrefs.documentLogoUrl ?? null,
       signatureImageUrl: documentPrefs.signatureImageUrl ?? null,
@@ -1558,6 +1565,7 @@ invoicesRouter.post('/preview', async (req, res) => {
       templateId: body.templateId ?? null,
       documentMode: body.documentMode ?? 'electronic',
       bankPaymentInfo: body.bankPaymentInfo ?? null,
+      promptPayId: body.promptPayId ?? null,
       showCompanyLogo: body.showCompanyLogo ?? true,
       signatureImageUrl: body.signatureImageUrl ?? null,
       signerName: body.signerName ?? null,
