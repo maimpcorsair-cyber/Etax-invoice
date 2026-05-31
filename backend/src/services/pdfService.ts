@@ -243,17 +243,30 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
   const enrichedData = await enrichElectronicDocument(data);
   const promptPay = await enrichPromptPayQr(enrichedData, companyId);
 
-  // Company-wide footer fine-print, resolved at render time (not snapshotted)
-  // since it is boilerplate terms, not invoice-specific data. Prefer an
-  // explicit value already on `data` (e.g. a preview override) when present.
+  // Company-wide defaults resolved at render time: the footer fine-print and
+  // the visual signature. Anything already on `data` (the invoice form's own
+  // signer, or a preview override) wins; otherwise fall back to the company
+  // profile so every document — including quotations, which carry no signer
+  // field — still shows the company signature + footer.
   let documentFooterNote = data.documentFooterNote ?? null;
-  if (documentFooterNote == null) {
+  let signerName = data.signerName ?? null;
+  let signerTitle = data.signerTitle ?? null;
+  let signatureImageUrl = data.signatureImageUrl ?? null;
+  if (documentFooterNote == null || (!signerName && !signatureImageUrl)) {
     try {
-      const company = await prisma.company.findUnique({ where: { id: companyId }, select: { documentFooterNote: true } });
-      documentFooterNote = company?.documentFooterNote ?? null;
-    } catch {
-      documentFooterNote = null;
-    }
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { documentFooterNote: true, documentSignatureProfile: true },
+      });
+      documentFooterNote = documentFooterNote ?? company?.documentFooterNote ?? null;
+      const sig = (company?.documentSignatureProfile ?? null) as
+        { signerName?: string | null; signerTitle?: string | null; signatureImageUrl?: string | null } | null;
+      if (sig) {
+        if (!signerName) signerName = sig.signerName ?? null;
+        if (!signerTitle) signerTitle = sig.signerTitle ?? null;
+        if (!signatureImageUrl) signatureImageUrl = sig.signatureImageUrl ?? null;
+      }
+    } catch { /* best-effort; never block rendering */ }
   }
 
   const mergedData = {
@@ -262,6 +275,9 @@ export async function buildHtmlForCompany(data: PdfInvoiceData, companyId: strin
     templateHtml: data.templateHtml ?? template?.html ?? null,
     templateNote: null,
     documentFooterNote,
+    signerName,
+    signerTitle,
+    signatureImageUrl,
     promptPayQrDataUrl: promptPay?.url ?? null,
     promptPayTarget: promptPay?.target ?? null,
   };
