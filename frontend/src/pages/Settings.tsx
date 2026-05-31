@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
   AlertTriangle,
   Building2,
@@ -28,6 +28,7 @@ import { useDocumentProfile } from '../hooks/useDocumentProfile';
 import { useAuthStore } from '../store/authStore';
 import type { BankAccountProfile, InvoiceType, Language } from '../types';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import SignaturePad from '../components/SignaturePad';
 import { MascotHelperCard, PageHeader } from '../components/ui/AppChrome';
 import SectionSubNav, { type SectionSubNavItem } from '../components/SectionSubNav';
 import { Settings as SettingsIcon, ScrollText } from 'lucide-react';
@@ -533,15 +534,6 @@ export default function Settings() {
     })));
   };
 
-  const handleSignatureFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setSignatureDraft((prev) => ({ ...prev, signatureImageUrl: event.target?.result as string }));
-    };
-    reader.readAsDataURL(file);
-  };
 
   const saveSignatureProfile = async () => {
     const saved = await documentProfile.saveProfile({
@@ -884,12 +876,16 @@ export default function Settings() {
                 <input className="input-field" value={signatureDraft.signerName} onChange={(e) => setSignatureDraft((prev) => ({ ...prev, signerName: e.target.value }))} placeholder={isThai ? 'ชื่อผู้ลงนาม' : 'Signer name'} />
                 <input className="input-field" value={signatureDraft.signerTitle} onChange={(e) => setSignatureDraft((prev) => ({ ...prev, signerTitle: e.target.value }))} placeholder={isThai ? 'ตำแหน่ง' : 'Title'} />
                 <textarea className="input-field" rows={3} value={signatureDraft.securityNote} onChange={(e) => setSignatureDraft((prev) => ({ ...prev, securityNote: e.target.value }))} placeholder={isThai ? 'ข้อความท้ายเอกสาร เช่น ตรวจสอบเอกสารผ่าน QR ได้' : 'Security note shown on documents'} />
-                <input type="file" accept="image/*" onChange={handleSignatureFile} className="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100" />
-                {signatureDraft.signatureImageUrl && (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <img src={signatureDraft.signatureImageUrl} alt="signature preview" className="h-20 object-contain" />
-                  </div>
-                )}
+                <SignaturePad
+                  value={signatureDraft.signatureImageUrl || null}
+                  onChange={(url) => setSignatureDraft((prev) => ({ ...prev, signatureImageUrl: url ?? '' }))}
+                  isThai={isThai}
+                />
+                <p className="text-xs text-slate-400">
+                  {isThai
+                    ? 'ลายเซ็นนี้เป็นภาพประกอบเอกสาร (เทียบเท่าเซ็นบนกระดาษ) ตั้งครั้งเดียวแล้วใช้กับทุกเอกสารอัตโนมัติ ไม่จำเป็นต้องมีก็ออกเอกสารได้'
+                    : 'This is a visual signature (same as signing on paper). Set it once and it applies to every document; it is optional.'}
+                </p>
                 <button type="button" onClick={() => void saveSignatureProfile()} disabled={documentProfile.saving} className="btn-primary inline-flex items-center gap-2">
                   <Save className="h-4 w-4" />
                   {isThai ? 'บันทึกลายเซ็น' : 'Save signature'}
