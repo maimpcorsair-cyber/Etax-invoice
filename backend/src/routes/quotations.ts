@@ -289,6 +289,8 @@ quotationsRouter.post('/preview', async (req, res) => {
       subtotal,
       vatAmount,
       discountAmount: body.discountAmount,
+      feePercent: body.feePercent ?? null,
+      feeLabel: body.feeLabel ?? null,
       total,
       notes: body.notes ?? null,
       paymentTerms: body.paymentTerms ?? null,
