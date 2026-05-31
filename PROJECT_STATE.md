@@ -1,8 +1,12 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (WHT certificate base fix + payroll/privacy audit)
+Last updated: 2026-06-01 (quotation detail UI + A4 live preview)
 
 ## Latest work (2026-06-01)
+
+Quotation detail UX polish — ready to deploy:
+- **A4 live preview fit** — quotation detail now renders the right-side live preview inside a scaled A4 frame (794×1123) with a visible zoom percent, matching the actual generated PDF shape instead of a tall free-form iframe.
+- **Customer-send actions simplified** — removed duplicate top/share-card buttons. The top bar keeps only PDF actions and conversion actions; the share panel now has one primary "ส่งทาง LINE" flow, one customer link area, one ready-to-send message area, and accept/reject/cancel controls only while the quotation is still `sent`.
 
 Quotation system hardening — shipped and verified live on prod:
 - **Management/agency fee %** (`97a47bf`, preview fix `ef653ec`) — `Quotation.feePercent`/`feeLabel` (migration `20260601_quotation_management_fee`). VATable fee on item subtotal before VAT: `feeAmount=subtotal*pct/100; feeVat=fee*0.07; vat=itemVat+feeVat; total=subtotal+fee+vat-discount`. Verified `361000 +15% → 444210.50` (matches ShowWorks/CRW example PDFs). Fee row + "รวมก่อน VAT" line in `standard.ts`; inputs in `QuotationBuilder.tsx`.
@@ -17,8 +21,8 @@ Remaining gaps closed (`9f39d51`), all verified live on prod:
 **Payment-schedule table** (`69bf0df`) — milestones (service_project / boq_contract) now render as a proper table on the PDF (งวด / รายละเอียด / กำหนดชำระ / จำนวนเงิน + schedule-total row + mismatch warning when sum ≠ total), instead of flattened note text. `extractMilestones` + `PdfInvoiceData.milestones` + `standard.ts` table. Form editor + validation already existed (no frontend change). Verified live: sums-match → no warning; sum 50000 vs 107000 → "ต่างจากยอดสุทธิ 57,000.00".
 
 **Known non-bug (by design):** management/agency fee is always VAT 7% (ค่าบริการ is VATable regardless of underlying items) — correct per Thai law.
-**Local follow-up ready for deploy:** invoice-linked WHT certificate now calculates withholding from pre-VAT `Invoice.subtotal` while keeping `totalAmount`/net payment based on the VAT-inclusive invoice total. Regression added: 100,000 + VAT 7% + WHT 3% => WHT 3,000, net 104,000. Backend typecheck passes; focused integration test cannot run locally until Postgres + backend API are running (`localhost:5432`/`:4000` currently unavailable).
-**Privacy entry audit:** `/app/account/privacy` route and desktop account menu already existed; mobile More drawer now includes the Privacy/data-rights entry.
+**WHT certificate base fix deployed** (`0cf01a1`) — invoice-linked WHT certificate now calculates withholding from pre-VAT `Invoice.subtotal` while keeping `totalAmount`/net payment based on the VAT-inclusive invoice total. Regression added: 100,000 + VAT 7% + WHT 3% => WHT 3,000, net 104,000. Verified: GitHub Typecheck + Unit tests + Prod smoke green; Render deploy run `26724301157` green; production `/api/health` 200. Focused local integration test still needs local Postgres + backend API (`localhost:5432`/`:4000`) to run outside CI/prod.
+**Privacy entry audit deployed** (`0cf01a1`) — `/app/account/privacy` route and desktop account menu already existed; mobile More drawer now includes the Privacy/data-rights entry. Vercel production deployment `https://etax-invoice-62g588ljy-maimpcorsair-1177s-projects.vercel.app` is Ready and `/app/account/privacy` returns 200.
 **Payroll audit:** existing payroll unit tests pass (tax calculator, SSO calculator, PND.1 CSV, SSO 1-10 CSV). Current module covers employee CRUD, payroll runs, payslip rows, finalize, and CSV government exports. Remaining product gaps are likely payslip PDF per employee and any native/macro government filing formats beyond CSV, not new payroll calculation logic.
 Test data left on siamtech demo tenant: several `ทดสอบ`/`PREVIEW` quotations + draft/cancelled invoices (non-draft quotations can't be deleted via API). Demo tenant only.
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
@@ -151,6 +151,8 @@ export default function QuotationBuilder() {
   const [shareUrl, setShareUrl] = useState('');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [quotePreviewHtml, setQuotePreviewHtml] = useState<string | null>(null);
+  const quotePreviewRef = useRef<HTMLDivElement | null>(null);
+  const [quotePreviewScale, setQuotePreviewScale] = useState(0.52);
 
   const [form, setForm] = useState<FormState>({
     buyerId: '',
@@ -374,6 +376,20 @@ export default function QuotationBuilder() {
     return () => window.clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, form]);
+
+  useEffect(() => {
+    const node = quotePreviewRef.current;
+    if (!node) return;
+    const updateScale = () => {
+      const width = node.clientWidth;
+      if (!width) return;
+      setQuotePreviewScale(Math.min(Math.max((width - 32) / 794, 0.38), 0.68));
+    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // Body shared by save + live preview. Excludes buyerId (preview uses a
   // sample buyer; save adds the real buyerId).
@@ -691,7 +707,7 @@ export default function QuotationBuilder() {
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Primary actions */}
         {editable ? (
           <div className="flex gap-2">
             <button onClick={() => save('draft')} disabled={saving} className="btn-secondary">
@@ -704,37 +720,15 @@ export default function QuotationBuilder() {
             </button>
           </div>
         ) : existing && (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap justify-end gap-2">
             <button onClick={() => openQuotationPdf('open')} disabled={pdfBusy !== null} className="btn-secondary">
               {pdfBusy === 'open' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
               {isThai ? 'เปิด PDF' : 'Open PDF'}
             </button>
             <button onClick={() => openQuotationPdf('download')} disabled={pdfBusy !== null} className="btn-secondary">
               {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {isThai ? 'ดาวน์โหลด' : 'Download'}
+              {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
             </button>
-            <button onClick={copySendMessage} disabled={copying} className="btn-secondary">
-              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
-              {isThai ? 'คัดลอกข้อความ' : 'Copy message'}
-            </button>
-            <button onClick={copyShareLink} disabled={shareBusy} className="btn-secondary">
-              {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-              {isThai ? 'คัดลอกลิงก์' : 'Copy link'}
-            </button>
-            <button onClick={openLineShare} className="btn-primary">
-              <ExternalLink className="w-4 h-4" />
-              LINE
-            </button>
-            {existing.status === 'sent' && (
-              <>
-                <button onClick={() => changeStatus('accepted')} disabled={acting} className="btn-secondary">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> {isThai ? 'ลูกค้ายอมรับ' : 'Mark accepted'}
-                </button>
-                <button onClick={() => changeStatus('rejected')} disabled={acting} className="btn-secondary">
-                  <XCircle className="w-4 h-4 text-rose-600" /> {isThai ? 'ปฏิเสธ' : 'Mark rejected'}
-                </button>
-              </>
-            )}
             {existing.status === 'accepted' && (
               <>
                 <button onClick={createDeliveryNote} disabled={acting} className="btn-secondary">
@@ -752,11 +746,6 @@ export default function QuotationBuilder() {
                 <Receipt className="w-4 h-4" /> {isThai ? 'ดูใบกำกับภาษี' : 'View tax invoice'}
               </Link>
             )}
-            {existing.status !== 'cancelled' && existing.status !== 'converted' && (
-              <button onClick={() => changeStatus('cancelled')} disabled={acting} className="btn-secondary text-rose-600">
-                <Trash2 className="w-4 h-4" /> {isThai ? 'ยกเลิก' : 'Cancel'}
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -769,55 +758,89 @@ export default function QuotationBuilder() {
       )}
 
       {existing && !editable && existing.status !== 'cancelled' && (
-        <div className="border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900">
-                {isThai ? 'ส่งใบเสนอราคาให้ลูกค้า' : 'Send this quotation to the customer'}
+              <p className="text-base font-semibold text-slate-900">
+                {isThai ? 'ส่งให้ลูกค้า' : 'Send to customer'}
               </p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
                 {isThai
-                  ? 'สร้างลิงก์ให้ลูกค้าเปิดดู PDF และกดยอมรับหรือปฏิเสธได้ ไม่ต้องให้ลูกค้า login'
-                  : 'Create a customer link so they can review the PDF and accept or reject without logging in.'}
+                  ? 'ลิงก์เดียวให้ลูกค้าเปิด PDF และตอบรับหรือปฏิเสธได้ โดยไม่ต้อง login'
+                  : 'One link lets the customer open the PDF and accept or reject without logging in.'}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-              <button onClick={copyShareLink} disabled={shareBusy} className="btn-secondary">
-                {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-                {isThai ? 'คัดลอกลิงก์' : 'Copy link'}
-              </button>
-              <button onClick={openCustomerPage} disabled={shareBusy} className="btn-secondary">
-                {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                {isThai ? 'เปิดหน้าลูกค้า' : 'Open customer page'}
-              </button>
-              <button onClick={() => openQuotationPdf('download')} disabled={pdfBusy !== null} className="btn-secondary">
-                {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
-              </button>
-              <button onClick={copySendMessage} disabled={copying} className="btn-secondary">
-                {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
-                {isThai ? 'คัดลอกข้อความ' : 'Copy message'}
-              </button>
-              <button onClick={openLineShare} className="btn-primary col-span-2 sm:col-span-1">
-                <ExternalLink className="w-4 h-4" />
-                {isThai ? 'เปิด LINE' : 'Open LINE'}
-              </button>
+            <button onClick={openLineShare} className="btn-primary shrink-0">
+              <ExternalLink className="w-4 h-4" />
+              {isThai ? 'ส่งทาง LINE' : 'Send via LINE'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 pt-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(320px,1fr)]">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {isThai ? 'ลิงก์ลูกค้า' : 'Customer link'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={openCustomerPage} disabled={shareBusy} className="btn-secondary text-xs">
+                    {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                    {isThai ? 'เปิดดู' : 'Open'}
+                  </button>
+                  <button onClick={copyShareLink} disabled={shareBusy} className="btn-secondary text-xs">
+                    {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                    {isThai ? 'คัดลอก' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              <input
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                readOnly
+                value={shareUrl || (isThai ? 'ยังไม่ได้สร้างลิงก์' : 'Link not created yet')}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+              <p className="text-xs leading-5 text-slate-500">
+                {isThai ? 'กดคัดลอกหรือส่งทาง LINE เพื่อสร้างลิงก์อัตโนมัติ' : 'Copy or send via LINE to create the link automatically.'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {isThai ? 'ข้อความพร้อมส่ง' : 'Ready-to-send message'}
+                </p>
+                <button onClick={copySendMessage} disabled={copying} className="btn-secondary text-xs">
+                  {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                  {isThai ? 'คัดลอกข้อความ' : 'Copy message'}
+                </button>
+              </div>
+              <textarea
+                className="min-h-[116px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700"
+                rows={isThai ? 4 : 5}
+                readOnly
+                value={sendMessage}
+              />
             </div>
           </div>
-          {shareUrl && (
-            <input
-              className="mt-3 w-full border border-slate-200 bg-white p-3 text-sm text-slate-700"
-              readOnly
-              value={shareUrl}
-              onFocus={(event) => event.currentTarget.select()}
-            />
+
+          {existing.status === 'sent' && (
+            <div className="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-600">
+                {isThai ? 'เมื่อได้คำตอบจากลูกค้า ให้ปรับสถานะดีลตรงนี้' : 'After the customer responds, update the deal status here.'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => changeStatus('accepted')} disabled={acting} className="btn-secondary text-xs">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" /> {isThai ? 'ลูกค้ายอมรับ' : 'Accepted'}
+                </button>
+                <button onClick={() => changeStatus('rejected')} disabled={acting} className="btn-secondary text-xs">
+                  <XCircle className="w-4 h-4 text-rose-600" /> {isThai ? 'ปฏิเสธ' : 'Rejected'}
+                </button>
+                <button onClick={() => changeStatus('cancelled')} disabled={acting} className="btn-secondary text-xs text-rose-600">
+                  <Trash2 className="w-4 h-4" /> {isThai ? 'ยกเลิก' : 'Cancel'}
+                </button>
+              </div>
+            </div>
           )}
-          <textarea
-            className="mt-3 w-full border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
-            rows={isThai ? 4 : 5}
-            readOnly
-            value={sendMessage}
-          />
         </div>
       )}
 
@@ -1432,17 +1455,41 @@ export default function QuotationBuilder() {
       {/* Live preview pane */}
       <aside className="hidden lg:block lg:sticky lg:top-4 self-start">
         <div className="card p-0 overflow-hidden">
-          <div className="px-3 py-2 text-xs font-semibold text-slate-500 border-b border-slate-100">
-            {isThai ? 'ตัวอย่างเอกสาร (สด)' : 'Live preview'}
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
+            <span className="font-semibold">{isThai ? 'ตัวอย่าง A4 (สด)' : 'Live A4 preview'}</span>
+            {quotePreviewHtml && (
+              <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                {Math.round(quotePreviewScale * 100)}%
+              </span>
+            )}
           </div>
           {quotePreviewHtml ? (
-            <iframe
-              srcDoc={quotePreviewHtml}
-              title={isThai ? 'ตัวอย่างใบเสนอราคา' : 'Quotation preview'}
-              sandbox="allow-same-origin allow-scripts"
-              className="block w-full border-0 bg-white"
-              style={{ height: 900 }}
-            />
+            <div ref={quotePreviewRef} className="max-h-[calc(100vh-7rem)] overflow-auto bg-slate-50 p-4">
+              <div
+                className="relative overflow-hidden rounded-sm bg-white shadow-xl ring-1 ring-slate-200"
+                style={{
+                  width: 794 * quotePreviewScale,
+                  height: 1123 * quotePreviewScale,
+                }}
+              >
+                <div
+                  style={{
+                    width: 794,
+                    height: 1123,
+                    transformOrigin: 'top left',
+                    transform: `scale(${quotePreviewScale})`,
+                  }}
+                >
+                  <iframe
+                    srcDoc={quotePreviewHtml}
+                    title={isThai ? 'ตัวอย่างใบเสนอราคา' : 'Quotation preview'}
+                    sandbox="allow-same-origin allow-scripts"
+                    className="block w-full rounded-sm border-0 bg-white"
+                    style={{ height: 1123 }}
+                  />
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="p-6 text-sm text-slate-400">
               {isThai ? 'กรอกรายการสินค้าอย่างน้อย 1 รายการเพื่อดูตัวอย่าง' : 'Add at least one item to see the preview.'}
