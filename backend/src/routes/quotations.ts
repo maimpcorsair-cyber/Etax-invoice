@@ -654,6 +654,34 @@ quotationsRouter.post('/:id/convert-to-invoice', async (req, res) => {
 
     const invoiceNumber = await generateInvoiceNumber(req.user!.companyId, 'tax_invoice');
 
+    // A management/agency fee lives on the quotation as a percent, not a line.
+    // The quotation totals already bake it in (subtotal excludes it, vat/total
+    // include it), so on the invoice we must materialize the fee as a real line
+    // item — otherwise subtotal + VAT would not reconcile to total and the
+    // e-Tax XML would be rejected. Adding the line lifts the invoice subtotal to
+    // (item subtotal + fee), which reconciles against the carried-over VAT/total.
+    const feeAmount = existing.feePercent && existing.feePercent > 0
+      ? +((existing.subtotal * existing.feePercent) / 100).toFixed(2)
+      : 0;
+    const feeLine = feeAmount > 0
+      ? {
+        productId: null,
+        nameTh: existing.feeLabel || 'ค่าบริหารงาน',
+        nameEn: existing.feeLabel || 'Management fee',
+        descriptionTh: existing.feePercent ? `${existing.feePercent}% ของยอดก่อน VAT` : null,
+        descriptionEn: null,
+        quantity: 1,
+        unit: 'งาน',
+        unitPrice: feeAmount,
+        discountAmount: 0,
+        vatType: 'vat7' as const,
+        amount: feeAmount,
+        vatAmount: +(feeAmount * 0.07).toFixed(2),
+        totalAmount: +(feeAmount * 1.07).toFixed(2),
+      }
+      : null;
+    const invoiceSubtotal = +(existing.subtotal + feeAmount).toFixed(2);
+
     const result = await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.create({
         data: {
@@ -666,28 +694,31 @@ quotationsRouter.post('/:id/convert-to-invoice', async (req, res) => {
           invoiceDate: new Date(),
           buyerId: existing.buyerId,
           seller: existing.seller as object,
-          subtotal: existing.subtotal,
+          subtotal: invoiceSubtotal,
           vatAmount: existing.vatAmount,
           discountAmount: existing.discountAmount,
           total: existing.total,
           notes: existing.notes,
           createdBy: req.user!.userId,
           items: {
-            create: existing.items.map((item) => ({
-              productId: item.productId,
-              nameTh: item.nameTh,
-              nameEn: item.nameEn,
-              descriptionTh: item.descriptionTh,
-              descriptionEn: item.descriptionEn,
-              quantity: item.quantity,
-              unit: item.unit,
-              unitPrice: item.unitPrice,
-              discountAmount: item.discountAmount,
-              vatType: item.vatType,
-              amount: item.amount,
-              vatAmount: item.vatAmount,
-              totalAmount: item.totalAmount,
-            })),
+            create: [
+              ...existing.items.map((item) => ({
+                productId: item.productId,
+                nameTh: item.nameTh,
+                nameEn: item.nameEn,
+                descriptionTh: item.descriptionTh,
+                descriptionEn: item.descriptionEn,
+                quantity: item.quantity,
+                unit: item.unit,
+                unitPrice: item.unitPrice,
+                discountAmount: item.discountAmount,
+                vatType: item.vatType,
+                amount: item.amount,
+                vatAmount: item.vatAmount,
+                totalAmount: item.totalAmount,
+              })),
+              ...(feeLine ? [feeLine] : []),
+            ],
           },
         },
         include: { items: true },
