@@ -215,8 +215,7 @@ test('standard document hides empty discount column and keeps it only when neede
 
   assert.ok(htmlWithoutDiscounts.includes('line-items no-discount'), 'line items should mark the no-discount table state');
   assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">ส่วนลด</th>`), 'empty discount column should not render');
-  assert.ok(htmlWithoutDiscounts.includes('single-vat'), 'homogeneous VAT documents should use the compact single-VAT table state');
-  assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'homogeneous VAT documents should not render per-line VAT');
+  assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'line-item VAT type should not render');
   assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:72px;text-align:right">ภาษี</th>`), 'line-item tax amount column should not render');
 
   const htmlWithDiscount = buildHtml({
@@ -238,7 +237,7 @@ test('standard document hides empty discount column and keeps it only when neede
   assert.ok(htmlWithDiscount.includes('>5%</td>'), 'discount value should render for the discounted line');
 });
 
-test('standard document shows per-line VAT type only for mixed VAT documents', () => {
+test('standard document keeps mixed VAT details in the summary instead of the line-item table', () => {
   const html = buildHtml({
     ...FIXTURE,
     type: 'quotation',
@@ -255,9 +254,8 @@ test('standard document shows per-line VAT type only for mixed VAT documents', (
     ],
   });
 
-  assert.ok(html.includes('mixed-vat'), 'mixed VAT documents should keep the VAT-type table state');
-  assert.ok(html.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'mixed VAT documents should render per-line VAT type');
-  assert.ok(html.includes('>ยกเว้น</td>'), 'mixed VAT documents should show exempt line status');
+  assert.ok(!html.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'mixed VAT documents should not render per-line VAT type');
+  assert.ok(!html.includes('>ยกเว้น</td>'), 'mixed VAT documents should keep VAT details out of line-item rows');
   assert.ok(!html.includes(`<th style="width:72px;text-align:right">ภาษี</th>`), 'per-line tax amount should remain summary-only even for mixed VAT');
 });
 

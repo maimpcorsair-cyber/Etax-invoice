@@ -1,8 +1,11 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (flat A4 PDF + document page footer)
+Last updated: 2026-06-01 (PDF line-item VAT cleanup)
 
 ## Latest work (2026-06-01)
+
+PDF line-item VAT cleanup — ready to deploy:
+- **More room for item details:** standard-builder PDFs no longer render a per-line VAT type column, including mixed `7% / 0% / exempt` documents. VAT stays in the totals summary below the table; tax calculations and e-Tax payload data are unchanged.
 
 Flat A4 PDF + document page footer — shipped and verified live on prod (`9372f4e`):
 - **Less boxed accounting layout:** removed the decorative outer paper frame/shadow and flattened the buyer section from a nested card-within-card into one compact accounting block, freeing A4 space.

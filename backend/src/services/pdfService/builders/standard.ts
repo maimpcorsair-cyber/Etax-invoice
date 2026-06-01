@@ -30,7 +30,6 @@ export function buildHtml(data: PdfInvoiceData): string {
   const fontUrl = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap';
   const theme = resolveDocumentTheme(data.templateId);
   const hasLineDiscounts = data.items.some((item) => item.discountAmount > 0);
-  const showLineVatType = new Set(data.items.map((item) => item.vatType)).size > 1;
 
   const itemRows = data.items.map((item, idx) => {
     const nameThEsc = escapeHtml(item.nameTh ?? '');
@@ -51,7 +50,6 @@ export function buildHtml(data: PdfInvoiceData): string {
         <td style="text-align:center">${unitEsc}</td>
         <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
         ${hasLineDiscounts ? `<td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : ''}</td>` : ''}
-        ${showLineVatType ? `<td style="text-align:center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>` : ''}
         <td style="text-align:right">${formatCurrency(item.amount)}</td>
         <td style="text-align:right"><strong>${formatCurrency(item.totalAmount)}</strong></td>
       </tr>`;
@@ -69,7 +67,6 @@ export function buildHtml(data: PdfInvoiceData): string {
     unit: isTh ? 'หน่วย' : isEn ? 'Unit' : 'Unit',
     price: isTh ? 'ราคา/หน่วย' : isEn ? 'Unit Price' : 'Unit Price',
     disc: isTh ? 'ส่วนลด' : isEn ? 'Disc.' : 'Disc.',
-    vat: isTh ? 'VAT' : isEn ? 'VAT' : 'VAT',
     amount: isTh ? 'ราคา' : isEn ? 'Amount' : 'Amount',
     vatAmt: isTh ? 'ภาษี' : isEn ? 'Tax' : 'Tax',
     total: isTh ? 'รวม' : isEn ? 'Total' : 'Total',
@@ -1091,7 +1088,7 @@ export function buildHtml(data: PdfInvoiceData): string {
         <div class="items-header">
           <h2>${labels.item}</h2>
         </div>
-        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'} ${showLineVatType ? 'mixed-vat' : 'single-vat'}">
+        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'}">
           <thead>
             <tr>
               <th style="width:38px;text-align:center">${labels.no}</th>
@@ -1100,7 +1097,6 @@ export function buildHtml(data: PdfInvoiceData): string {
               <th style="width:54px;text-align:center">${labels.unit}</th>
               <th style="width:90px;text-align:right">${labels.price}</th>
               ${hasLineDiscounts ? `<th style="width:52px;text-align:center">${labels.disc}</th>` : ''}
-              ${showLineVatType ? `<th style="width:52px;text-align:center">${labels.vat}</th>` : ''}
               <th style="width:92px;text-align:right">${labels.amount}</th>
               <th style="width:96px;text-align:right">${labels.total}</th>
             </tr>
