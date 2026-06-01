@@ -4,8 +4,8 @@ Last updated: 2026-06-01 (PDF line-item VAT cleanup)
 
 ## Latest work (2026-06-01)
 
-PDF line-item VAT cleanup — ready to deploy:
-- **More room for item details:** standard-builder PDFs no longer render a per-line VAT type column, including mixed `7% / 0% / exempt` documents. VAT stays in the totals summary below the table; tax calculations and e-Tax payload data are unchanged.
+PDF line-item VAT cleanup — shipped and verified live on prod (`e817a94`), final compact-column follow-up in progress:
+- **More room for item details:** standard-builder PDFs no longer render a per-line VAT type column, including mixed `7% / 0% / exempt` documents. The follow-up also removes VAT-inclusive line totals, leaving one pre-VAT amount column per item. VAT and net total stay in the totals summary below the table; tax calculations and e-Tax payload data are unchanged.
 
 Flat A4 PDF + document page footer — shipped and verified live on prod (`9372f4e`):
 - **Less boxed accounting layout:** removed the decorative outer paper frame/shadow and flattened the buyer section from a nested card-within-card into one compact accounting block, freeing A4 space.
