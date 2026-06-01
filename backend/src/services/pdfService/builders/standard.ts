@@ -3,6 +3,28 @@ import { amountInWordsThai, amountInWordsEnglish } from '../../invoiceService';
 import type { PdfInvoiceData } from '../../pdfService';
 
 const ONE_PAGE_ITEM_LIMIT = 8;
+const TAX_INVOICE_FINAL_PAGE_ITEM_LIMIT = 4;
+const TAX_INVOICE_INTERMEDIATE_PAGE_ITEM_LIMIT = 8;
+
+function splitTaxInvoiceItems<T>(items: T[]): T[][] {
+  if (items.length <= ONE_PAGE_ITEM_LIMIT) return [items];
+
+  const finalPageItems = items.slice(-TAX_INVOICE_FINAL_PAGE_ITEM_LIMIT);
+  const precedingItems = items.slice(0, -TAX_INVOICE_FINAL_PAGE_ITEM_LIMIT);
+  const precedingPageCount = Math.ceil(precedingItems.length / TAX_INVOICE_INTERMEDIATE_PAGE_ITEM_LIMIT);
+  const basePageSize = Math.floor(precedingItems.length / precedingPageCount);
+  const pagesWithExtraItem = precedingItems.length % precedingPageCount;
+  const pages: T[][] = [];
+  let offset = 0;
+
+  for (let pageIndex = 0; pageIndex < precedingPageCount; pageIndex += 1) {
+    const pageSize = basePageSize + (pageIndex < pagesWithExtraItem ? 1 : 0);
+    pages.push(precedingItems.slice(offset, offset + pageSize));
+    offset += pageSize;
+  }
+
+  return [...pages, finalPageItems];
+}
 
 function renderItemDetail(value?: string | null): string {
   return (value ?? '')
@@ -31,7 +53,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   const theme = resolveDocumentTheme(data.templateId);
   const hasLineDiscounts = data.items.some((item) => item.discountAmount > 0);
 
-  const itemRows = data.items.map((item, idx) => {
+  const renderItemRow = (item: PdfInvoiceData['items'][number], idx: number) => {
     const nameThEsc = escapeHtml(item.nameTh ?? '');
     const nameEnEsc = item.nameEn ? escapeHtml(item.nameEn) : '';
     const detailTh = renderItemDetail(item.descriptionTh);
@@ -52,7 +74,8 @@ export function buildHtml(data: PdfInvoiceData): string {
         ${hasLineDiscounts ? `<td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : ''}</td>` : ''}
         <td style="text-align:right">${formatCurrency(item.amount)}</td>
       </tr>`;
-  }).join('');
+  };
+  const itemRows = data.items.map(renderItemRow).join('');
 
   const labels = {
     seller: isTh ? 'ผู้ขาย' : isEn ? 'Seller' : 'ผู้ขาย / Seller',
@@ -197,6 +220,80 @@ export function buildHtml(data: PdfInvoiceData): string {
       </div>` : '';
   const isElectronicDocument = data.documentMode === 'electronic';
   const onePageCompact = !customTemplateBlock && data.items.length <= ONE_PAGE_ITEM_LIMIT;
+  const isTaxInvoiceDocument = data.type === 'tax_invoice' || data.type === 'tax_invoice_receipt';
+  const isTaxInvoiceMultiPage = isTaxInvoiceDocument && !customTemplateBlock && data.items.length > ONE_PAGE_ITEM_LIMIT;
+  const vat7Base = +(data.items
+    .filter((item) => item.vatType !== 'vatZero' && item.vatType !== 'vatExempt')
+    .reduce((sum, item) => sum + item.amount, 0) + (data.feeAmount ?? 0)).toFixed(2);
+  const vatZeroBase = +data.items
+    .filter((item) => item.vatType === 'vatZero')
+    .reduce((sum, item) => sum + item.amount, 0)
+    .toFixed(2);
+  const vatExemptBase = +data.items
+    .filter((item) => item.vatType === 'vatExempt')
+    .reduce((sum, item) => sum + item.amount, 0)
+    .toFixed(2);
+  const activeVatCategoryCount = [vat7Base, vatZeroBase, vatExemptBase].filter((amount) => amount > 0).length;
+  const vatSummaryHtml = activeVatCategoryCount <= 1 && vat7Base > 0
+    ? `<div class="totals-row"><span>${labels.vatTotal}</span><strong>${formatCurrency(data.vatAmount)} THB</strong></div>`
+    : [
+        vat7Base > 0 ? `<div class="totals-row"><span>${isTh ? 'ฐานภาษี VAT 7%' : 'VAT 7% base'}</span><strong>${formatCurrency(vat7Base)} THB</strong></div>
+          <div class="totals-row"><span>${labels.vatTotal}</span><strong>${formatCurrency(data.vatAmount)} THB</strong></div>` : '',
+        vatZeroBase > 0 ? `<div class="totals-row"><span>${isTh ? 'ฐานภาษี VAT 0%' : 'VAT 0% base'}</span><strong>${formatCurrency(vatZeroBase)} THB</strong></div>` : '',
+        vatExemptBase > 0 ? `<div class="totals-row"><span>${isTh ? 'รายการยกเว้น VAT' : 'VAT-exempt amount'}</span><strong>${formatCurrency(vatExemptBase)} THB</strong></div>` : '',
+      ].join('');
+  const taxPageHeaderHtml = `
+        <div class="tax-page-header">
+          <div class="tax-page-heading">
+            <strong>${docTitle}</strong>
+            <span>${labels.invoiceNo}: ${escapeHtml(data.invoiceNumber)} &nbsp;·&nbsp; ${labels.date}: ${escapeHtml(dateStr)}</span>
+          </div>
+          <div class="tax-page-parties">
+            <div>
+              <strong>${labels.seller}: ${sellerName}</strong>
+              <span>${labels.taxId}: ${escapeHtml(data.seller.taxId)} &nbsp;·&nbsp; ${labels.branch}: ${sellerBranch}</span>
+              <span>${sellerAddr}</span>
+            </div>
+            <div>
+              <strong>${labels.buyer}: ${buyerName}</strong>
+              <span>${labels.taxId}: ${buyerTaxIdEsc} &nbsp;·&nbsp; ${labels.branch}: ${buyerBranch}</span>
+              <span>${buyerAddr}</span>
+            </div>
+          </div>
+        </div>`;
+  const renderLineItemsSection = (rows: string) => `
+      <div class="items-section">
+        <div class="items-header">
+          <h2>${labels.item}</h2>
+        </div>
+        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'}">
+          <thead>
+            <tr>
+              <th style="width:38px;text-align:center">${labels.no}</th>
+              <th>${labels.item}</th>
+              <th style="width:50px;text-align:center">${labels.qty}</th>
+              <th style="width:54px;text-align:center">${labels.unit}</th>
+              <th style="width:90px;text-align:right">${labels.price}</th>
+              ${hasLineDiscounts ? `<th style="width:52px;text-align:center">${labels.disc}</th>` : ''}
+              <th style="width:92px;text-align:right">${labels.amount}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  const lineItemsSectionHtml = isTaxInvoiceMultiPage
+    ? splitTaxInvoiceItems(data.items).map((items, pageIndex, pages) => {
+        const itemOffset = pages.slice(0, pageIndex).reduce((sum, pageItems) => sum + pageItems.length, 0);
+        const rows = items.map((item, itemIndex) => renderItemRow(item, itemOffset + itemIndex)).join('');
+        const isLastPage = pageIndex === pages.length - 1;
+        return `
+      <div class="tax-item-page${isLastPage ? ' tax-item-page-last' : ''}">
+        ${taxPageHeaderHtml}
+        ${renderLineItemsSection(rows)}
+        ${isLastPage ? '' : `<div class="tax-continuation">${isTh ? 'มีหน้าต่อไป' : 'Continued on next page'}</div>`}
+      </div>`;
+      }).join('')
+    : renderLineItemsSection(itemRows);
   const documentEyebrow = isQuotation
     ? 'Sales Quotation'
     : isElectronicDocument
@@ -484,6 +581,44 @@ export function buildHtml(data: PdfInvoiceData): string {
   .item-detail-en {
     margin-top: 2px;
     color: #72809a;
+  }
+  .tax-page-header { display: none; }
+  .tax-multi-page .hero,
+  .tax-multi-page .overview-grid { display: none; }
+  .tax-multi-page .tax-page-header {
+    display: block;
+    border-top: 4px solid var(--accent-2);
+    border-bottom: 1px solid #cbd5e1;
+    padding: 10px 0 9px;
+    margin-bottom: 10px;
+  }
+  .tax-page-heading,
+  .tax-page-parties {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+  }
+  .tax-page-heading {
+    align-items: baseline;
+    padding-bottom: 7px;
+    margin-bottom: 7px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .tax-page-heading strong { color: var(--accent-2); font-size: 16px; }
+  .tax-page-heading span { color: #475569; text-align: right; font-size: 10.5px; }
+  .tax-page-parties div { display: grid; gap: 2px; min-width: 0; }
+  .tax-page-parties strong { color: #162444; font-size: 11px; }
+  .tax-page-parties span { color: #64748b; font-size: 9.5px; line-height: 1.35; }
+  .tax-item-page:not(.tax-item-page-last) {
+    break-after: page;
+    page-break-after: always;
+  }
+  .tax-continuation {
+    padding-top: 12px;
+    color: var(--accent-2);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: right;
   }
   .summary-grid {
     display: grid;
@@ -1019,7 +1154,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
 </style>
 </head>
-<body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}" data-document-number="${escapeHtml(data.invoiceNumber)}">
+<body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}${isTaxInvoiceMultiPage ? ' tax-multi-page' : ''}" data-document-number="${escapeHtml(data.invoiceNumber)}">
   <div class="page">
   <div class="document-shell">
     <div class="top-accent"></div>
@@ -1082,25 +1217,7 @@ export function buildHtml(data: PdfInvoiceData): string {
         </div>
       </div>
 
-      <div class="items-section">
-        <div class="items-header">
-          <h2>${labels.item}</h2>
-        </div>
-        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'}">
-          <thead>
-            <tr>
-              <th style="width:38px;text-align:center">${labels.no}</th>
-              <th>${labels.item}</th>
-              <th style="width:50px;text-align:center">${labels.qty}</th>
-              <th style="width:54px;text-align:center">${labels.unit}</th>
-              <th style="width:90px;text-align:right">${labels.price}</th>
-              ${hasLineDiscounts ? `<th style="width:52px;text-align:center">${labels.disc}</th>` : ''}
-              <th style="width:92px;text-align:right">${labels.amount}</th>
-            </tr>
-          </thead>
-          <tbody>${itemRows}</tbody>
-        </table>
-      </div>
+      ${lineItemsSectionHtml}
 
       <div class="summary-grid">
         <div class="notes-stack">
@@ -1125,7 +1242,7 @@ export function buildHtml(data: PdfInvoiceData): string {
           <div class="totals-row"><span>${labels.subtotal}</span><strong>${formatCurrency(data.subtotal)} THB</strong></div>
           ${data.feeAmount && data.feeAmount > 0 ? `<div class="totals-row"><span>${escapeHtml(data.feeLabel || (isTh ? 'ค่าบริหารงาน' : 'Management fee'))}${data.feePercent ? ` (${data.feePercent}%)` : ''}</span><strong>${formatCurrency(data.feeAmount)} THB</strong></div>
           <div class="totals-row"><span>${isTh ? 'รวมก่อน VAT' : 'Sub Total'}</span><strong>${formatCurrency(data.subtotal + data.feeAmount)} THB</strong></div>` : ''}
-          <div class="totals-row"><span>${labels.vatTotal}</span><strong>${formatCurrency(data.vatAmount)} THB</strong></div>
+          ${vatSummaryHtml}
           <div class="totals-row grand"><span>${labels.grandTotal}</span><strong>${formatCurrency(data.total)} THB</strong></div>
           ${whtAmount > 0 ? `<div class="totals-row wht"><span>${isTh ? 'หัก ณ ที่จ่าย' : 'Withholding tax'} (${whtRateNum}%)</span><strong>-${formatCurrency(whtAmount)} THB</strong></div>
           <div class="totals-row net"><span>${isTh ? 'ยอดชำระสุทธิ' : 'Net payable'}</span><strong>${formatCurrency(whtNetPayable)} THB</strong></div>` : ''}

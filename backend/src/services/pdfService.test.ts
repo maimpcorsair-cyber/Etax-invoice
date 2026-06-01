@@ -252,12 +252,45 @@ test('standard document keeps mixed VAT details in the summary instead of the li
         vatAmount: 0,
         totalAmount: FIXTURE.items[1]!.amount,
       },
+      {
+        ...FIXTURE.items[1]!,
+        nameTh: 'รายการ VAT 0%',
+        vatType: 'vatZero',
+        amount: 5_000,
+        vatAmount: 0,
+        totalAmount: 5_000,
+      },
     ],
   });
 
   assert.ok(!html.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'mixed VAT documents should not render per-line VAT type');
   assert.ok(!html.includes('>ยกเว้น</td>'), 'mixed VAT documents should keep VAT details out of line-item rows');
   assert.ok(!html.includes(`<th style="width:72px;text-align:right">ภาษี</th>`), 'per-line tax amount should remain summary-only even for mixed VAT');
+  assert.ok(html.includes('ฐานภาษี VAT 7%'), 'mixed VAT summary should identify the VAT 7% base');
+  assert.ok(html.includes('30,000.00 THB'), 'mixed VAT summary should show the VAT 7% base amount');
+  assert.ok(html.includes('รายการยกเว้น VAT'), 'mixed VAT summary should identify the exempt base');
+  assert.ok(html.includes('15,000.00 THB'), 'mixed VAT summary should show the exempt base amount');
+  assert.ok(html.includes('ฐานภาษี VAT 0%'), 'mixed VAT summary should identify the VAT 0% base');
+  assert.ok(html.includes('5,000.00 THB'), 'mixed VAT summary should show the VAT 0% base amount');
+});
+
+test('standard multi-page T02 repeats its tax header and marks only intermediate pages as continued', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    type: 'tax_invoice',
+    invoiceNumber: 'T02-2026-000010',
+    items: Array.from({ length: 11 }, (_, idx) => ({
+      ...FIXTURE.items[idx % FIXTURE.items.length]!,
+      nameTh: `รายการใบกำกับภาษีหลายหน้า ${idx + 1}`,
+    })),
+    documentMode: 'ordinary',
+  });
+
+  assert.ok(html.includes(' tax-multi-page" data-document-number'), 'long T02 should use the controlled tax multi-page flow');
+  assert.equal((html.match(/class="tax-page-header"/g) ?? []).length, 2, 'each controlled tax page should repeat its accounting header');
+  assert.equal((html.match(/มีหน้าต่อไป/g) ?? []).length, 1, 'only the intermediate tax page should say that another page follows');
+  assert.equal((html.match(/T02-2026-000010/g) ?? []).length >= 3, true, 'document number should appear in repeated tax headers and body metadata');
+  assert.equal((html.match(/class="totals-card"/g) ?? []).length, 1, 'tax totals should render once after the final item page');
 });
 
 test('standard quotation document uses quotation copy and valid-until wording', () => {
