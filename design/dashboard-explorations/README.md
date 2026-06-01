@@ -22,3 +22,11 @@ cd design/dashboard-explorations && python3 -m http.server 8899
 # open http://localhost:8899/A-statement.html (B, C)
 ```
 (Google Fonts load over network — needs internet for the intended typefaces.)
+
+## Selected direction
+
+**D · Hybrid (B+C)** is the locked target (`D-hybrid.html`): Console shell
+(navy rail + KPI strip + worklist table + VAT panel + pipeline) with the
+focal next-action hero from C at the top. The tokens in `D-hybrid.html`
+`:root` are mirrored into the app at `frontend/src/index.css` under the `.bb`
+scope (opt-in per page). Fonts: Anuphan (Thai/body) + Archivo (numerals).

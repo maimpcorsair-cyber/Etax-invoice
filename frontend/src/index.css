@@ -42,6 +42,42 @@ html, body {
     --radius-card: 18px;
     --shadow-soft: 0 16px 48px rgba(15, 23, 42, 0.09);
     --shadow-lift: 0 24px 64px rgba(15, 23, 42, 0.13);
+
+    /* ── Design system v2 (Billboy redesign — "Statement/Console" hybrid) ──
+       Opt-in via the `.bb` scope class so pages migrate one at a time;
+       global styles above are untouched until a page adopts `.bb`.
+       OKLCH, neutrals tinted toward the navy hue, navy as the only accent. */
+    --bb-bg:        oklch(0.984 0.004 258);
+    --bb-panel:     oklch(1 0 0);
+    --bb-ink:       oklch(0.24 0.028 260);
+    --bb-muted:     oklch(0.52 0.02 260);
+    --bb-faint:     oklch(0.64 0.015 260);
+    --bb-line:      oklch(0.91 0.01 260);
+    --bb-line-2:    oklch(0.95 0.008 260);
+    --bb-navy:      oklch(0.40 0.10 262);
+    --bb-navy-deep: oklch(0.29 0.085 263);
+    --bb-navy-soft: oklch(0.96 0.022 258);
+    --bb-good:      oklch(0.52 0.10 152);
+    --bb-good-bg:   oklch(0.95 0.04 152);
+    --bb-warn:      oklch(0.58 0.12 60);
+    --bb-warn-bg:   oklch(0.95 0.05 75);
+    --bb-due:       oklch(0.53 0.16 28);
+    --bb-due-bg:    oklch(0.965 0.03 30);
+  }
+
+  /* Scope: apply to a page/app-shell root to adopt the v2 visual language. */
+  .bb {
+    font-family: 'Anuphan', sans-serif;
+    color: var(--bb-ink);
+    background: var(--bb-bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Tabular lining figures for money/counts — Archivo carries the numerals. */
+  .bb-num {
+    font-family: 'Archivo', sans-serif;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.015em;
   }
 
   html[lang='th'] {
