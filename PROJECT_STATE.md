@@ -4,10 +4,10 @@ Last updated: 2026-06-01 (quotation preview workstation + sent-state guard)
 
 ## Latest work (2026-06-01)
 
-Quotation builder preview + sent-state guard — local verified, ready for production rollout:
+Quotation builder preview + sent-state guard — shipped to production via Vercel (`d32797c`, `dpl_8L7ZHmiENcbBFmzMpVBezCguxKKF`):
 - **Invoice-style preview workstation:** `/app/quotations/new` now has the same right-side A4 preview experience as the invoice builder: template dropdown, swatches, live updating A4 frame, zoom percent, preview loading/error states, download PDF, and open-fullscreen PDF action.
 - **Intermittent sent-status error fixed:** after "บันทึกและไปหน้าส่ง", the frontend now syncs the returned `sent` quotation immediately. If an older tab/action hits the backend guard `Cannot edit a quotation in status 'sent'`, the page refreshes status and shows the send-ready state instead of a scary red error.
-- **Verification:** frontend typecheck, lint, build, and `git diff --check` pass. Playwright local QA with Vite proxying to Render production confirmed `/app/quotations/new` renders the new preview pane and produces a live A4 iframe after adding an item, with no new console errors.
+- **Verification:** frontend typecheck, lint, build, and `git diff --check` pass. Playwright local QA with Vite proxying to Render production confirmed `/app/quotations/new` renders the new preview pane and produces a live A4 iframe after adding an item, with no new console errors. GitHub Typecheck + Unit tests + Prod smoke green for `d32797c`; Vercel production deployment `dpl_8L7ZHmiENcbBFmzMpVBezCguxKKF` is Ready + aliased to `etax-invoice.vercel.app`.
 
 Frontend UI polish — shipped to production via Vercel (main `6e272dd`, delete-button rollout `355ee6d`, quotation delete-visibility fix `80ec517`):
 - **DeleteButton rollout + visibility fix (`#5` `355ee6d`, `#6` `80ec517`):** reusable `<DeleteButton/>` now used at all icon-delete spots (Settings bank accounts, PurchaseInvoices/Expenses rows, expense line items). Quotation item table (`min-w-[860px]` in `overflow-x-auto`) had its delete column clipped off-screen in the narrow form pane — fixed by pinning it `sticky right-0`. Verified live on production (logged-in) that the trash now shows. DeliveryNote (`w-full` table) + Recurring (grid) were not clipped.
