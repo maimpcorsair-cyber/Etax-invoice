@@ -12,7 +12,7 @@ const STATUS_META: Record<DeliveryNoteStatus, { th: string; en: string; tone: st
   draft:     { th: 'แบบร่าง', en: 'Draft', tone: 'bg-slate-100 text-slate-700' },
   issued:    { th: 'ออกแล้ว', en: 'Issued', tone: 'bg-blue-100 text-blue-700' },
   delivered: { th: 'ส่งแล้ว', en: 'Delivered', tone: 'bg-emerald-100 text-emerald-700' },
-  converted: { th: 'แปลงแล้ว', en: 'Converted', tone: 'bg-indigo-100 text-indigo-700' },
+  converted: { th: 'แปลงแล้ว', en: 'Converted', tone: 'bg-primary-100 text-primary-700' },
   cancelled: { th: 'ยกเลิก', en: 'Cancelled', tone: 'bg-slate-100 text-slate-500' },
 };
 
@@ -314,7 +314,7 @@ export default function DeliveryNoteBuilder() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>;
+    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>;
   }
 
   return (
@@ -489,7 +489,7 @@ export default function DeliveryNoteBuilder() {
           <div className="flex justify-between"><span className="text-gray-500">{isThai ? 'จำนวนส่งรวม' : 'Delivered qty'}</span><span>{totals.deliveredQty}</span></div>
           <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
             <span>{isThai ? 'มูลค่ารวมโดยประมาณ' : 'Estimated amount'}</span>
-            <span className="text-indigo-700">{formatCurrency(totals.amount)}</span>
+            <span className="text-primary-700">{formatCurrency(totals.amount)}</span>
           </div>
         </div>
       </div>

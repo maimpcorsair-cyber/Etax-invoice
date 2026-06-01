@@ -426,7 +426,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
               : 'Upgrade your plan to use the LINE AI Assistant (Billboy).'}
           </p>
         </div>
-        <Link to="/app/plan" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+        <Link to="/app/plan" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
           <Zap className="w-4 h-4" />
           {isThai ? 'ดูแพ็กเกจทั้งหมด' : 'View plans'}
         </Link>
@@ -445,26 +445,26 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
       </h2>
 
       {/* Section 1: Features — 4 document groups */}
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-4">
-        <p className="font-semibold text-indigo-900 text-sm">
+      <div className="rounded-xl border border-primary-100 bg-primary-50 p-5 space-y-4">
+        <p className="font-semibold text-primary-900 text-sm">
           {isThai ? 'Billboy รองรับเอกสาร 16+ ประเภท ครอบคลุม 4 กลุ่มงาน' : 'Billboy supports 16+ document types across 4 categories'}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
-            <p className="text-xs font-semibold text-indigo-700">{isThai ? 'ภาษีซื้อ (Input VAT)' : 'Input VAT Documents'}</p>
-            <p className="text-xs text-indigo-800">{isThai ? 'ใบกำกับภาษี, ใบเสร็จ, ใบแจ้งหนี้, ใบวางบิล, ใบลดหนี้, ใบเพิ่มหนี้' : 'Tax invoice, receipt, invoice, billing note, credit note, debit note'}</p>
+          <div className="rounded-lg bg-white/70 border border-primary-100 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-primary-700">{isThai ? 'ภาษีซื้อ (Input VAT)' : 'Input VAT Documents'}</p>
+            <p className="text-xs text-primary-800">{isThai ? 'ใบกำกับภาษี, ใบเสร็จ, ใบแจ้งหนี้, ใบวางบิล, ใบลดหนี้, ใบเพิ่มหนี้' : 'Tax invoice, receipt, invoice, billing note, credit note, debit note'}</p>
           </div>
-          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+          <div className="rounded-lg bg-white/70 border border-primary-100 p-3 space-y-1.5">
             <p className="text-xs font-semibold text-emerald-700">{isThai ? 'หลักฐานชำระเงิน' : 'Payment Proofs'}</p>
-            <p className="text-xs text-indigo-800">{isThai ? 'สลิปโอนเงินทุกธนาคาร, รายการเดินบัญชี, Payment Advice' : 'Bank transfer slips, bank statements, payment advice'}</p>
+            <p className="text-xs text-primary-800">{isThai ? 'สลิปโอนเงินทุกธนาคาร, รายการเดินบัญชี, Payment Advice' : 'Bank transfer slips, bank statements, payment advice'}</p>
           </div>
-          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+          <div className="rounded-lg bg-white/70 border border-primary-100 p-3 space-y-1.5">
             <p className="text-xs font-semibold text-purple-700">{isThai ? 'เอกสารประกอบ' : 'Supporting Documents'}</p>
-            <p className="text-xs text-indigo-800">{isThai ? 'ใบเสนอราคา, Purchase Order (PO), ใบส่งของ, สัญญา, หนังสือหัก ณ ที่จ่าย' : 'Quotation, PO, delivery note, contract, withholding tax cert'}</p>
+            <p className="text-xs text-primary-800">{isThai ? 'ใบเสนอราคา, Purchase Order (PO), ใบส่งของ, สัญญา, หนังสือหัก ณ ที่จ่าย' : 'Quotation, PO, delivery note, contract, withholding tax cert'}</p>
           </div>
-          <div className="rounded-lg bg-white/70 border border-indigo-100 p-3 space-y-1.5">
+          <div className="rounded-lg bg-white/70 border border-primary-100 p-3 space-y-1.5">
             <p className="text-xs font-semibold text-amber-700">{isThai ? 'AI อัจฉริยะ' : 'Smart AI'}</p>
-            <p className="text-xs text-indigo-800">{isThai ? 'ถามตอบบัญชี, สรุป VAT, แจ้งเตือนเกินกำหนด, พิมพ์ไทยได้เลย' : 'Accounting Q&A, VAT summary, overdue alerts, natural Thai input'}</p>
+            <p className="text-xs text-primary-800">{isThai ? 'ถามตอบบัญชี, สรุป VAT, แจ้งเตือนเกินกำหนด, พิมพ์ไทยได้เลย' : 'Accounting Q&A, VAT summary, overdue alerts, natural Thai input'}</p>
           </div>
         </div>
       </div>
@@ -706,7 +706,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
       {lineStatus?.linked && (
         <div className="border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-indigo-600" />
+            <Bell className="w-4 h-4 text-primary-600" />
             <h3 className="font-medium text-gray-800">
               {isThai ? 'การตั้งค่าการแจ้งเตือน' : 'Notification Settings'}
             </h3>
@@ -716,7 +716,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 accent-indigo-600"
+                className="w-4 h-4 accent-primary-600"
                 checked={localNotifyEnabled}
                 onChange={e => setLocalNotifyEnabled(e.target.checked)}
               />

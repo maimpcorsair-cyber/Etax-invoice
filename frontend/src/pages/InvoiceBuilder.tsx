@@ -840,8 +840,8 @@ export default function InvoiceBuilder() {
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Updating badge */}
           {inlinePreviewLoading && (
-            <span className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-full">
-              <span className="w-2.5 h-2.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin inline-block" />
+            <span className="flex items-center gap-1.5 text-xs text-primary-600 bg-primary-50 border border-primary-200 px-2 py-1 rounded-full">
+              <span className="w-2.5 h-2.5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin inline-block" />
               {isThai ? 'กำลังอัปเดต...' : 'Updating...'}
             </span>
           )}
@@ -907,7 +907,7 @@ export default function InvoiceBuilder() {
           </div>
         ) : inlinePreviewLoading && !inlinePreviewHtml ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16">
-            <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
             <p className="text-sm text-slate-500">{isThai ? 'กำลังโหลดตัวอย่าง...' : 'Loading preview...'}</p>
           </div>
         ) : inlinePreviewHtml ? (
@@ -935,7 +935,7 @@ export default function InvoiceBuilder() {
               >
                 {inlinePreviewLoading && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-white/60">
-                    <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-500" />
+                    <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-200 border-t-primary-500" />
                   </div>
                 )}
                 <iframe
@@ -951,7 +951,7 @@ export default function InvoiceBuilder() {
         ) : (
           <div className="flex w-full flex-1 items-start justify-center py-8">
             <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-500">
                 <Eye className="h-6 w-6" />
               </div>
               <p className="mt-3 text-sm font-bold text-slate-900">
@@ -1070,7 +1070,7 @@ export default function InvoiceBuilder() {
           onClick={() => setMobileTab('form')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors border-b-2 ${
             mobileTab === 'form'
-              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              ? 'border-primary-600 text-primary-600 bg-primary-50/50'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -1081,7 +1081,7 @@ export default function InvoiceBuilder() {
           onClick={() => setMobileTab('preview')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors border-b-2 ${
             mobileTab === 'preview'
-              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              ? 'border-primary-600 text-primary-600 bg-primary-50/50'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >

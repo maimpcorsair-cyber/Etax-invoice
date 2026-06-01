@@ -10,7 +10,7 @@ const STATUS_LABELS: Record<DeliveryNoteStatus, { th: string; en: string; tone: 
   draft:     { th: 'แบบร่าง', en: 'Draft', tone: 'bg-slate-100 text-slate-700', icon: FileText },
   issued:    { th: 'ออกแล้ว', en: 'Issued', tone: 'bg-blue-100 text-blue-700', icon: Clock },
   delivered: { th: 'ส่งแล้ว', en: 'Delivered', tone: 'bg-emerald-100 text-emerald-700', icon: CheckCircle },
-  converted: { th: 'แปลงแล้ว', en: 'Converted', tone: 'bg-indigo-100 text-indigo-700', icon: Receipt },
+  converted: { th: 'แปลงแล้ว', en: 'Converted', tone: 'bg-primary-100 text-primary-700', icon: Receipt },
   cancelled: { th: 'ยกเลิก', en: 'Cancelled', tone: 'bg-slate-100 text-slate-500', icon: XCircle },
 };
 
@@ -61,7 +61,7 @@ export default function DeliveryNoteList() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Truck className="w-6 h-6 text-indigo-600" />
+            <Truck className="w-6 h-6 text-primary-600" />
             {isThai ? 'ใบส่งของ' : 'Delivery Notes'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -102,7 +102,7 @@ export default function DeliveryNoteList() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
       ) : deliveryNotes.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
           <Truck className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -132,7 +132,7 @@ export default function DeliveryNoteList() {
                 const Icon = meta.icon;
                 return (
                   <tr key={note.id} onClick={() => navigate(`/app/delivery-notes/${note.id}`)} className="hover:bg-gray-50 cursor-pointer">
-                    <td className="table-cell font-mono text-sm font-semibold text-indigo-700">{note.deliveryNoteNumber}</td>
+                    <td className="table-cell font-mono text-sm font-semibold text-primary-700">{note.deliveryNoteNumber}</td>
                     <td className="table-cell">
                       <div className="font-medium text-gray-900">{note.buyer?.nameTh ?? '-'}</div>
                       <div className="text-xs text-gray-500">{note.buyer?.taxId ?? ''}</div>
@@ -155,7 +155,7 @@ export default function DeliveryNoteList() {
       )}
 
       <div className="text-xs text-gray-400 mt-2">
-        <Link to="/app/quotations" className="text-indigo-600 hover:underline">
+        <Link to="/app/quotations" className="text-primary-600 hover:underline">
           {isThai ? '→ ดูใบเสนอราคา' : '→ View quotations'}
         </Link>
       </div>

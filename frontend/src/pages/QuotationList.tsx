@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<QuotationStatus, { th: string; en: string; tone: str
   draft:     { th: 'แบบร่าง',     en: 'Draft',     tone: 'bg-slate-100 text-slate-700',   icon: FileText },
   sent:      { th: 'ส่งแล้ว',     en: 'Sent',      tone: 'bg-blue-100 text-blue-700',     icon: Clock },
   accepted:  { th: 'ยอมรับ',      en: 'Accepted',  tone: 'bg-emerald-100 text-emerald-700', icon: CheckCircle },
-  converted: { th: 'แปลงแล้ว',    en: 'Converted', tone: 'bg-indigo-100 text-indigo-700', icon: ArrowRight },
+  converted: { th: 'แปลงแล้ว',    en: 'Converted', tone: 'bg-primary-100 text-primary-700', icon: ArrowRight },
   rejected:  { th: 'ปฏิเสธ',      en: 'Rejected',  tone: 'bg-rose-100 text-rose-700',     icon: XCircle },
   expired:   { th: 'หมดอายุ',     en: 'Expired',   tone: 'bg-amber-100 text-amber-700',   icon: Clock },
   cancelled: { th: 'ยกเลิก',      en: 'Cancelled', tone: 'bg-slate-100 text-slate-500',   icon: XCircle },
@@ -105,7 +105,7 @@ export default function QuotationList() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-indigo-600" />
+            <FileText className="w-6 h-6 text-primary-600" />
             {isThai ? 'ใบเสนอราคา' : 'Quotations'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -150,7 +150,7 @@ export default function QuotationList() {
       {listMsg && (
         <div className={`border px-4 py-3 text-sm ${
           listMsg.type === 'ok'
-            ? 'border-indigo-100 bg-indigo-50 text-indigo-800'
+            ? 'border-primary-100 bg-primary-50 text-primary-800'
             : 'border-rose-200 bg-rose-50 text-rose-800'
         }`}>
           {listMsg.text}
@@ -158,7 +158,7 @@ export default function QuotationList() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
       ) : quotations.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
           <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -199,9 +199,9 @@ export default function QuotationList() {
                   >
                     <td className="table-cell">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-indigo-700">{q.quotationNumber}</span>
+                        <span className="font-mono text-sm font-semibold text-primary-700">{q.quotationNumber}</span>
                         {(q.revisionNo ?? 0) > 0 && (
-                          <span className="border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                          <span className="border border-primary-100 bg-primary-50 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700">
                             R{q.revisionNo}
                           </span>
                         )}
@@ -235,7 +235,7 @@ export default function QuotationList() {
                               void shareQuotation(q);
                             }}
                             disabled={shareId === q.id}
-                            className="inline-flex items-center gap-1 border border-indigo-100 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                            className="inline-flex items-center gap-1 border border-primary-100 bg-white px-2.5 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:opacity-60"
                           >
                             {shareId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
                             {isThai ? 'ลิงก์' : 'Link'}
@@ -264,7 +264,7 @@ export default function QuotationList() {
       )}
 
       <div className="text-xs text-gray-400 mt-2">
-        <Link to="/app/invoices" className="text-indigo-600 hover:underline">
+        <Link to="/app/invoices" className="text-primary-600 hover:underline">
           {isThai ? '→ ดูใบกำกับภาษีที่ออกแล้ว' : '→ View issued tax invoices'}
         </Link>
       </div>
