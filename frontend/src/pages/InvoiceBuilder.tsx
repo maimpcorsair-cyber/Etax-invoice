@@ -15,6 +15,7 @@ import DocumentSettingsCard from '../components/invoice/DocumentSettingsCard';
 import DocumentAppearanceCard from '../components/invoice/DocumentAppearanceCard';
 import SellerCard from '../components/invoice/SellerCard';
 import BuyerCard from '../components/invoice/BuyerCard';
+import CustomerFormModal from '../components/customer/CustomerFormModal';
 import ItemsTable from '../components/invoice/ItemsTable';
 import NotesPaymentCard from '../components/invoice/NotesPaymentCard';
 import WhtCard from '../components/invoice/WhtCard';
@@ -180,6 +181,7 @@ export default function InvoiceBuilder() {
   const preview = useInvoicePreview(ctx);
 
   const [showBuyerSection, setShowBuyerSection] = useState(true);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [loadingInvoice, setLoadingInvoice] = useState(isEdit);
   const [loadInvoiceError, setLoadInvoiceError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<DocumentTemplateOption[]>([]);
@@ -802,6 +804,7 @@ export default function InvoiceBuilder() {
             }}
             onClearCustomer={customer.clearCustomer}
             onToggleSection={() => setShowBuyerSection((s) => !s)}
+            onAddCustomer={() => setShowAddCustomer(true)}
           />
         </div>
         <div ref={itemsRef} className="scroll-mt-28 xl:col-span-2">
@@ -1231,6 +1234,21 @@ export default function InvoiceBuilder() {
         downloading={preview.downloading}
         onDownload={preview.handleDownloadPdf}
         onClose={preview.closePreview}
+      />
+
+      <CustomerFormModal
+        open={showAddCustomer}
+        onClose={() => setShowAddCustomer(false)}
+        onSaved={(created) => {
+          customer.setCustomers((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+          customer.setSelectedCustomerId(created.id);
+          customer.setCustomerSearch(isThai ? created.nameTh : (created.nameEn ?? created.nameTh));
+          customer.clearResults();
+          setShowBuyerSection(true);
+        }}
+        token={token}
+        isThai={isThai}
+        lockPartyRole="customer"
       />
 
     </div>

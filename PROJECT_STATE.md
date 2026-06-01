@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (clickable sales-list rows + landing book-flip cards)
+Last updated: 2026-06-02 (inline add-customer popup across builders)
 
 ## Latest work (2026-06-02)
+
+Inline "add new customer" popup across all builders — `frontend/src/components/customer/CustomerFormModal.tsx`:
+- New shared modal reuses the Customers directory create form (party role · DBD/open-data lookup · tax fields · address · credit terms). The builders previously navigated away to `/app/customers` to add a buyer; now a `+ เพิ่มลูกค้าใหม่` button opens the popup in place, and on save the new customer is selected immediately.
+- Wired into all four customer-selecting builders: InvoiceBuilder (via `BuyerCard`'s new `onAddCustomer` prop), QuotationBuilder, DeliveryNoteBuilder, RecurringInvoiceBuilder. `useCustomerSearch` now also returns `setCustomers` so InvoiceBuilder can inject the created customer into its search list.
+- Builder context passes `lockPartyRole="customer"` → the customer/vendor role picker is hidden and the vendor-payee use-case is filtered out (a quote/invoice is always to a buyer).
+- Scope decision: the modal contains the create form only; the Customers page keeps its richer editor (Drive evidence upload, portal invite, readiness) — those are post-save management features that don't belong in a quick add-buyer flow, so Customers.tsx was intentionally left untouched (lower regression risk on a production-critical page). Follow-up if desired: converge Customers.tsx onto the shared modal via a children slot for the evidence section. Verified: frontend typecheck + build. Not yet click-tested live (no prod login creds in session).
+
 
 Clickable sales-list rows + landing book-flip feature cards — shipped to prod (`3b4f06b`, `f6e4e3f`; CI Typecheck + Unit + Prod-smoke green; Vercel auto-deploy):
 - **Clickable rows:** InvoiceList (ใบกำกับภาษี/ใบเสร็จ — desktop table + mobile card) and RecurringInvoiceList (วางบิลซ้ำ) now open the row's view/edit page on a click anywhere in the row, matching the existing Quotation/DeliveryNote UX. Row handler uses a `closest('a,button,input,select,label,[role=button]')` guard so inline actions (Submit RD, Preview, Receipt, Pay, LINE, Cancel, PDF, Generate, Pause/Resume) still fire — cleaner than per-button stopPropagation.

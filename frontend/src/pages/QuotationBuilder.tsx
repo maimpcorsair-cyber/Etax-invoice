@@ -9,6 +9,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import DeleteButton from '../components/ui/DeleteButton';
+import CustomerFormModal from '../components/customer/CustomerFormModal';
 import type { Customer, Quotation, QuotationStatus } from '../types';
 import {
   DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID,
@@ -150,6 +151,7 @@ export default function QuotationBuilder() {
 
   const [existing, setExisting] = useState<Quotation | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -1054,7 +1056,19 @@ export default function QuotationBuilder() {
       {/* Customer + dates */}
       <div className="card grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="sm:col-span-3">
-          <label className="label">{isThai ? 'ลูกค้า' : 'Customer'}</label>
+          <div className="flex items-center justify-between gap-2">
+            <label className="label">{isThai ? 'ลูกค้า' : 'Customer'}</label>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => setShowAddCustomer(true)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-800"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {isThai ? 'เพิ่มลูกค้าใหม่' : 'Add new customer'}
+              </button>
+            )}
+          </div>
           <select
             value={form.buyerId}
             onChange={(e) => setForm({ ...form, buyerId: e.target.value })}
@@ -1068,8 +1082,8 @@ export default function QuotationBuilder() {
           </select>
           {!form.buyerId && (
             <p className="text-xs text-gray-500 mt-1">
-              {isThai ? 'ยังไม่มีลูกค้า? ' : 'No customers yet? '}
-              <Link to="/app/customers/new" className="text-primary-600 underline">{isThai ? 'เพิ่มลูกค้าใหม่' : 'Add a new customer'}</Link>
+              {isThai ? 'ยังไม่มีลูกค้า? กด ' : 'No customers yet? Tap '}
+              <button type="button" onClick={() => setShowAddCustomer(true)} className="text-primary-600 underline">{isThai ? 'เพิ่มลูกค้าใหม่' : 'Add a new customer'}</button>
             </p>
           )}
         </div>
@@ -1800,6 +1814,17 @@ export default function QuotationBuilder() {
         </div>
       </aside>
     </div>{/* grid */}
+    <CustomerFormModal
+      open={showAddCustomer}
+      onClose={() => setShowAddCustomer(false)}
+      onSaved={(customer) => {
+        setCustomers((prev) => [customer, ...prev]);
+        setForm((prev) => ({ ...prev, buyerId: customer.id }));
+      }}
+      token={token}
+      isThai={isThai}
+      lockPartyRole="customer"
+    />
     </div>
   );
 }

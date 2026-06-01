@@ -36,6 +36,7 @@ export function useCustomerSearch({ token, partyRole = 'customer' }: Options) {
 
   return {
     customers,
+    setCustomers,
     customerSearch,
     setCustomerSearch,
     selectedCustomerId,

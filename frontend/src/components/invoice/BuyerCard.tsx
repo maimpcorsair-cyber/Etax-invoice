@@ -12,6 +12,8 @@ interface Props {
   onSelectCustomer: (customer: Customer, name: string) => void;
   onClearCustomer: () => void;
   onToggleSection: () => void;
+  /** When provided, the "add new customer" link opens this popup instead of navigating away. */
+  onAddCustomer?: () => void;
 }
 
 function maskPersonalId(value: string) {
@@ -39,6 +41,7 @@ export default function BuyerCard({
   onSelectCustomer,
   onClearCustomer,
   onToggleSection,
+  onAddCustomer,
 }: Props) {
   const { t } = useTranslation();
   const { isThai } = useLanguage();
@@ -173,15 +176,27 @@ export default function BuyerCard({
 
           <p className="text-xs text-gray-400">
             {isThai ? 'ยังไม่มีลูกค้า?' : 'Customer not found?'}{' '}
-            <a
-              href="/app/customers"
-              target="_blank"
-              className="text-primary-600 hover:underline"
-            >
-              {isThai ? 'เพิ่มลูกค้าใหม่' : 'Add new customer'}
-            </a>
+            {onAddCustomer ? (
+              <button
+                type="button"
+                onClick={onAddCustomer}
+                className="text-primary-600 hover:underline"
+              >
+                {isThai ? 'เพิ่มลูกค้าใหม่' : 'Add new customer'}
+              </button>
+            ) : (
+              <a
+                href="/app/customers"
+                target="_blank"
+                className="text-primary-600 hover:underline"
+              >
+                {isThai ? 'เพิ่มลูกค้าใหม่' : 'Add new customer'}
+              </a>
+            )}
             <span className="ml-1">
-              {isThai ? 'แล้วกลับมาเลือกที่หน้านี้ได้ทันที' : 'then return here to select them.'}
+              {isThai
+                ? (onAddCustomer ? 'ได้เลยที่หน้านี้' : 'แล้วกลับมาเลือกที่หน้านี้ได้ทันที')
+                : (onAddCustomer ? 'right here.' : 'then return here to select them.')}
             </span>
           </p>
         </div>

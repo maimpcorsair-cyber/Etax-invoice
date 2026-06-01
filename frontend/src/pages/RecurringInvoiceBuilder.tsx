@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarClock, Loader2, Plus, Receipt, Save } from 'lucide-r
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import DeleteButton from '../components/ui/DeleteButton';
+import CustomerFormModal from '../components/customer/CustomerFormModal';
 import type { Customer, Language, RecurringInvoice, RecurringInvoiceFrequency, RecurringInvoiceItem } from '../types';
 
 type ItemDraft = Omit<RecurringInvoiceItem, 'id'>;
@@ -56,6 +57,7 @@ export default function RecurringInvoiceBuilder() {
   const { token } = useAuthStore();
   const { isThai, formatCurrency } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [existing, setExisting] = useState<RecurringInvoice | null>(null);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -261,13 +263,23 @@ export default function RecurringInvoiceBuilder() {
                 <span className="text-xs font-semibold text-gray-600">{isThai ? 'ชื่อรอบวางบิล' : 'Schedule name'}</span>
                 <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} className="input-field mt-1 w-full" placeholder={isThai ? 'เช่น ค่าบริการรายเดือน' : 'e.g. Monthly service fee'} />
               </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-gray-600">{isThai ? 'ลูกค้า' : 'Customer'}</span>
+              <div className="block">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-gray-600">{isThai ? 'ลูกค้า' : 'Customer'}</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomer(true)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-800"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {isThai ? 'เพิ่มลูกค้าใหม่' : 'Add new customer'}
+                  </button>
+                </div>
                 <select value={form.customerId} onChange={(e) => setForm((prev) => ({ ...prev, customerId: e.target.value }))} className="input-field mt-1 w-full">
                   <option value="">{isThai ? 'เลือกลูกค้า' : 'Select customer'}</option>
                   {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.nameTh}</option>)}
                 </select>
-              </label>
+              </div>
               <label className="block">
                 <span className="text-xs font-semibold text-gray-600">{isThai ? 'ความถี่' : 'Frequency'}</span>
                 <select value={form.frequency} onChange={(e) => setForm((prev) => ({ ...prev, frequency: e.target.value as RecurringInvoiceFrequency }))} className="input-field mt-1 w-full">
@@ -361,6 +373,17 @@ export default function RecurringInvoiceBuilder() {
           ) : null}
         </aside>
       </div>
+      <CustomerFormModal
+        open={showAddCustomer}
+        onClose={() => setShowAddCustomer(false)}
+        onSaved={(customer) => {
+          setCustomers((prev) => [customer, ...prev]);
+          setForm((prev) => ({ ...prev, customerId: customer.id }));
+        }}
+        token={token}
+        isThai={isThai}
+        lockPartyRole="customer"
+      />
     </div>
   );
 }

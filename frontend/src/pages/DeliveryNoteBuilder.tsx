@@ -7,6 +7,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import DeleteButton from '../components/ui/DeleteButton';
+import CustomerFormModal from '../components/customer/CustomerFormModal';
 import type { Customer, DeliveryNote, DeliveryNoteStatus } from '../types';
 
 const STATUS_META: Record<DeliveryNoteStatus, { th: string; en: string; tone: string }> = {
@@ -68,6 +69,7 @@ export default function DeliveryNoteBuilder() {
 
   const [existing, setExisting] = useState<DeliveryNote | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [acting, setActing] = useState(false);
@@ -393,7 +395,19 @@ export default function DeliveryNoteBuilder() {
 
       <div className="card grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="sm:col-span-3">
-          <label className="label">{isThai ? 'ลูกค้า' : 'Customer'}</label>
+          <div className="flex items-center justify-between gap-2">
+            <label className="label">{isThai ? 'ลูกค้า' : 'Customer'}</label>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => setShowAddCustomer(true)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-800"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {isThai ? 'เพิ่มลูกค้าใหม่' : 'Add new customer'}
+              </button>
+            )}
+          </div>
           <select value={form.buyerId} onChange={(e) => setForm({ ...form, buyerId: e.target.value })} className="input-field" disabled={!editable}>
             <option value="">{isThai ? '— เลือกลูกค้า —' : '— Select customer —'}</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.nameTh} ({c.taxId})</option>)}
@@ -539,6 +553,17 @@ export default function DeliveryNoteBuilder() {
         </div>
       </aside>
     </div>{/* grid */}
+    <CustomerFormModal
+      open={showAddCustomer}
+      onClose={() => setShowAddCustomer(false)}
+      onSaved={(customer) => {
+        setCustomers((prev) => [customer, ...prev]);
+        setForm((prev) => ({ ...prev, buyerId: customer.id }));
+      }}
+      token={token}
+      isThai={isThai}
+      lockPartyRole="customer"
+    />
     </div>
   );
 }
