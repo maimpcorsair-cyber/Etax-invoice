@@ -4,10 +4,10 @@ Last updated: 2026-06-01 (flat A4 PDF + document page footer)
 
 ## Latest work (2026-06-01)
 
-Flat A4 PDF + document page footer — added 2026-06-01:
+Flat A4 PDF + document page footer — shipped and verified live on prod (`9372f4e`):
 - **Less boxed accounting layout:** removed the decorative outer paper frame/shadow and flattened the buyer section from a nested card-within-card into one compact accounting block, freeing A4 space.
 - **Multi-page traceability:** standard-builder PDFs now expose their document number to Puppeteer; generated PDF pages carry a print-margin footer `Billboy · <document no.>` + `Page x / y`, so page 2 clearly refers back to page 1 without consuming content space.
-- **Verification:** backend typecheck, backend lint, focused PDF tests (`17/17`), `git diff --check`, and a generated 11-line quotation PDF all pass; rendered page `1/2` and `2/2` visually confirmed.
+- **Verification:** backend typecheck, backend lint, focused PDF tests (`17/17`), `git diff --check`, and a generated 11-line quotation PDF all pass; rendered page `1/2` and `2/2` visually confirmed. GitHub Typecheck + Unit tests + Prod smoke green for `9372f4e`; Render deploy run `26744622698` green with production Prisma migrate deploy + backend health smoke. Post-deploy checks: `/api/health` 200, `/api/health/deep` status ok with `notConfigured=[]`, and `/api/health/pdf` 200.
 
 PDF signature/VAT polish — shipped and verified live on prod (`7858804`):
 - **Signature order changed:** issuer/authorized signature now renders on the left; customer/receiver signature renders on the right.
