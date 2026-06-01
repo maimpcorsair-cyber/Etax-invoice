@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (quotation revision flow)
+Last updated: 2026-06-01 (multi-page PDF layout polish)
 
 ## Latest work (2026-06-01)
+
+Multi-page PDF layout polish — shipped and verified live on prod (`1e80612`):
+- **Removed decorative document watermarks.** The standard builder no longer renders the faded theme word behind document content, and the default theme no longer carries `mark: "STANDARD"`.
+- **Cleaner line-item tables.** The discount column is hidden unless at least one line item has an actual discount; empty discount rows no longer waste table width.
+- **Better multi-page A4 flow.** Multi-page PDFs now use a white print background, repeated table headers, cloned page borders, tighter final-page support/signature spacing, and suppress the non-essential footer in multi-page print mode to avoid orphan footer-only pages.
+- **Verification:** backend typecheck, backend lint, backend unit tests pass. A generated 11-line quotation PDF rendered to 2 pages locally with no watermark and no empty discount column. GitHub Typecheck + Unit tests + Prod smoke green for `1e80612`; Render deploy run `26736640114` green with production Prisma migrate deploy + backend health smoke.
 
 Quotation revision flow — shipped and verified live on prod (`591c5b7`):
 - **Locked quotations are no longer edited in place.** Sent/accepted/rejected/expired quotations now get a `POST /api/quotations/:id/revise` path that creates a fresh draft revision with a new quotation number, links it back to the original chain, and marks the previous copy as superseded for audit/history.
