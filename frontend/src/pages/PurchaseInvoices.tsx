@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  Plus, Search, Edit2, Trash2, X, Save, Loader2, ShoppingCart,
+  Plus, Search, Edit2, X, Save, Loader2, ShoppingCart,
   Receipt, CheckCircle, Clock, AlertTriangle, FileCheck2,
   Upload, Image as ImageIcon, FileText, ExternalLink, Eye,
   Bot, ShieldCheck, ArrowRight, Inbox, Wallet,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
+import DeleteButton from '../components/ui/DeleteButton';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { Customer, DocumentIntake, Invoice, PurchaseInvoice } from '../types';
@@ -1374,9 +1375,7 @@ export default function PurchaseInvoices() {
                     {isThai ? 'ทำเครื่องหมายชำระ' : 'Mark Paid'}
                   </button>
                 )}
-                <button onClick={() => handleDelete(p.id)} className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <DeleteButton onClick={() => handleDelete(p.id)} label={isThai ? 'ลบ' : 'Delete'} size="sm" className="ml-auto" />
               </div>
             </div>
           ))
@@ -1459,9 +1458,7 @@ export default function PurchaseInvoices() {
                             <FileCheck2 className="w-4 h-4" />
                           </button>
                         )}
-                        <button onClick={() => handleDelete(p.id)} className="p-1 text-red-400 hover:text-red-600" title={isThai ? 'ลบ' : 'Delete'}>
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <DeleteButton onClick={() => handleDelete(p.id)} label={isThai ? 'ลบ' : 'Delete'} size="sm" />
                       </div>
                     </td>
                   </tr>

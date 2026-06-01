@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Plus, Search, Edit2, Trash2, X, Save, Loader2, Wallet,
+  Plus, Search, Edit2, X, Save, Loader2, Wallet,
   AlertTriangle, Send, ThumbsUp, ThumbsDown,
-  Link as LinkIcon, Image as ImageIcon, FileText, PlusCircle, MinusCircle,
+  Link as LinkIcon, Image as ImageIcon, FileText, PlusCircle,
   Eye, CheckCircle2, XCircle, Clock, ArrowRight,
   Upload, Sheet, HardDrive,
   BriefcaseBusiness,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import DeleteButton from '../components/ui/DeleteButton';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
@@ -705,9 +706,7 @@ export default function Expenses() {
                     <button onClick={() => handleSubmit(v.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100">
                       <Send className="w-3.5 h-3.5" /> {t('expenses.submit')}
                     </button>
-                    <button onClick={() => handleDelete(v.id)} className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <DeleteButton onClick={() => handleDelete(v.id)} label={t('common.delete')} size="sm" className="ml-auto" />
                   </>
                 )}
                 {canApproveVoucher(v) && (
@@ -790,9 +789,7 @@ export default function Expenses() {
                             <button onClick={() => handleSubmit(v.id)} className="p-1 text-amber-600 hover:text-amber-800" title={t('expenses.submit')}>
                               <Send className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleDelete(v.id)} className="p-1 text-red-400 hover:text-red-600" title={t('common.delete')}>
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <DeleteButton onClick={() => handleDelete(v.id)} label={t('common.delete')} size="sm" />
                           </>
                         )}
                         {canApproveVoucher(v) && (
@@ -878,13 +875,12 @@ export default function Expenses() {
                 {items.map((item, idx) => (
                   <div key={idx} className="rounded-lg border border-gray-200 p-4 space-y-3 relative">
                     {items.length > 1 && (
-                      <button
+                      <DeleteButton
                         onClick={() => removeItem(idx)}
-                        className="absolute top-2 right-2 p-1 text-red-400 hover:text-red-600"
-                        title={t('expenses.removeItem')}
-                      >
-                        <MinusCircle className="w-4 h-4" />
-                      </button>
+                        label={t('expenses.removeItem')}
+                        size="sm"
+                        className="absolute top-2 right-2"
+                      />
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="sm:col-span-2">
