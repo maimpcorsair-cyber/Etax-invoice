@@ -139,6 +139,10 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(html.includes('compact-one-page'), 'short ordinary invoice should use compact one-page layout');
   assert.ok(html.includes('min-height: calc(297mm - 40px)'), 'standard preview should keep an A4-height page frame');
   assert.ok(html.includes('margin-top: auto'), 'payment/support area should sit toward the bottom on short A4 invoices');
+  assert.ok(html.includes('grid-template-columns: minmax(0, 1.3fr) minmax(285px, 0.9fr)'), 'document metadata should have enough width for an unbroken document number');
+  assert.ok(html.includes('white-space: nowrap;\n    word-break: normal;'), 'emphasized document numbers should stay on one line');
+  assert.ok(html.includes('.words-card .section-label {\n    letter-spacing: 0;'), 'Thai amount-in-words heading should not use spaced uppercase label styling');
+  assert.ok(html.includes('width: 100%;\n      min-height: calc(297mm - 20mm);'), 'printed A4 content should use the full width left after Puppeteer margins');
   assert.ok(html.includes('data-document-number="IV-2026-000128"'), 'PDF HTML should expose its document number for the printed page footer');
   assert.ok(html.includes('border: 0 !important'), 'the printable A4 page should not render a decorative outer frame');
   assert.ok(html.includes('.party-grid { display: block; }'), 'buyer details should use a flat accounting block');
