@@ -4,8 +4,9 @@ Last updated: 2026-06-01 (PDF line-item VAT cleanup)
 
 ## Latest work (2026-06-01)
 
-PDF line-item VAT cleanup — shipped and verified live on prod (`e817a94`), final compact-column follow-up in progress:
+PDF line-item VAT cleanup — shipped and verified live on prod (`cd8efba`):
 - **More room for item details:** standard-builder PDFs no longer render a per-line VAT type column, including mixed `7% / 0% / exempt` documents. The follow-up also removes VAT-inclusive line totals, leaving one pre-VAT amount column per item. VAT and net total stay in the totals summary below the table; tax calculations and e-Tax payload data are unchanged.
+- **Verification:** backend typecheck, backend lint, focused PDF tests (`17/17`), `git diff --check`, and a rendered mixed-VAT A4 quotation PDF pass. GitHub Typecheck + Unit tests + Prod smoke green for `cd8efba`; Render deploy run `26748171745` green. Post-deploy checks: `/api/health` 200, `/api/health/deep` status ok with `notConfigured=[]`, and `/api/health/pdf` 200.
 
 Flat A4 PDF + document page footer — shipped and verified live on prod (`9372f4e`):
 - **Less boxed accounting layout:** removed the decorative outer paper frame/shadow and flattened the buyer section from a nested card-within-card into one compact accounting block, freeing A4 space.
