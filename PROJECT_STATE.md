@@ -4,11 +4,11 @@ Last updated: 2026-06-01 (PDF A4 width + Thai wrapping polish)
 
 ## Latest work (2026-06-01)
 
-PDF A4 width + Thai wrapping polish — locally verified, ready to deploy:
+PDF A4 width + Thai wrapping polish — shipped and verified live on prod (`7bdd689`):
 - **More usable A4 width:** standard PDFs now use `6mm` left/right Puppeteer margins instead of `10mm`, align the printed page footer to the same edge, and remove redundant inner horizontal padding. The print frame consumes the available width rather than subtracting the old margin a second time.
 - **Stable document metadata:** the right-side metadata column is wider and emphasized document numbers stay on one line, so values such as `QT-2026-000010` no longer wrap after the year.
 - **Thai amount-in-words heading:** the `จำนวนเงินเป็นตัวอักษร` label no longer inherits uppercase label letter-spacing and is kept intact on one line.
-- **Verification:** backend typecheck, backend lint, focused PDF tests (`18/18`), and `git diff --check` pass. A rendered 11-line quotation visually confirmed exactly two pages with the quotation number unbroken on page `1/2`, wider A4 content, aligned footer, and intact amount-in-words heading on page `2/2`.
+- **Verification:** backend typecheck, backend lint, backend unit tests (`109/109`), focused PDF tests (`18/18`), and `git diff --check` pass. A rendered 11-line quotation visually confirmed exactly two pages with the quotation number unbroken on page `1/2`, wider A4 content, aligned footer, and intact amount-in-words heading on page `2/2`. GitHub Typecheck + Unit tests + Prod smoke green for `7bdd689`; Render deploy run `26751515656` green. Post-deploy checks: `/api/health` 200, `/api/health/deep` status ok with `notConfigured=[]`, and `/api/health/pdf` 200.
 
 PDF mixed-VAT summary + controlled tax pagination — shipped and verified live on prod (`8b5088d`):
 - **Accurate compact VAT summary:** single-rate documents stay concise. Mixed `VAT 7% / VAT 0% / exempt` documents show their tax bases only in the totals card below the table; per-line rows remain compact and pre-VAT only.
