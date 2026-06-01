@@ -202,7 +202,7 @@ function pct(used: number, max: number | null): number {
 function barColor(p: number): string {
   if (p >= 90) return 'bg-red-500';
   if (p >= 70) return 'bg-amber-500';
-  return 'bg-indigo-500';
+  return 'bg-primary-500';
 }
 
 function UsageBar({
@@ -238,7 +238,7 @@ function UsageBar({
             style={{ width: `${p}%` }}
           />
         )}
-        {unlimited && <div className="h-2 rounded-full bg-indigo-200 w-full" />}
+        {unlimited && <div className="h-2 rounded-full bg-primary-200 w-full" />}
       </div>
     </div>
   );
@@ -276,7 +276,7 @@ export default function PlanPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     );
   }
@@ -332,7 +332,7 @@ export default function PlanPage() {
         <button
           onClick={openBillingPortal}
           disabled={portalLoading}
-          className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-60"
         >
           {portalLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {isThai ? `อัพเกรดเป็น ${plan.nameEn}` : `Upgrade to ${plan.nameEn}`}
@@ -346,7 +346,7 @@ export default function PlanPage() {
       return (
         <a
           href={href}
-          className="inline-flex items-center justify-center w-full px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+          className="inline-flex items-center justify-center w-full px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
         >
           {isThai ? `อัพเกรดเป็น ${plan.nameEn}` : `Upgrade to ${plan.nameEn}`}
         </a>
@@ -415,7 +415,7 @@ export default function PlanPage() {
               <button
                 onClick={openBillingPortal}
                 disabled={portalLoading}
-                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-60"
               >
                 {portalLoading
                   ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -497,7 +497,7 @@ export default function PlanPage() {
                   return (
                     <th
                       key={plan.key}
-                      className={`text-center pb-3 px-3 rounded-t-xl ${isCurrent ? 'bg-indigo-50 border-x border-t border-indigo-200' : ''}`}
+                      className={`text-center pb-3 px-3 rounded-t-xl ${isCurrent ? 'bg-primary-50 border-x border-t border-primary-200' : ''}`}
                     >
                       <div className="flex flex-col items-center gap-1">
                         <span className="p-1.5 rounded-lg bg-white shadow-sm inline-flex">
@@ -528,7 +528,7 @@ export default function PlanPage() {
                   return (
                     <td
                       key={plan.key}
-                      className={`py-3 px-3 text-center ${isCurrent ? 'bg-indigo-50 border-x border-indigo-200' : ''}`}
+                      className={`py-3 px-3 text-center ${isCurrent ? 'bg-primary-50 border-x border-primary-200' : ''}`}
                     >
                       <span className="text-lg font-bold text-gray-900">{plan.price}</span>
                       {plan.priceSub && (
@@ -558,7 +558,7 @@ export default function PlanPage() {
                     return (
                       <td
                         key={plan.key}
-                        className={`py-3 px-3 text-center text-sm font-medium text-gray-800 ${isCurrent ? 'bg-indigo-50 border-x border-indigo-200' : ''}`}
+                        className={`py-3 px-3 text-center text-sm font-medium text-gray-800 ${isCurrent ? 'bg-primary-50 border-x border-primary-200' : ''}`}
                       >
                         {plan[row.field]}
                       </td>
@@ -578,7 +578,7 @@ export default function PlanPage() {
                     return (
                       <td
                         key={plan.key}
-                        className={`py-3 px-3 text-center ${isCurrent ? 'bg-indigo-50 border-x border-indigo-200' : ''}`}
+                        className={`py-3 px-3 text-center ${isCurrent ? 'bg-primary-50 border-x border-primary-200' : ''}`}
                       >
                         {typeof val === 'boolean' ? (
                           val ? (
@@ -604,7 +604,7 @@ export default function PlanPage() {
                   return (
                     <td
                       key={plan.key}
-                      className={`pt-4 px-3 pb-4 ${isCurrent ? 'bg-indigo-50 border-x border-b border-indigo-200 rounded-b-xl' : ''}`}
+                      className={`pt-4 px-3 pb-4 ${isCurrent ? 'bg-primary-50 border-x border-b border-primary-200 rounded-b-xl' : ''}`}
                     >
                       {renderCta(plan)}
                     </td>
@@ -622,7 +622,7 @@ export default function PlanPage() {
             return (
               <div
                 key={plan.key}
-                className={`rounded-xl border-2 ${isCurrent ? 'border-indigo-400 shadow-md' : 'border-gray-200'} bg-white`}
+                className={`rounded-xl border-2 ${isCurrent ? 'border-primary-400 shadow-md' : 'border-gray-200'} bg-white`}
               >
                 <div className={`${plan.headerBg} px-4 py-3 rounded-t-xl flex items-center justify-between`}>
                   <div className="flex items-center gap-2">

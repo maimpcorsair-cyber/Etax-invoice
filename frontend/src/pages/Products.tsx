@@ -447,7 +447,7 @@ export default function Products() {
                         {p.trackInventory && (
                           <button
                             onClick={() => openStockAdjust(p)}
-                            className="p-1 text-indigo-600 hover:text-indigo-800"
+                            className="p-1 text-primary-600 hover:text-primary-800"
                             title={isThai ? 'ปรับสต๊อก' : 'Adjust stock'}
                           >
                             <Package className="h-4 w-4" />

@@ -82,13 +82,13 @@ export default function MobileBottomNav() {
               onClick={() => setSheetOpen(false)}
             >
               <Icon
-                className={clsx('w-6 h-6', isActive ? 'text-indigo-600' : 'text-gray-400')}
+                className={clsx('w-6 h-6', isActive ? 'text-primary-600' : 'text-gray-400')}
                 strokeWidth={isActive ? 2.5 : 1.8}
               />
               <span
                 className={clsx(
                   'text-[11px] font-medium leading-none',
-                  isActive ? 'text-indigo-600' : 'text-gray-400',
+                  isActive ? 'text-primary-600' : 'text-gray-400',
                 )}
               >
                 {t(tab.labelKey)}
@@ -105,13 +105,13 @@ export default function MobileBottomNav() {
           aria-expanded={sheetOpen}
         >
           <MoreHorizontal
-            className={clsx('w-6 h-6', isMoreActive || sheetOpen ? 'text-indigo-600' : 'text-gray-400')}
+            className={clsx('w-6 h-6', isMoreActive || sheetOpen ? 'text-primary-600' : 'text-gray-400')}
             strokeWidth={isMoreActive || sheetOpen ? 2.5 : 1.8}
           />
           <span
             className={clsx(
               'text-[11px] font-medium leading-none',
-              isMoreActive || sheetOpen ? 'text-indigo-600' : 'text-gray-400',
+              isMoreActive || sheetOpen ? 'text-primary-600' : 'text-gray-400',
             )}
           >
             {t('nav.more', 'More')}
@@ -160,7 +160,7 @@ export default function MobileBottomNav() {
                 className={clsx(
                   'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
+                    ? 'bg-primary-50 text-primary-700'
                     : 'text-gray-700 hover:bg-gray-100',
                 )}
               >

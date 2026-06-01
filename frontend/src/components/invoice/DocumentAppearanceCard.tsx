@@ -99,7 +99,7 @@ export default function DocumentAppearanceCard({
   return (
     <div className="card space-y-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
           <Building2 className="h-5 w-5" />
         </div>
         <div>
@@ -276,10 +276,10 @@ export default function DocumentAppearanceCard({
         )}
       </div>
 
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 p-4 shadow-sm">
+      <div className="rounded-2xl border border-primary-100 bg-gradient-to-br from-primary-50 via-white to-emerald-50 p-4 shadow-sm">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-indigo-700" />
+            <ShieldCheck className="h-4 w-4 text-primary-700" />
             <h4 className="text-sm font-semibold text-slate-900">
               {canUseElectronicMode
                 ? (isThai ? 'ลายเซ็นผู้จัดทำที่ตรวจสอบได้' : 'Trusted issuer signature')
@@ -303,7 +303,7 @@ export default function DocumentAppearanceCard({
               : ['Company scoped', 'QR verifiable', 'Audit logged']
             ).map((label) => (
               <div key={label} className="flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700">
-                <LockKeyhole className="h-3.5 w-3.5 text-indigo-600" />
+                <LockKeyhole className="h-3.5 w-3.5 text-primary-600" />
                 {label}
               </div>
             ))}

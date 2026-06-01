@@ -1254,9 +1254,9 @@ export default function PurchaseInvoices() {
                 <p className="text-xs font-medium text-green-700">{isThai ? 'ยอดซื้อก่อน VAT' : 'Total excl. VAT'}</p>
                 <p className="text-lg font-bold text-green-950">{formatCurrency(totalSubtotal)}</p>
               </div>
-              <div className="rounded-lg bg-indigo-50 px-3 py-2">
-                <p className="text-xs font-medium text-indigo-700">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
-                <p className="text-lg font-bold text-indigo-950">{formatCurrency(totalVat)}</p>
+              <div className="rounded-lg bg-primary-50 px-3 py-2">
+                <p className="text-xs font-medium text-primary-700">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
+                <p className="text-lg font-bold text-primary-900">{formatCurrency(totalVat)}</p>
               </div>
             </div>
           </div>
@@ -1429,7 +1429,7 @@ export default function PurchaseInvoices() {
                     <td className="table-cell font-mono text-xs">{p.invoiceNumber}</td>
                     <td className="table-cell text-gray-500 text-sm max-w-[200px] truncate">{p.description ?? '—'}</td>
                     <td className="table-cell text-right">{formatCurrency(p.subtotal)}</td>
-                    <td className="table-cell text-right text-indigo-700">{formatCurrency(p.vatAmount)}</td>
+                    <td className="table-cell text-right text-primary-700">{formatCurrency(p.vatAmount)}</td>
                     <td className="table-cell text-right font-semibold">{formatCurrency(p.total)}</td>
                     <td className="table-cell">
                       {p.isPaid ? (
@@ -1475,7 +1475,7 @@ export default function PurchaseInvoices() {
                     {isThai ? 'รวม' : 'Total'}
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">{formatCurrency(totalSubtotal)}</td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-indigo-700">{formatCurrency(totalVat)}</td>
+                  <td className="px-4 py-3 text-right text-sm font-semibold text-primary-700">{formatCurrency(totalVat)}</td>
                   <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">{formatCurrency(totalAmount)}</td>
                   <td colSpan={2} />
                 </tr>

@@ -109,7 +109,7 @@ export default function CustomerPortalDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
       </div>
     );
   }
@@ -136,7 +136,7 @@ export default function CustomerPortalDashboard() {
             {me?.company.logoUrl ? (
               <img src={me.company.logoUrl} alt="" className="w-10 h-10 rounded-lg object-cover" />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-primary-600 text-white flex items-center justify-center">
                 <Building2 className="w-5 h-5" />
               </div>
             )}
@@ -155,7 +155,7 @@ export default function CustomerPortalDashboard() {
         {/* Invoices */}
         <section>
           <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-            <Receipt className="w-5 h-5 text-indigo-600" />
+            <Receipt className="w-5 h-5 text-primary-600" />
             ใบกำกับภาษี / ใบเสร็จ ({invoices.length})
           </h2>
           {invoices.length === 0 ? (
@@ -176,7 +176,7 @@ export default function CustomerPortalDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {invoices.map((inv) => (
                     <tr key={inv.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-indigo-700">{inv.invoiceNumber}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-primary-700">{inv.invoiceNumber}</td>
                       <td className="px-4 py-3 text-sm">{inv.invoiceDate.slice(0, 10)}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{inv.dueDate ? inv.dueDate.slice(0, 10) : '—'}</td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(inv.total)}</td>
@@ -188,7 +188,7 @@ export default function CustomerPortalDashboard() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => downloadInvoicePdf(inv.id, inv.invoiceNumber)} className="text-indigo-600 hover:text-indigo-700">
+                        <button onClick={() => downloadInvoicePdf(inv.id, inv.invoiceNumber)} className="text-primary-600 hover:text-primary-700">
                           <Download className="w-4 h-4 inline" />
                         </button>
                       </td>
@@ -203,7 +203,7 @@ export default function CustomerPortalDashboard() {
         {/* Quotations */}
         <section>
           <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-            <FileText className="w-5 h-5 text-indigo-600" />
+            <FileText className="w-5 h-5 text-primary-600" />
             ใบเสนอราคา ({quotations.length})
           </h2>
           {quotations.length === 0 ? (
@@ -223,7 +223,7 @@ export default function CustomerPortalDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {quotations.map((q) => (
                     <tr key={q.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-indigo-700">{q.quotationNumber}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-primary-700">{q.quotationNumber}</td>
                       <td className="px-4 py-3 text-sm">{q.quotationDate.slice(0, 10)}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{q.validUntil ? q.validUntil.slice(0, 10) : '—'}</td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(q.total)}</td>
@@ -239,7 +239,7 @@ export default function CustomerPortalDashboard() {
         {/* Delivery Notes */}
         <section>
           <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-3">
-            <Truck className="w-5 h-5 text-indigo-600" />
+            <Truck className="w-5 h-5 text-primary-600" />
             ใบส่งของ ({notes.length})
           </h2>
           {notes.length === 0 ? (
@@ -258,7 +258,7 @@ export default function CustomerPortalDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {notes.map((dn) => (
                     <tr key={dn.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-indigo-700">{dn.deliveryNoteNumber}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-primary-700">{dn.deliveryNoteNumber}</td>
                       <td className="px-4 py-3 text-sm">{dn.deliveryDate.slice(0, 10)}</td>
                       <td className="px-4 py-3 text-sm text-slate-500">{dn.trackingNo ?? '—'}</td>
                       <td className="px-4 py-3 text-center text-xs">{dn.status}</td>

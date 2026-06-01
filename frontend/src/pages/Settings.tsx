@@ -870,7 +870,7 @@ export default function Settings() {
 
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-indigo-700" />
+                  <ShieldCheck className="h-4 w-4 text-primary-700" />
                   <h3 className="font-semibold text-slate-900">{isThai ? 'ลายเซ็นและข้อความความน่าเชื่อถือ' : 'Signature and trust note'}</h3>
                 </div>
                 <input className="input-field" value={signatureDraft.signerName} onChange={(e) => setSignatureDraft((prev) => ({ ...prev, signerName: e.target.value }))} placeholder={isThai ? 'ชื่อผู้ลงนาม' : 'Signer name'} />
@@ -1026,15 +1026,15 @@ export default function Settings() {
                       </div>
                     </div>
                     {lineOtp ? (
-                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 space-y-2">
+                      <div className="rounded-lg border border-primary-200 bg-primary-50 p-3 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-2xl font-bold tracking-[0.25em] text-indigo-700 select-all">{lineOtp}</span>
-                          <button type="button" onClick={copyLineOtp} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 border border-slate-200 rounded px-2 py-1">
+                          <span className="font-mono text-2xl font-bold tracking-[0.25em] text-primary-700 select-all">{lineOtp}</span>
+                          <button type="button" onClick={copyLineOtp} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-primary-600 border border-slate-200 rounded px-2 py-1">
                             {lineOtpCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                             {lineOtpCopied ? (isThai ? 'คัดลอกแล้ว' : 'Copied') : (isThai ? 'คัดลอก' : 'Copy')}
                           </button>
                         </div>
-                        <p className="text-xs text-indigo-800">{isThai ? 'ส่งรหัสนี้ให้ Billboy ใน LINE ภายใน 10 นาที' : 'Send this code to Billboy in LINE within 10 min.'}</p>
+                        <p className="text-xs text-primary-800">{isThai ? 'ส่งรหัสนี้ให้ Billboy ใน LINE ภายใน 10 นาที' : 'Send this code to Billboy in LINE within 10 min.'}</p>
                       </div>
                     ) : (
                       <button type="button" onClick={() => void handleLineSelfLink()} className="btn-primary text-sm w-full">

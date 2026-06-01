@@ -200,7 +200,7 @@ export default function VatSummary() {
           {/* Top row: 3 main cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Output VAT */}
-            <div className="card border-l-4 border-l-green-500">
+            <div className="card">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-green-600" />
@@ -230,7 +230,7 @@ export default function VatSummary() {
             </div>
 
             {/* Input VAT */}
-            <div className="card border-l-4 border-l-blue-500">
+            <div className="card">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
                   <TrendingDown className="w-5 h-5 text-blue-600" />
@@ -260,7 +260,7 @@ export default function VatSummary() {
             </div>
 
             {/* VAT Payable */}
-            <div className={`card border-l-4 ${mustPay ? 'border-l-red-500 bg-red-50/30' : 'border-l-emerald-500 bg-emerald-50/30'}`}>
+            <div className={`card ${mustPay ? 'bg-red-50/30' : 'bg-emerald-50/30'}`}>
               <div className="flex items-center gap-2 mb-2">
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${mustPay ? 'bg-red-100' : 'bg-emerald-100'}`}>
                   <Calculator className={`w-5 h-5 ${mustPay ? 'text-red-600' : 'text-emerald-600'}`} />
@@ -411,7 +411,7 @@ export default function VatSummary() {
           </div>
 
           {/* CTA */}
-          <div className="card flex items-center justify-between flex-wrap gap-3 bg-gradient-to-r from-primary-50 to-indigo-50">
+          <div className="card flex items-center justify-between flex-wrap gap-3 bg-gradient-to-r from-primary-50 to-primary-50">
             <div>
               <h3 className="font-semibold text-gray-900">
                 {isThai ? 'พร้อมยื่น ภ.พ.30 แล้วหรือยัง?' : 'Ready to file PP.30?'}
