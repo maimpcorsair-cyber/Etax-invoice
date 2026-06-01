@@ -156,12 +156,12 @@ pkill -f "tsx watch"; cd backend && npx tsx watch src/index.ts &
 
 ## Design Context (frontend/UI)
 
-Canonical source: [`.impeccable.md`](.impeccable.md). Read it before any UI work. Essence:
+Canonical source: [`DESIGN.md`](DESIGN.md) (design system / tokens) + [`PRODUCT.md`](PRODUCT.md) (product/audience). Read before any UI work. Essence:
 
 - **Users**: Thai SME owners (occasional, mobile, want simplicity + confidence), accountants (daily power users, want density + efficiency), LINE-first operators (capture from phone). Formal Thai business context — documents go to กรมสรรพากร; errors cost money.
-- **Brand**: Clear · Trustworthy · Professional. Feel like a well-run law firm's software — calm and in control, never flashy or entertaining.
+- **North Star**: "The Trusted Companion (ผู้ช่วยคู่ใจ)" — a reassuring sidekick for tax-stressed SME owners. Friendly-professional, calm and in control, warm not corporate-cold.
 - **Theme**: Light mode (daytime office, formal, government submissions).
-- **Color**: Navy authoritative (`#1e3a8a` zone), clean white backgrounds. **No** SaaS purple/gradient, no AI-slop glowing hero metrics, no marketing-site look.
-- **References**: Thai banking apps (KBank, SCB Biz), Notion, Linear — information density without decoration.
-- **Principles**: density over decoration · trust through restraint (solid fills, color means something) · clarity under time pressure · bilingual TH/EN first-class · mobile-aware desktop-first · next action always visible · customer surfaces simpler than seller surfaces · LINE is a first-class input channel.
-- **Anti-goals**: never leak infra/tax-infra terms (tenant, XAdES, BullMQ, webhook, worker, magic link) into owner/customer UI; no generic SaaS marketing pages for core product; don't bury pay/share actions behind menus; don't use AI/purple/glow to signal "intelligence" — show it through fewer corrections and clearer next steps.
+- **Color**: Navy authority (`#1e3a8a`) + teal/gold warmth on a light, softly-decorated surface. **No** SaaS purple/gradient, no gradient text, no marketing-site look.
+- **Keep the personality**: the **mascot** (`billoy-hero-mascot.jpg`, `MascotHelperCard`, `PageHeader mascot="hero"`, floating doodles) and the **soft wallpaper** (`.app-shell` glows + masked grid) are **core brand identity — never strip them for a "cleaner" minimal look**. A navy/white austere redesign was rejected (2026-06-01). Polish and elevate, don't strip.
+- **Principles**: clarity under time pressure · bilingual TH/EN first-class · mobile-aware desktop-first · next action always visible · money state first · customer surfaces simpler than seller surfaces · LINE is a first-class input channel.
+- **Anti-goals**: never leak infra/tax-infra terms (tenant, XAdES, BullMQ, webhook, worker, magic link) into owner/customer UI; don't bury pay/share actions behind menus; teal/gold are warmth accents, not functional status/action colors (navy is the action color).
