@@ -794,42 +794,62 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 max-w-6xl mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            {t('landing.features.title')}
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            {isThai ? 'ระบบที่สมบูรณ์สำหรับการออกใบกำกับภาษีอิเล็กทรอนิกส์' : 'Everything you need for seamless e-Invoice management'}
-          </p>
-        </div>
+      <section id="features" className="feature-grid-bg relative overflow-hidden py-24">
+        <div className="relative z-10 mx-auto max-w-6xl px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              {t('landing.features.title')}
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              {isThai ? 'ระบบที่สมบูรณ์สำหรับการออกใบกำกับภาษีอิเล็กทรอนิกส์' : 'Everything you need for seamless e-Invoice management'}
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {features.map(({ icon: Icon, key }, i) => {
-            const iconStyles = [
-              'bg-primary-700',
-              'bg-emerald-700',
-              'bg-slate-800',
-              'bg-amber-600',
-            ];
-            return (
-              <div
-                key={key}
-                className="animate-slide-up group rounded-lg border border-slate-200 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary-200 hover:shadow-card-hover"
-                style={{animationDelay: `${0.1 + i * 0.1}s`}}
-              >
-                <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-lg ${iconStyles[i % iconStyles.length]} shadow-sm transition-transform duration-300 group-hover:-translate-y-0.5`}>
-                  <Icon className="w-7 h-7 text-white" strokeWidth={2} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {features.map(({ icon: Icon, key }, i) => {
+              const iconStyles = [
+                'bg-primary-700',
+                'bg-emerald-700',
+                'bg-slate-800',
+                'bg-amber-600',
+              ];
+              const iconBg = iconStyles[i % iconStyles.length];
+              return (
+                <div
+                  key={key}
+                  className="animate-slide-up flip-card group"
+                  style={{animationDelay: `${0.1 + i * 0.1}s`}}
+                >
+                  {/* Inside page — revealed when the cover swings open (always shown on touch) */}
+                  <div className="flex h-full flex-col rounded-2xl border border-primary-100 bg-gradient-to-br from-white to-primary-50/50 p-6 shadow-card">
+                    <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${iconBg} shadow-sm`}>
+                      <Icon className="w-6 h-6 text-white" strokeWidth={2} />
+                    </div>
+                    <h3 className="mb-2 text-base font-bold text-gray-900">
+                      {t(`landing.features.${key}.title`)}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-gray-500">
+                      {t(`landing.features.${key}.desc`)}
+                    </p>
+                  </div>
+
+                  {/* Cover — the front of the "book", swings open on hover */}
+                  <div className="flip-card-cover rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+                    <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${iconBg} shadow-sm`}>
+                      <Icon className="w-7 h-7 text-white" strokeWidth={2} />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900">
+                      {t(`landing.features.${key}.title`)}
+                    </h3>
+                    <span className="flip-card-hint mt-auto flex items-center gap-1.5 pt-4 text-xs font-semibold text-primary-600">
+                      {isThai ? 'ดูรายละเอียด' : 'Read more'}
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300" strokeWidth={2.5} />
+                    </span>
+                  </div>
                 </div>
-                <h3 className="font-bold text-gray-900 mb-2 text-base">
-                  {t(`landing.features.${key}.title`)}
-                </h3>
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  {t(`landing.features.${key}.desc`)}
-                </p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </section>
 

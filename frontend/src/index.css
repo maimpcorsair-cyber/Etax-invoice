@@ -714,3 +714,73 @@ html, body {
     animation: none !important;
   }
 }
+
+/* ── Landing feature cards: graph-paper grid backdrop + book-flip reveal ──
+   Grid adapted from uiverse spotty-cheetah (kennyotsu), retinted to the
+   navy wallpaper already used by .app-shell::before. Flip cover adapted
+   from uiverse selfish-bobcat (eslam-hany), restyled to navy/teal with soft
+   shadows. Cover is a desktop hover enhancement only — touch / reduced-motion
+   show the full card directly so the copy is never hidden. */
+.feature-grid-bg {
+  position: relative;
+  --grid-color: rgba(30, 58, 138, 0.07);
+  background-color: #f5f8fd;
+  background-image:
+    linear-gradient(0deg, transparent 24%, var(--grid-color) 25%, var(--grid-color) 26%, transparent 27%, transparent 74%, var(--grid-color) 75%, var(--grid-color) 76%, transparent 77%, transparent),
+    linear-gradient(90deg, transparent 24%, var(--grid-color) 25%, var(--grid-color) 26%, transparent 27%, transparent 74%, var(--grid-color) 75%, var(--grid-color) 76%, transparent 77%, transparent);
+  background-size: 55px 55px;
+}
+
+/* Fade the grid into the page edges so it reads as soft wallpaper, not a hard panel. */
+.feature-grid-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 38%, transparent 32%, rgba(245, 248, 253, 0.92) 80%);
+}
+
+.flip-card {
+  position: relative;
+  perspective: 1600px;
+  min-height: 13.5rem;
+}
+
+.flip-card-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  transform-origin: left center;
+  transform: rotateY(0deg);
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-card:hover .flip-card-cover .flip-card-hint svg {
+  transform: translateX(3px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .flip-card:hover .flip-card-cover {
+    transform: rotateY(-112deg);
+    box-shadow: 22px 0 42px -26px rgba(30, 58, 138, 0.5);
+  }
+}
+
+/* Touch / coarse-pointer devices: no hover, so never hide the copy behind a cover. */
+@media (hover: none), (pointer: coarse) {
+  .flip-card-cover {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-card-cover {
+    display: none;
+  }
+}
