@@ -182,7 +182,7 @@ export async function generatePdfFromHtml(html: string): Promise<Buffer> {
     await page.emulateMediaType('print');
     const documentNumber = await page.evaluate('document.body.dataset.documentNumber ?? ""') as string;
     const footerTemplate = documentNumber
-      ? `<div style="box-sizing:border-box;width:100%;padding:0 10mm;font-family:Arial,sans-serif;font-size:8px;color:#64748b;display:flex;justify-content:space-between;align-items:center;">
+      ? `<div style="box-sizing:border-box;width:100%;padding:0 6mm;font-family:Arial,sans-serif;font-size:8px;color:#64748b;display:flex;justify-content:space-between;align-items:center;">
           <span>Billboy · ${escapeHtml(documentNumber)}</span>
           <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
         </div>`
@@ -194,7 +194,7 @@ export async function generatePdfFromHtml(html: string): Promise<Buffer> {
       displayHeaderFooter: Boolean(documentNumber),
       headerTemplate: '<div></div>',
       footerTemplate,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+      margin: { top: '10mm', right: '6mm', bottom: '10mm', left: '6mm' },
     });
 
     return Buffer.from(pdf);

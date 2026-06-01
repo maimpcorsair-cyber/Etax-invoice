@@ -345,7 +345,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 28px 30px 24px;
+    padding: 28px 20px 24px;
     position: relative;
     z-index: 1;
   }
@@ -449,7 +449,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
   .overview-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(250px, 0.9fr);
+    grid-template-columns: minmax(0, 1.3fr) minmax(285px, 0.9fr);
     gap: 18px;
     margin: 22px 0 18px;
   }
@@ -527,7 +527,15 @@ export function buildHtml(data: PdfInvoiceData): string {
   .meta-row:last-child { border-bottom: none; padding-bottom: 0; }
   .meta-key { color: #6d7789; }
   .meta-value { color: #162444; font-weight: 600; word-break: break-word; }
-  .meta-value.emphasize { font-size: 15px; font-weight: 700; color: var(--accent-2); }
+  .meta-value.emphasize {
+    color: var(--accent-2);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    overflow-wrap: normal;
+    white-space: nowrap;
+    word-break: normal;
+  }
   .items-section {
     margin-top: 8px;
     border: 1px solid #dde5f0;
@@ -629,6 +637,13 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
   .notes-stack { display: grid; gap: 12px; }
   .notes-card, .words-card { padding: 16px 18px; }
+  .words-card .section-label {
+    letter-spacing: 0;
+    overflow-wrap: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
   .notes-text, .words-text {
     color: #445063;
     font-size: 11.5px;
@@ -834,7 +849,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     box-shadow: none;
   }
   .compact-one-page .document-body {
-    padding: 16px 18px 12px;
+    padding: 16px 12px 12px;
   }
   .compact-one-page .hero {
     grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.85fr);
@@ -1104,7 +1119,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     }
 
     .page {
-      width: calc(210mm - 20mm);
+      width: 100%;
       min-height: calc(297mm - 20mm);
     }
 
