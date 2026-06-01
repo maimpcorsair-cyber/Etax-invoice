@@ -1,8 +1,13 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (multi-page PDF layout polish)
+Last updated: 2026-06-01 (PDF signature/VAT polish)
 
 ## Latest work (2026-06-01)
+
+PDF signature/VAT polish — shipped and verified live on prod (`7858804`):
+- **Signature order changed:** issuer/authorized signature now renders on the left; customer/receiver signature renders on the right.
+- **VAT columns simplified:** line-item tables hide VAT columns when all items share the same VAT type and show VAT only in the summary. If a document mixes VAT 7% / 0% / exempt lines, the table shows only the per-line VAT type for audit clarity; the per-line tax amount stays summary-only.
+- **Verification:** backend typecheck, backend lint, backend unit tests pass (`107` tests). A generated 2-line T01 PDF rendered locally with issuer-left/customer-right signature and no per-line VAT header. GitHub Typecheck + Unit tests + Prod smoke green for `7858804`; Render deploy run `26738671270` green with production Prisma migrate deploy + backend health smoke.
 
 Multi-page PDF layout polish — shipped and verified live on prod (`1e80612`):
 - **Removed decorative document watermarks.** The standard builder no longer renders the faded theme word behind document content, and the default theme no longer carries `mark: "STANDARD"`.
