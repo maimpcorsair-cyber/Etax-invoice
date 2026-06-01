@@ -10,7 +10,9 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import DeleteButton from '../components/ui/DeleteButton';
 import CustomerFormModal from '../components/customer/CustomerFormModal';
-import type { Customer, Quotation, QuotationStatus } from '../types';
+import ProductFormModal from '../components/product/ProductFormModal';
+import ProductPicker from '../components/product/ProductPicker';
+import type { Customer, Product, Quotation, QuotationStatus } from '../types';
 import {
   DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID,
   DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES,
@@ -152,6 +154,11 @@ export default function QuotationBuilder() {
   const [existing, setExisting] = useState<Quotation | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  // Row index to fill when the product popup saves; null = append as a new line.
+  const [addProductRow, setAddProductRow] = useState<number | null>(null);
+  const [addProductName, setAddProductName] = useState('');
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -219,13 +226,15 @@ export default function QuotationBuilder() {
     if (!token) return;
     (async () => {
       const headers = { Authorization: `Bearer ${token}` };
-      const [custRes, projectRes] = await Promise.all([
+      const [custRes, projectRes, productRes] = await Promise.all([
         fetch('/api/customers?limit=200', { headers }),
         fetch('/api/projects?status=active', { headers }),
+        fetch('/api/products?limit=500', { headers }),
       ]);
-      const [custJson, projectJson] = await Promise.all([custRes.json(), projectRes.json()]);
+      const [custJson, projectJson, productJson] = await Promise.all([custRes.json(), projectRes.json(), productRes.json()]);
       setCustomers(custJson.data ?? []);
       setProjects(projectJson.data ?? []);
+      setProducts(productJson.data ?? []);
       if (!isNew && id) {
         const res = await fetch(`/api/quotations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
@@ -339,6 +348,24 @@ export default function QuotationBuilder() {
   }
   function addItem() {
     setForm((prev) => ({ ...prev, items: [...prev.items, { ...blankItem }] }));
+  }
+  function productToItemPatch(p: Product): Partial<ItemDraft> {
+    return {
+      productId: p.id,
+      nameTh: p.nameTh,
+      nameEn: p.nameEn ?? '',
+      descriptionTh: p.descriptionTh ?? '',
+      descriptionEn: p.descriptionEn ?? '',
+      unit: p.unit || 'รายการ',
+      unitPrice: p.unitPrice,
+      vatType: p.vatType,
+    };
+  }
+  // Open the "add new product" popup from a line (idx) or the header (idx=null).
+  function openAddProduct(idx: number | null, typedName = '') {
+    setAddProductRow(idx);
+    setAddProductName(typedName);
+    setShowAddProduct(true);
   }
   function removeItem(idx: number) {
     setForm((prev) => ({ ...prev, items: prev.items.length > 1 ? prev.items.filter((_, i) => i !== idx) : prev.items }));
@@ -1479,9 +1506,14 @@ export default function QuotationBuilder() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-gray-900">{isThai ? 'รายการ' : 'Items'}</h3>
           {editable && (
-            <button onClick={addItem} className="btn-secondary text-xs">
-              <Plus className="w-3 h-3" /> {isThai ? 'เพิ่มรายการ' : 'Add item'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => openAddProduct(null)} className="btn-secondary text-xs">
+                <Plus className="w-3 h-3" /> {isThai ? 'สินค้าใหม่' : 'New product'}
+              </button>
+              <button onClick={addItem} className="btn-secondary text-xs">
+                <Plus className="w-3 h-3" /> {isThai ? 'เพิ่มรายการ' : 'Add item'}
+              </button>
+            </div>
           )}
         </div>
         {form.kind === 'boq_contract' && (
@@ -1512,7 +1544,16 @@ export default function QuotationBuilder() {
                     {form.kind === 'boq_contract' && (
                       <input value={item.sectionTitle ?? ''} onChange={(e) => setItem(idx, { sectionTitle: e.target.value })} placeholder={isThai ? 'หมวดงาน เช่น งานไฟฟ้า' : 'Section e.g. electrical'} className="input-field mb-2 text-xs" disabled={!editable} />
                     )}
-                    <input value={item.nameTh} onChange={(e) => setItem(idx, { nameTh: e.target.value })} placeholder={isThai ? 'ชื่อรายการ' : 'Item name'} className="input-field text-sm" disabled={!editable} />
+                    <ProductPicker
+                      value={item.nameTh}
+                      onChangeText={(text) => setItem(idx, { nameTh: text, productId: null })}
+                      products={products}
+                      onSelectProduct={(product) => setItem(idx, productToItemPatch(product))}
+                      onCreateNew={(typedName) => openAddProduct(idx, typedName)}
+                      isThai={isThai}
+                      disabled={!editable}
+                      placeholder={isThai ? 'ชื่อรายการ' : 'Item name'}
+                    />
                     <textarea
                       value={item.descriptionTh ?? ''}
                       onChange={(e) => setItem(idx, { descriptionTh: e.target.value })}
@@ -1824,6 +1865,21 @@ export default function QuotationBuilder() {
       token={token}
       isThai={isThai}
       lockPartyRole="customer"
+    />
+    <ProductFormModal
+      open={showAddProduct}
+      onClose={() => setShowAddProduct(false)}
+      onSaved={(product) => {
+        setProducts((prev) => [product, ...prev]);
+        if (addProductRow === null) {
+          setForm((prev) => ({ ...prev, items: [...prev.items, { ...blankItem, ...productToItemPatch(product) }] }));
+        } else {
+          setItem(addProductRow, productToItemPatch(product));
+        }
+      }}
+      token={token}
+      isThai={isThai}
+      initialName={addProductName}
     />
     </div>
   );

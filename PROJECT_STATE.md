@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (inline add-customer popup across builders)
+Last updated: 2026-06-02 (quotation item product picker + add-product popup)
 
 ## Latest work (2026-06-02)
+
+Quotation line-item product picker + inline add-product popup — `frontend/src/components/product/ProductFormModal.tsx` + `ProductPicker.tsx`:
+- QuotationBuilder now fetches the product catalog (`/api/products?limit=500`). The item-name field is a combobox (`ProductPicker`): type freely for a one-off line, or pick a catalog product to fill name/nameEn/description/unit/unitPrice/vatType + link `productId`. Editing the text after a pick clears `productId` (back to a manual line).
+- `ProductFormModal` is the Products-page create form pulled into a shared popup (type chips · code · unit · name TH/EN · price · VAT · category · descriptions · advanced account/cost/WHT/note · inventory). POSTs to `/api/products`, returns the created product.
+- Two ways to create: the picker dropdown footer "เพิ่มสินค้าใหม่" (prefilled with the typed name, fills that row on save) and a header "สินค้าใหม่" button (appends the created product as a new line). The existing "เพิ่มรายการ" still adds a quick blank row.
+- Design note: deliberately NOT forcing every line through the product-creation form — adding a quote line ≠ creating a catalog product. Picker + optional create-popup matches standard invoicing UX (and mirrors the customer popup pattern). Scope: QuotationBuilder only for now; Invoice (`ItemsTable`), DeliveryNote, and Recurring builders still use plain name inputs — easy follow-up to reuse `ProductPicker`/`ProductFormModal`. Verified: frontend typecheck + build. Not yet click-tested live (no prod login creds in session).
 
 Inline "add new customer" popup across all builders — `frontend/src/components/customer/CustomerFormModal.tsx`:
 - New shared modal reuses the Customers directory create form (party role · DBD/open-data lookup · tax fields · address · credit terms). The builders previously navigated away to `/app/customers` to add a buyer; now a `+ เพิ่มลูกค้าใหม่` button opens the popup in place, and on save the new customer is selected immediately.
