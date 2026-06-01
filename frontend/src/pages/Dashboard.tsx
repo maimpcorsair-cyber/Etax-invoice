@@ -644,7 +644,7 @@ export default function Dashboard() {
                 <Link
                   key={step.key}
                   to={step.href}
-                  className="group flex min-h-[108px] flex-col justify-between rounded-xl border border-white/70 bg-white/85 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                  className="group flex min-h-[108px] flex-col justify-between rounded-xl border border-white/70 bg-white/85 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -688,7 +688,7 @@ export default function Dashboard() {
                 ? 'success'
                 : 'primary';
           return (
-            <Link key={item.key} to={item.href} className="group block">
+            <Link key={item.key} to={item.href} className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
               <MetricCard
                 label={item.title}
                 value={item.value}
@@ -716,7 +716,7 @@ export default function Dashboard() {
       <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100">
+            <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
@@ -1005,7 +1005,7 @@ export default function Dashboard() {
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary-700 ring-1 ring-slate-200">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <span className="text-xs font-bold text-gray-400">0{index + 1}</span>
+                  <span className="text-xs font-bold text-gray-500">0{index + 1}</span>
                 </div>
                 <p className="mt-3 text-xs font-bold uppercase tracking-wide text-gray-500">{lane.label}</p>
                 <p className="mt-1 text-sm font-bold text-gray-950">{lane.title}</p>
@@ -1213,13 +1213,13 @@ export default function Dashboard() {
                       </span>
                     )}
                     {!m.isPast && m.total > 0 && (
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-gray-500">
                         {isThai ? `เหลือ ${m.daysLeft} วัน` : `${m.daysLeft}d left`}
                       </span>
                     )}
                   </div>
                   {m.total === 0 ? (
-                    <span className="text-xs text-gray-400">{isThai ? 'ไม่มีเอกสาร' : 'No documents'}</span>
+                    <span className="text-xs text-gray-500">{isThai ? 'ไม่มีเอกสาร' : 'No documents'}</span>
                   ) : (
                     <div className="flex items-center gap-3 text-xs text-gray-600">
                       <span className="flex items-center gap-1 text-green-700">
@@ -1259,7 +1259,7 @@ export default function Dashboard() {
                         className="text-xs px-2 py-1.5 rounded-lg bg-gray-50 border border-gray-100"
                       >
                         <span className="font-mono font-semibold text-gray-700">{t.code}</span>
-                        <span className="text-gray-400 mx-1">·</span>
+                        <span className="text-gray-500 mx-1">·</span>
                         <span className={t.failed > 0 ? 'text-red-600 font-medium' : t.success === t.total ? 'text-green-700' : 'text-gray-600'}>
                           {t.success}/{t.total}
                         </span>

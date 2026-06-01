@@ -10,7 +10,7 @@ export default function AuditLogTab({ isThai }: { isThai: boolean }) {
       </p>
       <Link
         to="/app/audit"
-        className="text-sm text-indigo-600 hover:underline"
+        className="text-sm text-primary-600 hover:underline"
       >
         {isThai ? 'ไปยังหน้า Audit Log เต็ม' : 'Go to full Audit Log page'}
       </Link>

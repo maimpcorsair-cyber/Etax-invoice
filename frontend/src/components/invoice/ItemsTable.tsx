@@ -241,10 +241,10 @@ function ItemCard({
   const [showEn, setShowEn] = useState(!!item.nameEn);
 
   return (
-    <div className="group relative bg-white border border-gray-200 rounded-xl p-3 hover:border-indigo-200 hover:shadow-sm transition-all">
+    <div className="group relative bg-white border border-gray-200 rounded-xl p-3 hover:border-primary-200 hover:shadow-sm transition-all">
       {/* Row 1: index badge + product search + delete */}
       <div className="flex items-center gap-2 mb-2.5">
-        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">
+        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary-100 text-primary-700 text-[10px] font-bold flex items-center justify-center">
           {index + 1}
         </span>
         <ProductSearchCell
@@ -277,7 +277,7 @@ function ItemCard({
           <button
             type="button"
             onClick={() => setShowEn(true)}
-            className="text-xs text-gray-400 hover:text-indigo-600 flex items-center gap-1 transition-colors"
+            className="text-xs text-gray-400 hover:text-primary-600 flex items-center gap-1 transition-colors"
           >
             <Plus className="w-3 h-3" />
             {isThai ? 'เพิ่มชื่อภาษาอังกฤษ' : 'Add English name'}
@@ -352,7 +352,7 @@ function ItemCard({
             <select
               value={item.vatType}
               onChange={(e) => onUpdate('vatType', e.target.value)}
-              className="appearance-none text-xs font-medium border border-gray-200 rounded-lg pl-2.5 pr-6 py-1 bg-white text-gray-700 hover:border-gray-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="appearance-none text-xs font-medium border border-gray-200 rounded-lg pl-2.5 pr-6 py-1 bg-white text-gray-700 hover:border-gray-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="vat7">7%</option>
               <option value="vatExempt">{isThai ? 'ยกเว้น' : 'Exempt'}</option>

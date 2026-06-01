@@ -34,10 +34,10 @@ export default function CustomerPortalLanding() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-slate-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-600 text-white mb-4">
             <Building2 className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Customer Portal</h1>
@@ -69,7 +69,7 @@ export default function CustomerPortalLanding() {
               </p>
               <button
                 onClick={() => { setSent(false); setEmail(''); }}
-                className="text-sm text-indigo-600 hover:underline mt-2"
+                className="text-sm text-primary-600 hover:underline mt-2"
               >
                 ส่งลิงก์ใหม่
               </button>

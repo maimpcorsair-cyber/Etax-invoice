@@ -218,7 +218,7 @@ export default function RecurringInvoiceBuilder() {
     }
   }
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>;
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>;
 
   return (
     <div className="space-y-4">
@@ -227,7 +227,7 @@ export default function RecurringInvoiceBuilder() {
           <Link to="/app/recurring-invoices" className="text-gray-500 hover:text-gray-800"><ArrowLeft className="h-5 w-5" /></Link>
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-              <CalendarClock className="h-6 w-6 text-indigo-600" />
+              <CalendarClock className="h-6 w-6 text-primary-600" />
               {isNew ? (isThai ? 'สร้างรอบวางบิล' : 'New recurring schedule') : existing?.name}
             </h1>
             <p className="mt-1 text-sm text-gray-500">{isThai ? 'ระบบจะสร้าง draft invoice ตามรอบ ยังไม่ส่ง RD จนกว่าจะกดออกเอกสาร' : 'The system creates draft invoices on schedule. RD submission still requires issuing the document.'}</p>
@@ -352,7 +352,7 @@ export default function RecurringInvoiceBuilder() {
               <div className="space-y-2">
                 {existing.runs.map((run) => (
                   <Link key={run.id} to={run.invoice ? `/app/invoices/${run.invoice.id}/edit` : '#'} className="block rounded-md border border-gray-100 px-3 py-2 text-xs hover:bg-gray-50">
-                    <div className="font-semibold text-indigo-700">{run.invoice?.invoiceNumber ?? run.status}</div>
+                    <div className="font-semibold text-primary-700">{run.invoice?.invoiceNumber ?? run.status}</div>
                     <div className="text-gray-500">{run.scheduledFor.slice(0, 10)}</div>
                   </Link>
                 ))}

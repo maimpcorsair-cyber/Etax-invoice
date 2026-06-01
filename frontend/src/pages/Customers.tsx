@@ -998,7 +998,7 @@ export default function Customers() {
                         {c.email && (
                           <button
                             onClick={() => handleSendPortalLink(c)}
-                            className="p-1 text-indigo-500 hover:text-indigo-700"
+                            className="p-1 text-primary-500 hover:text-primary-700"
                             title={isThai ? 'ส่งลิงก์ Customer Portal ให้ลูกค้า' : 'Send Customer Portal link'}
                           >
                             <Send className="w-4 h-4" />

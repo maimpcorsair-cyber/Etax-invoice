@@ -71,7 +71,7 @@ const STATUS_COPY: Record<string, { label: string; tone: string }> = {
   sent: { label: 'รอการตอบรับ', tone: 'border-amber-200 bg-amber-50 text-amber-700' },
   accepted: { label: 'ยอมรับแล้ว', tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
   rejected: { label: 'ปฏิเสธแล้ว', tone: 'border-rose-200 bg-rose-50 text-rose-700' },
-  converted: { label: 'ดำเนินการต่อแล้ว', tone: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
+  converted: { label: 'ดำเนินการต่อแล้ว', tone: 'border-primary-200 bg-primary-50 text-primary-700' },
   expired: { label: 'หมดอายุ', tone: 'border-slate-200 bg-slate-100 text-slate-600' },
   cancelled: { label: 'ยกเลิก', tone: 'border-slate-200 bg-slate-100 text-slate-600' },
 };

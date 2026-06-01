@@ -117,7 +117,7 @@ export default function SignaturePad({ value, onChange, isThai }: Props) {
             type="button"
             onClick={() => setMode(id)}
             className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              mode === id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              mode === id ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             <Icon className="h-3.5 w-3.5" /> {label}
@@ -162,7 +162,7 @@ export default function SignaturePad({ value, onChange, isThai }: Props) {
           type="file"
           accept="image/*"
           onChange={onUpload}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
+          className="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-100"
         />
       )}
 

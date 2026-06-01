@@ -105,7 +105,7 @@ export default function RecurringInvoiceList() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <CalendarClock className="h-6 w-6 text-indigo-600" />
+            <CalendarClock className="h-6 w-6 text-primary-600" />
             {isThai ? 'Recurring invoice' : 'Recurring invoices'}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -145,7 +145,7 @@ export default function RecurringInvoiceList() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>
       ) : rows.length === 0 ? (
         <div className="card py-12 text-center text-gray-400">
           <CalendarClock className="mx-auto mb-3 h-12 w-12 opacity-30" />
@@ -182,7 +182,7 @@ export default function RecurringInvoiceList() {
                 return (
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="table-cell">
-                      <button onClick={() => navigate(`/app/recurring-invoices/${row.id}`)} className="text-left font-semibold text-indigo-700 hover:underline">
+                      <button onClick={() => navigate(`/app/recurring-invoices/${row.id}`)} className="text-left font-semibold text-primary-700 hover:underline">
                         {row.name}
                       </button>
                       <div className="text-xs text-gray-500">{row.runCount} {isThai ? 'ครั้งที่สร้างแล้ว' : 'drafts generated'}</div>
@@ -224,7 +224,7 @@ export default function RecurringInvoiceList() {
       )}
 
       <div className="mt-2 text-xs text-gray-400">
-        <Link to="/app/invoices" className="text-indigo-600 hover:underline">
+        <Link to="/app/invoices" className="text-primary-600 hover:underline">
           {isThai ? '→ ดูใบกำกับภาษีที่สร้างแล้ว' : '→ View generated invoices'}
         </Link>
       </div>

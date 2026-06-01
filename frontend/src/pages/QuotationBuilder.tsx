@@ -21,7 +21,7 @@ const STATUS_META: Record<QuotationStatus, { th: string; en: string; tone: strin
   draft:     { th: 'แบบร่าง',  en: 'Draft',     tone: 'bg-slate-100 text-slate-700' },
   sent:      { th: 'ส่งแล้ว',  en: 'Sent',      tone: 'bg-blue-100 text-blue-700' },
   accepted:  { th: 'ยอมรับ',   en: 'Accepted',  tone: 'bg-emerald-100 text-emerald-700' },
-  converted: { th: 'แปลงแล้ว', en: 'Converted', tone: 'bg-indigo-100 text-indigo-700' },
+  converted: { th: 'แปลงแล้ว', en: 'Converted', tone: 'bg-primary-100 text-primary-700' },
   rejected:  { th: 'ปฏิเสธ',   en: 'Rejected',  tone: 'bg-rose-100 text-rose-700' },
   expired:   { th: 'หมดอายุ',  en: 'Expired',   tone: 'bg-amber-100 text-amber-700' },
   cancelled: { th: 'ยกเลิก',   en: 'Cancelled', tone: 'bg-slate-100 text-slate-500' },
@@ -717,7 +717,7 @@ export default function QuotationBuilder() {
   }
 
   if (loading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>;
+    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>;
   }
 
   return (
@@ -909,7 +909,7 @@ export default function QuotationBuilder() {
         <div className="card">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <GitBranch className="mt-0.5 h-5 w-5 text-indigo-700" />
+              <GitBranch className="mt-0.5 h-5 w-5 text-primary-700" />
               <div>
                 <h3 className="font-semibold text-slate-900">{isThai ? 'ประวัติฉบับแก้ไข' : 'Revision history'}</h3>
                 <p className="mt-1 text-xs text-slate-500">
@@ -934,7 +934,7 @@ export default function QuotationBuilder() {
                   type="button"
                   onClick={() => navigate(`/app/quotations/${revision.id}`)}
                   className={`border px-3 py-2 text-left text-xs transition ${
-                    active ? 'border-indigo-300 bg-indigo-50 text-indigo-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    active ? 'border-primary-300 bg-primary-50 text-primary-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <span className="block font-semibold">
@@ -951,7 +951,7 @@ export default function QuotationBuilder() {
 
       <div className="card">
         <div className="flex items-center gap-2">
-          <BriefcaseBusiness className="h-4 w-4 text-indigo-700" />
+          <BriefcaseBusiness className="h-4 w-4 text-primary-700" />
           <h3 className="font-semibold text-gray-900">{isThai ? 'ลักษณะใบเสนอราคา' : 'Quotation type'}</h3>
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)]">
@@ -992,7 +992,7 @@ export default function QuotationBuilder() {
           {!form.buyerId && (
             <p className="text-xs text-gray-500 mt-1">
               {isThai ? 'ยังไม่มีลูกค้า? ' : 'No customers yet? '}
-              <Link to="/app/customers/new" className="text-indigo-600 underline">{isThai ? 'เพิ่มลูกค้าใหม่' : 'Add a new customer'}</Link>
+              <Link to="/app/customers/new" className="text-primary-600 underline">{isThai ? 'เพิ่มลูกค้าใหม่' : 'Add a new customer'}</Link>
             </p>
           )}
         </div>
@@ -1055,7 +1055,7 @@ export default function QuotationBuilder() {
       {hasStructuredDetails && (
         <div className="card space-y-4">
           <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
-            <BriefcaseBusiness className="mt-0.5 h-5 w-5 text-indigo-700" />
+            <BriefcaseBusiness className="mt-0.5 h-5 w-5 text-primary-700" />
             <div>
               <h3 className="font-semibold text-slate-900">{isThai ? 'รายละเอียดเพิ่มเติม' : 'Additional details'}</h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -1078,7 +1078,7 @@ export default function QuotationBuilder() {
                   ? (isThai ? 'ยังไม่มีโปรเจกต์ คุณยังกรอกใบเสนอราคาได้' : 'No projects yet. You can still complete this quotation.')
                   : (isThai ? 'เลือกโปรเจกต์เดิม หรือกรอกเฉพาะใบเสนอราคานี้' : 'Reuse an existing project or enter quote-only details.')}
                 {' '}
-                <Link to="/app/projects" className="font-medium text-indigo-700 hover:underline">
+                <Link to="/app/projects" className="font-medium text-primary-700 hover:underline">
                   {isThai ? 'ไปที่โปรเจกต์' : 'Open projects'}
                 </Link>
               </p>
@@ -1526,7 +1526,7 @@ export default function QuotationBuilder() {
           </div>
           <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
             <span>{isThai ? 'ยอดสุทธิ' : 'Total'}</span>
-            <span className="text-indigo-700">{formatCurrency(totals.total)}</span>
+            <span className="text-primary-700">{formatCurrency(totals.total)}</span>
           </div>
           <div className="flex justify-between items-center pt-1">
             <span className="text-gray-500">{isThai ? 'หัก ณ ที่จ่าย' : 'Withholding tax'}</span>
