@@ -288,7 +288,7 @@ export function buildHtml(data: PdfInvoiceData): string {
         const isLastPage = pageIndex === pages.length - 1;
         return `
       <div class="tax-item-page${isLastPage ? ' tax-item-page-last' : ''}">
-        ${taxPageHeaderHtml}
+        ${pageIndex === 0 ? '' : taxPageHeaderHtml}
         ${renderLineItemsSection(rows)}
         ${isLastPage ? '' : `<div class="tax-continuation">${isTh ? 'มีหน้าต่อไป' : 'Continued on next page'}</div>`}
       </div>`;
@@ -591,8 +591,6 @@ export function buildHtml(data: PdfInvoiceData): string {
     color: #72809a;
   }
   .tax-page-header { display: none; }
-  .tax-multi-page .hero,
-  .tax-multi-page .overview-grid { display: none; }
   .tax-multi-page .tax-page-header {
     display: block;
     border-top: 4px solid var(--accent-2);

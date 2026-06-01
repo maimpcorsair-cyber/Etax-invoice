@@ -1,6 +1,13 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (accepted quotation to editable invoice prefill)
+Last updated: 2026-06-02 (multi-page tax invoice first-page layout)
+
+## Latest work (2026-06-02)
+
+Multi-page T01/T02 first-page layout — ready to deploy:
+- **Quotation conversion symptom explained:** accepted quotations with more than eight carried-over items exposed a shared standard-PDF pagination issue. It was not a separate quotation invoice template: every long T01/T02 hid the normal first-page hero + buyer/document overview and rendered the compact continuation header on page one.
+- **Correct accounting flow:** page one now keeps the normal full tax-invoice structure; only page two onward renders the compact repeated header with document number/date and seller/buyer references. Intermediate pages still show `มีหน้าต่อไป`; totals and signatures remain on the final page.
+- **Verification:** backend typecheck, lint, build, unit tests (`109/109`), focused PDF tests (`18/18`), and `git diff --check` pass. A locally rendered 11-line T02 PDF visually confirmed exactly two pages with the full tax-invoice header/overview on page `1/2`.
 
 ## Latest work (2026-06-01)
 
