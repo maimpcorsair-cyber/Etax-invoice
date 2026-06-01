@@ -4,11 +4,11 @@ Last updated: 2026-06-02 (invoice preview buyer + pagination polish)
 
 ## Latest work (2026-06-02)
 
-Invoice builder preview buyer + pagination polish — ready to deploy:
+Invoice builder preview buyer + pagination polish — shipped and verified live on prod (`77400a3`; Vercel `dpl_4BFPSpQcwLb8hVYqwrxJZZ149BE8`; Render deploy run `26773879208`):
 - **Real selected buyer in preview:** `/app/invoices/new` now sends the selected `customerId` to `POST /api/invoices/preview`; the backend resolves it company-scoped and renders the customer's legal data. The sample buyer remains only as the useful empty-form fallback before a customer is chosen.
 - **Honest preview document number:** unsaved previews no longer show the fake sequence-like `PREVIEW-001`; they show `รอออกเลข` (`Pending issue` for English). Running numbers are still reserved only when saving/issuing, so preview clicks cannot create gaps in the accounting sequence.
 - **Denser two-page tax invoices:** long T01/T02 documents with 9-12 rows now fill page one to its eight-row capacity and keep the remaining 1-4 rows plus totals/signatures on the final page. The reported 11-row case changes from `7 + 4` to `8 + 3`.
-- **Verification:** backend/frontend typecheck, lint, and build; backend unit tests (`109/109`); focused PDF tests (`18/18`); and `git diff --check` pass. A locally rendered 11-line T02 visually confirmed the real-buyer layout, `รอออกเลข`, page `1/2`, and eight rows on the first page.
+- **Verification:** backend/frontend typecheck, lint, and build; backend unit tests (`109/109`); focused PDF tests (`18/18`); and `git diff --check` pass. A locally rendered 11-line T02 visually confirmed the real-buyer layout, `รอออกเลข`, page `1/2`, and eight rows on the first page. GitHub Typecheck + Unit tests + Prod smoke green for `77400a3`; Vercel production Ready + aliased to `etax-invoice.vercel.app`; Render deploy run `26773879208` green. Post-deploy `/api/health`, `/api/health/deep`, and `/api/health/pdf` checks pass, and an authenticated production preview smoke confirmed `hasSelectedBuyer=true`, `hasPendingIssueLabel=true`, and `hasMockBuyer=false`.
 
 Multi-page T01/T02 first-page layout — shipped and verified live on prod (`9b2b5e9`):
 - **Quotation conversion symptom explained:** accepted quotations with more than eight carried-over items exposed a shared standard-PDF pagination issue. It was not a separate quotation invoice template: every long T01/T02 hid the normal first-page hero + buyer/document overview and rendered the compact continuation header on page one.
