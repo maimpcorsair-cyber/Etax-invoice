@@ -148,6 +148,10 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(html.includes('<div class="signature-grid">'), 'signature lines should always render for manual signing');
   assert.ok(html.includes('ผู้รับสินค้า / ลูกค้า'), 'received-by signature line should render');
   assert.ok(html.includes('ผู้มีอำนาจลงนาม'), 'authorized signatory line should render');
+  assert.ok(
+    html.indexOf('ผู้มีอำนาจลงนาม') < html.indexOf('ผู้รับสินค้า / ลูกค้า'),
+    'issuer signature should render on the left before the customer signature',
+  );
   assert.ok(html.includes('ได้รับสินค้า/บริการ'), 'received-goods acknowledgement statement should render on non-quotation docs');
 });
 
@@ -190,6 +194,9 @@ test('standard document hides empty discount column and keeps it only when neede
 
   assert.ok(htmlWithoutDiscounts.includes('line-items no-discount'), 'line items should mark the no-discount table state');
   assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">ส่วนลด</th>`), 'empty discount column should not render');
+  assert.ok(htmlWithoutDiscounts.includes('single-vat'), 'homogeneous VAT documents should use the compact single-VAT table state');
+  assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'homogeneous VAT documents should not render per-line VAT');
+  assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:72px;text-align:right">ภาษี</th>`), 'line-item tax amount column should not render');
 
   const htmlWithDiscount = buildHtml({
     ...FIXTURE,
@@ -208,6 +215,29 @@ test('standard document hides empty discount column and keeps it only when neede
   assert.ok(htmlWithDiscount.includes('line-items has-discount'), 'discounted documents should keep the discount table state');
   assert.ok(htmlWithDiscount.includes(`<th style="width:52px;text-align:center">ส่วนลด</th>`), 'discount column should render when any line has discount');
   assert.ok(htmlWithDiscount.includes('>5%</td>'), 'discount value should render for the discounted line');
+});
+
+test('standard document shows per-line VAT type only for mixed VAT documents', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    type: 'quotation',
+    invoiceNumber: 'QT-2026-000012',
+    documentMode: 'ordinary',
+    items: [
+      FIXTURE.items[0]!,
+      {
+        ...FIXTURE.items[1]!,
+        vatType: 'vatExempt',
+        vatAmount: 0,
+        totalAmount: FIXTURE.items[1]!.amount,
+      },
+    ],
+  });
+
+  assert.ok(html.includes('mixed-vat'), 'mixed VAT documents should keep the VAT-type table state');
+  assert.ok(html.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'mixed VAT documents should render per-line VAT type');
+  assert.ok(html.includes('>ยกเว้น</td>'), 'mixed VAT documents should show exempt line status');
+  assert.ok(!html.includes(`<th style="width:72px;text-align:right">ภาษี</th>`), 'per-line tax amount should remain summary-only even for mixed VAT');
 });
 
 test('standard quotation document uses quotation copy and valid-until wording', () => {

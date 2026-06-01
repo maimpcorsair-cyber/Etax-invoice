@@ -30,6 +30,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   const fontUrl = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap';
   const theme = resolveDocumentTheme(data.templateId);
   const hasLineDiscounts = data.items.some((item) => item.discountAmount > 0);
+  const showLineVatType = new Set(data.items.map((item) => item.vatType)).size > 1;
 
   const itemRows = data.items.map((item, idx) => {
     const nameThEsc = escapeHtml(item.nameTh ?? '');
@@ -50,9 +51,8 @@ export function buildHtml(data: PdfInvoiceData): string {
         <td style="text-align:center">${unitEsc}</td>
         <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
         ${hasLineDiscounts ? `<td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : ''}</td>` : ''}
-        <td style="text-align:center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>
+        ${showLineVatType ? `<td style="text-align:center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>` : ''}
         <td style="text-align:right">${formatCurrency(item.amount)}</td>
-        <td style="text-align:right">${formatCurrency(item.vatAmount)}</td>
         <td style="text-align:right"><strong>${formatCurrency(item.totalAmount)}</strong></td>
       </tr>`;
   }).join('');
@@ -1090,19 +1090,18 @@ export function buildHtml(data: PdfInvoiceData): string {
         <div class="items-header">
           <h2>${labels.item}</h2>
         </div>
-        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'}">
+        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'} ${showLineVatType ? 'mixed-vat' : 'single-vat'}">
           <thead>
             <tr>
               <th style="width:38px;text-align:center">${labels.no}</th>
               <th>${labels.item}</th>
-              <th style="width:48px;text-align:center">${labels.qty}</th>
+              <th style="width:50px;text-align:center">${labels.qty}</th>
               <th style="width:54px;text-align:center">${labels.unit}</th>
-              <th style="width:82px;text-align:right">${labels.price}</th>
+              <th style="width:90px;text-align:right">${labels.price}</th>
               ${hasLineDiscounts ? `<th style="width:52px;text-align:center">${labels.disc}</th>` : ''}
-              <th style="width:48px;text-align:center">${labels.vat}</th>
-              <th style="width:82px;text-align:right">${labels.amount}</th>
-              <th style="width:72px;text-align:right">${labels.vatAmt}</th>
-              <th style="width:88px;text-align:right">${labels.total}</th>
+              ${showLineVatType ? `<th style="width:52px;text-align:center">${labels.vat}</th>` : ''}
+              <th style="width:92px;text-align:right">${labels.amount}</th>
+              <th style="width:96px;text-align:right">${labels.total}</th>
             </tr>
           </thead>
           <tbody>${itemRows}</tbody>
@@ -1145,18 +1144,18 @@ export function buildHtml(data: PdfInvoiceData): string {
 
       <div class="signature-grid">
         <div class="sig-card">
-          <div class="sig-space"></div>
-          <div class="sig-line"></div>
-          <div class="sig-title">${labels.receivedBy}</div>
-          <div class="sig-date">${labels.dateLine} ......../......../........</div>
-        </div>
-        <div class="sig-card">
           <div class="sig-space">${data.signatureImageUrl ? `<img class="sig-image" src="${data.signatureImageUrl}" alt="authorized signature"/>` : ''}</div>
           <div class="sig-line"></div>
           <div class="sig-title">${labels.authorizedBy}</div>
           ${(data.signerName || data.signerTitle)
             ? `<div class="sig-name">${escapeHtml([data.signerName, data.signerTitle].filter(Boolean).join(' · '))}</div>`
             : `<div class="sig-date">${labels.dateLine} ......../......../........</div>`}
+        </div>
+        <div class="sig-card">
+          <div class="sig-space"></div>
+          <div class="sig-line"></div>
+          <div class="sig-title">${labels.receivedBy}</div>
+          <div class="sig-date">${labels.dateLine} ......../......../........</div>
         </div>
       </div>
 
