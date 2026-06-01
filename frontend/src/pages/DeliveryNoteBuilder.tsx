@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
+import DeleteButton from '../components/ui/DeleteButton';
 import type { Customer, DeliveryNote, DeliveryNoteStatus } from '../types';
 
 const STATUS_META: Record<DeliveryNoteStatus, { th: string; en: string; tone: string }> = {
@@ -476,7 +477,7 @@ export default function DeliveryNoteBuilder() {
                   <td className="py-2 pr-2 text-right font-medium">{amount === null ? '—' : formatCurrency(amount)}</td>
                   {editable && (
                     <td className="py-2 text-center">
-                      <button onClick={() => removeItem(idx)} className="text-gray-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                      <DeleteButton onClick={() => removeItem(idx)} label={isThai ? 'ลบรายการ' : 'Remove item'} size="sm" className="mx-auto" />
                     </td>
                   )}
                 </tr>

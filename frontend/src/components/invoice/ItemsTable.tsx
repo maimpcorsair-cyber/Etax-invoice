@@ -1,4 +1,5 @@
-import { Plus, Trash2, Search, ChevronDown } from 'lucide-react';
+import { Plus, Search, ChevronDown } from 'lucide-react';
+import DeleteButton from '../ui/DeleteButton';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -253,14 +254,13 @@ function ItemCard({
           whtRate={whtRate}
           onWhtRateChange={onWhtRateChange}
         />
-        <button
+        <DeleteButton
           onClick={onRemove}
           disabled={!canDelete}
-          className="flex-shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-          title={isThai ? 'ลบรายการ' : 'Remove item'}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+          label={isThai ? 'ลบรายการ' : 'Remove item'}
+          size="sm"
+          className="flex-shrink-0"
+        />
       </div>
 
       {/* EN name toggle */}

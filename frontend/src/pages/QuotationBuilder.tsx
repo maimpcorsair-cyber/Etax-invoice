@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
+import DeleteButton from '../components/ui/DeleteButton';
 import type { Customer, Quotation, QuotationStatus } from '../types';
 import { builtinDocumentTemplates } from '../lib/documentTemplatePresets';
 
@@ -1356,9 +1357,12 @@ export default function QuotationBuilder() {
                   <input type="number" min="0" value={milestone.amount} onChange={(e) => setMilestone(index, { amount: Number(e.target.value) })} className="input-field text-right" placeholder={isThai ? 'จำนวนเงิน' : 'Amount'} disabled={!editable} />
                   <input type="date" value={milestone.dueDate} onChange={(e) => setMilestone(index, { dueDate: e.target.value })} className="input-field" disabled={!editable} />
                   {editable && (
-                    <button type="button" onClick={() => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, milestones: prev.serviceDetails.milestones.filter((_, itemIndex) => itemIndex !== index) } }))} className="flex items-center justify-center text-slate-400 hover:text-rose-600">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <DeleteButton
+                      onClick={() => setForm((prev) => ({ ...prev, serviceDetails: { ...prev.serviceDetails, milestones: prev.serviceDetails.milestones.filter((_, itemIndex) => itemIndex !== index) } }))}
+                      label={isThai ? 'ลบงวดงาน' : 'Remove milestone'}
+                      size="sm"
+                      className="justify-self-center"
+                    />
                   )}
                   <input value={milestone.note} onChange={(e) => setMilestone(index, { note: e.target.value })} className="input-field md:col-start-2 md:col-span-3" placeholder={isThai ? 'หมายเหตุงวดงาน (ถ้ามี)' : 'Milestone note (optional)'} disabled={!editable} />
                 </div>
@@ -1459,9 +1463,7 @@ export default function QuotationBuilder() {
                   <td className="py-2 pr-2 text-right font-medium">{formatCurrency(line.totalAmount)}</td>
                   {editable && (
                     <td className="py-2 text-center">
-                      <button onClick={() => removeItem(idx)} className="text-gray-400 hover:text-rose-600">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <DeleteButton onClick={() => removeItem(idx)} label={isThai ? 'ลบรายการ' : 'Remove item'} size="sm" className="mx-auto" />
                     </td>
                   )}
                 </tr>

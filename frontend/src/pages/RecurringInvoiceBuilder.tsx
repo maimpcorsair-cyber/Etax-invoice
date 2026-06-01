@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Loader2, Plus, Receipt, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Loader2, Plus, Receipt, Save } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
+import DeleteButton from '../components/ui/DeleteButton';
 import type { Customer, Language, RecurringInvoice, RecurringInvoiceFrequency, RecurringInvoiceItem } from '../types';
 
 type ItemDraft = Omit<RecurringInvoiceItem, 'id'>;
@@ -318,7 +319,7 @@ export default function RecurringInvoiceBuilder() {
                       <option value="vatZero">VAT 0%</option>
                       <option value="vatExempt">{isThai ? 'ยกเว้น VAT' : 'Exempt'}</option>
                     </select>
-                    <button onClick={() => removeItem(idx)} className="rounded-md p-2 text-gray-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove item"><Trash2 className="h-4 w-4" /></button>
+                    <DeleteButton onClick={() => removeItem(idx)} label={isThai ? 'ลบรายการ' : 'Remove item'} size="sm" />
                     <div className="md:col-span-6 text-right text-xs text-gray-500">{formatCurrency(line.totalAmount)}</div>
                   </div>
                 );
