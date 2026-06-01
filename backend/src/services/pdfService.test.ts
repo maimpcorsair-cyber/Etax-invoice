@@ -141,6 +141,8 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(html.includes('margin-top: auto'), 'payment/support area should sit toward the bottom on short A4 invoices');
   assert.ok(!html.includes('Electronic Tax Document'), 'ordinary document must not show electronic tax eyebrow');
   assert.ok(!html.includes('ORDINARY DOCUMENT'), 'ordinary document should not spend space on a redundant ordinary badge');
+  assert.ok(!html.includes('class="watermark"'), 'document PDF should not render decorative background watermarks');
+  assert.ok(!html.includes('>STANDARD<'), 'standard theme name should not appear as a watermark');
   // Accounting standard: signature LINES are always present so the document
   // can be signed by hand, even when no signature image/name is configured.
   assert.ok(html.includes('<div class="signature-grid">'), 'signature lines should always render for manual signing');
@@ -176,6 +178,36 @@ test('standard ordinary document keeps up to eight items in compact one-page lay
   assert.ok(html.includes('.compact-one-page {\n    padding: 0;'), 'compact one-page layout should not add overflow padding');
   assert.ok(html.includes('height: calc(297mm - 20mm)'), 'printed compact A4 should have a fixed content-height box');
   assert.ok(!html.includes('📱'), 'invoice PDFs should not render emoji labels');
+});
+
+test('standard document hides empty discount column and keeps it only when needed', () => {
+  const htmlWithoutDiscounts = buildHtml({
+    ...FIXTURE,
+    type: 'quotation',
+    invoiceNumber: 'QT-2026-000010',
+    documentMode: 'ordinary',
+  });
+
+  assert.ok(htmlWithoutDiscounts.includes('line-items no-discount'), 'line items should mark the no-discount table state');
+  assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">ส่วนลด</th>`), 'empty discount column should not render');
+
+  const htmlWithDiscount = buildHtml({
+    ...FIXTURE,
+    type: 'quotation',
+    invoiceNumber: 'QT-2026-000011',
+    documentMode: 'ordinary',
+    items: [
+      {
+        ...FIXTURE.items[0]!,
+        discountAmount: 5,
+      },
+      FIXTURE.items[1]!,
+    ],
+  });
+
+  assert.ok(htmlWithDiscount.includes('line-items has-discount'), 'discounted documents should keep the discount table state');
+  assert.ok(htmlWithDiscount.includes(`<th style="width:52px;text-align:center">ส่วนลด</th>`), 'discount column should render when any line has discount');
+  assert.ok(htmlWithDiscount.includes('>5%</td>'), 'discount value should render for the discounted line');
 });
 
 test('standard quotation document uses quotation copy and valid-until wording', () => {

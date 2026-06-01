@@ -275,6 +275,6 @@ export function resolveDocumentTheme(templateId?: string | null) {
     'builtin:anime-pastel':  { className: 'theme-anime-pastel',  accent: '#b794f4', accent2: '#9f7aea', soft: '#f5f0ff', ink: '#553c7b', label: 'Anime Pastel',  mark: '♡' },
   };
 
-  const base = themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: 'STANDARD' };
+  const base = themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: '' };
   return { ...base, ...deriveSurfaceTokens(base) };
 }

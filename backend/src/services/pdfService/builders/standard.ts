@@ -29,6 +29,7 @@ export function buildHtml(data: PdfInvoiceData): string {
 
   const fontUrl = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap';
   const theme = resolveDocumentTheme(data.templateId);
+  const hasLineDiscounts = data.items.some((item) => item.discountAmount > 0);
 
   const itemRows = data.items.map((item, idx) => {
     const nameThEsc = escapeHtml(item.nameTh ?? '');
@@ -48,7 +49,7 @@ export function buildHtml(data: PdfInvoiceData): string {
         <td style="text-align:center">${item.quantity}</td>
         <td style="text-align:center">${unitEsc}</td>
         <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
-        <td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : '-'}</td>
+        ${hasLineDiscounts ? `<td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : ''}</td>` : ''}
         <td style="text-align:center">${item.vatType === 'vatExempt' ? (isTh ? 'ยกเว้น' : 'Exempt') : item.vatType === 'vatZero' ? '0%' : '7%'}</td>
         <td style="text-align:right">${formatCurrency(item.amount)}</td>
         <td style="text-align:right">${formatCurrency(item.vatAmount)}</td>
@@ -250,19 +251,6 @@ export function buildHtml(data: PdfInvoiceData): string {
     position: relative;
   }
   .top-accent { height: 3px; background: var(--accent-2); }
-  .watermark {
-    position: absolute;
-    right: 24px;
-    top: 118px;
-    font-size: 54px;
-    line-height: 1;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    opacity: 0.055;
-    transform: rotate(-8deg);
-    pointer-events: none;
-  }
   .document-body {
     flex: 1;
     display: flex;
@@ -469,6 +457,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     color: #1e2f5a;
   }
   table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .line-items { table-layout: fixed; }
   thead th {
     background: var(--accent-2);
     color: #ffffff;
@@ -483,6 +472,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     border-bottom: 1px solid #edf2f7;
     vertical-align: top;
     color: #243348;
+    word-break: break-word;
   }
   tbody tr:nth-child(even) td { background: #fbfcfe; }
   tbody tr:last-child td { border-bottom: none; }
@@ -979,6 +969,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     body,
     .compact-one-page {
       padding: 0;
+      background: #ffffff;
     }
 
     .page {
@@ -1007,9 +998,17 @@ export function buildHtml(data: PdfInvoiceData): string {
       min-height: 0;
       border-radius: 0;
       box-shadow: none;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
-    body:not(.compact-one-page) .document-body { display: block; }
-    body:not(.compact-one-page) .document-support { margin-top: 24px; }
+    body:not(.compact-one-page) .document-body { display: block; padding-bottom: 20px; }
+    body:not(.compact-one-page) .signature-grid { margin-top: 20px; gap: 16px; }
+    body:not(.compact-one-page) .sig-card { padding: 14px 16px 12px; }
+    body:not(.compact-one-page) .sig-space { height: 44px; }
+    body:not(.compact-one-page) .document-support { margin-top: 18px; padding-top: 0; gap: 12px; }
+    body:not(.compact-one-page) .bank-box,
+    body:not(.compact-one-page) .online-box { padding: 12px 14px; }
+    body:not(.compact-one-page) .footer { display: none; }
     body:not(.compact-one-page) thead { display: table-header-group; }
     body:not(.compact-one-page) tr { break-inside: avoid; }
     body:not(.compact-one-page) .totals-card,
@@ -1019,15 +1018,15 @@ export function buildHtml(data: PdfInvoiceData): string {
     body:not(.compact-one-page) .meta-card,
     body:not(.compact-one-page) .notes-card,
     body:not(.compact-one-page) .words-card,
-    body:not(.compact-one-page) .ack-statement { break-inside: avoid; }
+    body:not(.compact-one-page) .ack-statement,
+    body:not(.compact-one-page) .schedule-card { break-inside: avoid; }
   }
 </style>
 </head>
 <body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}">
-<div class="page">
+  <div class="page">
   <div class="document-shell">
     <div class="top-accent"></div>
-    <div class="watermark">${theme.mark}</div>
     <div class="document-body">
       <div class="hero">
         <div class="brand-area">
@@ -1091,19 +1090,19 @@ export function buildHtml(data: PdfInvoiceData): string {
         <div class="items-header">
           <h2>${labels.item}</h2>
         </div>
-        <table>
+        <table class="line-items ${hasLineDiscounts ? 'has-discount' : 'no-discount'}">
           <thead>
             <tr>
-              <th style="width:42px;text-align:center">${labels.no}</th>
+              <th style="width:38px;text-align:center">${labels.no}</th>
               <th>${labels.item}</th>
-              <th style="width:54px;text-align:center">${labels.qty}</th>
-              <th style="width:56px;text-align:center">${labels.unit}</th>
-              <th style="width:96px;text-align:right">${labels.price}</th>
-              <th style="width:56px;text-align:center">${labels.disc}</th>
-              <th style="width:52px;text-align:center">${labels.vat}</th>
-              <th style="width:96px;text-align:right">${labels.amount}</th>
-              <th style="width:78px;text-align:right">${labels.vatAmt}</th>
-              <th style="width:102px;text-align:right">${labels.total}</th>
+              <th style="width:48px;text-align:center">${labels.qty}</th>
+              <th style="width:54px;text-align:center">${labels.unit}</th>
+              <th style="width:82px;text-align:right">${labels.price}</th>
+              ${hasLineDiscounts ? `<th style="width:52px;text-align:center">${labels.disc}</th>` : ''}
+              <th style="width:48px;text-align:center">${labels.vat}</th>
+              <th style="width:82px;text-align:right">${labels.amount}</th>
+              <th style="width:72px;text-align:right">${labels.vatAmt}</th>
+              <th style="width:88px;text-align:right">${labels.total}</th>
             </tr>
           </thead>
           <tbody>${itemRows}</tbody>
