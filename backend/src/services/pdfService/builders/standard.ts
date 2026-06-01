@@ -51,7 +51,6 @@ export function buildHtml(data: PdfInvoiceData): string {
         <td style="text-align:right">${formatCurrency(item.unitPrice)}</td>
         ${hasLineDiscounts ? `<td style="text-align:center">${item.discountAmount > 0 ? item.discountAmount + '%' : ''}</td>` : ''}
         <td style="text-align:right">${formatCurrency(item.amount)}</td>
-        <td style="text-align:right"><strong>${formatCurrency(item.totalAmount)}</strong></td>
       </tr>`;
   }).join('');
 
@@ -69,7 +68,6 @@ export function buildHtml(data: PdfInvoiceData): string {
     disc: isTh ? 'ส่วนลด' : isEn ? 'Disc.' : 'Disc.',
     amount: isTh ? 'ราคา' : isEn ? 'Amount' : 'Amount',
     vatAmt: isTh ? 'ภาษี' : isEn ? 'Tax' : 'Tax',
-    total: isTh ? 'รวม' : isEn ? 'Total' : 'Total',
     subtotal: isTh ? 'ยอดรวมก่อน VAT' : isEn ? 'Subtotal (excl. VAT)' : 'Subtotal',
     vatTotal: isTh ? 'ภาษีมูลค่าเพิ่ม (7%)' : isEn ? 'VAT (7%)' : 'VAT (7%)',
     grandTotal: isTh ? 'ยอดรวมสุทธิ' : isEn ? 'Grand Total' : 'Grand Total',
@@ -1098,7 +1096,6 @@ export function buildHtml(data: PdfInvoiceData): string {
               <th style="width:90px;text-align:right">${labels.price}</th>
               ${hasLineDiscounts ? `<th style="width:52px;text-align:center">${labels.disc}</th>` : ''}
               <th style="width:92px;text-align:right">${labels.amount}</th>
-              <th style="width:96px;text-align:right">${labels.total}</th>
             </tr>
           </thead>
           <tbody>${itemRows}</tbody>
