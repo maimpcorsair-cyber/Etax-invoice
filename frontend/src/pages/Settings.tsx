@@ -17,11 +17,11 @@ import {
   ReceiptText,
   Save,
   ShieldCheck,
-  Trash2,
   Unlink2,
   XCircle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import DeleteButton from '../components/ui/DeleteButton';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import { useDocumentProfile } from '../hooks/useDocumentProfile';
@@ -842,9 +842,7 @@ export default function Settings() {
                                 {isThai ? 'ตั้งเป็นหลัก' : 'Make default'}
                               </button>
                             )}
-                            <button type="button" onClick={() => void removeBankAccount(account.id)} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-600 hover:bg-rose-100">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <DeleteButton onClick={() => void removeBankAccount(account.id)} label={isThai ? 'ลบบัญชีธนาคาร' : 'Remove bank account'} />
                           </div>
                         </div>
                       </div>
