@@ -1,8 +1,13 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (invoice preview buyer + pagination polish)
+Last updated: 2026-06-02 (formal monochrome system default template)
 
 ## Latest work (2026-06-02)
+
+Formal monochrome system default template — shipped and verified live on prod (`fe61c28`; Vercel `dpl_6od9YjjVhZgd8e3Cf1Yvq6q2XdV7`; Render deploy run `26776571731`):
+- **New system default:** documents without an explicit template now render with `builtin:minimal-dark-accent` (`ขาว-ดำ · ทางการ`) instead of the legacy blue fallback. The shared fallback covers invoice previews, saved invoice PDFs, quotation PDFs, and automatic document flows while preserving explicit user selections and company templates.
+- **Builder UI parity:** invoice and quotation template dropdowns now label the system option `ขาว-ดำ · ทางการ (ค่าเริ่มต้น)` and show matching monochrome swatches, so the selected label matches the generated PDF.
+- **Verification:** frontend/backend typecheck, lint, and build; backend unit tests (`110/110`); focused PDF tests (`19/19`); `git diff --check`; and a locally rendered A4 visual check pass. GitHub Typecheck + Unit tests + Prod smoke green for `fe61c28`; Vercel production Ready + aliased to `etax-invoice.vercel.app`; Render deploy run `26776571731` green. Post-deploy `/app/invoices/new`, `/api/health`, `/api/health/deep`, and `/api/health/pdf` checks pass. An authenticated production preview smoke confirmed `hasFormalMonoDefault=true`, `hasBlueSystemDefault=false`, and `hasPendingIssueLabel=true`.
 
 Invoice builder preview buyer + pagination polish — shipped and verified live on prod (`77400a3`; Vercel `dpl_4BFPSpQcwLb8hVYqwrxJZZ149BE8`; Render deploy run `26773879208`):
 - **Real selected buyer in preview:** `/app/invoices/new` now sends the selected `customerId` to `POST /api/invoices/preview`; the backend resolves it company-scoped and renders the customer's legal data. The sample buyer remains only as the useful empty-form fallback before a customer is chosen.
