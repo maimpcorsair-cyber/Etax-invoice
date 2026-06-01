@@ -180,7 +180,11 @@ export default function InvoiceBuilder() {
   const [isDraft, setIsDraft] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
+  const [quotationPrefillMessage, setQuotationPrefillMessage] = useState<string | null>(null);
+  const [quotationPrefillError, setQuotationPrefillError] = useState<string | null>(null);
+  const [prefilledQuotationNumber, setPrefilledQuotationNumber] = useState<string | null>(null);
   const [showDraftRecoveryPrompt, setShowDraftRecoveryPrompt] = useState(false);
+  const fromQuotationId = searchParams.get('fromQuotation');
 
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
   const hasCompanyLogo = Boolean(company?.logoUrl);
@@ -350,12 +354,15 @@ export default function InvoiceBuilder() {
     invoiceDate: form.invoiceDate,
     dueDate: form.docType === 'tax_invoice' && form.dueDate ? form.dueDate : undefined,
     items: form.items.map((item) => ({
+      productId: item.productId || undefined,
       nameTh: item.nameTh,
       nameEn: item.nameEn || '',
+      descriptionTh: item.descriptionTh || '',
+      descriptionEn: item.descriptionEn || '',
       quantity: item.quantity,
       unit: item.unit,
       unitPrice: item.unitPrice,
-      discount: item.discount,
+      discountAmount: item.discount,
       vatType: item.vatType,
     })),
     notes: form.notes || undefined,
@@ -487,11 +494,76 @@ export default function InvoiceBuilder() {
 
   useEffect(() => {
     const presetType = searchParams.get('type');
-    if (!isEdit && presetType && ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'].includes(presetType)) {
+    if (!isEdit && !fromQuotationId && presetType && ['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'].includes(presetType)) {
       form.setDocType(presetType as typeof form.docType);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.setDocType, isEdit, searchParams, form.docType]);
+  }, [form.setDocType, fromQuotationId, isEdit, searchParams, form.docType]);
+
+  useEffect(() => {
+    if (!token || isEdit || !fromQuotationId) return;
+    let active = true;
+
+    async function loadQuotationPrefill() {
+      setQuotationPrefillMessage(null);
+      setQuotationPrefillError(null);
+      setPrefilledQuotationNumber(null);
+      setShowDraftRecoveryPrompt(false);
+      form.clearDraftFromStorage();
+      try {
+        const res = await fetch(`/api/quotations/${fromQuotationId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json() as { data?: import('../types').Quotation; error?: string };
+        if (!res.ok || !json.data) throw new Error(json.error ?? 'Failed to load quotation');
+        if (!active) return;
+
+        if (json.data.status === 'converted' && json.data.convertedToInvoiceId) {
+          navigate(`/app/invoices/${json.data.convertedToInvoiceId}/edit`, { replace: true });
+          return;
+        }
+        if (json.data.status !== 'accepted') {
+          throw new Error(
+            isThai
+              ? 'ใบเสนอราคาต้องอยู่สถานะลูกค้ายืนยันแล้วก่อนออกใบกำกับภาษี'
+              : 'The quotation must be accepted before creating a tax invoice.',
+          );
+        }
+
+        form.hydrateFromQuotation(json.data);
+        setProjectId(json.data.projectId ?? '');
+        customer.setSelectedCustomerId(json.data.buyerId);
+        customer.setCustomerSearch(isThai ? (json.data.buyer?.nameTh ?? '') : (json.data.buyer?.nameEn ?? json.data.buyer?.nameTh ?? ''));
+        customer.clearResults();
+        setShowBuyerSection(true);
+        setPrefilledQuotationNumber(json.data.quotationNumber);
+        setQuotationPrefillMessage(
+          isThai
+            ? `เติมข้อมูลจากใบเสนอราคา ${json.data.quotationNumber} แล้ว แก้ไขรายละเอียดก่อนบันทึกหรือออกเอกสารได้`
+            : `Prefilled from quotation ${json.data.quotationNumber}. You can edit details before saving or issuing.`,
+        );
+      } catch (error) {
+        if (!active) return;
+        setQuotationPrefillError(
+          error instanceof Error
+            ? error.message
+            : (isThai ? 'โหลดข้อมูลใบเสนอราคาไม่สำเร็จ' : 'Could not load quotation prefill.'),
+        );
+      }
+    }
+
+    void loadQuotationPrefill();
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    fromQuotationId,
+    isEdit,
+    isThai,
+    navigate,
+    token,
+    form.hydrateFromQuotation,
+    form.clearDraftFromStorage,
+  ]);
 
   useEffect(() => {
     if (!token) return;
@@ -516,20 +588,20 @@ export default function InvoiceBuilder() {
 
   /* ── Draft recovery — on new invoice, offer to restore from localStorage ── */
   useEffect(() => {
-    if (isEdit || !token || form.recoveredDraft || form.userDismissedDraft) return;
+    if (isEdit || fromQuotationId || !token || form.recoveredDraft || form.userDismissedDraft) return;
     setShowDraftRecoveryPrompt(form.hasRecoverableDraft());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, token, form.recoveredDraft, form.userDismissedDraft]);
+  }, [fromQuotationId, isEdit, token, form.recoveredDraft, form.userDismissedDraft]);
 
   /* ── Auto-save form to localStorage every 5 seconds (new invoices only) ── */
   useEffect(() => {
-    if (isEdit || form.saving || form.recoveredDraft || form.userDismissedDraft || showDraftRecoveryPrompt) return;
+    if (isEdit || fromQuotationId || form.saving || form.recoveredDraft || form.userDismissedDraft || showDraftRecoveryPrompt) return;
     const interval = setInterval(() => {
       form.saveDraftToStorage();
     }, 5000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, form.saving, form.recoveredDraft, form.userDismissedDraft, showDraftRecoveryPrompt]);
+  }, [fromQuotationId, isEdit, form.saving, form.recoveredDraft, form.userDismissedDraft, showDraftRecoveryPrompt]);
 
   /* ── Auto-clear draft when successfully issued ── */
   useEffect(() => {
@@ -986,6 +1058,25 @@ export default function InvoiceBuilder() {
             setIssuedInvoiceId(issuedId);
           }, projectId)}
         />
+
+        {(prefilledQuotationNumber || quotationPrefillMessage || quotationPrefillError) && (
+          <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+            quotationPrefillError
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}>
+            <div className="flex items-start gap-3">
+              <FileText className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                {quotationPrefillError
+                  ?? quotationPrefillMessage
+                  ?? (isThai
+                    ? `เติมข้อมูลจากใบเสนอราคา ${prefilledQuotationNumber} แล้ว แก้ไขรายละเอียดก่อนบันทึกหรือออกเอกสารได้`
+                    : `Prefilled from quotation ${prefilledQuotationNumber}. You can edit details before saving or issuing.`)}
+              </p>
+            </div>
+          </div>
+        )}
 
         {showDraftRecoveryPrompt && (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">

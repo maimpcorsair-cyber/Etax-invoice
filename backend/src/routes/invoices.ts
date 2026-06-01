@@ -72,6 +72,7 @@ const createInvoiceSchema = z.object({
   signerTitle: z.string().optional(),
   referenceInvoiceId: z.string().optional(),
   referenceDocNumber: z.string().optional(),
+  sourceQuotationId: z.string().optional(),
   asDraft: z.boolean().optional().default(false),
 });
 const updateInvoiceSchema = createInvoiceSchema;
@@ -429,6 +430,38 @@ invoicesRouter.post('/', async (req, res) => {
     if (!customer) { res.status(404).json({ error: 'Customer not found' }); return; }
     if (!company) { res.status(404).json({ error: 'Company not found' }); return; }
 
+    const sourceQuotation = body.sourceQuotationId
+      ? await prisma.quotation.findFirst({
+        where: { id: body.sourceQuotationId, companyId: req.user!.companyId },
+        select: {
+          id: true,
+          quotationNumber: true,
+          status: true,
+          supersededById: true,
+          convertedToInvoiceId: true,
+        },
+      })
+      : null;
+    if (body.sourceQuotationId && !sourceQuotation) {
+      res.status(404).json({ error: 'Source quotation not found' });
+      return;
+    }
+    if (sourceQuotation?.convertedToInvoiceId) {
+      res.status(409).json({
+        error: 'Source quotation is already converted to an invoice',
+        invoiceId: sourceQuotation.convertedToInvoiceId,
+      });
+      return;
+    }
+    if (sourceQuotation?.supersededById) {
+      res.status(409).json({ error: 'This quotation has a newer revision. Create the invoice from the latest accepted revision.' });
+      return;
+    }
+    if (sourceQuotation && sourceQuotation.status !== 'accepted') {
+      res.status(400).json({ error: `Cannot create an invoice from a ${sourceQuotation.status} quotation` });
+      return;
+    }
+
     // Draft save: use a temporary number; skip PDF + RD queue
     const isDraft = body.asDraft === true;
     let invoiceNumber: string;
@@ -524,6 +557,25 @@ invoicesRouter.post('/', async (req, res) => {
           items: created.items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
           createdBy: req.user!.userId,
         });
+      }
+
+      if (sourceQuotation) {
+        const updated = await tx.quotation.updateMany({
+          where: {
+            id: sourceQuotation.id,
+            companyId: req.user!.companyId,
+            status: 'accepted',
+            convertedToInvoiceId: null,
+          },
+          data: {
+            status: 'converted',
+            convertedToInvoiceId: created.id,
+            convertedAt: new Date(),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new Error('Source quotation was already converted by another request');
+        }
       }
       return created;
     });

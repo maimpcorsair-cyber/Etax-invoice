@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (quotation preview workstation + sent-state guard)
+Last updated: 2026-06-01 (accepted quotation to editable invoice prefill)
 
 ## Latest work (2026-06-01)
+
+Accepted quotation → editable invoice prefill — ready to deploy:
+- **No instant hidden conversion from the UI:** the accepted-quotation "ออกใบกำกับภาษี" action now opens `/app/invoices/new?fromQuotation=<id>` instead of immediately creating a draft invoice. The user sees a normal invoice builder first and can edit buyer, project, due date, items, notes, WHT, payment, and template before saving or issuing.
+- **Prefill coverage:** invoice builder loads the accepted quotation, preselects the buyer/project, sets T02 tax invoice, fills invoice date + due date from quotation payment terms, copies line items/descriptions/discounts/WHT/notes, references the quotation number, and materializes quotation management fees as invoice line items so totals reconcile.
+- **Conversion guard moved to save/issue:** backend `POST /api/invoices` accepts `sourceQuotationId`, validates same-company/latest/accepted/not-yet-converted status, then links the quotation to the created invoice inside the transaction. Existing cancel flow can still release the quotation back to accepted.
+- **Stock/detail preservation:** invoice create/preview payloads now preserve `productId` and English descriptions from the form, so product-linked quotation lines can still drive inventory hooks after issuing.
+- **Verification:** frontend typecheck/lint/build, backend typecheck/lint/build, backend unit tests (`109/109`), and `git diff --check` pass. Local Playwright QA with Vite proxying to Render production confirmed accepted quote `QT-2026-000001` opens the invoice builder with prefill banner, buyer, item, notes/reference, T02 dates, live preview, no draft-recovery prompt, and no local draft left behind.
 
 Quotation builder preview + sent-state guard — shipped to production via Vercel (`d32797c`, `dpl_8L7ZHmiENcbBFmzMpVBezCguxKKF`):
 - **Invoice-style preview workstation:** `/app/quotations/new` now has the same right-side A4 preview experience as the invoice builder: template dropdown, swatches, live updating A4 frame, zoom percent, preview loading/error states, download PDF, and open-fullscreen PDF action.

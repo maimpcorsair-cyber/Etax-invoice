@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
-import type { Invoice, InvoiceItem, InvoiceType, Language } from '../types';
+import type { Invoice, InvoiceItem, InvoiceType, Language, Quotation } from '../types';
 import { emptyItem, calculateItem, translateZodMessage } from '../utils/invoiceHelpers';
+import { addCalendarDays } from '../lib/dateMath';
 
 const DRAFT_STORAGE_KEY = 'etax_invoice_draft';
 const PREFERENCES_STORAGE_KEY = 'etax_invoice_preferences';
@@ -56,7 +57,56 @@ interface DraftPayload {
   signerName: string;
   signerTitle: string;
   whtRate: string; // "1" | "3" | "5" | ""
+  sourceQuotationId?: string;
   savedAt: number;
+}
+
+function todayInputValue() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function inferPaymentTermDays(paymentTerms?: string | null) {
+  const match = paymentTerms?.match(/(\d{1,3})\s*(?:วัน|days?)/i);
+  const days = match ? Number(match[1]) : 30;
+  return Number.isFinite(days) && days > 0 ? days : 30;
+}
+
+function mapQuotationItemToInvoiceItem(item: Quotation['items'][number]): InvoiceItem {
+  return calculateItem({
+    productId: item.productId ?? undefined,
+    nameTh: item.nameTh,
+    nameEn: item.nameEn ?? '',
+    descriptionTh: item.descriptionTh ?? '',
+    descriptionEn: item.descriptionEn ?? '',
+    quantity: item.quantity,
+    unit: item.unit,
+    unitPrice: item.unitPrice,
+    discount: item.discountAmount ?? 0,
+    vatType: item.vatType,
+    vatAmount: 0,
+    amount: 0,
+    totalAmount: 0,
+  });
+}
+
+function buildQuotationFeeItem(quotation: Quotation): InvoiceItem | null {
+  const feePercent = quotation.feePercent ?? 0;
+  if (feePercent <= 0) return null;
+  const feeAmount = +((quotation.subtotal * feePercent) / 100).toFixed(2);
+  return calculateItem({
+    nameTh: quotation.feeLabel || 'ค่าบริหารงาน',
+    nameEn: quotation.feeLabel || 'Management fee',
+    descriptionTh: `${feePercent}% ของยอดก่อน VAT`,
+    descriptionEn: '',
+    quantity: 1,
+    unit: 'งาน',
+    unitPrice: feeAmount,
+    discount: 0,
+    vatType: 'vat7',
+    vatAmount: 0,
+    amount: 0,
+    totalAmount: 0,
+  });
 }
 
 interface Options {
@@ -92,6 +142,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
   const [signerTitle, setSignerTitle] = useState('');
   // WHT (Withholding Tax / ภาษีหัก ณ ที่จ่าย / 50 ทวิ)
   const [whtRate, setWhtRate] = useState<string>(preferences.defaultWhtRate ?? ''); // "1" | "3" | "5" | ""
+  const [sourceQuotationId, setSourceQuotationId] = useState('');
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitMessageType, setSubmitMessageType] = useState<'ok' | 'err' | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState(false);
@@ -114,6 +165,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
         items, notes, paymentMethod, documentLogoUrl: logoUrl, showCompanyLogo, templateId,
         documentMode, bankPaymentInfo, promptPayId, signatureImageUrl, signerName, signerTitle,
         whtRate,
+        sourceQuotationId,
         savedAt: Date.now(),
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -122,7 +174,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     }
   }, [docType, docLanguage, invoiceDate, dueDate, supportsDueDate, referenceDocNumber, items, notes,
       paymentMethod, logoUrl, showCompanyLogo, templateId, documentMode,
-      bankPaymentInfo, promptPayId, signatureImageUrl, signerName, signerTitle, whtRate]);
+      bankPaymentInfo, promptPayId, signatureImageUrl, signerName, signerTitle, whtRate, sourceQuotationId]);
 
   const clearDraftFromStorage = useCallback(() => {
     try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* ignore */ }
@@ -164,6 +216,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
       if (draft.signerName != null) setSignerName(draft.signerName);
       if (draft.signerTitle != null) setSignerTitle(draft.signerTitle);
       if (draft.whtRate) setWhtRate(draft.whtRate);
+      setSourceQuotationId(draft.sourceQuotationId ?? '');
       setRecoveredDraft(true);
       setUserDismissedDraft(false);
       clearDraftFromStorage();
@@ -233,16 +286,40 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     setSignatureImageUrl(invoice.signatureImageUrl ?? null);
     setSignerName(invoice.signerName ?? '');
     setSignerTitle(invoice.signerTitle ?? '');
+    setSourceQuotationId('');
     setItems(
       invoice.items.length > 0
         ? invoice.items.map((item) => ({
             ...item,
+            productId: item.productId ?? undefined,
             nameEn: item.nameEn ?? '',
             descriptionTh: item.descriptionTh ?? '',
             descriptionEn: item.descriptionEn ?? '',
+            discount: (item as InvoiceItem & { discountAmount?: number }).discountAmount ?? item.discount ?? 0,
           }))
         : [emptyItem()],
     );
+    setSubmitMessage(null);
+    setSubmitMessageType(null);
+  }, []);
+
+  const hydrateFromQuotation = useCallback((quotation: Quotation, nextInvoiceDate = todayInputValue()) => {
+    const items = quotation.items.map(mapQuotationItemToInvoiceItem);
+    const feeItem = buildQuotationFeeItem(quotation);
+    const referenceLine = `อ้างอิงใบเสนอราคา ${quotation.quotationNumber}`;
+    const nextNotes = [referenceLine, quotation.notes ?? ''].filter(Boolean).join('\n');
+
+    setDocType('tax_invoice');
+    setDocLanguage(quotation.language);
+    setInvoiceDate(nextInvoiceDate);
+    setDueDate(addCalendarDays(nextInvoiceDate, inferPaymentTermDays(quotation.paymentTerms)));
+    setReferenceDocNumber(quotation.quotationNumber);
+    setItems(feeItem ? [...items, feeItem] : (items.length > 0 ? items : [emptyItem()]));
+    setNotes(nextNotes);
+    setPaymentMethod('');
+    setTemplateId(null);
+    setWhtRate(quotation.whtRate ?? '');
+    setSourceQuotationId(quotation.id);
     setSubmitMessage(null);
     setSubmitMessageType(null);
   }, []);
@@ -280,13 +357,15 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     customerId,
     asDraft,
     items: items.map((item) => ({
+      productId: item.productId || undefined,
       nameTh: item.nameTh,
       nameEn: item.nameEn || '',
       descriptionTh: item.descriptionTh || '',
+      descriptionEn: item.descriptionEn || '',
       quantity: item.quantity,
       unit: item.unit,
       unitPrice: item.unitPrice,
-      discount: item.discount,
+      discountAmount: item.discount,
       vatType: item.vatType,
     })),
     notes: notes || undefined,
@@ -301,6 +380,7 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     signerName: signerName || undefined,
     signerTitle: signerTitle || undefined,
     referenceDocNumber: referenceDocNumber || undefined,
+    sourceQuotationId: sourceQuotationId || undefined,
   });
 
   const handleApiError = async (res: Response) => {
@@ -430,6 +510,9 @@ export function useInvoiceForm({ token, clearAuth, navigate, isThai }: Options) 
     totalVat,
     total,
     hydrateFromInvoice,
+    hydrateFromQuotation,
+    sourceQuotationId,
+    setSourceQuotationId,
     saveDraftToStorage,
     clearDraftFromStorage,
     loadDraftFromStorage,

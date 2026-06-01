@@ -584,24 +584,8 @@ export default function QuotationBuilder() {
   }
 
   async function convertToInvoice() {
-    if (!token || !id) return;
-    setActing(true);
-    setMsg(null);
-    try {
-      const res = await fetch(`/api/quotations/${id}/convert-to-invoice`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(surfaceError(json));
-      const invoiceId = json.data.invoice.id;
-      setMsg({ type: 'ok', text: isThai ? 'แปลงเป็นใบกำกับภาษีแล้ว' : 'Converted to invoice' });
-      navigate(`/app/invoices/${invoiceId}/edit`);
-    } catch (e) {
-      setMsg({ type: 'err', text: (e as Error).message });
-    } finally {
-      setActing(false);
-    }
+    if (!id) return;
+    navigate(`/app/invoices/new?fromQuotation=${encodeURIComponent(id)}`);
   }
 
   async function reviseQuotation() {
