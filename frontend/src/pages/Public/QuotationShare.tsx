@@ -65,6 +65,15 @@ interface QuotationShareData {
     amount: number;
     totalAmount: number;
   }>;
+  attachments?: Array<{
+    id: string;
+    docType: string;
+    label: string | null;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    downloadUrl: string;
+  }>;
 }
 
 const STATUS_COPY: Record<string, { label: string; tone: string }> = {
@@ -346,6 +355,31 @@ export default function QuotationShare() {
             {quotation.paymentTerms && <InfoBlock title="เงื่อนไขการชำระเงิน" value={quotation.paymentTerms} />}
             {quotation.deliveryTerms && <InfoBlock title="เงื่อนไขการส่งของ" value={quotation.deliveryTerms} />}
             {quotation.notes && <InfoBlock title="หมายเหตุ" value={quotation.notes} wide />}
+          </section>
+        )}
+
+        {data.attachments && data.attachments.length > 0 && (
+          <section className="border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="mb-3 text-sm font-semibold text-slate-900">เอกสารแนบ</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {data.attachments.map((att) => (
+                <a
+                  key={att.id}
+                  href={att.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 border border-slate-200 bg-white px-3 py-2.5 hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4 shrink-0 text-slate-500" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-slate-800">{att.label || att.fileName}</span>
+                    <span className="block truncate text-xs text-slate-400">
+                      {att.fileName} · {(att.fileSize / 1024 / 1024).toFixed(att.fileSize < 1024 * 1024 ? 2 : 1)} MB
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </div>
           </section>
         )}
 

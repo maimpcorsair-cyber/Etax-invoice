@@ -85,6 +85,8 @@ const quotationCreateSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
   paymentTerms: z.string().max(500).optional().nullable(),
   deliveryTerms: z.string().max(500).optional().nullable(),
+  // Reusable company-library document ids attached to the customer share link.
+  attachmentDocumentIds: z.array(z.string()).max(20).optional(),
 });
 
 // Live preview from un-saved form data (no buyer required — uses a sample
@@ -544,6 +546,7 @@ quotationsRouter.post('/', async (req, res) => {
         notes: body.notes ?? null,
         paymentTerms: body.paymentTerms ?? null,
         deliveryTerms: body.deliveryTerms ?? null,
+        attachmentDocumentIds: body.attachmentDocumentIds ?? [],
         createdBy: req.user!.userId,
         items: {
           create: enrichedItems.map((item) => ({
@@ -777,6 +780,7 @@ quotationsRouter.patch('/:id', async (req, res) => {
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.paymentTerms !== undefined ? { paymentTerms: body.paymentTerms ?? null } : {}),
         ...(body.deliveryTerms !== undefined ? { deliveryTerms: body.deliveryTerms ?? null } : {}),
+        ...(body.attachmentDocumentIds !== undefined ? { attachmentDocumentIds: body.attachmentDocumentIds } : {}),
         ...(body.templateId !== undefined ? { seller: sellerSnapshotWithTemplate(existing.seller, body.templateId) } : {}),
         ...(recomputedTotals ? recomputedTotals : {}),
         ...(itemsUpdate ? { items: itemsUpdate } : {}),

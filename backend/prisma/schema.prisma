@@ -238,8 +238,32 @@ model Company {
   whtCertificates       WhtCertificate[]
   employees             Employee[]
   payrollRuns           PayrollRun[]
+  companyDocuments      CompanyDocument[]
 
   @@map("companies")
+}
+
+// Reusable company library documents (ภ.พ.20, company certificate, bank book,
+// company profile, catalog, …). Stored once in object storage and attached to
+// many quotations/invoices by reference — never copied per-document. These are
+// customer-facing supporting files, NOT part of any e-Tax payload.
+model CompanyDocument {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  docType         String   @default("other") // por_por_20 | company_cert | bank_book | company_profile | catalog | other
+  label           String?
+  fileName        String   @map("file_name")
+  mimeType        String   @map("mime_type")
+  fileSize        Int      @map("file_size")
+  s3Key           String   @map("s3_key")
+  attachByDefault Boolean  @default(false) @map("attach_by_default")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_documents")
 }
 
 model User {
@@ -746,6 +770,11 @@ model Quotation {
   notes         String?
   paymentTerms  String? // เงื่อนไขการชำระเงิน — placeholder string ที่ขึ้นบน PDF
   deliveryTerms String? // เงื่อนไขการส่งของ
+
+  // Customer-facing supporting files attached to the share link. References
+  // CompanyDocument.id values from the reusable company library (ภ.พ.20, cert,
+  // catalog, …). Presentational only; never part of the e-Tax payload.
+  attachmentDocumentIds String[] @default([]) @map("attachment_document_ids")
 
   // Conversion to Invoice
   convertedToInvoiceId String?   @map("converted_to_invoice_id")

@@ -232,6 +232,19 @@ export interface Product {
   reorderPoint?: number | null;
 }
 
+export type CompanyDocumentType = 'por_por_20' | 'company_cert' | 'bank_book' | 'company_profile' | 'catalog' | 'other';
+
+export interface CompanyDocument {
+  id: string;
+  docType: CompanyDocumentType;
+  label?: string | null;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  attachByDefault: boolean;
+  createdAt: string;
+}
+
 export interface InvoiceItem {
   id?: string;
   productId?: string;
@@ -339,6 +352,7 @@ export interface Quotation {
   notes?: string | null;
   paymentTerms?: string | null;
   deliveryTerms?: string | null;
+  attachmentDocumentIds?: string[];
   templateId?: string | null;
   convertedToInvoiceId?: string | null;
   convertedAt?: string | null;

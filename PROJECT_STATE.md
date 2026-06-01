@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (quotation item product picker + add-product popup)
+Last updated: 2026-06-02 (company document library + quotation attachments)
 
 ## Latest work (2026-06-02)
+
+Company document library + quotation customer-facing attachments (Phase 1) — **new migration `20260602_company_documents`** (CREATE `company_documents` + add `quotations.attachment_document_ids TEXT[]`; applied in prod by the render-deploy `prisma migrate deploy` step):
+- **Model:** `CompanyDocument` (companyId, docType, label, fileName, mimeType, fileSize, s3Key, attachByDefault) — reusable library (ภ.พ.20 / cert / bank book / profile / catalog / other). Stored once in object storage (R2), attached to quotations **by reference** — never copied per document (library model = dedup by design, no refcount cache).
+- **Backend:** `routes/companyDocuments.ts` (`GET/POST(multer→R2)/PATCH/DELETE` + owner `/:id/download` presigned, mounted `/api/company-documents`). `quotations.ts` accepts/persists `attachmentDocumentIds` on create+update. `quotationShare.ts` returns `attachments[]` and adds `GET /quotation/:token/attachment/:docId` → verifies the doc is attached to THIS quote, then redirects to a 5-min presigned R2 URL (raw object URL never exposed; gated by the timeout share token).
+- **Frontend:** Settings → "เอกสารบริษัท" (`components/settings/CompanyDocumentsSettings.tsx`: upload/list/delete); QuotationBuilder → "เอกสารแนบ (ส่งให้ลูกค้า)" checkboxes of library docs (saved in `attachmentDocumentIds`); QuotationShare (customer) → downloadable attachments section.
+- **Design decisions (from the chat):** R2 is the store (egress-free → large catalogs are cheap to serve; reliable customer links even if the user later edits their Drive). Drive-as-home + on-demand proxy and per-quote ad-hoc uploads (drawings/BOQ) are documented follow-ups; the refcount/TTL cache was rejected as over-engineering. **Security follow-up:** `User.googleRefreshToken` is still plaintext ([drive.ts:182](backend/src/routes/drive.ts)) — encrypt before leaning harder on Drive. Customer-facing attachments are never part of any e-Tax XML. Verified: frontend + backend typecheck, frontend build. Not yet click-tested live (no prod login creds in session); watch the render-deploy migrate step for `20260602_company_documents`.
+
+Quotation line-item product picker + inline add-product popup — `frontend/src/components/product/ProductFormModal.tsx` + `ProductPicker.tsx`:
 
 Quotation line-item product picker + inline add-product popup — `frontend/src/components/product/ProductFormModal.tsx` + `ProductPicker.tsx`:
 - QuotationBuilder now fetches the product catalog (`/api/products?limit=500`). The item-name field is a combobox (`ProductPicker`): type freely for a one-off line, or pick a catalog product to fill name/nameEn/description/unit/unitPrice/vatType + link `productId`. Editing the text after a pick clears `productId` (back to a manual line).

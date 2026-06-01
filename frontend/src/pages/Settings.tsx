@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
 import { useDocumentProfile } from '../hooks/useDocumentProfile';
 import { useAuthStore } from '../store/authStore';
+import CompanyDocumentsSettings from '../components/settings/CompanyDocumentsSettings';
 import type { BankAccountProfile, InvoiceType, Language } from '../types';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import SignaturePad from '../components/SignaturePad';
@@ -1122,6 +1123,17 @@ export default function Settings() {
                 <p className="mt-2 text-xs text-slate-500">{integrationStatus?.googleSheets?.mode ?? 'not_configured'}</p>
               </div>
             </div>
+          </SettingsCard>
+
+          <SettingsCard
+            id="company-documents"
+            icon={<FileCheck2 className="h-5 w-5" />}
+            title={isThai ? 'เอกสารบริษัท' : 'Company documents'}
+            description={isThai
+              ? 'เก็บ ภ.พ.20 หนังสือรับรอง บุ๊คแบงก์ แคตตาล็อก ไว้ครั้งเดียว แล้วเลือกแนบกับลิงก์ใบเสนอราคาที่ส่งให้ลูกค้าได้'
+              : 'Store Por.Por.20, certificate, bank book, and catalogs once, then attach them to the quotation links you send customers.'}
+          >
+            <CompanyDocumentsSettings token={token} isThai={isThai} canManage={isAdmin} />
           </SettingsCard>
 
           <SettingsCard

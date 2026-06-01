@@ -5,6 +5,7 @@ import { logger } from '../config/logger';
 import { buildHtmlForCompany, generatePdfFromHtml } from '../services/pdfService';
 import { buildQuotationPdfData } from '../services/quotationPdfService';
 import { verifyQuotationShareToken } from '../services/quotationShareToken';
+import { getPresignedUrl } from '../services/storageService';
 
 export const quotationSharePublicRouter = Router();
 
@@ -46,6 +47,18 @@ quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
       return;
     }
 
+    // Customer-facing supporting files (company library docs the seller chose to
+    // attach). Served only through our timeout-gated download endpoint below.
+    const attachmentIds = quotation.attachmentDocumentIds ?? [];
+    const attachments = attachmentIds.length > 0
+      ? await withSystemRlsContext(prisma, async (tx) =>
+        tx.companyDocument.findMany({
+          where: { id: { in: attachmentIds }, companyId: payload.companyId },
+          select: { id: true, docType: true, label: true, fileName: true, mimeType: true, fileSize: true },
+        }),
+      )
+      : [];
+
     res.json({
       quotation: {
         id: quotation.id,
@@ -69,6 +82,15 @@ quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
         project: quotation.project,
         pdfUrl: `/api/share/quotation/${encodeURIComponent(req.params.token)}/pdf`,
       },
+      attachments: attachments.map((doc) => ({
+        id: doc.id,
+        docType: doc.docType,
+        label: doc.label,
+        fileName: doc.fileName,
+        mimeType: doc.mimeType,
+        fileSize: doc.fileSize,
+        downloadUrl: `/api/share/quotation/${encodeURIComponent(req.params.token)}/attachment/${doc.id}`,
+      })),
       buyer: quotation.buyer,
       seller: {
         nameTh: quotation.company.nameTh,
@@ -127,6 +149,44 @@ quotationSharePublicRouter.get('/quotation/:token/pdf', async (req, res) => {
   } catch (err) {
     logger.error('[quotationShare] pdf download failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'โหลด PDF ไม่สำเร็จ' });
+  }
+});
+
+quotationSharePublicRouter.get('/quotation/:token/attachment/:docId', async (req, res) => {
+  try {
+    const { payload, quotation } = await findSharedQuotation(req.params.token);
+    if (!payload) {
+      res.status(401).json({ error: 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว' });
+      return;
+    }
+    if (!quotation) {
+      res.status(404).json({ error: 'ไม่พบใบเสนอราคานี้' });
+      return;
+    }
+    // Only serve a document the seller actually attached to THIS quotation.
+    if (!(quotation.attachmentDocumentIds ?? []).includes(req.params.docId)) {
+      res.status(404).json({ error: 'ไม่พบเอกสารแนบนี้' });
+      return;
+    }
+
+    const doc = await withSystemRlsContext(prisma, async (tx) =>
+      tx.companyDocument.findFirst({
+        where: { id: req.params.docId, companyId: payload.companyId },
+        select: { s3Key: true },
+      }),
+    );
+    if (!doc) {
+      res.status(404).json({ error: 'ไม่พบเอกสารแนบนี้' });
+      return;
+    }
+
+    // Redirect to a short-lived presigned URL (R2 — egress is free). The raw
+    // object URL is never exposed; access is gated by the timeout share token.
+    const url = await getPresignedUrl(doc.s3Key, 300);
+    res.redirect(url);
+  } catch (err) {
+    logger.error('[quotationShare] attachment download failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'โหลดเอกสารแนบไม่สำเร็จ' });
   }
 });
 

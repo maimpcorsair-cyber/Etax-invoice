@@ -12,7 +12,7 @@ import DeleteButton from '../components/ui/DeleteButton';
 import CustomerFormModal from '../components/customer/CustomerFormModal';
 import ProductFormModal from '../components/product/ProductFormModal';
 import ProductPicker from '../components/product/ProductPicker';
-import type { Customer, Product, Quotation, QuotationStatus } from '../types';
+import type { CompanyDocument, Customer, Product, Quotation, QuotationStatus } from '../types';
 import {
   DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID,
   DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES,
@@ -101,6 +101,7 @@ interface FormState {
   notes: string;
   paymentTerms: string;
   deliveryTerms: string;
+  attachmentDocumentIds: string[];
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -155,6 +156,7 @@ export default function QuotationBuilder() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [companyDocs, setCompanyDocs] = useState<CompanyDocument[]>([]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   // Row index to fill when the product popup saves; null = append as a new line.
   const [addProductRow, setAddProductRow] = useState<number | null>(null);
@@ -219,6 +221,7 @@ export default function QuotationBuilder() {
     notes: '',
     paymentTerms: 'ชำระภายใน 30 วันหลังได้รับใบกำกับภาษี',
     deliveryTerms: '',
+    attachmentDocumentIds: [],
   });
 
   // Load customers + (if editing) the existing quotation
@@ -226,15 +229,17 @@ export default function QuotationBuilder() {
     if (!token) return;
     (async () => {
       const headers = { Authorization: `Bearer ${token}` };
-      const [custRes, projectRes, productRes] = await Promise.all([
+      const [custRes, projectRes, productRes, companyDocRes] = await Promise.all([
         fetch('/api/customers?limit=200', { headers }),
         fetch('/api/projects?status=active', { headers }),
         fetch('/api/products?limit=500', { headers }),
+        fetch('/api/company-documents', { headers }),
       ]);
-      const [custJson, projectJson, productJson] = await Promise.all([custRes.json(), projectRes.json(), productRes.json()]);
+      const [custJson, projectJson, productJson, companyDocJson] = await Promise.all([custRes.json(), projectRes.json(), productRes.json(), companyDocRes.json()]);
       setCustomers(custJson.data ?? []);
       setProjects(projectJson.data ?? []);
       setProducts(productJson.data ?? []);
+      setCompanyDocs(companyDocJson.data ?? []);
       if (!isNew && id) {
         const res = await fetch(`/api/quotations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
@@ -301,6 +306,7 @@ export default function QuotationBuilder() {
             notes: q.notes ?? '',
             paymentTerms: q.paymentTerms ?? '',
             deliveryTerms: q.deliveryTerms ?? '',
+            attachmentDocumentIds: q.attachmentDocumentIds ?? [],
           });
         }
         setLoading(false);
@@ -531,6 +537,7 @@ export default function QuotationBuilder() {
         notes: form.notes || null,
         paymentTerms: form.paymentTerms || null,
         deliveryTerms: form.deliveryTerms || null,
+        attachmentDocumentIds: form.attachmentDocumentIds,
     };
   }
 
@@ -1697,6 +1704,67 @@ export default function QuotationBuilder() {
           <label className="label">{isThai ? 'หมายเหตุ' : 'Notes'}</label>
           <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field" rows={2} disabled={!editable} />
         </div>
+      </div>
+
+      {/* Customer-facing attachments (company library docs) */}
+      <div className="card">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-gray-900">{isThai ? 'เอกสารแนบ (ส่งให้ลูกค้า)' : 'Attachments (sent to customer)'}</h3>
+          <Link to="/app/settings" className="text-xs font-semibold text-primary-600 hover:text-primary-800">
+            {isThai ? 'จัดการเอกสารบริษัท' : 'Manage company docs'}
+          </Link>
+        </div>
+        <p className="mb-3 text-xs text-gray-500">
+          {isThai
+            ? 'เลือกเอกสารบริษัทที่จะแนบไปกับลิงก์ใบเสนอราคาให้ลูกค้า เช่น ภ.พ.20 หนังสือรับรอง บุ๊คแบงก์ แคตตาล็อก'
+            : 'Pick company documents to include with the customer quotation link (e.g. Por.Por.20, certificate, bank book, catalog).'}
+        </p>
+        {companyDocs.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-500">
+            {isThai
+              ? 'ยังไม่มีเอกสารบริษัท — เพิ่มได้ที่ ตั้งค่า › เอกสารบริษัท แล้วกลับมาเลือกแนบที่นี่'
+              : 'No company documents yet — add them in Settings › Company documents, then attach here.'}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {companyDocs.map((doc) => {
+              const checked = form.attachmentDocumentIds.includes(doc.id);
+              const typeLabel = ({
+                por_por_20: isThai ? 'ภ.พ.20' : 'Por.Por.20',
+                company_cert: isThai ? 'หนังสือรับรอง' : 'Certificate',
+                bank_book: isThai ? 'บุ๊คแบงก์' : 'Bank book',
+                company_profile: isThai ? 'โปรไฟล์บริษัท' : 'Company profile',
+                catalog: isThai ? 'แคตตาล็อก' : 'Catalog',
+                other: isThai ? 'อื่น ๆ' : 'Other',
+              } as Record<string, string>)[doc.docType] ?? doc.docType;
+              return (
+                <label
+                  key={doc.id}
+                  className={`flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 transition ${
+                    checked ? 'border-primary-300 bg-primary-50' : 'border-slate-200 bg-white hover:bg-slate-50'
+                  } ${!editable ? 'cursor-not-allowed opacity-60' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!editable}
+                    onChange={() => setForm((prev) => ({
+                      ...prev,
+                      attachmentDocumentIds: prev.attachmentDocumentIds.includes(doc.id)
+                        ? prev.attachmentDocumentIds.filter((x) => x !== doc.id)
+                        : [...prev.attachmentDocumentIds, doc.id],
+                    }))}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-slate-900">{doc.label || doc.fileName}</span>
+                    <span className="block truncate text-xs text-slate-400">{typeLabel} · {doc.fileName}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Footer hint */}
