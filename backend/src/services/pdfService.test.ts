@@ -294,6 +294,8 @@ test('standard multi-page T02 keeps the full invoice header on page one and uses
   assert.equal((html.match(/class="tax-page-header"/g) ?? []).length, 1, 'only continuation pages should use the compact accounting header');
   assert.ok(!html.includes('.tax-multi-page .hero,\n  .tax-multi-page .overview-grid { display: none; }'), 'page one should retain the full invoice header and document overview');
   assert.equal((html.match(/มีหน้าต่อไป/g) ?? []).length, 1, 'only the intermediate tax page should say that another page follows');
+  assert.ok(html.indexOf('รายการใบกำกับภาษีหลายหน้า 8') < html.indexOf('มีหน้าต่อไป'), 'the first page should use its full eight-row capacity');
+  assert.ok(html.indexOf('รายการใบกำกับภาษีหลายหน้า 9') > html.indexOf('มีหน้าต่อไป'), 'remaining rows should move to the final summary page');
   assert.equal((html.match(/T02-2026-000010/g) ?? []).length >= 2, true, 'document number should appear in the body metadata and continuation headers');
   assert.equal((html.match(/class="totals-card"/g) ?? []).length, 1, 'tax totals should render once after the final item page');
 });

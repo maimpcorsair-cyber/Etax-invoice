@@ -8,6 +8,12 @@ const TAX_INVOICE_INTERMEDIATE_PAGE_ITEM_LIMIT = 8;
 
 function splitTaxInvoiceItems<T>(items: T[]): T[][] {
   if (items.length <= ONE_PAGE_ITEM_LIMIT) return [items];
+  if (items.length <= TAX_INVOICE_INTERMEDIATE_PAGE_ITEM_LIMIT + TAX_INVOICE_FINAL_PAGE_ITEM_LIMIT) {
+    return [
+      items.slice(0, TAX_INVOICE_INTERMEDIATE_PAGE_ITEM_LIMIT),
+      items.slice(TAX_INVOICE_INTERMEDIATE_PAGE_ITEM_LIMIT),
+    ];
+  }
 
   const finalPageItems = items.slice(-TAX_INVOICE_FINAL_PAGE_ITEM_LIMIT);
   const precedingItems = items.slice(0, -TAX_INVOICE_FINAL_PAGE_ITEM_LIMIT);

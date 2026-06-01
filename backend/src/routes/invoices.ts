@@ -78,6 +78,7 @@ const createInvoiceSchema = z.object({
 const updateInvoiceSchema = createInvoiceSchema;
 
 const previewInvoiceSchema = z.object({
+  customerId: z.string().optional(),
   type: z.enum(['tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note']),
   language: z.enum(['th', 'en', 'both']),
   invoiceDate: z.string(),
@@ -1585,7 +1586,18 @@ invoicesRouter.post('/preview', async (req, res) => {
       return;
     }
 
-    // Mock buyer data for preview
+    const selectedBuyer = body.customerId
+      ? await prisma.customer.findFirst({
+          where: { id: body.customerId, companyId: req.user!.companyId },
+        })
+      : null;
+    if (body.customerId && !selectedBuyer) {
+      res.status(404).json({ error: 'Customer not found' });
+      return;
+    }
+
+    // Keep the empty-form preview useful, then switch to the selected buyer
+    // as soon as the user chooses one.
     const mockBuyer = {
       nameTh: 'ลูกค้าตัวอย่าง',
       nameEn: 'Sample Customer',
@@ -1596,7 +1608,7 @@ invoicesRouter.post('/preview', async (req, res) => {
     };
 
     const invoiceData = {
-      invoiceNumber: 'PREVIEW-001',
+      invoiceNumber: body.language === 'en' ? 'Pending issue' : 'รอออกเลข',
       invoiceDate: new Date(body.invoiceDate),
       dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
       type: body.type,
@@ -1614,7 +1626,16 @@ invoicesRouter.post('/preview', async (req, res) => {
         website: (company as { website?: string | null }).website ?? null,
         logoUrl: (company as { logoUrl?: string | null }).logoUrl ?? null,
       },
-      buyer: mockBuyer,
+      buyer: selectedBuyer
+        ? {
+            nameTh: selectedBuyer.nameTh,
+            nameEn: selectedBuyer.nameEn,
+            taxId: selectedBuyer.taxId,
+            branchCode: selectedBuyer.branchCode,
+            addressTh: selectedBuyer.addressTh,
+            addressEn: selectedBuyer.addressEn,
+          }
+        : mockBuyer,
       items: calculated.map((item) => ({
         nameTh: item.nameTh,
         nameEn: item.nameEn,

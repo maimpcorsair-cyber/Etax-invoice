@@ -349,6 +349,7 @@ export default function InvoiceBuilder() {
 
   /* ── Preview payload builder ── */
   const buildPreviewPayload = useCallback((overrides?: { templateId?: string | null }) => ({
+    customerId: customer.selectedCustomerId || undefined,
     type: form.docType,
     language: form.docLanguage,
     invoiceDate: form.invoiceDate,
@@ -375,7 +376,7 @@ export default function InvoiceBuilder() {
     signatureImageUrl: form.signatureImageUrl || undefined,
     signerName: form.signerName || undefined,
     signerTitle: form.signerTitle || undefined,
-  }), [form]);
+  }), [form, customer.selectedCustomerId]);
 
   /* ── Inline preview fetch ── */
   const fetchInlinePreview = useCallback(async (payload: object) => {
