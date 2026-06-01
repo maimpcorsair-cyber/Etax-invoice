@@ -275,10 +275,18 @@ export default function Navbar() {
 
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                    className="group relative w-full overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                   >
-                    <LogOut className="w-4 h-4" />
-                    {t('nav.logout')}
+                    {/* soft red wash slides in from the left on hover (borrowed from the
+                        uiverse expand idea, fitted to a menu row; reduced-motion safe) */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 origin-left scale-x-0 bg-red-50 transition-transform duration-300 ease-out group-hover:scale-x-100 motion-reduce:transition-none"
+                    />
+                    <span className="relative flex items-center gap-2">
+                      <LogOut className="w-4 h-4 transition-transform duration-300 ease-out group-hover:-translate-x-0.5 motion-reduce:transition-none" />
+                      {t('nav.logout')}
+                    </span>
                   </button>
                 </div>
               )}
