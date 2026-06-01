@@ -4,10 +4,10 @@ Last updated: 2026-06-01 (PDF mixed-VAT summary + controlled tax pagination)
 
 ## Latest work (2026-06-01)
 
-PDF mixed-VAT summary + controlled tax pagination — ready to deploy:
+PDF mixed-VAT summary + controlled tax pagination — shipped and verified live on prod (`8b5088d`):
 - **Accurate compact VAT summary:** single-rate documents stay concise. Mixed `VAT 7% / VAT 0% / exempt` documents show their tax bases only in the totals card below the table; per-line rows remain compact and pre-VAT only.
 - **T01/T02 multi-page accounting layout:** tax invoices with more than eight items now use controlled pages. Every page repeats the document number/date plus seller and buyer legal details; intermediate pages show `มีหน้าต่อไป`; totals, acknowledgements, and signatures render once after the final item page. Quotations keep the existing lighter pagination flow.
-- **Verification:** backend typecheck, backend lint, focused PDF tests (`18/18`), and `git diff --check` pass. A rendered 11-line mixed-VAT T02 PDF visually confirmed exactly two pages with repeated accounting headers, `มีหน้าต่อไป` only on page `1/2`, VAT buckets and signatures only on page `2/2`.
+- **Verification:** backend typecheck, backend lint, focused PDF tests (`18/18`), and `git diff --check` pass. A rendered 11-line mixed-VAT T02 PDF visually confirmed exactly two pages with repeated accounting headers, `มีหน้าต่อไป` only on page `1/2`, VAT buckets and signatures only on page `2/2`. GitHub Typecheck + Unit tests + Prod smoke green for `8b5088d`; Render deploy run `26749458370` green. Post-deploy checks: `/api/health` 200, `/api/health/deep` status ok with `notConfigured=[]`, and `/api/health/pdf` 200.
 
 PDF line-item VAT cleanup — shipped and verified live on prod (`cd8efba`):
 - **More room for item details:** standard-builder PDFs no longer render a per-line VAT type column, including mixed `7% / 0% / exempt` documents. The follow-up also removes VAT-inclusive line totals, leaving one pre-VAT amount column per item. VAT and net total stay in the totals summary below the table; tax calculations and e-Tax payload data are unchanged.
