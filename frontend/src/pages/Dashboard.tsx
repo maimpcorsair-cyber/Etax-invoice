@@ -24,8 +24,9 @@ import {
   FileText,
   Link as LinkIcon,
 } from 'lucide-react';
-import { EmptyState, MetricCard, PageHeader, MascotHelperCard } from '../components/ui/AppChrome';
+import { EmptyState, MetricCard, MascotHelperCard } from '../components/ui/AppChrome';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
+import DashboardView, { type DashboardViewProps, type DashboardFocus } from './dashboard/DashboardView';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus } from '../types';
@@ -326,22 +327,6 @@ export default function Dashboard() {
     ? ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed']
         .reduce((sum, status) => sum + (documentStats.byStatus[status] ?? 0), 0)
     : 0;
-  const readyIntegrations = integrations
-    ? [
-        integrations.lineAi.connected,
-        integrations.googleAccount.connected,
-        integrations.googleSheets.connected,
-        integrations.googleDrive.connected,
-      ].filter(Boolean).length
-    : 0;
-  const commandCount = [
-    aiReviewCount > 0,
-    pendingRdCount > 0,
-    (stats?.receivables.overdueOutstanding ?? 0) > 0,
-    (stats?.customerReadiness?.actionNeeded ?? 0) > 0,
-    integrations ? readyIntegrations < 4 : false,
-  ].filter(Boolean).length;
-
   const commandItems = [
     {
       key: 'ai-inbox',
@@ -439,6 +424,76 @@ export default function Dashboard() {
         : (isThai ? 'พร้อม' : 'Ready'),
     },
   ];
+
+  // ── Design-system v2: map the existing command-center data into the
+  // redesigned DashboardView (focal next-action + KPIs + worklist + pipeline).
+  // Same content as the old PageHeader + command cards, restated in the new
+  // visual language. Detail panels (month-end, Drive, RD, etc.) stay below.
+  const overdueAmount = stats?.receivables.overdueOutstanding ?? 0;
+  const companyName = driveSummary?.companyName ?? user?.company?.nameTh ?? user?.company?.nameEn ?? 'Billboy';
+  const dashboardFocus: DashboardFocus | null = overdueAmount > 0
+    ? {
+      label: isThai ? 'ควรทำก่อน' : 'Do first',
+      amount: formatCurrency(overdueAmount),
+      detail: isThai
+        ? 'ลูกหนี้เกินกำหนด — ตามชำระ หรือออกใบเสร็จเมื่อได้รับเงินแล้ว'
+        : 'Overdue receivables — follow up or issue a receipt once paid',
+      primary: { label: isThai ? 'ดูใบค้างชำระ' : 'View invoices', href: '/app/invoices' },
+    }
+    : pendingRdCount > 0
+      ? {
+        label: isThai ? 'ควรทำก่อน' : 'Do first',
+        amount: null,
+        detail: isThai
+          ? `มีเอกสารยังไม่ส่งกรมสรรพากร ${pendingRdCount} รายการ${currentMonth ? ` · เหลือ ${currentMonth.daysLeft} วัน` : ''}`
+          : `${pendingRdCount} documents pending RD submission${currentMonth ? ` · ${currentMonth.daysLeft} days left` : ''}`,
+        primary: { label: isThai ? 'ตรวจคิวส่ง' : 'Review queue', href: '/app/invoices' },
+      }
+      : null;
+
+  const dashboardViewProps: DashboardViewProps = {
+    greeting: (isThai ? `สวัสดี ${user?.name ?? ''}` : `Hi ${user?.name ?? ''}`).trim(),
+    contextLine: [
+      companyName,
+      currentMonth
+        ? (isThai ? `รอบภาษี ${currentMonth.month} · เหลือ ${currentMonth.daysLeft} วัน` : `Filing ${currentMonth.month} · ${currentMonth.daysLeft} days left`)
+        : null,
+    ].filter(Boolean).join(' · '),
+    focus: dashboardFocus,
+    kpis: stats
+      ? [
+        { label: isThai ? 'รายได้สะสม' : 'Revenue', value: formatCurrency(stats.totalRevenue), detail: isThai ? `${stats.totalInvoices} ใบ` : `${stats.totalInvoices} docs` },
+        { label: isThai ? 'ลูกหนี้คงค้าง' : 'Outstanding', value: formatCurrency(stats.receivables.totalOutstanding) },
+        { label: isThai ? 'ลูกหนี้เกินกำหนด' : 'Overdue', value: formatCurrency(stats.receivables.overdueOutstanding), tone: 'due', dot: 'due' },
+        { label: isThai ? 'ส่ง RD สำเร็จ' : 'RD submitted', value: stats.rdSuccessCount.toLocaleString(), tone: 'good', dot: 'good' },
+      ]
+      : [],
+    worklistTitle: isThai ? 'คิวงานวันนี้' : 'Today’s queue',
+    worklistHref: '/app/purchase-invoices',
+    worklist: commandItems
+      .filter((it) => it.key !== 'ar')
+      .map((it) => {
+        const raw = it.value.replace(/[,%]/g, '');
+        const isCount = /^\d+$/.test(raw) && !it.value.includes('%') && !it.value.includes('฿');
+        return {
+          title: it.title,
+          meta: it.detail,
+          href: it.href,
+          actionLabel: it.action,
+          count: isCount ? Number(raw) : undefined,
+          chip: isCount ? undefined : { label: it.value, tone: it.key === 'rd' ? 'warn' as const : 'warn' as const },
+        };
+      }),
+    vat: null,
+    vatTitle: isThai ? 'ความพร้อมยื่น VAT' : 'VAT readiness',
+    pipelineTitle: isThai ? 'เส้นทางเอกสารเดือนนี้' : 'Document flow this month',
+    pipeline: autopilotLanes.map((lane) => ({
+      key: lane.label,
+      title: lane.title,
+      value: lane.status,
+      on: lane.key === 'capture' || lane.key === 'review',
+    })),
+  };
 
   const shouldShowFirstInvoicePath = Boolean(stats && stats.totalInvoices <= 2);
   const firstInvoiceSteps = [
@@ -578,28 +633,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Command Center */}
-      <PageHeader
-        eyebrow={isThai ? 'Billboy Command Center' : 'Billboy Command Center'}
-        title={isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
-        description={isThai
-          ? `สวัสดี ${user?.name ?? ''} ระบบรวมงานเอกสารเข้า เอกสารขาย VAT ลูกหนี้ และไฟล์บริษัทไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
-          : `Hi ${user?.name ?? ''}. This workspace brings document intake, sales documents, VAT, receivables, and company files into one daily operating view.`}
-        icon={<Bot className="h-3.5 w-3.5" />}
-        mascot="hero"
-        actions={(
-          <>
-            <Link to="/app/purchase-invoices" className="btn-primary">
-              <Inbox className="h-4 w-4" />
-              {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
-            </Link>
-            <Link to="/app/invoices/new" className="btn-secondary">
-              <Plus className="h-4 w-4" />
-              {isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
-            </Link>
-          </>
-        )}
-      />
+      {/* Command Center — design system v2 (focal next-action + KPIs + worklist + pipeline) */}
+      {stats && <DashboardView {...dashboardViewProps} />}
 
       {shouldShowFirstInvoicePath && (
         <section className="rounded-2xl border border-blue-200 bg-blue-50/70 px-4 py-4 shadow-sm">
@@ -674,37 +709,6 @@ export default function Dashboard() {
           </div>
         </section>
       )}
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {commandItems.map((item) => {
-          const Icon = item.icon;
-          const tone = item.key === 'rd' && pendingRdCount > 0
-            ? 'danger'
-            : item.key === 'ar' && (stats?.receivables.overdueOutstanding ?? 0) > 0
-              ? 'warning'
-              : item.key === 'customers' && (stats?.customerReadiness?.actionNeeded ?? 0) > 0
-                ? 'warning'
-              : item.key === 'tax'
-                ? 'success'
-                : 'primary';
-          return (
-            <Link key={item.key} to={item.href} className="group block">
-              <MetricCard
-                label={item.title}
-                value={item.value}
-                detail={(
-                  <span className="inline-flex items-center gap-1">
-                    {item.detail}
-                    <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                  </span>
-                )}
-                icon={<Icon className="h-5 w-5" />}
-                tone={tone}
-              />
-            </Link>
-          );
-        })}
-      </div>
 
       {/* Error banner */}
       {error && (

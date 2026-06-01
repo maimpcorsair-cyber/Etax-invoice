@@ -105,7 +105,7 @@ export default function DashboardView(props: DashboardViewProps) {
         </div>
       )}
 
-      <div className="bb-grid">
+      <div className={`bb-grid${vat ? '' : ' solo'}`}>
         <section className="bb-panel">
           <h2>{worklistTitle} <a href={worklistHref}>ดูทั้งหมด →</a></h2>
           <div className="bb-list">

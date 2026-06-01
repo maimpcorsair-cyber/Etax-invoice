@@ -107,6 +107,7 @@ html, body {
   .bb-dot { width: 7px; height: 7px; border-radius: 99px; display: inline-block; }
 
   .bb-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; margin-top: 18px; }
+  .bb-grid.solo { grid-template-columns: 1fr; }
   .bb-panel { background: var(--bb-panel); border: 1px solid var(--bb-line); border-radius: 10px; }
   .bb-panel > h2 { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bb-muted); font-weight: 600; padding: 13px 16px; border-bottom: 1px solid var(--bb-line-2); display: flex; justify-content: space-between; align-items: center; }
   .bb-panel > h2 a { color: var(--bb-navy); text-decoration: none; font-size: 12px; text-transform: none; letter-spacing: 0; }
