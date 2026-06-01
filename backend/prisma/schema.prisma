@@ -751,6 +751,14 @@ model Quotation {
   convertedToInvoiceId String?   @map("converted_to_invoice_id")
   convertedAt          DateTime? @map("converted_at")
 
+  // Revision chain. A sent/accepted quotation must not be edited in place;
+  // instead, a new draft revision is created and the previous public/audit
+  // version is marked as superseded.
+  revisionRootId String?   @map("revision_root_id")
+  revisionNo     Int       @default(0) @map("revision_no")
+  supersededById String?   @map("superseded_by_id")
+  supersededAt   DateTime? @map("superseded_at")
+
   // Storage
   pdfUrl String?
 
@@ -779,6 +787,8 @@ model Quotation {
   @@index([companyId, projectId])
   @@index([companyId, status])
   @@index([companyId, quotationDate])
+  @@index([companyId, revisionRootId, revisionNo])
+  @@index([companyId, supersededById])
   @@index([buyerId])
   @@index([createdBy])
   @@index([convertedToInvoiceId])

@@ -52,12 +52,6 @@ function serviceDetailsNotes(value: unknown, total = 0): string[] {
       ? `มัดจำก่อนเริ่มงาน: ${details.depositPercent}%`
       : null;
   const exchangeRate = optionalNumberField(details.exchangeRate);
-  const milestones = Array.isArray(details.milestones)
-    ? details.milestones.filter((item): item is ServiceMilestone => {
-      const row = objectRecord(item);
-      return typeof row.title === 'string' && typeof row.amount === 'number';
-    })
-    : [];
   const lines = [
     optionalStringField(details.scope) ? `ขอบเขตงาน: ${String(details.scope).trim()}` : null,
     optionalStringField(details.deliverables) ? `สิ่งส่งมอบ: ${String(details.deliverables).trim()}` : null,

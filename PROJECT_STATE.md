@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (quotation item detail lines)
+Last updated: 2026-06-01 (quotation revision flow)
 
 ## Latest work (2026-06-01)
+
+Quotation revision flow — ready to deploy:
+- **Locked quotations are no longer edited in place.** Sent/accepted/rejected/expired quotations now get a `POST /api/quotations/:id/revise` path that creates a fresh draft revision with a new quotation number, links it back to the original chain, and marks the previous copy as superseded for audit/history.
+- **Lists stay clean.** Normal quotation lists and customer-portal document lists hide superseded quotations by default, while detail pages show revision history and a clear "open latest" path for old copies. Public customer links for superseded quotations remain readable but cannot be accepted/rejected; they ask the customer to request the latest link.
+- **Guardrails added.** Superseded quotations cannot be re-shared, status-changed, converted to invoice, or used to create delivery notes; only the latest active revision can continue the workflow.
+- **Migration:** `20260601_quotation_revisions` adds `revision_root_id`, `revision_no`, `superseded_by_id`, and `superseded_at` to `quotations`.
+- **Local verification:** backend typecheck, frontend typecheck, frontend build, focused quotation/PDF/share token tests, and `git diff --check` pass. Focused tests still log the known local Postgres unavailable message from shared imports, but exit 0.
 
 Quotation item detail lines — shipped and verified live on prod (`5e8fbcd`):
 - **Multi-line detail per quotation item** — the quotation builder now exposes a textarea under each line-item name for per-item details (scope, model, conditions, notes). The existing `QuotationItem.descriptionTh/descriptionEn` fields are used, so no schema migration is needed.

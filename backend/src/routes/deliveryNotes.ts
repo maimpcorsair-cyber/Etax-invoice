@@ -510,6 +510,10 @@ deliveryNotesRouter.post('/from-quotation/:quotationId', async (req, res) => {
       res.status(400).json({ error: `Cannot create a delivery note from a ${quotation.status} quotation` });
       return;
     }
+    if (quotation.supersededById) {
+      res.status(409).json({ error: 'This quotation has a newer revision. Create the delivery note from the latest accepted revision.' });
+      return;
+    }
 
     const existing = await prisma.deliveryNote.findFirst({
       where: { companyId: req.user!.companyId, quotationId: quotation.id, status: { not: 'cancelled' } },

@@ -176,6 +176,45 @@ function sellerSnapshotWithTemplate(seller: unknown, templateId: string | null |
   };
 }
 
+type QuotationRevisionSummary = {
+  id: string;
+  quotationNumber: string;
+  status: string;
+  revisionNo: number;
+  supersededById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+async function buildQuotationRevisionHistory(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  quotation: { id: string; revisionRootId: string | null },
+): Promise<QuotationRevisionSummary[]> {
+  const rootId = quotation.revisionRootId ?? quotation.id;
+  return tx.quotation.findMany({
+    where: {
+      companyId,
+      OR: [{ id: rootId }, { revisionRootId: rootId }],
+    },
+    select: {
+      id: true,
+      quotationNumber: true,
+      status: true,
+      revisionNo: true,
+      supersededById: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [{ revisionNo: 'asc' }, { createdAt: 'asc' }],
+  });
+}
+
+function latestRevisionId(history: QuotationRevisionSummary[]): string | null {
+  const latest = history.find((item) => !item.supersededById) ?? history[history.length - 1];
+  return latest?.id ?? null;
+}
+
 // ── List ──────────────────────────────────────────────────────────────
 
 // Force-expire this company's overdue `sent` quotations now, rather than
@@ -196,8 +235,10 @@ quotationsRouter.get('/', async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '25'), 10) || 25));
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const includeSuperseded = req.query.includeSuperseded === 'true';
 
     const where: Record<string, unknown> = { companyId: req.user!.companyId };
+    if (!includeSuperseded) where.supersededById = null;
     if (status) where.status = status;
     if (search) {
       where.OR = [
@@ -218,7 +259,29 @@ quotationsRouter.get('/', async (req, res) => {
         }),
         tx.quotation.count({ where }),
       ]);
-      return { rows, total };
+
+      const roots = [...new Set(rows.map((row) => row.revisionRootId ?? row.id))];
+      const allRevisions = roots.length > 0
+        ? await tx.quotation.findMany({
+          where: {
+            companyId: req.user!.companyId,
+            OR: [{ id: { in: roots } }, { revisionRootId: { in: roots } }],
+          },
+          select: { id: true, revisionRootId: true },
+        })
+        : [];
+      const counts = allRevisions.reduce<Record<string, number>>((acc, row) => {
+        const root = row.revisionRootId ?? row.id;
+        acc[root] = (acc[root] ?? 0) + 1;
+        return acc;
+      }, {});
+      return {
+        rows: rows.map((row) => ({
+          ...row,
+          revisionCount: counts[row.revisionRootId ?? row.id] ?? 1,
+        })),
+        total,
+      };
     });
 
     res.json({
@@ -240,14 +303,20 @@ quotationsRouter.get('/', async (req, res) => {
 
 quotationsRouter.get('/:id', async (req, res) => {
   try {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: req.params.id, companyId: req.user!.companyId },
-      include: {
-        buyer: true,
-        items: { orderBy: { id: 'asc' } },
-        project: { select: { id: true, code: true, name: true } },
-      },
+    const result = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const quotation = await tx.quotation.findFirst({
+        where: { id: req.params.id, companyId: req.user!.companyId },
+        include: {
+          buyer: true,
+          items: { orderBy: { id: 'asc' } },
+          project: { select: { id: true, code: true, name: true } },
+        },
+      });
+      if (!quotation) return null;
+      const revisionHistory = await buildQuotationRevisionHistory(tx, req.user!.companyId, quotation);
+      return { quotation, revisionHistory };
     });
+    const quotation = result?.quotation;
     if (!quotation) {
       res.status(404).json({ error: 'Quotation not found' });
       return;
@@ -256,6 +325,8 @@ quotationsRouter.get('/:id', async (req, res) => {
     res.json({
       data: {
         ...quotation,
+        revisionHistory: result.revisionHistory,
+        latestRevisionId: latestRevisionId(result.revisionHistory),
         templateId: typeof documentPreferences.templateId === 'string' ? documentPreferences.templateId : null,
       },
     });
@@ -377,7 +448,7 @@ quotationsRouter.post('/:id/share-link', async (req, res) => {
   try {
     const quotation = await prisma.quotation.findFirst({
       where: { id: req.params.id, companyId: req.user!.companyId },
-      select: { id: true, quotationNumber: true, status: true },
+      select: { id: true, quotationNumber: true, status: true, supersededById: true },
     });
     if (!quotation) {
       res.status(404).json({ error: 'Quotation not found' });
@@ -389,6 +460,10 @@ quotationsRouter.post('/:id/share-link', async (req, res) => {
     }
     if (quotation.status === 'cancelled' || quotation.status === 'converted') {
       res.status(400).json({ error: `Cannot share a ${quotation.status} quotation` });
+      return;
+    }
+    if (quotation.supersededById) {
+      res.status(409).json({ error: 'This quotation has a newer revision. Share the latest quotation instead.' });
       return;
     }
 
@@ -500,6 +575,120 @@ quotationsRouter.post('/', async (req, res) => {
     }
     logger.error('create quotation failed', { err: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ error: 'Failed to create quotation' });
+  }
+});
+
+// ── Revise locked quotation ───────────────────────────────────────────
+
+quotationsRouter.post('/:id/revise', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const existing = await prisma.quotation.findFirst({
+      where: { id: req.params.id, companyId },
+      include: { items: { orderBy: { id: 'asc' } } },
+    });
+    if (!existing) {
+      res.status(404).json({ error: 'Quotation not found' });
+      return;
+    }
+    if (existing.supersededById) {
+      res.status(409).json({ error: 'This quotation already has a newer revision. Open the latest revision before editing.' });
+      return;
+    }
+    if (existing.status === 'draft') {
+      res.status(400).json({ error: 'Draft quotations can be edited directly' });
+      return;
+    }
+    if (existing.status === 'converted') {
+      res.status(400).json({ error: 'Converted quotations are locked. Create a new quotation for a new deal.' });
+      return;
+    }
+    if (existing.status === 'cancelled') {
+      res.status(400).json({ error: 'Cancelled quotations cannot be revised. Create a new quotation instead.' });
+      return;
+    }
+
+    const rootId = existing.revisionRootId ?? existing.id;
+    const [quotationNumber, latestRevision] = await Promise.all([
+      generateQuotationNumber(companyId),
+      prisma.quotation.findFirst({
+        where: {
+          companyId,
+          OR: [{ id: rootId }, { revisionRootId: rootId }],
+        },
+        orderBy: [{ revisionNo: 'desc' }, { createdAt: 'desc' }],
+        select: { revisionNo: true },
+      }),
+    ]);
+    const revisionNo = (latestRevision?.revisionNo ?? existing.revisionNo ?? 0) + 1;
+    const now = new Date();
+    const validUntil = new Date(now.getTime() + 30 * 86400_000);
+    validUntil.setHours(23, 59, 59, 0);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const created = await tx.quotation.create({
+        data: {
+          companyId: existing.companyId,
+          projectId: existing.projectId,
+          quotationNumber,
+          status: 'draft',
+          language: existing.language,
+          kind: existing.kind,
+          serviceDetails: existing.serviceDetails ?? Prisma.JsonNull,
+          quotationDate: now,
+          validUntil,
+          buyerId: existing.buyerId,
+          seller: existing.seller as object,
+          subtotal: existing.subtotal,
+          vatAmount: existing.vatAmount,
+          discountAmount: existing.discountAmount,
+          feePercent: existing.feePercent,
+          feeLabel: existing.feeLabel,
+          total: existing.total,
+          whtRate: existing.whtRate,
+          notes: existing.notes,
+          paymentTerms: existing.paymentTerms,
+          deliveryTerms: existing.deliveryTerms,
+          revisionRootId: rootId,
+          revisionNo,
+          createdBy: req.user!.userId,
+          items: {
+            create: existing.items.map((item) => ({
+              productId: item.productId,
+              sectionTitle: item.sectionTitle,
+              nameTh: item.nameTh,
+              nameEn: item.nameEn,
+              descriptionTh: item.descriptionTh,
+              descriptionEn: item.descriptionEn,
+              quantity: item.quantity,
+              unit: item.unit,
+              unitPrice: item.unitPrice,
+              discountAmount: item.discountAmount,
+              vatType: item.vatType,
+              amount: item.amount,
+              vatAmount: item.vatAmount,
+              totalAmount: item.totalAmount,
+            })),
+          },
+        },
+        include: {
+          buyer: true,
+          items: { orderBy: { id: 'asc' } },
+        },
+      });
+
+      await tx.quotation.update({
+        where: { id: existing.id },
+        data: { supersededById: created.id, supersededAt: now },
+      });
+
+      return created;
+    });
+
+    res.status(201).json({ data: result });
+  } catch (err) {
+    logger.error('revise quotation failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to create quotation revision' });
   }
 });
 
@@ -626,6 +815,10 @@ quotationsRouter.post('/:id/status', async (req, res) => {
       res.status(400).json({ error: 'Quotation already converted to an invoice — cannot change status' });
       return;
     }
+    if (existing.supersededById) {
+      res.status(409).json({ error: 'This quotation has a newer revision. Update the latest revision instead.' });
+      return;
+    }
 
     const updated = await prisma.quotation.update({
       where: { id: existing.id },
@@ -663,6 +856,10 @@ quotationsRouter.post('/:id/convert-to-invoice', async (req, res) => {
     }
     if (existing.status === 'converted') {
       res.status(400).json({ error: 'Quotation already converted' });
+      return;
+    }
+    if (existing.supersededById) {
+      res.status(409).json({ error: 'This quotation has a newer revision. Convert the latest accepted revision instead.' });
       return;
     }
     if (existing.status === 'cancelled' || existing.status === 'rejected' || existing.status === 'expired') {

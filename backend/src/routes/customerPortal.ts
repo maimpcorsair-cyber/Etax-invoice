@@ -183,6 +183,7 @@ customerPortalRouter.get('/documents', requirePortalSession, async (req, res) =>
           where: {
             companyId,
             buyerId: customerId,
+            supersededById: null,
             status: { notIn: ['draft', 'cancelled'] },
           },
           orderBy: { quotationDate: 'desc' },

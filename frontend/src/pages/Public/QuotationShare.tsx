@@ -13,6 +13,9 @@ interface QuotationShareData {
     vatAmount: number;
     discountAmount: number;
     total: number;
+    revisionNo?: number;
+    supersededById?: string | null;
+    supersededAt?: string | null;
     notes: string | null;
     paymentTerms: string | null;
     deliveryTerms: string | null;
@@ -123,7 +126,8 @@ export default function QuotationShare() {
     return new Date(data.quotation.validUntil) < new Date();
   }, [data]);
   const status = data ? (STATUS_COPY[data.quotation.status] ?? STATUS_COPY.sent) : STATUS_COPY.sent;
-  const canRespond = data?.quotation.status === 'sent' && !isExpired;
+  const isSuperseded = Boolean(data?.quotation.supersededById);
+  const canRespond = data?.quotation.status === 'sent' && !isExpired && !isSuperseded;
 
   async function respond(action: 'accept' | 'reject') {
     if (!token || !data) return;
@@ -216,6 +220,11 @@ export default function QuotationShare() {
             <div className={`mt-4 border px-3 py-2 text-sm ${isExpired ? 'border-rose-100 bg-rose-50 text-rose-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
               {isExpired ? 'ใบเสนอราคานี้หมดอายุเมื่อ ' : 'ราคาใช้ได้ถึง '}
               <span className="font-semibold">{formatThaiDate(quotation.validUntil)}</span>
+            </div>
+          )}
+          {isSuperseded && (
+            <div className="mt-4 border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              ใบเสนอราคานี้มีฉบับใหม่กว่าแล้ว กรุณาขอลิงก์ล่าสุดจากผู้ขายก่อนตอบรับ
             </div>
           )}
         </section>

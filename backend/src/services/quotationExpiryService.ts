@@ -11,6 +11,7 @@ export async function runQuotationExpiry(companyId?: string): Promise<number> {
   const { count } = await prisma.quotation.updateMany({
     where: {
       status: 'sent',
+      supersededById: null,
       validUntil: { not: null, lt: now },
       ...(companyId ? { companyId } : {}),
     },

@@ -4,6 +4,7 @@ import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
   Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt, Truck,
   Download, Copy, ExternalLink, Eye, Share2, BriefcaseBusiness,
+  GitBranch,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -148,6 +149,7 @@ export default function QuotationBuilder() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [acting, setActing] = useState(false);
+  const [revising, setRevising] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<'open' | 'download' | null>(null);
   const [copying, setCopying] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -544,6 +546,27 @@ export default function QuotationBuilder() {
     }
   }
 
+  async function reviseQuotation() {
+    if (!token || !id) return;
+    setRevising(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/quotations/${id}/revise`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(surfaceError(json));
+      const newId = (json.data as { id: string }).id;
+      setMsg({ type: 'ok', text: isThai ? 'สร้างฉบับแก้ไขแล้ว' : 'Revision draft created' });
+      navigate(`/app/quotations/${newId}`);
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setRevising(false);
+    }
+  }
+
   async function createDeliveryNote() {
     if (!token || !id) return;
     setActing(true);
@@ -578,6 +601,9 @@ export default function QuotationBuilder() {
   const cuteTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Cute');
   const selectedTemplate = builtinDocumentTemplates.find((template) => template.id === form.templateId) ?? null;
   const selectedKind = QUOTATION_KIND_OPTIONS.find((option) => option.value === form.kind) ?? QUOTATION_KIND_OPTIONS[0];
+  const isSuperseded = Boolean(existing?.supersededById);
+  const canCreateRevision = Boolean(existing && !editable && !isSuperseded && ['sent', 'accepted', 'rejected', 'expired'].includes(existing.status));
+  const latestRevision = existing?.revisionHistory?.find((revision) => revision.id === existing.latestRevisionId);
 
   const buildCustomerMessage = useCallback((link?: string) => {
     const number = existing?.quotationNumber ?? (isThai ? 'ใบเสนอราคา' : 'quotation');
@@ -728,6 +754,12 @@ export default function QuotationBuilder() {
           </div>
         ) : existing && (
           <div className="flex flex-wrap justify-end gap-2">
+            {canCreateRevision && (
+              <button onClick={reviseQuotation} disabled={revising} className="btn-primary">
+                {revising ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
+                {isThai ? 'แก้ไขแล้วส่งใหม่' : 'Revise and resend'}
+              </button>
+            )}
             <button onClick={() => openQuotationPdf('open')} disabled={pdfBusy !== null} className="btn-secondary">
               {pdfBusy === 'open' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
               {isThai ? 'เปิด PDF' : 'Open PDF'}
@@ -736,7 +768,7 @@ export default function QuotationBuilder() {
               {pdfBusy === 'download' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
             </button>
-            {existing.status === 'accepted' && (
+            {!isSuperseded && existing.status === 'accepted' && (
               <>
                 <button onClick={createDeliveryNote} disabled={acting} className="btn-secondary">
                   {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
@@ -764,7 +796,28 @@ export default function QuotationBuilder() {
         </div>
       )}
 
-      {existing && !editable && existing.status !== 'cancelled' && (
+      {existing && isSuperseded && (
+        <div className="border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-semibold">{isThai ? 'ใบเสนอราคานี้ถูกแทนที่แล้ว' : 'This quotation was replaced'}</p>
+              <p className="mt-1 text-amber-800">
+                {isThai
+                  ? `ระบบเก็บฉบับนี้ไว้เป็นประวัติ ${latestRevision ? `ฉบับล่าสุดคือ ${latestRevision.quotationNumber}` : 'กรุณาเปิดฉบับล่าสุดก่อนส่งให้ลูกค้า'}`
+                  : `This copy remains as history. ${latestRevision ? `Latest revision: ${latestRevision.quotationNumber}` : 'Open the latest revision before sending.'}`}
+              </p>
+            </div>
+            {existing.latestRevisionId && existing.latestRevisionId !== existing.id && (
+              <button onClick={() => navigate(`/app/quotations/${existing.latestRevisionId}`)} className="btn-secondary shrink-0">
+                <ArrowRight className="w-4 h-4" />
+                {isThai ? 'เปิดฉบับล่าสุด' : 'Open latest'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {existing && !editable && !isSuperseded && existing.status !== 'cancelled' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -848,6 +901,50 @@ export default function QuotationBuilder() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {existing?.revisionHistory && existing.revisionHistory.length > 1 && (
+        <div className="card">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <GitBranch className="mt-0.5 h-5 w-5 text-indigo-700" />
+              <div>
+                <h3 className="font-semibold text-slate-900">{isThai ? 'ประวัติฉบับแก้ไข' : 'Revision history'}</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isThai ? 'รายการปกติจะแสดงเฉพาะฉบับล่าสุด ฉบับเก่ายังเปิดได้เพื่ออ้างอิง' : 'Lists show only the latest active copy; older versions remain available for audit.'}
+                </p>
+              </div>
+            </div>
+            {canCreateRevision && (
+              <button onClick={reviseQuotation} disabled={revising} className="btn-secondary shrink-0">
+                {revising ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
+                {isThai ? 'สร้างฉบับใหม่' : 'Create revision'}
+              </button>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {existing.revisionHistory.map((revision) => {
+              const active = revision.id === existing.id;
+              const latest = revision.id === existing.latestRevisionId;
+              return (
+                <button
+                  key={revision.id}
+                  type="button"
+                  onClick={() => navigate(`/app/quotations/${revision.id}`)}
+                  className={`border px-3 py-2 text-left text-xs transition ${
+                    active ? 'border-indigo-300 bg-indigo-50 text-indigo-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="block font-semibold">
+                    {revision.revisionNo > 0 ? `R${revision.revisionNo}` : isThai ? 'ต้นฉบับ' : 'Original'}
+                    {latest ? (isThai ? ' · ล่าสุด' : ' · Latest') : ''}
+                  </span>
+                  <span className="block font-mono">{revision.quotationNumber}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

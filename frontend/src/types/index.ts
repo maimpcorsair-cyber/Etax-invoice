@@ -321,6 +321,21 @@ export interface Quotation {
   feeLabel?: string | null;
   whtRate?: string | null;
   total: number;
+  revisionRootId?: string | null;
+  revisionNo?: number;
+  revisionCount?: number;
+  revisionHistory?: Array<{
+    id: string;
+    quotationNumber: string;
+    status: QuotationStatus;
+    revisionNo: number;
+    supersededById?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  latestRevisionId?: string | null;
+  supersededById?: string | null;
+  supersededAt?: string | null;
   notes?: string | null;
   paymentTerms?: string | null;
   deliveryTerms?: string | null;

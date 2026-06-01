@@ -197,7 +197,21 @@ export default function QuotationList() {
                     onClick={() => navigate(`/app/quotations/${q.id}`)}
                     className="hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="table-cell font-mono text-sm font-semibold text-indigo-700">{q.quotationNumber}</td>
+                    <td className="table-cell">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-indigo-700">{q.quotationNumber}</span>
+                        {(q.revisionNo ?? 0) > 0 && (
+                          <span className="border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                            R{q.revisionNo}
+                          </span>
+                        )}
+                      </div>
+                      {(q.revisionCount ?? 1) > 1 && (
+                        <div className="mt-0.5 text-[11px] text-slate-500">
+                          {isThai ? `มีประวัติ ${q.revisionCount} ฉบับ` : `${q.revisionCount} revisions`}
+                        </div>
+                      )}
+                    </td>
                     <td className="table-cell">
                       <div className="font-medium text-gray-900">{q.buyer?.nameTh ?? '-'}</div>
                       <div className="text-xs text-gray-500">{q.buyer?.taxId ?? ''}</div>

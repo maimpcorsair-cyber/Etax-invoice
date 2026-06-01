@@ -58,6 +58,9 @@ quotationSharePublicRouter.get('/quotation/:token', async (req, res) => {
         vatAmount: quotation.vatAmount,
         discountAmount: quotation.discountAmount,
         total: quotation.total,
+        revisionNo: quotation.revisionNo,
+        supersededById: quotation.supersededById,
+        supersededAt: quotation.supersededAt,
         notes: quotation.notes,
         paymentTerms: quotation.paymentTerms,
         deliveryTerms: quotation.deliveryTerms,
@@ -144,9 +147,12 @@ quotationSharePublicRouter.post('/quotation/:token/respond', async (req, res) =>
     const updated = await withSystemRlsContext(prisma, async (tx) => {
       const quotation = await tx.quotation.findFirst({
         where: { id: payload.quotationId, companyId: payload.companyId },
-        select: { id: true, status: true, validUntil: true },
+        select: { id: true, status: true, validUntil: true, supersededById: true },
       });
       if (!quotation) return null;
+      if (quotation.supersededById) {
+        throw new Error('ใบเสนอราคานี้มีฉบับใหม่กว่าแล้ว กรุณาขอลิงก์ล่าสุดจากผู้ขาย');
+      }
       if (quotation.status === 'accepted' || quotation.status === 'rejected') return quotation;
       if (quotation.status !== 'sent') {
         throw new Error(`Cannot respond to a ${quotation.status} quotation`);
