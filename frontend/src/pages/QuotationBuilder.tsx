@@ -1409,7 +1409,7 @@ export default function QuotationBuilder() {
               <th className="text-right pb-2 w-24">{isThai ? 'ส่วนลด %' : 'Discount %'}</th>
               <th className="text-left pb-2 w-24">VAT</th>
               <th className="text-right pb-2 w-28">{isThai ? 'รวม' : 'Total'}</th>
-              {editable && <th className="w-8" />}
+              {editable && <th className="sticky right-0 w-12 bg-white" />}
             </tr>
           </thead>
           <tbody>
@@ -1462,7 +1462,7 @@ export default function QuotationBuilder() {
                   </td>
                   <td className="py-2 pr-2 text-right font-medium">{formatCurrency(line.totalAmount)}</td>
                   {editable && (
-                    <td className="py-2 text-center">
+                    <td className="sticky right-0 z-10 bg-white py-2 pl-2 pr-1 text-center shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.12)]">
                       <DeleteButton onClick={() => removeItem(idx)} label={isThai ? 'ลบรายการ' : 'Remove item'} size="sm" className="mx-auto" />
                     </td>
                   )}
