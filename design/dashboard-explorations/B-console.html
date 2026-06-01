@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Billboy · Dashboard — B · Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:    oklch(0.984 0.004 258);
+    --panel: oklch(1 0 0);
+    --ink:   oklch(0.24 0.028 260);
+    --muted: oklch(0.52 0.02 260);
+    --faint: oklch(0.64 0.015 260);
+    --line:  oklch(0.91 0.01 260);
+    --line2: oklch(0.95 0.008 260);
+    --navy:  oklch(0.40 0.10 262);
+    --navy-deep: oklch(0.30 0.088 263);
+    --good:  oklch(0.52 0.10 152);
+    --good-bg: oklch(0.95 0.04 152);
+    --warn:  oklch(0.58 0.12 60);
+    --warn-bg: oklch(0.95 0.05 75);
+    --due:   oklch(0.53 0.16 28);
+    --due-bg: oklch(0.95 0.04 28);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased}
+  body{ font-family:'Anuphan',sans-serif; background:var(--bg); color:var(--ink); font-size:14px; line-height:1.45 }
+  .num{ font-family:'Archivo',sans-serif; font-variant-numeric:tabular-nums lining-nums; letter-spacing:-0.01em }
+  .shell{ display:grid; grid-template-columns: 232px 1fr; min-height:100vh }
+  @media(max-width:880px){ .shell{ grid-template-columns:1fr } .rail{ display:none } }
+
+  /* Left rail */
+  .rail{ background:var(--navy-deep); color:oklch(0.9 0.02 258); padding:20px 16px; display:flex; flex-direction:column; gap:4px }
+  .rail .logo{ font-family:'Archivo',sans-serif; font-weight:800; font-size:19px; color:#fff; letter-spacing:-0.02em; padding:6px 8px 18px }
+  .rail .grp{ font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.68 0.03 258); padding:14px 8px 6px; font-weight:600 }
+  .rail a{ display:flex; justify-content:space-between; align-items:center; text-decoration:none; color:oklch(0.86 0.02 258);
+    font-size:13.5px; padding:7px 8px; border-radius:6px }
+  .rail a.on{ background:color-mix(in oklch, #fff 12%, transparent); color:#fff; font-weight:600 }
+  .rail a .b{ font-family:'Archivo',sans-serif; font-size:11px; background:var(--due); color:#fff; padding:1px 7px; border-radius:99px; font-weight:700 }
+
+  .main{ padding:24px clamp(18px,3vw,36px); max-width:1080px }
+  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:22px }
+  .topbar h1{ font-family:'Archivo',sans-serif; font-size:20px; font-weight:700; letter-spacing:-0.02em }
+  .topbar .sub{ font-size:12.5px; color:var(--muted); margin-top:1px }
+  .topbar .cmd{ font-size:12.5px; color:var(--muted); border:1px solid var(--line); border-radius:7px; padding:7px 12px; display:flex; gap:8px; align-items:center }
+  .topbar .cmd kbd{ font-family:'Archivo',sans-serif; font-size:11px; background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:1px 5px; color:var(--faint) }
+
+  /* KPI strip — compact, inline, no big cards */
+  .kpis{ display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:10px; background:var(--panel); overflow:hidden }
+  .kpis .k{ padding:14px 16px; border-right:1px solid var(--line2) }
+  .kpis .k:last-child{ border-right:none }
+  .kpis .k .lab{ font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px }
+  .kpis .k .v{ font-family:'Archivo',sans-serif; font-variant-numeric:tabular-nums lining-nums; font-size:25px; font-weight:700; margin-top:4px; letter-spacing:-0.02em }
+  .kpis .k .d{ font-size:11.5px; margin-top:2px; color:var(--faint) }
+  .kpis .k .v.due{ color:var(--due) } .kpis .k .v.good{ color:var(--good) }
+  .dot{ width:7px;height:7px;border-radius:99px;display:inline-block }
+  @media(max-width:680px){ .kpis{ grid-template-columns:1fr 1fr } .kpis .k:nth-child(2){border-right:none} }
+
+  .grid{ display:grid; grid-template-columns: 1.55fr 1fr; gap:18px; margin-top:18px }
+  @media(max-width:880px){ .grid{ grid-template-columns:1fr } }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px }
+  .panel > h2{ font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); font-weight:600;
+    padding:13px 16px; border-bottom:1px solid var(--line2); display:flex; justify-content:space-between; align-items:center }
+  .panel > h2 a{ color:var(--navy); text-decoration:none; font-size:12px; text-transform:none; letter-spacing:0 }
+
+  /* Worklist as dense table */
+  table{ width:100%; border-collapse:collapse }
+  tbody tr{ border-bottom:1px solid var(--line2) } tbody tr:last-child{ border-bottom:none }
+  td{ padding:11px 16px; vertical-align:middle }
+  td .t{ font-weight:600; font-size:13.5px } td .m{ font-size:11.5px; color:var(--muted); margin-top:1px }
+  td.r{ text-align:right }
+  .qty{ font-family:'Archivo',sans-serif; font-variant-numeric:tabular-nums lining-nums; font-weight:700; font-size:16px }
+  .chip{ font-size:11px; font-weight:600; padding:2px 9px; border-radius:99px; display:inline-block; white-space:nowrap }
+  .chip.due{ background:var(--due-bg); color:var(--due) } .chip.warn{ background:var(--warn-bg); color:oklch(0.45 0.1 60) }
+  .chip.go{ background:var(--good-bg); color:var(--good) } .chip.idle{ background:var(--line2); color:var(--muted) }
+  .go-link{ color:var(--navy); font-weight:600; font-size:12.5px; text-decoration:none }
+
+  /* VAT mini-panel */
+  .vat{ padding:16px }
+  .vat .row{ display:flex; justify-content:space-between; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line2) }
+  .vat .row:last-child{ border-bottom:none; padding-top:13px }
+  .vat .row .l{ font-size:13px; color:var(--muted) } .vat .row.net .l{ color:var(--ink); font-weight:600 }
+  .vat .row .v{ font-family:'Archivo',sans-serif; font-variant-numeric:tabular-nums lining-nums; font-weight:700; font-size:16px }
+  .vat .row.net .v{ font-size:22px; color:var(--navy-deep) }
+  .vat .meter{ height:6px; background:var(--line2); border-radius:99px; margin:14px 0 8px; overflow:hidden }
+  .vat .meter > i{ display:block; height:100%; width:96%; background:var(--navy); border-radius:99px }
+  .vat .note{ font-size:12px; color:var(--muted) }
+  .vat button{ font-family:inherit; width:100%; margin-top:14px; background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px; font-weight:600; font-size:13.5px; cursor:pointer }
+
+  /* pipeline footer */
+  .flow{ display:flex; gap:0; margin-top:18px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden }
+  .flow .s{ flex:1; padding:13px 16px; border-right:1px solid var(--line2); position:relative }
+  .flow .s:last-child{ border-right:none }
+  .flow .s .k{ font-size:11px; color:var(--faint); text-transform:uppercase; letter-spacing:0.06em; font-weight:600 }
+  .flow .s .t{ font-weight:600; font-size:13px; margin-top:3px }
+  .flow .s .v{ font-family:'Archivo',sans-serif; font-variant-numeric:lining-nums; font-size:12.5px; color:var(--muted); margin-top:1px }
+  .flow .s.on .k{ color:var(--navy) }
+  @media(max-width:560px){ .flow{ flex-wrap:wrap } .flow .s{ flex:1 1 50%; border-bottom:1px solid var(--line2) } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail">
+    <div class="logo">Billboy</div>
+    <div class="grp">ขาย</div>
+    <a class="on" href="#">หน้าแรก</a>
+    <a href="#">ใบกำกับภาษี</a>
+    <a href="#">ใบเสนอราคา</a>
+    <div class="grp">ซื้อ & ค่าใช้จ่าย</div>
+    <a href="#">AI Inbox <span class="b">4</span></a>
+    <a href="#">ใบซื้อ</a>
+    <a href="#">เงินสดย่อย</a>
+    <div class="grp">ภาษี</div>
+    <a href="#">สรุป VAT</a>
+    <a href="#">ภพ.30</a>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>หน้าแรก</h1>
+        <div class="sub">บริษัท สยามเทค จำกัด · รอบภาษี พฤษภาคม 2569 · เหลือ 8 วัน</div>
+      </div>
+      <div class="cmd">ค้นหา หรือพิมพ์คำสั่ง <kbd>⌘K</kbd></div>
+    </div>
+
+    <div class="kpis">
+      <div class="k"><div class="lab">รายได้เดือนนี้</div><div class="v">฿1.28M</div><div class="d">142 ใบ · +12% MoM</div></div>
+      <div class="k"><div class="lab"><span class="dot" style="background:var(--good)"></span>รับชำระแล้ว</div><div class="v good">฿1.10M</div><div class="d">138 ตรงสลิป</div></div>
+      <div class="k"><div class="lab"><span class="dot" style="background:var(--due)"></span>ลูกหนี้เกินกำหนด</div><div class="v due">฿186K</div><div class="d">3 ราย · 21 วัน</div></div>
+      <div class="k"><div class="lab">ต้องนำส่ง VAT</div><div class="v">฿48,655</div><div class="d">เอกสารครบ 96%</div></div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>คิวงานวันนี้ <a href="#">ดูทั้งหมด →</a></h2>
+        <table>
+          <tbody>
+            <tr><td><div class="t">ตามเก็บลูกหนี้เกินกำหนด</div><div class="m">บจ. รุ่งเรือง · ค้าง 21 วัน · ฿88,000</div></td><td class="r"><span class="chip due">เกินกำหนด</span></td><td class="r"><a class="go-link" href="#">ส่งทวง →</a></td></tr>
+            <tr><td><div class="t">เอกสารรอ AI ตรวจ</div><div class="m">สลิป/บิลจาก LINE 4 ไฟล์</div></td><td class="r"><span class="qty">4</span></td><td class="r"><a class="go-link" href="#">เปิด Inbox →</a></td></tr>
+            <tr><td><div class="t">ใบขายรออนุมัติ</div><div class="m">ตรวจแล้วกดออกเอกสาร</div></td><td class="r"><span class="qty">5</span></td><td class="r"><a class="go-link" href="#">ตรวจ →</a></td></tr>
+            <tr><td><div class="t">ยังไม่ส่งกรมสรรพากร</div><div class="m">รอบ พ.ค. · เหลือ 8 วัน</div></td><td class="r"><span class="chip warn">7 รอส่ง</span></td><td class="r"><a class="go-link" href="#">คิวส่ง →</a></td></tr>
+            <tr><td><div class="t">คู่ค้าข้อมูลไม่พร้อม</div><div class="m">รอ ภ.พ.20 · 2 ราย</div></td><td class="r"><span class="qty">2</span></td><td class="r"><a class="go-link" href="#">เปิด →</a></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>ความพร้อมยื่น VAT · พ.ค.</h2>
+        <div class="vat">
+          <div class="row"><span class="l">ภาษีขาย</span><span class="v">฿89,915</span></div>
+          <div class="row"><span class="l">ภาษีซื้อ</span><span class="v">฿41,260</span></div>
+          <div class="row net"><span class="l">ต้องนำส่งสุทธิ</span><span class="v">฿48,655</span></div>
+          <div class="meter"><i></i></div>
+          <div class="note">เอกสารพร้อม 96% · ขาด ภ.พ.20 คู่ค้า 2 ราย</div>
+          <button>เปิดสรุป ภพ.30</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="flow">
+      <div class="s on"><div class="k">รับเข้า</div><div class="t">LINE · เว็บ · PDF</div><div class="v">30 ไฟล์ / 30 วัน</div></div>
+      <div class="s on"><div class="k">AI อ่าน</div><div class="t">แยก VAT · ผู้ขาย</div><div class="v">4 รอยืนยัน</div></div>
+      <div class="s"><div class="k">ออกขาย</div><div class="t">สร้าง PDF</div><div class="v">5 รออนุมัติ</div></div>
+      <div class="s"><div class="k">ยื่นภาษี</div><div class="t">ส่ง RD</div><div class="v">142 สำเร็จ</div></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

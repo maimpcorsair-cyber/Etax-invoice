@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Billboy · Dashboard — C · Quiet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: oklch(0.991 0.005 250);
+    --card:  oklch(1 0 0);
+    --ink:   oklch(0.25 0.03 258);
+    --muted: oklch(0.52 0.022 258);
+    --faint: oklch(0.64 0.016 258);
+    --line:  oklch(0.92 0.01 258);
+    --navy:  oklch(0.40 0.10 261);
+    --navy-deep: oklch(0.29 0.085 263);
+    --navy-soft: oklch(0.96 0.022 258);
+    --good:  oklch(0.52 0.10 152);
+    --due:   oklch(0.53 0.155 28);
+    --due-soft: oklch(0.965 0.03 30);
+    --warn:  oklch(0.57 0.12 62);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+  body{ font-family:'Anuphan',sans-serif; background:var(--paper); color:var(--ink); line-height:1.5;
+    font-size:15px; padding:clamp(24px,5vw,56px) clamp(20px,5vw,40px); max-width:760px; margin:0 auto }
+  .tnum{ font-variant-numeric:tabular-nums lining-nums; letter-spacing:-0.02em }
+
+  .hello{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px }
+  .hello h1{ font-size:26px; font-weight:600; letter-spacing:-0.02em }
+  .hello .date{ font-size:13px; color:var(--faint) }
+  .lede{ color:var(--muted); font-size:15px; margin-bottom:28px }
+  .lede b{ color:var(--ink); font-weight:600 }
+
+  /* Focal action */
+  .focus{ background:var(--navy-deep); color:oklch(0.97 0.012 255); border-radius:18px; padding:24px 26px; margin-bottom:14px }
+  .focus .k{ font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:oklch(0.78 0.03 255); font-weight:600 }
+  .focus .big{ font-variant-numeric:tabular-nums lining-nums; letter-spacing:-0.025em; font-size:44px; font-weight:600; margin:6px 0 2px }
+  .focus p{ color:oklch(0.84 0.02 255); font-size:14px; max-width:48ch }
+  .focus .actions{ display:flex; gap:10px; margin-top:18px; flex-wrap:wrap }
+  .focus button{ font-family:inherit; font-size:14px; font-weight:600; border:none; border-radius:10px; padding:11px 18px; cursor:pointer }
+  .focus .primary{ background:oklch(0.97 0.012 255); color:var(--navy-deep) }
+  .focus .ghost{ background:color-mix(in oklch,#fff 14%,transparent); color:#fff }
+
+  /* Two calm figures */
+  .pair{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:28px }
+  @media(max-width:520px){ .pair{ grid-template-columns:1fr } .focus .big{font-size:38px} }
+  .stat{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px 22px }
+  .stat .k{ font-size:13px; color:var(--muted) }
+  .stat .v{ font-variant-numeric:tabular-nums lining-nums; letter-spacing:-0.02em; font-size:30px; font-weight:600; margin-top:6px }
+  .stat .d{ font-size:12.5px; color:var(--faint); margin-top:3px; display:flex; align-items:center; gap:6px }
+  .stat .v.good{ color:var(--good) }
+  .dot{ width:7px; height:7px; border-radius:99px; display:inline-block }
+
+  .h{ font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); font-weight:600; margin:0 0 12px 2px }
+
+  /* To-do — calm rows, no cards-in-cards */
+  .todo{ background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:28px }
+  .todo .item{ display:flex; align-items:center; gap:14px; padding:15px 20px; border-bottom:1px solid var(--line); text-decoration:none; color:inherit }
+  .todo .item:last-child{ border-bottom:none }
+  .todo .item:hover{ background:var(--navy-soft) }
+  .todo .badge{ width:34px; height:34px; flex:none; border-radius:10px; display:grid; place-items:center;
+    font-weight:700; font-size:15px; font-variant-numeric:lining-nums; background:var(--navy-soft); color:var(--navy) }
+  .todo .badge.due{ background:var(--due-soft); color:var(--due) }
+  .todo .grow{ flex:1 } .todo .grow b{ font-weight:600; font-size:15px } .todo .grow p{ font-size:13px; color:var(--muted); margin-top:1px }
+  .todo .chev{ color:var(--faint); font-size:18px }
+
+  /* pipeline as quiet steps */
+  .steps{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:13px; padding:0 2px }
+  .steps .s{ display:flex; align-items:center; gap:7px }
+  .steps .s b{ color:var(--ink); font-weight:600 }
+  .steps .s .n{ font-variant-numeric:lining-nums; color:var(--faint) }
+  .steps .arr{ color:var(--line); }
+  .steps .s.on b{ color:var(--navy) }
+  .foot{ margin-top:34px; font-size:11.5px; color:var(--faint); text-align:center }
+</style>
+</head>
+<body>
+  <div class="hello">
+    <h1>สวัสดี, คุณสมชาย</h1>
+    <div class="date">เสาร์ 31 พ.ค. 2569</div>
+  </div>
+  <p class="lede">เดือนนี้ออกใบไปแล้ว <b>1.28 ล้านบาท</b> · มีงานสำคัญ <b>1 อย่าง</b>ที่ควรทำก่อน</p>
+
+  <section class="focus">
+    <div class="k">ควรทำก่อน</div>
+    <div class="big tnum">฿186,200</div>
+    <p>ลูกหนี้เกินกำหนด 3 ราย ค้างนานสุด 21 วัน — ส่งลิงก์ทวงถาม หรือออกใบเสร็จเมื่อได้รับชำระแล้ว</p>
+    <div class="actions">
+      <button class="primary">ดูใบค้างชำระ</button>
+      <button class="ghost">ส่งทวงทาง LINE</button>
+    </div>
+  </section>
+
+  <div class="pair">
+    <div class="stat"><div class="k">รับชำระแล้วเดือนนี้</div><div class="v good tnum">฿1,098,300</div><div class="d"><span class="dot" style="background:var(--good)"></span>138 รายการ ตรงกับสลิป</div></div>
+    <div class="stat"><div class="k">ต้องนำส่ง VAT</div><div class="v tnum">฿48,655</div><div class="d">รอบ พ.ค. · เหลือ 8 วัน</div></div>
+  </div>
+
+  <p class="h">งานที่เหลือ</p>
+  <div class="todo">
+    <a class="item" href="#"><span class="badge due">4</span><span class="grow"><b>เอกสารรอ AI ตรวจ</b><p>สลิปและบิลจาก LINE รอยืนยันก่อนบันทึก</p></span><span class="chev">›</span></a>
+    <a class="item" href="#"><span class="badge">5</span><span class="grow"><b>ใบขายรออนุมัติ</b><p>ตรวจแล้วกดออกเอกสารเพื่อส่งให้ลูกค้า</p></span><span class="chev">›</span></a>
+    <a class="item" href="#"><span class="badge due">7</span><span class="grow"><b>ยังไม่ส่งกรมสรรพากร</b><p>รอบ พ.ค. เหลือเวลายื่นอีก 8 วัน</p></span><span class="chev">›</span></a>
+    <a class="item" href="#"><span class="badge">2</span><span class="grow"><b>คู่ค้าข้อมูลไม่พร้อม</b><p>รอ ภ.พ.20 ก่อนเปิดเครดิตหรือทำสัญญา</p></span><span class="chev">›</span></a>
+  </div>
+
+  <p class="h">เส้นทางเอกสารเดือนนี้</p>
+  <div class="steps">
+    <span class="s on"><b>รับเข้า</b><span class="n">30</span></span><span class="arr">———</span>
+    <span class="s on"><b>AI อ่าน</b><span class="n">4 รอ</span></span><span class="arr">———</span>
+    <span class="s"><b>ออกขาย</b><span class="n">5 รอ</span></span><span class="arr">———</span>
+    <span class="s"><b>ยื่นภาษี</b><span class="n">142 ✓</span></span>
+  </div>
+
+  <p class="foot">C · Quiet — Anuphan · โฟกัสงานเดียว, ตัวเลขใหญ่ไม่กี่ตัว, เหมาะเปิดบนมือถือ</p>
+</body>
+</html>

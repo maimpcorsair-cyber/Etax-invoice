@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Billboy · Dashboard — A · Statement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: oklch(0.992 0.004 255);
+    --ink:   oklch(0.22 0.03 258);
+    --muted: oklch(0.50 0.02 258);
+    --faint: oklch(0.62 0.015 258);
+    --line:  oklch(0.90 0.012 258);
+    --hair:  oklch(0.86 0.014 258);
+    --navy:  oklch(0.36 0.094 261);
+    --navy-deep: oklch(0.28 0.085 263);
+    --good:  oklch(0.50 0.09 150);
+    --warn:  oklch(0.56 0.12 58);
+    --due:   oklch(0.52 0.15 28);
+    --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;--space-12:48px;--space-16:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility }
+  body{
+    font-family:'Anuphan',sans-serif; background:var(--paper); color:var(--ink);
+    line-height:1.5; font-size:15px; padding:var(--space-12) clamp(20px,5vw,72px);
+    max-width:1180px; margin:0 auto;
+  }
+  .num{ font-family:'Spectral',serif; font-variant-numeric:tabular-nums lining-nums; letter-spacing:-0.01em }
+
+  /* Masthead */
+  .masthead{ display:flex; justify-content:space-between; align-items:flex-end;
+    padding-bottom:var(--space-4); border-bottom:2px solid var(--ink); }
+  .brand{ display:flex; align-items:baseline; gap:var(--space-3) }
+  .brand b{ font-weight:700; font-size:20px; letter-spacing:-0.02em }
+  .brand .tag{ font-family:'Spectral',serif; font-style:italic; color:var(--faint); font-size:14px }
+  .masthead .meta{ text-align:right; font-size:12.5px; color:var(--muted) }
+  .masthead .meta strong{ color:var(--ink); font-weight:600 }
+
+  /* Statement band */
+  .statement{ margin-top:var(--space-8) }
+  .statement .eyebrow{ font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--faint); font-weight:600 }
+  .ledger{ margin-top:var(--space-4); border-top:1px solid var(--hair) }
+  .ledger-row{ display:grid; grid-template-columns: 1fr auto; align-items:baseline;
+    padding:var(--space-4) 0; border-bottom:1px solid var(--hair); gap:var(--space-6) }
+  .ledger-row .lbl{ display:flex; flex-direction:column; gap:2px }
+  .ledger-row .lbl b{ font-weight:600; font-size:15px }
+  .ledger-row .lbl span{ font-size:12.5px; color:var(--muted) }
+  .ledger-row .val{ font-family:'Spectral',serif; font-variant-numeric:tabular-nums lining-nums;
+    font-size:30px; font-weight:500; text-align:right; letter-spacing:-0.015em }
+  .ledger-row .val small{ font-size:14px; color:var(--faint); font-weight:400; margin-left:6px }
+  .ledger-row.lead .val{ font-size:42px; color:var(--navy-deep) }
+  .ledger-row .val.due{ color:var(--due) }
+
+  /* Two columns */
+  .cols{ display:grid; grid-template-columns: 1.3fr 1fr; gap:var(--space-12); margin-top:var(--space-12) }
+  @media(max-width:840px){ .cols{ grid-template-columns:1fr; gap:var(--space-8) } body{padding:var(--space-8) 20px} }
+  .sec-title{ font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--faint);
+    font-weight:600; padding-bottom:var(--space-3); border-bottom:1px solid var(--ink) }
+
+  /* Action register — numbered list, no cards */
+  .register{ list-style:none; counter-reset:reg }
+  .register li{ counter-increment:reg; display:grid; grid-template-columns: 28px 1fr auto;
+    gap:var(--space-4); align-items:baseline; padding:var(--space-4) 0; border-bottom:1px solid var(--hair) }
+  .register li::before{ content:counter(reg,decimal-leading-zero); font-family:'Spectral',serif;
+    color:var(--faint); font-size:14px; font-variant-numeric:lining-nums }
+  .register .body b{ font-weight:600 }
+  .register .body p{ font-size:12.5px; color:var(--muted); margin-top:2px }
+  .register .act{ font-size:12.5px; color:var(--navy); font-weight:600; white-space:nowrap;
+    border-bottom:1px solid color-mix(in oklch, var(--navy) 35%, transparent); padding-bottom:1px }
+  .register .count{ font-family:'Spectral',serif; font-size:18px; font-weight:600;
+    font-variant-numeric:lining-nums; min-width:34px; text-align:right }
+  .register .count.warn{ color:var(--warn) } .register .count.due{ color:var(--due) }
+
+  /* Pipeline — horizontal hairline steps */
+  .pipe{ display:grid; grid-template-columns:repeat(4,1fr); gap:0; margin-top:var(--space-4) }
+  .pipe .step{ padding:var(--space-4) var(--space-4) var(--space-4) 0; border-top:2px solid var(--hair); position:relative }
+  .pipe .step.on{ border-top-color:var(--navy) }
+  .pipe .step .k{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--faint); font-weight:600 }
+  .pipe .step .t{ font-weight:600; margin-top:var(--space-1); font-size:13.5px }
+  .pipe .step .s{ font-family:'Spectral',serif; font-variant-numeric:lining-nums; color:var(--muted); font-size:13px; margin-top:2px }
+  @media(max-width:560px){ .pipe{ grid-template-columns:1fr 1fr } }
+
+  .ribbon{ margin-top:var(--space-12); padding:var(--space-6); background:var(--navy-deep); color:oklch(0.96 0.01 255);
+    display:flex; justify-content:space-between; align-items:center; gap:var(--space-6) }
+  .ribbon .l b{ font-family:'Spectral',serif; font-style:italic; font-weight:500; font-size:17px }
+  .ribbon .l p{ font-size:12.5px; color:oklch(0.82 0.02 255); margin-top:2px }
+  .ribbon button{ font-family:inherit; font-size:13.5px; font-weight:600; color:var(--navy-deep);
+    background:oklch(0.97 0.01 255); border:none; padding:10px 18px; cursor:pointer }
+  .foot{ margin-top:var(--space-8); font-size:11.5px; color:var(--faint); text-align:center }
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand"><b>Billboy</b><span class="tag">งบสรุปประจำวัน</span></div>
+    <div class="meta">บริษัท สยามเทค จำกัด · สาขาสำนักงานใหญ่<br><strong>31 พฤษภาคม 2569</strong> · รอบภาษี พ.ค.</div>
+  </header>
+
+  <section class="statement">
+    <div class="eyebrow">สถานะเงิน · เดือนนี้</div>
+    <div class="ledger">
+      <div class="ledger-row lead">
+        <div class="lbl"><b>รายได้ที่ออกใบแล้ว</b><span>142 ใบกำกับ · เทียบเดือนก่อน +12%</span></div>
+        <div class="val">1,284,500<small>฿</small></div>
+      </div>
+      <div class="ledger-row">
+        <div class="lbl"><b>รับชำระแล้ว</b><span>ตรงกับสลิป 138 รายการ</span></div>
+        <div class="val">1,098,300<small>฿</small></div>
+      </div>
+      <div class="ledger-row">
+        <div class="lbl"><b>ลูกหนี้เกินกำหนด</b><span>3 ราย · ค้างนานสุด 21 วัน</span></div>
+        <div class="val due">186,200<small>฿</small></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="cols">
+    <div>
+      <div class="sec-title">สิ่งที่ควรทำตอนนี้</div>
+      <ol class="register">
+        <li><span class="count due">3</span><div class="body"><b>ตามเก็บลูกหนี้เกินกำหนด</b><p>ออกใบเสร็จเมื่อได้รับชำระ หรือส่งลิงก์ทวงถาม</p></div><span class="act">ดูใบค้างชำระ</span></li>
+        <li><span class="count warn">4</span><div class="body"><b>เอกสารรอ AI ตรวจ</b><p>สลิป/บิลจาก LINE รอยืนยันก่อนบันทึก</p></div><span class="act">เปิด AI Inbox</span></li>
+        <li><span class="count">5</span><div class="body"><b>ใบขายรออนุมัติ</b><p>ตรวจแล้วกดออกเอกสารเพื่อส่ง</p></div><span class="act">ตรวจรายการ</span></li>
+        <li><span class="count warn">7</span><div class="body"><b>ยังไม่ส่งกรมสรรพากร</b><p>รอบ พ.ค. เหลือเวลายื่นอีก 8 วัน</p></div><span class="act">ตรวจคิวส่ง</span></li>
+        <li><span class="count">2</span><div class="body"><b>คู่ค้าข้อมูลไม่พร้อม</b><p>รอ ภ.พ.20 ก่อนเปิดเครดิต</p></div><span class="act">เปิดคู่ค้า</span></li>
+      </ol>
+    </div>
+    <div>
+      <div class="sec-title">เส้นทางเอกสาร</div>
+      <div class="pipe">
+        <div class="step on"><div class="k">รับเข้า</div><div class="t">LINE · เว็บ · PDF</div><div class="s">30 ไฟล์ / 30 วัน</div></div>
+        <div class="step on"><div class="k">AI อ่าน</div><div class="t">แยก VAT · ผู้ขาย</div><div class="s">4 รอยืนยัน</div></div>
+        <div class="step"><div class="k">ออกขาย</div><div class="t">สร้าง PDF</div><div class="s">5 รออนุมัติ</div></div>
+        <div class="step"><div class="k">ยื่นภาษี</div><div class="t">ส่ง RD</div><div class="s">142 สำเร็จ</div></div>
+      </div>
+
+      <div class="sec-title" style="margin-top:var(--space-8)">ความพร้อมยื่น VAT</div>
+      <div class="ledger" style="border-top:none">
+        <div class="ledger-row" style="padding:var(--space-3) 0">
+          <div class="lbl"><b>ภาษีขาย</b></div><div class="val" style="font-size:20px">89,915<small>฿</small></div>
+        </div>
+        <div class="ledger-row" style="padding:var(--space-3) 0">
+          <div class="lbl"><b>ภาษีซื้อ</b></div><div class="val" style="font-size:20px">41,260<small>฿</small></div>
+        </div>
+        <div class="ledger-row" style="padding:var(--space-3) 0; border-bottom:none">
+          <div class="lbl"><b>ต้องนำส่งสุทธิ</b></div><div class="val" style="font-size:24px; color:var(--navy-deep)">48,655<small>฿</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ribbon">
+    <div class="l"><b>พร้อมยื่น ภพ.30 รอบพฤษภาคม</b><p>เหลือเวลาอีก 8 วัน · เอกสารครบ 96%</p></div>
+    <button>เปิดสรุป VAT</button>
+  </div>
+
+  <p class="foot">A · Statement — Anuphan + Spectral · ledger rules, ไม่มีการ์ด, ตัวเลข serif แบบงบการเงิน</p>
+</body>
+</html>
