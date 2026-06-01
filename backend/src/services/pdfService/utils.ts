@@ -42,6 +42,8 @@ export const DOC_TITLE: Record<string, Record<Language | 'both', string>> = {
 
 export const ALL_DOCUMENT_TYPES = ['quotation', 'tax_invoice', 'tax_invoice_receipt', 'receipt', 'credit_note', 'debit_note'];
 
+export const DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID = 'builtin:minimal-dark-accent';
+
 export const BUILTIN_DOCUMENT_TEMPLATES: Record<string, {
   name: string;
   supportedTypes: string[];
@@ -275,6 +277,8 @@ export function resolveDocumentTheme(templateId?: string | null) {
     'builtin:anime-pastel':  { className: 'theme-anime-pastel',  accent: '#b794f4', accent2: '#9f7aea', soft: '#f5f0ff', ink: '#553c7b', label: 'Anime Pastel',  mark: '♡' },
   };
 
-  const base = themes[templateId ?? ''] ?? { className: 'theme-standard', accent: '#1e3a8a', accent2: '#2563eb', soft: '#f2f6fd', ink: '#15254b', label: 'System Standard', mark: '' };
+  const base =
+    themes[templateId ?? DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID] ??
+    themes[DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID];
   return { ...base, ...deriveSurfaceTokens(base) };
 }

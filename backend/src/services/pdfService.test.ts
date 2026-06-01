@@ -333,6 +333,19 @@ test('built-in template themes keep the standard accounting document structure',
   assert.ok(!html.includes('poster-panel'), 'built-in template should not switch to a different poster/gallery layout');
 });
 
+test('system default document theme is formal monochrome', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    templateId: null,
+    documentMode: 'ordinary',
+  });
+
+  assert.ok(
+    html.includes('theme-minimal-dark-accent'),
+    'documents without an explicit template should use the formal monochrome system default',
+  );
+});
+
 test('built-in quotation template keeps quotation copy and applies the selected theme', () => {
   const html = buildHtml({
     ...FIXTURE,

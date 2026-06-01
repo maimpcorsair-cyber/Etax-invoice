@@ -22,13 +22,20 @@ const ALL_DOCUMENT_TYPES: InvoiceType[] = [
   'debit_note',
 ];
 
+export const DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID = 'builtin:minimal-dark-accent';
+export const DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES: BuiltinDocumentTemplate['swatches'] = [
+  'bg-white',
+  'bg-gray-900',
+  'bg-black',
+];
+
 // Curated set. Every built-in template renders through the same formal A4
 // base (clean white paper, thin accent rule, full accounting footer); the
 // only thing a template changes is the accent colour. So we keep a small,
 // modern set of distinct accent tones instead of dozens of near-identical
 // entries. tagEn drives the dropdown grouping (Minimal → "เรียบง่าย/ทางการ",
-// Cute → "สีพาสเทล/ร้านค้า"). The hard-coded "Standard A4" option in the
-// builders is the 8th choice.
+// Cute → "สีพาสเทล/ร้านค้า"). Builders expose a separate system-default
+// entry that currently resolves to the formal monochrome preset.
 export const builtinDocumentTemplates: BuiltinDocumentTemplate[] = [
   // ── ทางการ / Professional ───────────────────────────────────────────
   {

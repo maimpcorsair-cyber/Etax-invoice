@@ -10,7 +10,11 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import DeleteButton from '../components/ui/DeleteButton';
 import type { Customer, Quotation, QuotationStatus } from '../types';
-import { builtinDocumentTemplates } from '../lib/documentTemplatePresets';
+import {
+  DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID,
+  DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES,
+  builtinDocumentTemplates,
+} from '../lib/documentTemplatePresets';
 
 // ใบเสนอราคา — Build (new/edit draft) + view (non-draft) + status actions
 // in one page. Routed as:
@@ -641,7 +645,9 @@ export default function QuotationBuilder() {
 
   const minimalTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Minimal');
   const cuteTemplates = builtinDocumentTemplates.filter((template) => template.tagEn === 'Cute');
-  const selectedTemplate = builtinDocumentTemplates.find((template) => template.id === form.templateId) ?? null;
+  const selectedTemplate =
+    builtinDocumentTemplates.find((template) => template.id === (form.templateId ?? DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID)) ??
+    null;
   const selectedKind = QUOTATION_KIND_OPTIONS.find((option) => option.value === form.kind) ?? QUOTATION_KIND_OPTIONS[0];
   const isSuperseded = Boolean(existing?.supersededById);
   const canCreateRevision = Boolean(existing && !editable && !isSuperseded && ['sent', 'accepted', 'rejected', 'expired'].includes(existing.status));
@@ -1093,7 +1099,7 @@ export default function QuotationBuilder() {
               disabled={!editable}
             >
               <option value={STANDARD_TEMPLATE_VALUE}>
-                {isThai ? 'มาตรฐาน - แบบราชการ A4' : 'Standard - official A4'}
+                {isThai ? 'ขาว-ดำ · ทางการ (ค่าเริ่มต้น)' : 'Mono · Formal (default)'}
               </option>
               <optgroup label={isThai ? 'เรียบง่าย / ทางการ' : 'Minimal / official'}>
                 {minimalTemplates.map((template) => (
@@ -1107,7 +1113,7 @@ export default function QuotationBuilder() {
               </optgroup>
             </select>
             <div className="flex min-w-0 items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
-              {(selectedTemplate?.swatches ?? ['bg-white', 'bg-blue-200', 'bg-blue-800']).map((swatch, index) => (
+              {(selectedTemplate?.swatches ?? DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES).map((swatch, index) => (
                 <span key={`${swatch}-${index}`} className={`h-4 w-4 border border-slate-200 ${swatch}`} />
               ))}
               <span className="min-w-0 truncate text-xs font-medium text-slate-600">
@@ -1652,7 +1658,7 @@ export default function QuotationBuilder() {
         <div className="flex max-h-[calc(100vh-6rem)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-primary-700 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-100">
-              {(selectedTemplate?.swatches ?? ['bg-white', 'bg-blue-200', 'bg-blue-800']).slice(0, 3).map((swatch, index) => (
+              {(selectedTemplate?.swatches ?? DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES).slice(0, 3).map((swatch, index) => (
                 <span key={`${swatch}-${index}`} className={`h-3.5 w-3.5 shrink-0 rounded-full border border-slate-200 ${swatch}`} />
               ))}
               <div className="min-w-0 flex-1">
@@ -1668,7 +1674,7 @@ export default function QuotationBuilder() {
                     aria-label={isThai ? 'เลือกเทมเพลตใบเสนอราคา' : 'Choose quotation template'}
                   >
                     <option value={STANDARD_TEMPLATE_VALUE}>
-                      {isThai ? 'มาตรฐาน - แบบราชการ A4' : 'Standard - official A4'}
+                      {isThai ? 'ขาว-ดำ · ทางการ (ค่าเริ่มต้น)' : 'Mono · Formal (default)'}
                     </option>
                     {minimalTemplates.length > 0 && (
                       <optgroup label={isThai ? 'เรียบง่าย / ทางการ' : 'Minimal / official'}>

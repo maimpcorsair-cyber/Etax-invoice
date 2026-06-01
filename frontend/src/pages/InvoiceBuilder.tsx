@@ -20,7 +20,13 @@ import NotesPaymentCard from '../components/invoice/NotesPaymentCard';
 import WhtCard from '../components/invoice/WhtCard';
 import PreviewModal from '../components/invoice/PreviewModal';
 import type { BankAccountProfile, DocumentTemplateOption } from '../types';
-import { type BuiltinDocumentTemplate, builtinDocumentTemplates, supportsDocumentType } from '../lib/documentTemplatePresets';
+import {
+  DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID,
+  DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES,
+  type BuiltinDocumentTemplate,
+  builtinDocumentTemplates,
+  supportsDocumentType,
+} from '../lib/documentTemplatePresets';
 
 const STANDARD_TEMPLATE_VALUE = '__system_standard__';
 
@@ -33,6 +39,7 @@ const swatchColors: Record<string, string> = {
   'bg-gray-400': '#9ca3af',
   'bg-gray-800': '#1f2937',
   'bg-gray-900': '#111827',
+  'bg-black': '#000',
   'bg-slate-100': '#f1f5f9',
   'bg-slate-300': '#cbd5e1',
   'bg-slate-400': '#94a3b8',
@@ -63,7 +70,7 @@ const swatchColors: Record<string, string> = {
 };
 
 function renderTemplateSwatches(template?: BuiltinDocumentTemplate | null) {
-  const swatches = template?.swatches ?? ['bg-blue-900', 'bg-blue-200', 'bg-white'];
+  const swatches = template?.swatches ?? DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_SWATCHES;
   return (
     <div className="flex shrink-0 gap-1" aria-hidden="true">
       {swatches.map((cls, index) => (
@@ -678,7 +685,9 @@ export default function InvoiceBuilder() {
   const filteredCustomTemplates = templates.filter((t) =>
     t.type === form.docType && (t.language === form.docLanguage || t.language === 'both' || form.docLanguage === 'both'),
   );
-  const selectedBuiltinTemplate = matchingBuiltinTemplates.find((template) => template.id === form.templateId) ?? null;
+  const selectedBuiltinTemplate =
+    matchingBuiltinTemplates.find((template) => template.id === (form.templateId ?? DEFAULT_SYSTEM_DOCUMENT_TEMPLATE_ID)) ??
+    null;
   const minimalTemplates = matchingBuiltinTemplates.filter((template) => template.tagEn === 'Minimal');
   const cuteTemplates = matchingBuiltinTemplates.filter((template) => template.tagEn === 'Cute');
 
@@ -877,7 +886,7 @@ export default function InvoiceBuilder() {
                 aria-label={isThai ? 'เลือกเทมเพลตเอกสาร' : 'Choose document template'}
               >
                 <option value={STANDARD_TEMPLATE_VALUE}>
-                  {isThai ? 'มาตรฐาน - แบบราชการ A4' : 'Standard - official A4'}
+                  {isThai ? 'ขาว-ดำ · ทางการ (ค่าเริ่มต้น)' : 'Mono · Formal (default)'}
                 </option>
                 {minimalTemplates.length > 0 && (
                   <optgroup label={isThai ? 'เรียบง่าย / ทางการ' : 'Minimal / official'}>
