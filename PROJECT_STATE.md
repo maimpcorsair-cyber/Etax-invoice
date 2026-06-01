@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-06-01 (PDF A4 width + Thai wrapping polish)
+Last updated: 2026-06-01 (frontend UI polish + DeleteButton shipped)
 
 ## Latest work (2026-06-01)
+
+Frontend UI polish — shipped to production via Vercel (main `6e272dd`):
+- **App-wide brand consistency (`#3`, 41f1376):** swept off-brand `indigo-*` → `primary-*` (navy) across 24 files (~160 occurrences; indigo isn't in the palette). Removed 3 banned `border-l-4` side-stripes in VatSummary. Dashboard a11y/contrast: `text-gray-400`→`text-gray-500`, `focus-visible` rings on command/first-invoice cards, e-Tax banner indigo→navy. Token-only, no layout/logic change. Detector on `src/pages` 23→17 (real slop — `ai-color-palette` + 3 `side-tab` — gone; remainder are gray-on-color ternary false-positives + 1 informational single-font).
+- **`<DeleteButton/>` component (`#4`, 6e272dd):** reusable on-brand animated delete (trash-lid-lift hover, danger-red, focus ring, aria-label, prefers-reduced-motion, ghost/solid + sm/md). Replaced 4 ad-hoc `Trash2` buttons in ItemsTable, QuotationBuilder (items+milestones), DeliveryNoteBuilder, RecurringInvoiceBuilder.
+- **Design docs:** added `PRODUCT.md` + `DESIGN.md` (Stitch format) as canonical; `.impeccable.md` reduced to a pointer; CLAUDE.md design-context records the **keep mascot + soft wallpaper, never strip for minimal** rule (an austere navy redesign was rejected and reverted).
+- **Verification:** typecheck + unit-tests + build green on both PRs; components rendered in isolation. Vercel Production deploy `6e272dd` `state=success`, `etax-invoice.vercel.app` HTTP 200. Note: the live, logged-in pages were not visually QA'd from here (local DB down + Vercel preview SSO) — changes are token-only/additive and low-risk; revert is a `git revert` away.
+
+## Earlier work (2026-06-01)
 
 PDF A4 width + Thai wrapping polish — shipped and verified live on prod (`7bdd689`):
 - **More usable A4 width:** standard PDFs now use `6mm` left/right Puppeteer margins instead of `10mm`, align the printed page footer to the same edge, and remove redundant inner horizontal padding. The print frame consumes the available width rather than subtracting the old margin a second time.
