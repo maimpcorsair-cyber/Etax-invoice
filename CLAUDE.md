@@ -41,9 +41,8 @@ backend/src/services/
 
 backend/src/queues/workers/rdSubmitWorker.ts   BullMQ signing pipeline
 
-frontend/src/pages/InvoiceBuilder.tsx                  Form + live preview split pane (responsive tabs mobile)
-frontend/src/components/invoice/TemplateMarketplace.tsx Canva-style gallery panel
-frontend/src/lib/documentTemplatePresets.ts            51 template definitions
+frontend/src/pages/InvoiceBuilder.tsx                  Form + live preview split pane (responsive tabs mobile); template picker is a <select> in the preview toolbar
+frontend/src/lib/documentTemplatePresets.ts            8 curated template presets (the Canva-style TemplateMarketplace gallery was deleted 2026-05-31)
 ```
 
 ## Document types
@@ -55,10 +54,10 @@ frontend/src/lib/documentTemplatePresets.ts            51 template definitions
 | T04 | `credit_note` | Refund |
 | T05 | `debit_note` | Extra charge |
 
-## Template system (51 templates)
-- Groups: Standard · Minimal · Pro · Cute · Dark (10) · Anime (10) · Fun
-- `pdfService.ts` routes by prefix: `builtin:dark-*` → `buildHtmlDark(variant)`, `builtin:anime-*` → `buildHtmlAnime(variant)`
-- `documentTemplatePresets.ts` — `id, tagEn, swatches[]`; `tagEn` controls marketplace category
+## Template system (8 curated presets)
+- Choices: Standard A4 + 4 formal (Pro Navy / Minimal Gray / Minimal Dark-accent / Pro Corp Teal) + 3 colour (Cute Pastel Pink / Cute Baby Blue / Minimal Beige)
+- All themes render through ONE formal base builder: `pdfService/builders/standard.ts` via `buildHtml`. The old per-variant builders (dark/anime/cute/pro/…) were dead code and were deleted 2026-05-31; a theme is now just its accent colour + a subtle accent-tinted page wash on clean white paper.
+- `documentTemplatePresets.ts` — `id, tagEn, swatches[]`; `tagEn` controls picker grouping. Picked via the `<select>` in InvoiceBuilder's preview toolbar (there is no separate marketplace/gallery component).
 
 ## Signing pipeline
 ```

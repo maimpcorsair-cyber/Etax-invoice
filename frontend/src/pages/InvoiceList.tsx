@@ -656,7 +656,11 @@ export default function InvoiceList() {
             return (
               <div
                 key={inv.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 p-4"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
+                  navigate(`/app/invoices/${inv.id}/edit`);
+                }}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer"
               >
                 {/* Row 1: type badge + invoice number + status */}
                 <div className="flex items-center gap-2 mb-1">
@@ -804,7 +808,14 @@ export default function InvoiceList() {
                 invoices.map((inv) => {
                   const typeInfo = TYPE_LABELS[inv.type];
                   return (
-                    <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={inv.id}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
+                        navigate(`/app/invoices/${inv.id}/edit`);
+                      }}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
                       <td className="table-cell">
                         <div className="font-mono text-xs font-medium">{inv.invoiceNumber}</div>
                         {inv.referenceDocNumber && (

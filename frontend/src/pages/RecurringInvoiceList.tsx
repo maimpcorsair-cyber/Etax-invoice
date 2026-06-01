@@ -180,7 +180,14 @@ export default function RecurringInvoiceList() {
                   return sum + amount + (item.vatType === 'vat7' ? amount * 0.07 : 0);
                 }, 0) - row.discountAmount;
                 return (
-                  <tr key={row.id} className="hover:bg-gray-50">
+                  <tr
+                    key={row.id}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
+                      navigate(`/app/recurring-invoices/${row.id}`);
+                    }}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <td className="table-cell">
                       <button onClick={() => navigate(`/app/recurring-invoices/${row.id}`)} className="text-left font-semibold text-primary-700 hover:underline">
                         {row.name}
