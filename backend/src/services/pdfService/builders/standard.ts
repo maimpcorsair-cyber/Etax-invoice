@@ -243,11 +243,9 @@ export function buildHtml(data: PdfInvoiceData): string {
     min-height: inherit;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    overflow: hidden;
+    border: 0;
+    border-radius: 0;
     background: var(--surface);
-    box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
     position: relative;
   }
   .top-accent { height: 3px; background: var(--accent-2); }
@@ -386,7 +384,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     border-radius: 18px;
     background: #ffffff;
   }
-  .party-card { padding: 18px; }
+  .party-card { padding: 14px 16px; background: #fbfcfe; }
   .meta-card { padding: 14px 16px; background: #fbfcfe; }
   .section-label {
     font-size: 10.5px;
@@ -396,13 +394,12 @@ export function buildHtml(data: PdfInvoiceData): string {
     font-weight: 700;
     margin-bottom: 12px;
   }
-  .party-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .party-grid { display: block; }
   .party-column {
-    padding: 14px 14px 12px;
-    border-radius: 16px;
-    background: #f9fbff;
-    border: 1px solid #e5ecf5;
-    min-height: 132px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    min-height: 0;
   }
   .party-title {
     font-size: 10.5px;
@@ -748,8 +745,8 @@ export function buildHtml(data: PdfInvoiceData): string {
     padding: 10px;
   }
   .compact-one-page .party-column {
-    min-height: 78px;
-    padding: 8px 10px;
+    min-height: 0;
+    padding: 0;
   }
   .compact-one-page .meta-card {
     padding: 8px 10px;
@@ -964,6 +961,10 @@ export function buildHtml(data: PdfInvoiceData): string {
   .cert-pill {
     border-radius: 2px !important;
   }
+  .document-shell {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
 
   @media print {
     body,
@@ -1023,7 +1024,7 @@ export function buildHtml(data: PdfInvoiceData): string {
   }
 </style>
 </head>
-<body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}">
+<body class="${theme.className}${onePageCompact ? ' compact-one-page' : ''}" data-document-number="${escapeHtml(data.invoiceNumber)}">
   <div class="page">
   <div class="document-shell">
     <div class="top-accent"></div>

@@ -139,6 +139,10 @@ test('standard ordinary document stays compact and does not show e-Tax labels', 
   assert.ok(html.includes('compact-one-page'), 'short ordinary invoice should use compact one-page layout');
   assert.ok(html.includes('min-height: calc(297mm - 40px)'), 'standard preview should keep an A4-height page frame');
   assert.ok(html.includes('margin-top: auto'), 'payment/support area should sit toward the bottom on short A4 invoices');
+  assert.ok(html.includes('data-document-number="IV-2026-000128"'), 'PDF HTML should expose its document number for the printed page footer');
+  assert.ok(html.includes('border: 0 !important'), 'the printable A4 page should not render a decorative outer frame');
+  assert.ok(html.includes('.party-grid { display: block; }'), 'buyer details should use a flat accounting block');
+  assert.ok(html.includes('min-height: 0;\n    padding: 0;'), 'buyer details should not render a wasteful nested box');
   assert.ok(!html.includes('Electronic Tax Document'), 'ordinary document must not show electronic tax eyebrow');
   assert.ok(!html.includes('ORDINARY DOCUMENT'), 'ordinary document should not spend space on a redundant ordinary badge');
   assert.ok(!html.includes('class="watermark"'), 'document PDF should not render decorative background watermarks');
@@ -182,6 +186,23 @@ test('standard ordinary document keeps up to eight items in compact one-page lay
   assert.ok(html.includes('.compact-one-page {\n    padding: 0;'), 'compact one-page layout should not add overflow padding');
   assert.ok(html.includes('height: calc(297mm - 20mm)'), 'printed compact A4 should have a fixed content-height box');
   assert.ok(!html.includes('📱'), 'invoice PDFs should not render emoji labels');
+});
+
+test('standard multi-page document keeps a document-number hook for repeated PDF footers', () => {
+  const html = buildHtml({
+    ...FIXTURE,
+    type: 'quotation',
+    invoiceNumber: 'QT-2026-000010',
+    items: Array.from({ length: 11 }, (_, idx) => ({
+      ...FIXTURE.items[idx % FIXTURE.items.length]!,
+      nameTh: `รายการหลายหน้า ${idx + 1}`,
+    })),
+    documentMode: 'ordinary',
+  });
+
+  assert.ok(!html.includes(' compact-one-page" data-document-number'), 'more than eight items should use the multi-page flow');
+  assert.ok(html.includes('data-document-number="QT-2026-000010"'), 'multi-page HTML should expose the quotation number to Puppeteer');
+  assert.ok(html.includes('body:not(.compact-one-page) thead { display: table-header-group; }'), 'multi-page tables should repeat their column header');
 });
 
 test('standard document hides empty discount column and keeps it only when needed', () => {
