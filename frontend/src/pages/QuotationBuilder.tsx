@@ -4,7 +4,7 @@ import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle, XCircle,
   Loader2, AlertTriangle, FileText, ArrowRight, Clock, Receipt, Truck,
   Download, Copy, ExternalLink, Eye, Share2, BriefcaseBusiness,
-  GitBranch,
+  ChevronDown, GitBranch, Maximize2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -157,6 +157,9 @@ export default function QuotationBuilder() {
   const [shareUrl, setShareUrl] = useState('');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [quotePreviewHtml, setQuotePreviewHtml] = useState<string | null>(null);
+  const [quotePreviewLoading, setQuotePreviewLoading] = useState(false);
+  const [quotePreviewError, setQuotePreviewError] = useState<string | null>(null);
+  const [quotePreviewPdfBusy, setQuotePreviewPdfBusy] = useState<'open' | 'download' | null>(null);
   const quotePreviewRef = useRef<HTMLDivElement | null>(null);
   const [quotePreviewScale, setQuotePreviewScale] = useState(0.52);
 
@@ -366,22 +369,54 @@ export default function QuotationBuilder() {
     return errJson.error ?? 'Save failed';
   }, []);
 
+  const refreshExistingQuotationStatus = useCallback(async () => {
+    if (!token || !id || isNew) return null;
+    const res = await fetch(`/api/quotations/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { data?: Quotation };
+    if (json.data) setExisting(json.data);
+    return json.data ?? null;
+  }, [id, isNew, token]);
+
   // Live preview: re-render the quotation HTML from current form data
   // (debounced) whenever the form changes, like the invoice builder.
   useEffect(() => {
     if (!token) return;
-    if (!form.items.some((it) => it.nameTh.trim())) { setQuotePreviewHtml(null); return; }
+    if (!form.items.some((it) => it.nameTh.trim())) {
+      setQuotePreviewHtml(null);
+      setQuotePreviewError(null);
+      setQuotePreviewLoading(false);
+      return;
+    }
+    const controller = new AbortController();
     const handle = window.setTimeout(async () => {
+      setQuotePreviewLoading(true);
+      setQuotePreviewError(null);
       try {
         const res = await fetch('/api/quotations/preview?format=html', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(buildBody()),
+          signal: controller.signal,
         });
-        if (res.ok) setQuotePreviewHtml(await res.text());
-      } catch { /* preview is best-effort, never blocks editing */ }
+        if (!res.ok) {
+          const body = await res.json().catch(() => null) as { error?: string } | null;
+          throw new Error(body?.error ?? (isThai ? 'สร้างตัวอย่างไม่สำเร็จ' : 'Preview failed'));
+        }
+        setQuotePreviewHtml(await res.text());
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setQuotePreviewError(error instanceof Error ? error.message : (isThai ? 'สร้างตัวอย่างไม่สำเร็จ' : 'Preview failed'));
+      } finally {
+        if (!controller.signal.aborted) setQuotePreviewLoading(false);
+      }
     }, 600);
-    return () => window.clearTimeout(handle);
+    return () => {
+      window.clearTimeout(handle);
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, form]);
 
@@ -397,7 +432,7 @@ export default function QuotationBuilder() {
     const observer = new ResizeObserver(updateScale);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [quotePreviewHtml]);
 
   // Body shared by save + live preview. Excludes buyerId (preview uses a
   // sample buyer; save adds the real buyerId).
@@ -480,9 +515,25 @@ export default function QuotationBuilder() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(surfaceError(json));
-      const savedId = (json.data as { id: string }).id;
+      const json = await res.json() as { data?: Quotation; error?: string; details?: Array<{ path?: (string|number)[]; message?: string }> };
+      if (!res.ok) {
+        const message = surfaceError(json);
+        if (!isNew && message.includes("Cannot edit a quotation in status 'sent'")) {
+          await refreshExistingQuotationStatus();
+          setMsg({
+            type: 'ok',
+            text: isThai
+              ? 'ใบเสนอราคานี้ถูกส่งแล้ว ระบบเปลี่ยนเป็นหน้าส่งให้ลูกค้าให้แล้ว'
+              : 'This quotation has already been sent. The send view is now open.',
+          });
+          return;
+        }
+        throw new Error(message);
+      }
+      const savedQuotation = json.data;
+      const savedId = savedQuotation?.id ?? id;
+      if (savedQuotation) setExisting(savedQuotation);
+      if (!savedId) throw new Error(isThai ? 'บันทึกไม่สำเร็จ' : 'Save failed');
 
       if (action === 'send') {
         const sendRes = await fetch(`/api/quotations/${savedId}/status`, {
@@ -490,14 +541,20 @@ export default function QuotationBuilder() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ status: 'sent' }),
         });
+        const sendJson = await sendRes.json() as { data?: Quotation; error?: string; details?: Array<{ path?: (string|number)[]; message?: string }> };
         if (!sendRes.ok) {
-          const sendJson = await sendRes.json();
           throw new Error(surfaceError(sendJson));
         }
+        if (sendJson.data) setExisting(sendJson.data);
       }
 
-      setMsg({ type: 'ok', text: isThai ? 'บันทึกแล้ว' : 'Saved' });
-      navigate(`/app/quotations/${savedId}`);
+      setMsg({
+        type: 'ok',
+        text: action === 'send'
+          ? (isThai ? 'บันทึกแล้ว พร้อมส่งให้ลูกค้า' : 'Saved and ready to send')
+          : (isThai ? 'บันทึกแล้ว' : 'Saved'),
+      });
+      navigate(`/app/quotations/${savedId}`, { replace: !isNew });
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
     } finally {
@@ -656,6 +713,36 @@ export default function QuotationBuilder() {
     }
   }
 
+  async function openCurrentPreviewPdf(mode: 'open' | 'download') {
+    if (!token || !quotePreviewHtml) return;
+    setQuotePreviewPdfBusy(mode);
+    setQuotePreviewError(null);
+    try {
+      const res = await fetch('/api/quotations/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(buildBody()),
+      });
+      if (!res.ok) throw new Error(isThai ? 'สร้างไฟล์ PDF ไม่สำเร็จ' : 'Could not create the PDF');
+      const blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      if (mode === 'open') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `quotation-preview-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      }
+    } catch (error) {
+      setQuotePreviewError(error instanceof Error ? error.message : (isThai ? 'สร้างไฟล์ PDF ไม่สำเร็จ' : 'Could not create the PDF'));
+    } finally {
+      setQuotePreviewPdfBusy(null);
+    }
+  }
+
   async function copySendMessage() {
     const url = await ensureShareLink();
     if (!url && existing?.status === 'sent') return;
@@ -721,8 +808,8 @@ export default function QuotationBuilder() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,460px)] lg:items-start">
+    <div className="mx-auto max-w-[1540px]">
+    <div className="grid gap-4 lg:grid-cols-[minmax(620px,820px)_minmax(420px,1fr)] lg:items-start">
     <div className="space-y-4 min-w-0">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1577,48 +1664,149 @@ export default function QuotationBuilder() {
     </div>{/* left column */}
 
       {/* Live preview pane */}
-      <aside className="hidden lg:block lg:sticky lg:top-4 self-start">
-        <div className="card p-0 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
-            <span className="font-semibold">{isThai ? 'ตัวอย่าง A4 (สด)' : 'Live A4 preview'}</span>
-            {quotePreviewHtml && (
-              <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
-                {Math.round(quotePreviewScale * 100)}%
-              </span>
-            )}
-          </div>
-          {quotePreviewHtml ? (
-            <div ref={quotePreviewRef} className="max-h-[calc(100vh-7rem)] overflow-auto bg-slate-50 p-4">
-              <div
-                className="relative overflow-hidden rounded-sm bg-white shadow-xl ring-1 ring-slate-200"
-                style={{
-                  width: 794 * quotePreviewScale,
-                  height: 1123 * quotePreviewScale,
-                }}
-              >
-                <div
-                  style={{
-                    width: 794,
-                    height: 1123,
-                    transformOrigin: 'top left',
-                    transform: `scale(${quotePreviewScale})`,
-                  }}
-                >
-                  <iframe
-                    srcDoc={quotePreviewHtml}
-                    title={isThai ? 'ตัวอย่างใบเสนอราคา' : 'Quotation preview'}
-                    sandbox="allow-same-origin allow-scripts"
-                    className="block w-full rounded-sm border-0 bg-white"
-                    style={{ height: 1123 }}
-                  />
+      <aside className="hidden lg:sticky lg:top-4 lg:block self-start">
+        <div className="flex max-h-[calc(100vh-6rem)] min-h-[620px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-primary-700 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-100">
+              {(selectedTemplate?.swatches ?? ['bg-white', 'bg-blue-200', 'bg-blue-800']).slice(0, 3).map((swatch, index) => (
+                <span key={`${swatch}-${index}`} className={`h-3.5 w-3.5 shrink-0 rounded-full border border-slate-200 ${swatch}`} />
+              ))}
+              <div className="min-w-0 flex-1">
+                <label className="block text-[10px] font-semibold leading-3 text-slate-400">
+                  {isThai ? 'เทมเพลตใบเสนอราคา' : 'Quotation template'}
+                </label>
+                <div className="relative">
+                  <select
+                    value={form.templateId ?? STANDARD_TEMPLATE_VALUE}
+                    onChange={(event) => setForm({ ...form, templateId: event.target.value === STANDARD_TEMPLATE_VALUE ? null : event.target.value })}
+                    className="w-full appearance-none bg-transparent pr-6 text-xs font-semibold leading-5 text-slate-800 outline-none"
+                    disabled={!editable}
+                    aria-label={isThai ? 'เลือกเทมเพลตใบเสนอราคา' : 'Choose quotation template'}
+                  >
+                    <option value={STANDARD_TEMPLATE_VALUE}>
+                      {isThai ? 'มาตรฐาน - แบบราชการ A4' : 'Standard - official A4'}
+                    </option>
+                    {minimalTemplates.length > 0 && (
+                      <optgroup label={isThai ? 'เรียบง่าย / ทางการ' : 'Minimal / official'}>
+                        {minimalTemplates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {isThai ? template.nameTh : template.nameEn}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {cuteTemplates.length > 0 && (
+                      <optgroup label={isThai ? 'สีพาสเทล / ร้านค้า' : 'Pastel / shop'}>
+                        {cuteTemplates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {isThai ? template.nameTh : template.nameEn}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="p-6 text-sm text-slate-400">
-              {isThai ? 'กรอกรายการสินค้าอย่างน้อย 1 รายการเพื่อดูตัวอย่าง' : 'Add at least one item to see the preview.'}
+
+            <div className="flex shrink-0 items-center gap-2">
+              {quotePreviewLoading && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-2 py-1 text-xs font-semibold text-primary-700">
+                  <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-primary-400 border-t-transparent" />
+                  {isThai ? 'อัปเดต' : 'Updating'}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => void openCurrentPreviewPdf('download')}
+                disabled={!quotePreviewHtml || quotePreviewPdfBusy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {quotePreviewPdfBusy === 'download' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void openCurrentPreviewPdf('open')}
+                disabled={!quotePreviewHtml || quotePreviewPdfBusy !== null}
+                title={isThai ? 'เปิดแบบเต็มจอ' : 'Open fullscreen'}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {quotePreviewPdfBusy === 'open' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                <Eye className="h-3.5 w-3.5" />
+              </button>
             </div>
-          )}
+          </div>
+
+          <div ref={quotePreviewRef} className="flex flex-1 flex-col items-center overflow-auto bg-[radial-gradient(circle_at_top,#eef2ff_0,#f8fafc_42%,#eef2f7_100%)] p-5">
+            {quotePreviewError && (
+              <div className="mb-3 w-full max-w-2xl rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {quotePreviewError}
+              </div>
+            )}
+
+            {quotePreviewHtml ? (
+              <div className="rounded-3xl bg-white/70 p-4 shadow-inner ring-1 ring-slate-200/70">
+                <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+                  <span className="font-medium">{isThai ? 'ตัวอย่าง A4' : 'A4 preview'}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                    {Math.round(quotePreviewScale * 100)}%
+                  </span>
+                </div>
+                <div
+                  className="relative overflow-hidden rounded-sm bg-white shadow-xl"
+                  style={{
+                    width: 794 * quotePreviewScale,
+                    height: 1123 * quotePreviewScale,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 794,
+                      height: 1123,
+                      transformOrigin: 'top left',
+                      transform: `scale(${quotePreviewScale})`,
+                    }}
+                  >
+                    {quotePreviewLoading && (
+                      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-white/60">
+                        <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary-200 border-t-primary-500" />
+                      </div>
+                    )}
+                    <iframe
+                      srcDoc={quotePreviewHtml}
+                      title={isThai ? 'ตัวอย่างใบเสนอราคา' : 'Quotation preview'}
+                      sandbox="allow-same-origin allow-scripts"
+                      className="block w-full rounded-sm border-0 bg-white"
+                      style={{ height: 1123 }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : quotePreviewLoading ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-500" />
+                <p className="text-sm text-slate-500">{isThai ? 'กำลังโหลดตัวอย่าง...' : 'Loading preview...'}</p>
+              </div>
+            ) : (
+              <div className="flex w-full flex-1 items-start justify-center py-8">
+                <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-500">
+                    <Eye className="h-6 w-6" />
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-slate-900">
+                    {isThai ? 'พื้นที่ตัวอย่างใบเสนอราคา' : 'Quotation preview'}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    {isThai
+                      ? 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ แล้วตัวอย่าง PDF จะอัปเดตที่นี่'
+                      : 'Add at least one item to see the PDF-style preview here.'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </div>{/* grid */}
