@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (formal monochrome system default template)
+Last updated: 2026-06-02 (clickable sales-list rows + landing book-flip cards)
 
 ## Latest work (2026-06-02)
+
+Clickable sales-list rows + landing book-flip feature cards — shipped to prod (`3b4f06b`, `f6e4e3f`; CI Typecheck + Unit + Prod-smoke green; Vercel auto-deploy):
+- **Clickable rows:** InvoiceList (ใบกำกับภาษี/ใบเสร็จ — desktop table + mobile card) and RecurringInvoiceList (วางบิลซ้ำ) now open the row's view/edit page on a click anywhere in the row, matching the existing Quotation/DeliveryNote UX. Row handler uses a `closest('a,button,input,select,label,[role=button]')` guard so inline actions (Submit RD, Preview, Receipt, Pay, LINE, Cancel, PDF, Generate, Pause/Resume) still fire — cleaner than per-button stopPropagation.
+- **Landing Key Features:** retinted two uiverse effects to the navy/teal/gold theme — a graph-paper grid section backdrop and per-card book-cover flip-open reveal. Cover is a desktop hover enhancement only; touch / coarse-pointer / reduced-motion show the full card (copy never hidden). Decorative marketing surface only — no money/invoice cards touched.
+- **Management-fee question resolved (no code change):** the quotation management fee (`feePercent`/`feeLabel`) is already materialized as a real "ค่าบริหารงาน" line item with VAT on quotation→invoice conversion — both frontend `useInvoiceForm.hydrateFromQuotation` and backend `POST /api/quotations/:id/convert` (`quotations.ts:872`). This is the correct Thai e-Tax behavior (a fee must be a line, not a floating %, or subtotal/VAT/total won't reconcile and the RD XML is rejected). User confirmed the line appears correctly; no separate %-control on the invoice builder is wanted or standard.
+- **Docs:** CLAUDE.md corrected — removed the deleted `TemplateMarketplace.tsx` reference and "51 templates"; now describes the 8 curated `documentTemplatePresets` picked via the InvoiceBuilder preview-toolbar `<select>` and the single `pdfService/builders/standard.ts` base builder.
 
 Formal monochrome system default template — shipped and verified live on prod (`fe61c28`; Vercel `dpl_6od9YjjVhZgd8e3Cf1Yvq6q2XdV7`; Render deploy run `26776571731`):
 - **New system default:** documents without an explicit template now render with `builtin:minimal-dark-accent` (`ขาว-ดำ · ทางการ`) instead of the legacy blue fallback. The shared fallback covers invoice previews, saved invoice PDFs, quotation PDFs, and automatic document flows while preserving explicit user selections and company templates.
