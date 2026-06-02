@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, CalendarClock, FileText, Loader2, CheckCircle, XCircle, Clock, Receipt, Truck } from 'lucide-react';
+import { Plus, Search, CalendarClock, FileText, Loader2, CheckCircle, XCircle, Clock, Receipt, Truck, ExternalLink } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
@@ -16,6 +16,19 @@ const STATUS_LABELS: Record<DeliveryNoteStatus, { th: string; en: string; tone: 
 
 function itemCount(note: DeliveryNote) {
   return note.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+}
+
+function deliveredCount(note: DeliveryNote) {
+  return note.items?.reduce((sum, item) => sum + item.deliveredQty, 0) ?? 0;
+}
+
+function statusMeta(note: DeliveryNote) {
+  const ordered = itemCount(note);
+  const delivered = deliveredCount(note);
+  if (note.status === 'issued' && delivered > 0 && delivered < ordered) {
+    return { th: 'ส่งบางส่วน', en: 'Partial', tone: 'bg-amber-100 text-amber-800', icon: Truck };
+  }
+  return STATUS_LABELS[note.status];
 }
 
 export default function DeliveryNoteList() {
@@ -114,21 +127,21 @@ export default function DeliveryNoteList() {
           </button>
         </div>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full">
+        <div className="card overflow-x-auto p-0">
+          <table className="w-full min-w-[760px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header">{isThai ? 'เลขที่' : 'Number'}</th>
                 <th className="table-header">{isThai ? 'ลูกค้า' : 'Customer'}</th>
                 <th className="table-header">{isThai ? 'วันที่ส่ง' : 'Delivery date'}</th>
-                <th className="table-header text-right">{isThai ? 'จำนวน' : 'Qty'}</th>
-                <th className="table-header">{isThai ? 'Tracking' : 'Tracking'}</th>
+                <th className="table-header text-right">{isThai ? 'ส่ง / สั่ง' : 'Delivered / ordered'}</th>
+                <th className="table-header">{isThai ? 'การจัดส่ง' : 'Delivery'}</th>
                 <th className="table-header text-center">{isThai ? 'สถานะ' : 'Status'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {deliveryNotes.map((note) => {
-                const meta = STATUS_LABELS[note.status];
+                const meta = statusMeta(note);
                 const Icon = meta.icon;
                 return (
                   <tr key={note.id} onClick={() => navigate(`/app/delivery-notes/${note.id}`)} className="hover:bg-gray-50 cursor-pointer">
@@ -138,8 +151,22 @@ export default function DeliveryNoteList() {
                       <div className="text-xs text-gray-500">{note.buyer?.taxId ?? ''}</div>
                     </td>
                     <td className="table-cell text-sm text-gray-700">{note.deliveryDate.slice(0, 10)}</td>
-                    <td className="table-cell text-right font-medium">{itemCount(note)}</td>
-                    <td className="table-cell text-sm text-gray-500">{note.trackingNo || '—'}</td>
+                    <td className="table-cell text-right font-medium">{deliveredCount(note)} / {itemCount(note)}</td>
+                    <td className="table-cell text-sm text-gray-500">
+                      {note.carrierName && <div>{note.carrierName}</div>}
+                      {note.trackingUrl ? (
+                        <a
+                          href={note.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(event) => event.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-primary-700 hover:underline"
+                        >
+                          {note.trackingNo || (isThai ? 'เปิดลิงก์ติดตาม' : 'Open tracking')}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (note.trackingNo || '—')}
+                    </td>
                     <td className="table-cell text-center">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${meta.tone}`}>
                         <Icon className="w-3 h-3" />

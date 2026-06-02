@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Send, Plus, Trash2, CheckCircle,
   Loader2, AlertTriangle, ArrowRight, Clock, Receipt, Truck, Download, Printer,
+  Copy, ExternalLink, Eye, Share2, X,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -19,6 +20,7 @@ const STATUS_META: Record<DeliveryNoteStatus, { th: string; en: string; tone: st
 };
 
 interface ItemDraft {
+  id?: string;
   productId?: string | null;
   nameTh: string;
   nameEn?: string | null;
@@ -47,8 +49,10 @@ interface FormState {
   shippingAddress: string;
   contactName: string;
   contactPhone: string;
+  carrierName: string;
   vehicleNo: string;
   trackingNo: string;
+  trackingUrl: string;
   notes: string;
   deliveryTerms: string;
 }
@@ -58,6 +62,15 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 function computeAmount(item: ItemDraft) {
   if (item.unitPrice === undefined || item.unitPrice === null) return null;
   return +(item.quantity * item.unitPrice).toFixed(2);
+}
+
+type DeliveryProgress = 'not-started' | 'partial' | 'complete';
+
+function deliveryProgress(items: ItemDraft[]): DeliveryProgress {
+  const delivered = items.reduce((sum, item) => sum + Number(item.deliveredQty || 0), 0);
+  if (delivered <= 0) return 'not-started';
+  if (items.every((item) => Number(item.deliveredQty) === Number(item.quantity))) return 'complete';
+  return 'partial';
 }
 
 export default function DeliveryNoteBuilder() {
@@ -76,6 +89,7 @@ export default function DeliveryNoteBuilder() {
   const [pdfBusy, setPdfBusy] = useState<'open' | 'download' | null>(null);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [dnPreviewHtml, setDnPreviewHtml] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     buyerId: '',
@@ -86,8 +100,10 @@ export default function DeliveryNoteBuilder() {
     shippingAddress: '',
     contactName: '',
     contactPhone: '',
+    carrierName: '',
     vehicleNo: '',
     trackingNo: '',
+    trackingUrl: '',
     notes: '',
     deliveryTerms: '',
   });
@@ -110,6 +126,7 @@ export default function DeliveryNoteBuilder() {
             expectedDate: note.expectedDate ? note.expectedDate.slice(0, 10) : '',
             language: note.language,
             items: note.items.map((it) => ({
+              id: it.id,
               productId: it.productId ?? null,
               nameTh: it.nameTh,
               nameEn: it.nameEn ?? null,
@@ -122,8 +139,10 @@ export default function DeliveryNoteBuilder() {
             shippingAddress: note.shippingAddress ?? '',
             contactName: note.contactName ?? '',
             contactPhone: note.contactPhone ?? '',
+            carrierName: note.carrierName ?? '',
             vehicleNo: note.vehicleNo ?? '',
             trackingNo: note.trackingNo ?? '',
+            trackingUrl: note.trackingUrl ?? '',
             notes: note.notes ?? '',
             deliveryTerms: note.deliveryTerms ?? '',
           });
@@ -134,6 +153,11 @@ export default function DeliveryNoteBuilder() {
   }, [token, id, isNew]);
 
   const editable = isNew || existing?.status === 'draft';
+  const canEditProgress = editable || existing?.status === 'issued' || existing?.status === 'delivered';
+  const progress = useMemo(() => deliveryProgress(form.items), [form.items]);
+  const displayedStatus = existing?.status === 'issued' && progress === 'partial'
+    ? { th: 'ส่งบางส่วน', en: 'Partially delivered', tone: 'bg-amber-100 text-amber-800' }
+    : existing ? STATUS_META[existing.status] : null;
   const totals = useMemo(() => {
     const qty = +form.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0).toFixed(2);
     const deliveredQty = +form.items.reduce((sum, item) => sum + Number(item.deliveredQty || 0), 0).toFixed(2);
@@ -168,7 +192,7 @@ export default function DeliveryNoteBuilder() {
         const res = await fetch('/api/delivery-notes/preview', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(buildBody()),
+          body: JSON.stringify(buildBody({ includeBuyer: true })),
         });
         if (res.ok) setDnPreviewHtml(await res.text());
       } catch { /* preview is best-effort, never blocks editing */ }
@@ -177,10 +201,10 @@ export default function DeliveryNoteBuilder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, form]);
 
-  // Body shared by save + live preview (excludes buyerId; preview uses a
-  // sample buyer, save adds the real buyerId).
-  function buildBody() {
+  // Preview resolves the selected buyer while save adds the required buyerId.
+  function buildBody(options: { includeBuyer?: boolean } = {}) {
     return {
+        ...(options.includeBuyer && form.buyerId ? { buyerId: form.buyerId } : {}),
         deliveryDate: form.deliveryDate,
         expectedDate: form.expectedDate || null,
         language: form.language,
@@ -197,8 +221,10 @@ export default function DeliveryNoteBuilder() {
         shippingAddress: form.shippingAddress || null,
         contactName: form.contactName || null,
         contactPhone: form.contactPhone || null,
+        carrierName: form.carrierName || null,
         vehicleNo: form.vehicleNo || null,
         trackingNo: form.trackingNo || null,
+        trackingUrl: form.trackingUrl || null,
         notes: form.notes || null,
         deliveryTerms: form.deliveryTerms || null,
     };
@@ -262,6 +288,51 @@ export default function DeliveryNoteBuilder() {
     } finally {
       setActing(false);
     }
+  }
+
+  async function saveDeliveryProgress() {
+    if (!token || !id) return;
+    setActing(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/delivery-notes/${id}/progress`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          carrierName: form.carrierName || null,
+          vehicleNo: form.vehicleNo || null,
+          trackingNo: form.trackingNo || null,
+          trackingUrl: form.trackingUrl || null,
+          items: form.items.flatMap((item) => item.id ? [{ id: item.id, deliveredQty: Number(item.deliveredQty) }] : []),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(surfaceError(json));
+      setExisting(json.data);
+      setMsg({ type: 'ok', text: isThai ? 'บันทึกข้อมูลจัดส่งแล้ว' : 'Delivery progress saved' });
+    } catch (e) {
+      setMsg({ type: 'err', text: (e as Error).message });
+    } finally {
+      setActing(false);
+    }
+  }
+
+  function trackingMessage() {
+    return [
+      isThai ? `แจ้งสถานะจัดส่ง ${existing?.deliveryNoteNumber ?? ''}` : `Delivery update ${existing?.deliveryNoteNumber ?? ''}`,
+      form.carrierName ? `${isThai ? 'ผู้ให้บริการขนส่ง' : 'Carrier'}: ${form.carrierName}` : '',
+      form.trackingNo ? `${isThai ? 'เลขติดตาม / เลขใบงาน' : 'Tracking no.'}: ${form.trackingNo}` : '',
+      form.trackingUrl,
+    ].filter(Boolean).join('\n');
+  }
+
+  async function copyTracking() {
+    await navigator.clipboard.writeText(trackingMessage());
+    setMsg({ type: 'ok', text: isThai ? 'คัดลอกข้อความติดตามแล้ว' : 'Tracking message copied' });
+  }
+
+  function shareTrackingViaLine() {
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(trackingMessage())}`, '_blank', 'noopener,noreferrer');
   }
 
   async function convertToInvoice() {
@@ -331,17 +402,23 @@ export default function DeliveryNoteBuilder() {
             <h1 className="text-2xl font-bold text-gray-900">
               {isNew ? (isThai ? 'สร้างใบส่งของ' : 'New delivery note') : existing?.deliveryNoteNumber}
             </h1>
-            {existing && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_META[existing.status].tone}`}>
+            {existing && displayedStatus && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${displayedStatus.tone}`}>
                 <Clock className="w-3 h-3" />
-                {isThai ? STATUS_META[existing.status].th : STATUS_META[existing.status].en}
+                {isThai ? displayedStatus.th : displayedStatus.en}
               </span>
             )}
           </div>
         </div>
 
         {editable ? (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {dnPreviewHtml && (
+              <button onClick={() => setPreviewOpen(true)} className="btn-secondary lg:hidden">
+                <Eye className="w-4 h-4" />
+                {isThai ? 'ดูตัวอย่าง' : 'Preview'}
+              </button>
+            )}
             <button onClick={() => save('draft')} disabled={saving} className="btn-secondary">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {isThai ? 'บันทึกแบบร่าง' : 'Save draft'}
@@ -353,6 +430,12 @@ export default function DeliveryNoteBuilder() {
           </div>
         ) : existing && (
           <div className="flex gap-2 flex-wrap">
+            {canEditProgress && (
+              <button onClick={saveDeliveryProgress} disabled={acting} className="btn-secondary">
+                {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isThai ? 'บันทึกการจัดส่ง' : 'Save delivery'}
+              </button>
+            )}
             <button onClick={() => openPdf('open')} disabled={pdfBusy !== null} className="btn-secondary">
               {pdfBusy === 'open' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
               {isThai ? 'เปิด/พิมพ์ PDF' : 'Open / print PDF'}
@@ -362,12 +445,22 @@ export default function DeliveryNoteBuilder() {
               {isThai ? 'ดาวน์โหลด' : 'Download'}
             </button>
             {existing.status === 'issued' && (
-              <button onClick={() => changeStatus('delivered')} disabled={acting} className="btn-secondary">
+              <button
+                onClick={() => changeStatus('delivered')}
+                disabled={acting || progress !== 'complete'}
+                title={progress !== 'complete' ? (isThai ? 'กรอกจำนวนส่งให้ครบก่อน' : 'Complete delivered quantities first') : undefined}
+                className="btn-secondary"
+              >
                 <CheckCircle className="w-4 h-4 text-emerald-600" /> {isThai ? 'ส่งของครบแล้ว' : 'Mark delivered'}
               </button>
             )}
             {(existing.status === 'issued' || existing.status === 'delivered') && (
-              <button onClick={convertToInvoice} disabled={acting} className="btn-primary">
+              <button
+                onClick={convertToInvoice}
+                disabled={acting || progress !== 'complete'}
+                title={progress !== 'complete' ? (isThai ? 'ส่งของให้ครบก่อนออกใบกำกับภาษี' : 'Complete delivery before converting') : undefined}
+                className="btn-primary"
+              >
                 {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 {isThai ? 'ออกใบกำกับภาษี' : 'Convert to tax invoice'}
               </button>
@@ -382,6 +475,22 @@ export default function DeliveryNoteBuilder() {
                 <Trash2 className="w-4 h-4" /> {isThai ? 'ยกเลิก' : 'Cancel'}
               </button>
             )}
+            {(form.trackingNo || form.trackingUrl) && (
+              <>
+                <button onClick={copyTracking} className="btn-secondary" title={isThai ? 'คัดลอกข้อความติดตาม' : 'Copy tracking message'}>
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button onClick={shareTrackingViaLine} className="btn-secondary">
+                  <Share2 className="w-4 h-4" />
+                  LINE
+                </button>
+                {form.trackingUrl && (
+                  <a href={form.trackingUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary" title={isThai ? 'เปิดลิงก์ติดตาม' : 'Open tracking link'}>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -390,6 +499,12 @@ export default function DeliveryNoteBuilder() {
         <div className={`flex items-start gap-2 text-sm p-3 rounded-lg ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
           {msg.type === 'ok' ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
           <span>{msg.text}</span>
+        </div>
+      )}
+      {existing?.status === 'issued' && progress === 'partial' && (
+        <div className="flex items-start gap-2 border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Truck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>{isThai ? 'กำลังส่งบางส่วน บันทึกจำนวนส่งจริงให้ครบก่อนออกใบกำกับภาษี' : 'Partially delivered. Save the completed quantities before converting to a tax invoice.'}</span>
         </div>
       )}
 
@@ -441,10 +556,6 @@ export default function DeliveryNoteBuilder() {
           <label className="label">{isThai ? 'โทรศัพท์' : 'Phone'}</label>
           <input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} className="input-field" disabled={!editable} />
         </div>
-        <div>
-          <label className="label">Tracking</label>
-          <input value={form.trackingNo} onChange={(e) => setForm({ ...form, trackingNo: e.target.value })} className="input-field" disabled={!editable} />
-        </div>
       </div>
 
       <div className="card">
@@ -456,6 +567,7 @@ export default function DeliveryNoteBuilder() {
             </button>
           )}
         </div>
+        <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead className="text-xs text-gray-500 uppercase">
             <tr>
@@ -480,7 +592,7 @@ export default function DeliveryNoteBuilder() {
                     <input type="number" min="0" step="0.01" value={item.quantity} onChange={(e) => setItem(idx, { quantity: Number(e.target.value), deliveredQty: Number(e.target.value) })} className="input-field text-sm text-right" disabled={!editable} />
                   </td>
                   <td className="py-2 pr-2">
-                    <input type="number" min="0" step="0.01" value={item.deliveredQty} onChange={(e) => setItem(idx, { deliveredQty: Number(e.target.value) })} className="input-field text-sm text-right" disabled={!editable} />
+                    <input type="number" min="0" max={item.quantity} step="0.01" value={item.deliveredQty} onChange={(e) => setItem(idx, { deliveredQty: Number(e.target.value) })} className="input-field text-sm text-right" disabled={!canEditProgress} />
                   </td>
                   <td className="py-2 pr-2">
                     <input value={item.unit} onChange={(e) => setItem(idx, { unit: e.target.value })} className="input-field text-sm" disabled={!editable} />
@@ -499,6 +611,43 @@ export default function DeliveryNoteBuilder() {
             })}
           </tbody>
         </table>
+        </div>
+        <div className="space-y-3 md:hidden">
+          {form.items.map((item, idx) => {
+            const amount = computeAmount(item);
+            return (
+              <div key={idx} className="border border-slate-200 p-3">
+                <div className="mb-3 flex items-start gap-2">
+                  <span className="mt-2 text-xs font-semibold text-slate-400">{idx + 1}</span>
+                  <input value={item.nameTh} onChange={(e) => setItem(idx, { nameTh: e.target.value })} placeholder={isThai ? 'ชื่อรายการ' : 'Item name'} className="input-field text-sm" disabled={!editable} />
+                  {editable && <DeleteButton onClick={() => removeItem(idx)} label={isThai ? 'ลบรายการ' : 'Remove item'} size="sm" />}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="label">{isThai ? 'จำนวนสั่ง' : 'Ordered'}</label>
+                    <input type="number" min="0" step="0.01" value={item.quantity} onChange={(e) => setItem(idx, { quantity: Number(e.target.value), deliveredQty: Number(e.target.value) })} className="input-field text-right" disabled={!editable} />
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'จำนวนส่งจริง' : 'Delivered'}</label>
+                    <input type="number" min="0" max={item.quantity} step="0.01" value={item.deliveredQty} onChange={(e) => setItem(idx, { deliveredQty: Number(e.target.value) })} className="input-field text-right" disabled={!canEditProgress} />
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'หน่วย' : 'Unit'}</label>
+                    <input value={item.unit} onChange={(e) => setItem(idx, { unit: e.target.value })} className="input-field" disabled={!editable} />
+                  </div>
+                  <div>
+                    <label className="label">{isThai ? 'ราคา/หน่วย' : 'Unit price'}</label>
+                    <input type="number" min="0" step="0.01" value={item.unitPrice ?? ''} onChange={(e) => setItem(idx, { unitPrice: e.target.value === '' ? null : Number(e.target.value) })} className="input-field text-right" disabled={!editable} />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-between border-t border-slate-100 pt-2 text-sm">
+                  <span className="text-slate-500">{isThai ? 'มูลค่า' : 'Amount'}</span>
+                  <span className="font-semibold">{amount === null ? '—' : formatCurrency(amount)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
         <div className="border-t border-gray-200 mt-4 pt-3 space-y-1 text-sm">
           <div className="flex justify-between"><span className="text-gray-500">{isThai ? 'จำนวนสั่งรวม' : 'Ordered qty'}</span><span>{totals.qty}</span></div>
           <div className="flex justify-between"><span className="text-gray-500">{isThai ? 'จำนวนส่งรวม' : 'Delivered qty'}</span><span>{totals.deliveredQty}</span></div>
@@ -510,9 +659,27 @@ export default function DeliveryNoteBuilder() {
       </div>
 
       <div className="card grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2">
+          <h3 className="font-semibold text-gray-900">{isThai ? 'ข้อมูลติดตามการจัดส่ง' : 'Delivery tracking'}</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {isThai ? 'เพิ่มภายหลังได้เมื่อบริษัทขนส่งแจ้งเลขติดตามหรือเลขใบงาน' : 'You can add these later when the carrier provides a tracking or job number.'}
+          </p>
+        </div>
         <div>
-          <label className="label">{isThai ? 'ทะเบียนรถ / ผู้ขนส่ง' : 'Vehicle / carrier'}</label>
-          <input value={form.vehicleNo} onChange={(e) => setForm({ ...form, vehicleNo: e.target.value })} className="input-field" disabled={!editable} />
+          <label className="label">{isThai ? 'ผู้ให้บริการขนส่ง' : 'Carrier'}</label>
+          <input value={form.carrierName} onChange={(e) => setForm({ ...form, carrierName: e.target.value })} placeholder={isThai ? 'เช่น Flash, Kerry, รถบริษัท' : 'e.g. Flash, Kerry, company vehicle'} className="input-field" disabled={!canEditProgress} />
+        </div>
+        <div>
+          <label className="label">{isThai ? 'ทะเบียนรถ' : 'Vehicle registration'}</label>
+          <input value={form.vehicleNo} onChange={(e) => setForm({ ...form, vehicleNo: e.target.value })} className="input-field" disabled={!canEditProgress} />
+        </div>
+        <div>
+          <label className="label">{isThai ? 'เลขติดตาม / เลขใบงานขนส่ง' : 'Tracking / delivery job no.'}</label>
+          <input value={form.trackingNo} onChange={(e) => setForm({ ...form, trackingNo: e.target.value })} placeholder={isThai ? 'เช่น TH123456789 หรือ JOB-001' : 'e.g. TH123456789 or JOB-001'} className="input-field" disabled={!canEditProgress} />
+        </div>
+        <div>
+          <label className="label">{isThai ? 'ลิงก์ติดตาม' : 'Tracking link'}</label>
+          <input type="url" value={form.trackingUrl} onChange={(e) => setForm({ ...form, trackingUrl: e.target.value })} placeholder="https://..." className="input-field" disabled={!canEditProgress} />
         </div>
         <div>
           <label className="label">{isThai ? 'เงื่อนไขการส่งของ' : 'Delivery terms'}</label>
@@ -553,6 +720,27 @@ export default function DeliveryNoteBuilder() {
         </div>
       </aside>
     </div>{/* grid */}
+    {previewOpen && dnPreviewHtml && (
+      <div className="fixed inset-0 z-50 bg-slate-950/60 p-3 lg:hidden">
+        <div className="mx-auto flex h-full max-w-2xl flex-col bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+            <div>
+              <h2 className="font-semibold text-slate-900">{isThai ? 'ตัวอย่างใบส่งของ' : 'Delivery note preview'}</h2>
+              <p className="text-xs text-slate-500">{isThai ? 'เลื่อนดูเอกสาร A4 ก่อนบันทึก' : 'Scroll through the A4 document before saving.'}</p>
+            </div>
+            <button onClick={() => setPreviewOpen(false)} className="p-2 text-slate-500 hover:text-slate-900" title={isThai ? 'ปิด' : 'Close'}>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <iframe
+            srcDoc={dnPreviewHtml}
+            title={isThai ? 'ตัวอย่างใบส่งของบนมือถือ' : 'Mobile delivery note preview'}
+            sandbox="allow-same-origin allow-scripts"
+            className="block min-h-0 flex-1 w-full border-0 bg-white"
+          />
+        </div>
+      </div>
+    )}
     <CustomerFormModal
       open={showAddCustomer}
       onClose={() => setShowAddCustomer(false)}

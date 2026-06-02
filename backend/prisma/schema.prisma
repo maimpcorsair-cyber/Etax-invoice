@@ -931,8 +931,10 @@ model DeliveryNote {
   shippingAddress String?
   contactName     String?
   contactPhone    String?
+  carrierName     String?
   vehicleNo       String?
   trackingNo      String?
+  trackingUrl     String?
 
   notes         String?
   deliveryTerms String?

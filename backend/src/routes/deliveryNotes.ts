@@ -6,6 +6,10 @@ import { withInvoiceLock, withRlsContext, tenantRlsContext } from '../config/rls
 import { generatePdfFromHtml } from '../services/pdfService';
 import { escapeHtml, formatCurrency, formatDateEn, formatDateTh } from '../services/pdfService/utils';
 import { generateInvoiceNumber } from '../services/invoiceService';
+import {
+  deliveryProgressState,
+  validateDeliveryQuantities,
+} from '../services/deliveryNoteProgress';
 
 // ใบส่งของ (Delivery Note) — operational delivery document.
 // Not a tax document. No e-Tax submission, no VAT remittance obligation.
@@ -24,6 +28,18 @@ const itemSchema = z.object({
   unit: z.string().max(50),
   unitPrice: z.number().nonnegative().optional().nullable(),
   vatType: z.enum(['vat7', 'vatExempt', 'vatZero']).default('vat7'),
+}).superRefine((item, ctx) => {
+  const error = validateDeliveryQuantities([{
+    quantity: item.quantity,
+    deliveredQty: item.deliveredQty ?? item.quantity,
+  }]);
+  if (error) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['deliveredQty'],
+      message: error,
+    });
+  }
 });
 
 const deliveryNoteCreateSchema = z.object({
@@ -38,8 +54,10 @@ const deliveryNoteCreateSchema = z.object({
   shippingAddress: z.string().max(1000).optional().nullable(),
   contactName: z.string().max(200).optional().nullable(),
   contactPhone: z.string().max(50).optional().nullable(),
+  carrierName: z.string().max(120).optional().nullable(),
   vehicleNo: z.string().max(100).optional().nullable(),
   trackingNo: z.string().max(100).optional().nullable(),
+  trackingUrl: z.string().url('ลิงก์ติดตามต้องขึ้นต้นด้วย http:// หรือ https://').max(500).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
   deliveryTerms: z.string().max(500).optional().nullable(),
 });
@@ -48,7 +66,21 @@ const deliveryNoteCreateSchema = z.object({
 // mirroring the invoice + quotation builders.
 const deliveryNotePreviewSchema = deliveryNoteCreateSchema
   .omit({ buyerId: true })
-  .extend({ deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+  .extend({
+    buyerId: z.string().optional(),
+    deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  });
+
+const deliveryNoteProgressSchema = z.object({
+  carrierName: z.string().max(120).optional().nullable(),
+  vehicleNo: z.string().max(100).optional().nullable(),
+  trackingNo: z.string().max(100).optional().nullable(),
+  trackingUrl: z.string().url('ลิงก์ติดตามต้องขึ้นต้นด้วย http:// หรือ https://').max(500).optional().nullable(),
+  items: z.array(z.object({
+    id: z.string().min(1),
+    deliveredQty: z.number().nonnegative(),
+  })).optional(),
+});
 
 function computeAmount(input: z.infer<typeof itemSchema>) {
   if (input.unitPrice === undefined || input.unitPrice === null) return null;
@@ -141,8 +173,10 @@ function buildDeliveryNoteHtml(note: {
   shippingAddress: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  carrierName: string | null;
   vehicleNo: string | null;
   trackingNo: string | null;
+  trackingUrl: string | null;
   notes: string | null;
   deliveryTerms: string | null;
   quotation?: { quotationNumber: string } | null;
@@ -171,8 +205,10 @@ function buildDeliveryNoteHtml(note: {
     shipping: isEn ? 'Shipping details' : 'รายละเอียดการจัดส่ง',
     contact: isEn ? 'Contact' : 'ผู้รับสินค้า',
     phone: isEn ? 'Phone' : 'โทรศัพท์',
-    vehicle: isEn ? 'Vehicle / carrier' : 'ทะเบียนรถ / ผู้ขนส่ง',
-    tracking: isEn ? 'Tracking' : 'Tracking',
+    carrier: isEn ? 'Carrier' : 'ผู้ให้บริการขนส่ง',
+    vehicle: isEn ? 'Vehicle' : 'ทะเบียนรถ',
+    tracking: isEn ? 'Tracking no.' : 'เลขติดตาม / เลขใบงาน',
+    trackingUrl: isEn ? 'Tracking link' : 'ลิงก์ติดตาม',
     reference: isEn ? 'Reference' : 'เอกสารอ้างอิง',
     item: isEn ? 'Item' : 'รายการ',
     ordered: isEn ? 'Ordered' : 'จำนวนสั่ง',
@@ -285,7 +321,9 @@ function buildDeliveryNoteHtml(note: {
     <h2>${labels.shipping}</h2>
     <div>${escapeHtml(note.shippingAddress || buyerAddress)}</div>
     <div class="muted">${labels.contact}: ${escapeHtml(note.contactName || '-')} · ${labels.phone}: ${escapeHtml(note.contactPhone || '-')}</div>
-    <div class="muted">${labels.vehicle}: ${escapeHtml(note.vehicleNo || '-')} · ${labels.tracking}: ${escapeHtml(note.trackingNo || '-')}</div>
+    <div class="muted">${labels.carrier}: ${escapeHtml(note.carrierName || '-')} · ${labels.vehicle}: ${escapeHtml(note.vehicleNo || '-')}</div>
+    <div class="muted">${labels.tracking}: ${escapeHtml(note.trackingNo || '-')}</div>
+    ${note.trackingUrl ? `<div class="muted">${labels.trackingUrl}: ${escapeHtml(note.trackingUrl)}</div>` : ''}
     <div class="muted">${labels.reference}: ${escapeHtml(reference)}</div>
   </section>
 
@@ -338,6 +376,7 @@ deliveryNotesRouter.get('/', async (req, res) => {
         { deliveryNoteNumber: { contains: search, mode: 'insensitive' } },
         { buyer: { is: { nameTh: { contains: search, mode: 'insensitive' } } } },
         { buyer: { is: { nameEn: { contains: search, mode: 'insensitive' } } } },
+        { carrierName: { contains: search, mode: 'insensitive' } },
         { trackingNo: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -411,14 +450,23 @@ deliveryNotesRouter.post('/preview', async (req, res) => {
         phone: true, email: true, website: true, logoUrl: true,
       },
     });
+    const selectedBuyer = body.buyerId
+      ? await prisma.customer.findFirst({
+          where: { id: body.buyerId, companyId: req.user!.companyId },
+        })
+      : null;
+    if (body.buyerId && !selectedBuyer) {
+      res.status(404).json({ error: 'Buyer (customer) not found in your company' });
+      return;
+    }
     const note = {
-      deliveryNoteNumber: 'PREVIEW-001',
+      deliveryNoteNumber: body.language === 'en' ? 'Pending issue' : 'รอออกเลข',
       language: body.language,
       deliveryDate: body.deliveryDate ? new Date(`${body.deliveryDate}T00:00:00.000Z`) : new Date(),
       expectedDate: body.expectedDate ? new Date(`${body.expectedDate}T00:00:00.000Z`) : null,
       deliveredAt: null,
       seller: (company ?? {}) as object,
-      buyer: {
+      buyer: selectedBuyer ?? {
         nameTh: 'ลูกค้าตัวอย่าง', nameEn: 'Sample Customer', taxId: '0000000000000',
         branchCode: '00000', addressTh: 'ที่อยู่ตัวอย่าง', addressEn: 'Sample Address',
       },
@@ -437,8 +485,10 @@ deliveryNotesRouter.post('/preview', async (req, res) => {
       shippingAddress: body.shippingAddress ?? null,
       contactName: body.contactName ?? null,
       contactPhone: body.contactPhone ?? null,
+      carrierName: body.carrierName ?? null,
       vehicleNo: body.vehicleNo ?? null,
       trackingNo: body.trackingNo ?? null,
+      trackingUrl: body.trackingUrl ?? null,
       notes: body.notes ?? null,
       deliveryTerms: body.deliveryTerms ?? null,
       quotation: null,
@@ -616,8 +666,10 @@ deliveryNotesRouter.post('/', async (req, res) => {
         shippingAddress: body.shippingAddress ?? buyer.addressTh ?? null,
         contactName: body.contactName ?? buyer.contactPerson ?? null,
         contactPhone: body.contactPhone ?? buyer.phone ?? null,
+        carrierName: body.carrierName ?? null,
         vehicleNo: body.vehicleNo ?? null,
         trackingNo: body.trackingNo ?? null,
+        trackingUrl: body.trackingUrl ?? null,
         notes: body.notes ?? null,
         deliveryTerms: body.deliveryTerms ?? null,
         createdBy: req.user!.userId,
@@ -710,8 +762,10 @@ deliveryNotesRouter.patch('/:id', async (req, res) => {
         ...(body.shippingAddress !== undefined ? { shippingAddress: body.shippingAddress ?? null } : {}),
         ...(body.contactName !== undefined ? { contactName: body.contactName ?? null } : {}),
         ...(body.contactPhone !== undefined ? { contactPhone: body.contactPhone ?? null } : {}),
+        ...(body.carrierName !== undefined ? { carrierName: body.carrierName ?? null } : {}),
         ...(body.vehicleNo !== undefined ? { vehicleNo: body.vehicleNo ?? null } : {}),
         ...(body.trackingNo !== undefined ? { trackingNo: body.trackingNo ?? null } : {}),
+        ...(body.trackingUrl !== undefined ? { trackingUrl: body.trackingUrl ?? null } : {}),
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.deliveryTerms !== undefined ? { deliveryTerms: body.deliveryTerms ?? null } : {}),
         ...(itemsUpdate ? { items: itemsUpdate } : {}),
@@ -729,6 +783,70 @@ deliveryNotesRouter.patch('/:id', async (req, res) => {
   }
 });
 
+deliveryNotesRouter.patch('/:id/progress', async (req, res) => {
+  try {
+    const body = deliveryNoteProgressSchema.parse(req.body);
+    const existing = await prisma.deliveryNote.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      include: { items: true },
+    });
+    if (!existing) {
+      res.status(404).json({ error: 'Delivery note not found' });
+      return;
+    }
+    if (['cancelled', 'converted'].includes(existing.status)) {
+      res.status(400).json({ error: `Cannot update delivery progress in status '${existing.status}'` });
+      return;
+    }
+
+    const deliveredById = new Map((body.items ?? []).map((item) => [item.id, item.deliveredQty]));
+    if ([...deliveredById.keys()].some((id) => !existing.items.some((item) => item.id === id))) {
+      res.status(400).json({ error: 'Delivery item not found in this delivery note' });
+      return;
+    }
+    const mergedItems = existing.items.map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      deliveredQty: deliveredById.get(item.id) ?? item.deliveredQty,
+    }));
+    const quantityError = validateDeliveryQuantities(mergedItems);
+    if (quantityError) {
+      res.status(400).json({ error: quantityError });
+      return;
+    }
+    if (existing.status === 'delivered' && deliveryProgressState(mergedItems) !== 'complete') {
+      res.status(400).json({ error: 'Cannot reduce delivered quantities after marking the delivery as complete' });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await Promise.all(mergedItems.map((item) => tx.deliveryNoteItem.update({
+        where: { id: item.id },
+        data: { deliveredQty: item.deliveredQty },
+      })));
+      return tx.deliveryNote.update({
+        where: { id: existing.id },
+        data: {
+          ...(body.carrierName !== undefined ? { carrierName: body.carrierName ?? null } : {}),
+          ...(body.vehicleNo !== undefined ? { vehicleNo: body.vehicleNo ?? null } : {}),
+          ...(body.trackingNo !== undefined ? { trackingNo: body.trackingNo ?? null } : {}),
+          ...(body.trackingUrl !== undefined ? { trackingUrl: body.trackingUrl ?? null } : {}),
+        },
+        include: { items: true, buyer: true },
+      });
+    });
+
+    res.json({ data: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.issues });
+      return;
+    }
+    logger.error('update delivery progress failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to update delivery progress' });
+  }
+});
+
 const statusSchema = z.object({
   status: z.enum(['draft', 'issued', 'delivered', 'cancelled']),
   reason: z.string().max(500).optional(),
@@ -739,6 +857,7 @@ deliveryNotesRouter.post('/:id/status', async (req, res) => {
     const body = statusSchema.parse(req.body);
     const existing = await prisma.deliveryNote.findFirst({
       where: { id: req.params.id, companyId: req.user!.companyId },
+      include: { items: true },
     });
     if (!existing) {
       res.status(404).json({ error: 'Delivery note not found' });
@@ -746,6 +865,10 @@ deliveryNotesRouter.post('/:id/status', async (req, res) => {
     }
     if (existing.status === 'converted') {
       res.status(400).json({ error: 'Delivery note already converted to an invoice — cannot change status' });
+      return;
+    }
+    if (body.status === 'delivered' && deliveryProgressState(existing.items) !== 'complete') {
+      res.status(400).json({ error: 'Cannot mark delivered until every delivered quantity matches the ordered quantity' });
       return;
     }
 
@@ -788,13 +911,26 @@ deliveryNotesRouter.post('/:id/convert-to-invoice', async (req, res) => {
       res.status(400).json({ error: 'Cannot convert a cancelled delivery note' });
       return;
     }
+    if (!['issued', 'delivered'].includes(existing.status)) {
+      res.status(400).json({ error: 'Issue the delivery note before converting it to an invoice' });
+      return;
+    }
+    const quantityError = validateDeliveryQuantities(existing.items);
+    if (quantityError) {
+      res.status(400).json({ error: quantityError });
+      return;
+    }
+    if (deliveryProgressState(existing.items) !== 'complete') {
+      res.status(400).json({ error: 'Complete all delivered quantities before converting to an invoice' });
+      return;
+    }
 
     // Use the proper per-tenant invoice number sequence. Timestamp-based
     // suffixes collide under bursts (two converts in the same ms).
     const invoiceNumber = await generateInvoiceNumber(req.user!.companyId, 'tax_invoice');
     const invoiceItems = existing.items.map((item) => {
       const unitPrice = item.unitPrice ?? 0;
-      const amount = +(item.quantity * unitPrice).toFixed(2);
+      const amount = +(item.deliveredQty * unitPrice).toFixed(2);
       const vatAmount = item.vatType === 'vat7' ? +(amount * 0.07).toFixed(2) : 0;
       return {
         productId: item.productId,
@@ -802,7 +938,7 @@ deliveryNotesRouter.post('/:id/convert-to-invoice', async (req, res) => {
         nameEn: item.nameEn,
         descriptionTh: item.descriptionTh,
         descriptionEn: item.descriptionEn,
-        quantity: item.quantity,
+        quantity: item.deliveredQty,
         unit: item.unit,
         unitPrice,
         discountAmount: 0,

@@ -417,8 +417,10 @@ export interface DeliveryNote {
   shippingAddress?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
+  carrierName?: string | null;
   vehicleNo?: string | null;
   trackingNo?: string | null;
+  trackingUrl?: string | null;
   notes?: string | null;
   deliveryTerms?: string | null;
   quotationId?: string | null;

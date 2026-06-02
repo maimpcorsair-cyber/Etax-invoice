@@ -36,7 +36,9 @@ interface DeliveryNoteRow {
   deliveryNoteNumber: string;
   status: string;
   deliveryDate: string;
+  carrierName: string | null;
   trackingNo: string | null;
+  trackingUrl: string | null;
 }
 
 export default function CustomerPortalDashboard() {
@@ -251,7 +253,7 @@ export default function CustomerPortalDashboard() {
                   <tr>
                     <th className="text-left text-xs uppercase text-slate-500 px-4 py-2">เลขที่</th>
                     <th className="text-left text-xs uppercase text-slate-500 px-4 py-2">วันที่ส่ง</th>
-                    <th className="text-left text-xs uppercase text-slate-500 px-4 py-2">เลขพัสดุ</th>
+                    <th className="text-left text-xs uppercase text-slate-500 px-4 py-2">การจัดส่ง</th>
                     <th className="text-center text-xs uppercase text-slate-500 px-4 py-2">สถานะ</th>
                   </tr>
                 </thead>
@@ -260,7 +262,20 @@ export default function CustomerPortalDashboard() {
                     <tr key={dn.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-mono text-sm font-semibold text-primary-700">{dn.deliveryNoteNumber}</td>
                       <td className="px-4 py-3 text-sm">{dn.deliveryDate.slice(0, 10)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{dn.trackingNo ?? '—'}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">
+                        {dn.carrierName && <div>{dn.carrierName}</div>}
+                        {dn.trackingUrl ? (
+                          <a
+                            href={dn.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary-700 hover:underline"
+                          >
+                            {dn.trackingNo ?? 'เปิดลิงก์ติดตาม'}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (dn.trackingNo ?? '—')}
+                      </td>
                       <td className="px-4 py-3 text-center text-xs">{dn.status}</td>
                     </tr>
                   ))}

@@ -203,7 +203,7 @@ customerPortalRouter.get('/documents', requirePortalSession, async (req, res) =>
           orderBy: { deliveryDate: 'desc' },
           select: {
             id: true, deliveryNoteNumber: true, status: true,
-            deliveryDate: true, trackingNo: true,
+            deliveryDate: true, carrierName: true, trackingNo: true, trackingUrl: true,
           },
           take: 100,
         }),
