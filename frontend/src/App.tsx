@@ -39,6 +39,7 @@ const OpsDsrQueue = React.lazy(() => import('./pages/OpsDsrQueue'));
 const AccountPrivacy = React.lazy(() => import('./pages/AccountPrivacy'));
 const CancelDelete = React.lazy(() => import('./pages/CancelDelete'));
 const Financials = React.lazy(() => import('./pages/Financials'));
+const FinanceOverview = React.lazy(() => import('./pages/FinanceOverview'));
 const AcceptInvite = React.lazy(() => import('./pages/AcceptInvite'));
 const Reconciliation = React.lazy(() => import('./pages/Reconciliation'));
 const Employees = React.lazy(() => import('./pages/Employees'));
@@ -221,6 +222,7 @@ export default function App() {
             <Route path="audit" element={<AuditLogs />} />
             <Route path="plan" element={<PlanPage />} />
             <Route path="account/privacy" element={<AccountPrivacy />} />
+            <Route path="reports/finance-overview" element={<FinanceOverview />} />
             <Route path="reports/financials" element={<Financials />} />
             <Route path="reports/reconciliation" element={<Reconciliation />} />
             <Route path="payroll/employees" element={<Employees />} />

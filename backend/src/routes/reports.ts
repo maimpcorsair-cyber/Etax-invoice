@@ -152,6 +152,98 @@ const balanceSheetSchema = z.object({
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+// ── GET /api/reports/finance-overview ────────────────────────────────
+// One consolidated "CFO view" payload: cashflow (real money in/out this
+// period), P&L summary, AR/AP aging, VAT position, and a 6-month revenue
+// trend. Aggregates existing docs — no journal/double-entry.
+function emptyAging() {
+  return { current: 0, days1_30: 0, days31_60: 0, days61_90: 0, days90plus: 0 };
+}
+function bucketInto(aging: ReturnType<typeof emptyAging>, dueRef: Date, amount: number, today: number) {
+  const daysOverdue = Math.floor((today - new Date(dueRef).getTime()) / 86400_000);
+  if (daysOverdue <= 0) aging.current += amount;
+  else if (daysOverdue <= 30) aging.days1_30 += amount;
+  else if (daysOverdue <= 60) aging.days31_60 += amount;
+  else if (daysOverdue <= 90) aging.days61_90 += amount;
+  else aging.days90plus += amount;
+}
+
+reportsRouter.get('/finance-overview', async (req, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const { from, to } = parseDateRange(req.query);
+
+    const data = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const [
+        paymentsIn, expensesOut, purchasesPaidOut,
+        revenueAgg, cogsAgg, arInvoices, apPurchases, outputAgg, inputAgg,
+      ] = await Promise.all([
+        tx.payment.aggregate({ where: { paidAt: { gte: from, lte: to }, invoice: { companyId } }, _sum: { amount: true } }),
+        tx.expenseVoucher.aggregate({ where: { companyId, status: 'approved', voucherDate: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
+        tx.purchaseInvoice.aggregate({ where: { companyId, isPaid: true, paidAt: { gte: from, lte: to } }, _sum: { total: true } }),
+        tx.invoice.aggregate({ where: { companyId, invoiceDate: { gte: from, lte: to }, status: { notIn: ['cancelled', 'rejected'] } }, _sum: { subtotal: true }, _count: { _all: true } }),
+        tx.purchaseInvoice.aggregate({ where: { companyId, invoiceDate: { gte: from, lte: to } }, _sum: { subtotal: true } }),
+        tx.invoice.findMany({ where: { companyId, status: { notIn: ['cancelled', 'rejected'] }, isPaid: false, invoiceDate: { lte: to } }, select: { total: true, dueDate: true, invoiceDate: true } }),
+        tx.purchaseInvoice.findMany({ where: { companyId, isPaid: false, invoiceDate: { lte: to } }, select: { total: true, dueDate: true, invoiceDate: true } }),
+        tx.invoice.aggregate({ where: { companyId, invoiceDate: { lte: to }, status: { notIn: ['cancelled', 'rejected'] } }, _sum: { vatAmount: true } }),
+        tx.purchaseInvoice.aggregate({ where: { companyId, invoiceDate: { lte: to } }, _sum: { vatAmount: true } }),
+      ]);
+
+      // 6-month revenue trend (ending in the `to` month).
+      const trend: Array<{ month: string; revenue: number }> = [];
+      const anchor = new Date(to.getFullYear(), to.getMonth(), 1);
+      for (let i = 5; i >= 0; i--) {
+        const mStart = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
+        const mEnd = new Date(anchor.getFullYear(), anchor.getMonth() - i + 1, 0, 23, 59, 59, 999);
+        const agg = await tx.invoice.aggregate({ where: { companyId, invoiceDate: { gte: mStart, lte: mEnd }, status: { notIn: ['cancelled', 'rejected'] } }, _sum: { subtotal: true } });
+        trend.push({ month: `${mStart.getFullYear()}-${String(mStart.getMonth() + 1).padStart(2, '0')}`, revenue: agg._sum.subtotal ?? 0 });
+      }
+
+      return { paymentsIn, expensesOut, purchasesPaidOut, revenueAgg, cogsAgg, arInvoices, apPurchases, outputAgg, inputAgg, trend };
+    });
+
+    const cashIn = data.paymentsIn._sum.amount ?? 0;
+    const expensesCash = Number(data.expensesOut._sum.totalAmount ?? 0);
+    const purchasesCash = data.purchasesPaidOut._sum.total ?? 0;
+    const cashOut = expensesCash + purchasesCash;
+
+    const revenue = data.revenueAgg._sum.subtotal ?? 0;
+    const cogs = data.cogsAgg._sum.subtotal ?? 0;
+    const opex = expensesCash;
+    const operatingProfit = revenue - cogs - opex;
+
+    const today = Date.now();
+    const arAging = emptyAging();
+    let arTotal = 0;
+    for (const inv of data.arInvoices) { const t = inv.total ?? 0; arTotal += t; bucketInto(arAging, inv.dueDate ?? inv.invoiceDate, t, today); }
+    const apAging = emptyAging();
+    let apTotal = 0;
+    for (const p of data.apPurchases) { const t = p.total ?? 0; apTotal += t; bucketInto(apAging, p.dueDate ?? p.invoiceDate, t, today); }
+
+    const outputVat = data.outputAgg._sum.vatAmount ?? 0;
+    const inputVat = data.inputAgg._sum.vatAmount ?? 0;
+
+    res.json({
+      data: {
+        period: { from: from.toISOString(), to: to.toISOString() },
+        cashflow: { in: cashIn, out: cashOut, net: cashIn - cashOut, paymentsIn: cashIn, expensesOut: expensesCash, purchasesOut: purchasesCash },
+        pnl: { revenue, cogs, opex, operatingProfit, margin: revenue > 0 ? operatingProfit / revenue : 0, invoiceCount: data.revenueAgg._count._all },
+        ar: { total: arTotal, aging: arAging },
+        ap: { total: apTotal, aging: apAging },
+        vat: { output: outputVat, input: inputVat, payable: Math.max(0, outputVat - inputVat) },
+        trend: data.trend,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid query', details: err.issues });
+      return;
+    }
+    logger.error('finance-overview report failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to build finance overview' });
+  }
+});
+
 reportsRouter.get('/balance-sheet', async (req, res) => {
   try {
     const companyId = req.user!.companyId;

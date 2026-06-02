@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (marketplace orders view + sales summary + low-stock)
+Last updated: 2026-06-02 (Finance Overview — CFO view)
 
 ## Latest work (2026-06-02)
+
+Finance Overview (CFO view) — one consolidated management-finance page; no migration (read-only aggregation over existing docs). Direction chosen over full double-entry: Billboy stays "ops → tax → management finance" (FlowAccount/PEAK remain the formal-books option).
+- **Backend:** `GET /api/reports/finance-overview?from&to` (`routes/reports.ts`) — cashflow (payments in vs approved-expenses + paid-purchases out), P&L summary (revenue/COGS/opex/operating profit, mirrors existing `/p-and-l`), AR + AP aging buckets, VAT position, and a 6-month revenue trend. Reuses the same naïve-sum approach as the existing P&L/balance-sheet (cancelled/rejected excluded).
+- **Frontend:** `pages/FinanceOverview.tsx` (route `/app/reports/finance-overview`) — KPI cards (cash in/out/net, operating profit+margin), P&L + cashflow breakdown, AR/AP aging grids, VAT card, 6-month revenue bar chart, date-range picker, cross-links to Financials/Reconciliation/PP30. Added as the first tab in the finance `SectionSubNav` (Financials page + the new page).
+- **Verified end-to-end on local stack (Playwright):** page renders all sections; with range 2024-2025 it computed **revenue ฿3,993,600 from 8 invoices** (correctly excluding the 4 cancelled/rejected of 12) — confirms the aggregation + status filtering. Cash/AR/AP show 0 for the seed tenant where no payments/purchases exist (expected).
+
+Marketplace orders view + per-channel sales summary + low-stock alerts — no migration (read-only over existing tables):
 
 Marketplace orders view + per-channel sales summary + low-stock alerts — no migration (read-only over existing tables):
 - **Backend (`routes/marketplace.ts`):** `GET /orders` (paginated MarketplaceOrder list) and `GET /summary` (per-channel order/stock-applied counts via groupBy, ordersWithUnmapped count, and low-stock products where `trackInventory && currentStock <= reorderPoint`).

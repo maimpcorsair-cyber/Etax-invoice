@@ -102,6 +102,7 @@ export default function Financials() {
     <div className="space-y-6">
       <SectionSubNav
         items={[
+          { key: 'overview', to: '/app/reports/finance-overview', label: isThai ? 'ภาพรวมการเงิน' : 'Finance Overview', icon: Wallet },
           { key: 'financials', to: '/app/reports/financials', label: isThai ? 'งบการเงิน' : 'Financials', icon: TrendingUp },
           { key: 'vat', to: '/app/vat-summary', label: isThai ? 'สรุปภาษีมูลค่าเพิ่ม' : 'VAT Summary', icon: Calculator },
           { key: 'pp30', to: '/app/pp30', label: isThai ? 'ภพ.30' : 'PP30 Filing', icon: FileText },
