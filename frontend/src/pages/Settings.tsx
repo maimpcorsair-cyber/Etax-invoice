@@ -27,6 +27,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useDocumentProfile } from '../hooks/useDocumentProfile';
 import { useAuthStore } from '../store/authStore';
 import CompanyDocumentsSettings from '../components/settings/CompanyDocumentsSettings';
+import MarketplaceConnectionsSettings from '../components/settings/MarketplaceConnectionsSettings';
 import type { BankAccountProfile, InvoiceType, Language } from '../types';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import SignaturePad from '../components/SignaturePad';
@@ -1134,6 +1135,17 @@ export default function Settings() {
               : 'Store Por.Por.20, certificate, bank book, and catalogs once, then attach them to the quotation links you send customers.'}
           >
             <CompanyDocumentsSettings token={token} isThai={isThai} canManage={isAdmin} />
+          </SettingsCard>
+
+          <SettingsCard
+            id="marketplace"
+            icon={<Cloud className="h-5 w-5" />}
+            title={isThai ? 'ช่องทางขาย (Marketplace)' : 'Sales channels (Marketplace)'}
+            description={isThai
+              ? 'เชื่อม Shopee / Lazada / TikTok เพื่อดึงออเดอร์มาตัดสต็อกอัตโนมัติ ผ่าน SKU ช่องทางขายที่ตั้งไว้ในหน้าสินค้า'
+              : 'Connect Shopee / Lazada / TikTok to pull orders and auto-decrement stock via the channel SKUs set on products.'}
+          >
+            <MarketplaceConnectionsSettings token={token} isThai={isThai} />
           </SettingsCard>
 
           <SettingsCard

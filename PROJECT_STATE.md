@@ -1,8 +1,17 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (product channel SKU mapping — multi-channel foundation)
+Last updated: 2026-06-02 (marketplace connector scaffold — Shopee first)
 
 ## Latest work (2026-06-02)
+
+Marketplace connector scaffold (Shopee-first) — **new migration `20260602_marketplace_connections`**. No live API calls yet; this is the dormant foundation the user approved ("ทำ scaffold กลางก่อน + Shopee"). The hard blocker for going live is external (register Shopee Open Platform app → Partner ID/Key → shop OAuth + HMAC signing), not code.
+- **Model:** `MarketplaceConnection` (companyId+channel unique, status, externalShopId/Name, accessTokenEnc/refreshTokenEnc encrypted via `companyConfigService.encryptConfigValue`, tokenExpiresAt, lastSyncedAt, lastError).
+- **Service `backend/src/services/marketplace/`:** `types.ts` (`NormalizedOrder` + `MarketplaceConnector` interface), `applyOrderToStock.ts` (shared engine: resolve each line's channel SKU via `ProductChannelMapping` → `inventoryService.moveStock` sale-decrement; returns applied/unmapped/untracked; only consumes stock for paid/shipped/completed; **dormant — no caller in prod yet**, will be wired from the live connector and CSV import), `shopeeConnector.ts` (stub implementing the interface; throws until `SHOPEE_PARTNER_ID/KEY` set).
+- **Backend route:** `/api/marketplace/connections` (GET status board per channel with readiness available/coming_soon/planned; DELETE disconnect).
+- **Frontend:** Settings → "ช่องทางขาย (Marketplace)" card (`components/settings/MarketplaceConnectionsSettings.tsx`) showing each channel's readiness/status.
+- **Next to go live (needs user):** register Shopee Open Platform app, set `SHOPEE_PARTNER_ID`/`SHOPEE_PARTNER_KEY` on Render, build the real OAuth callback + signed order fetch in `shopeeConnector`, then wire `applyOrderToStock`. CSV order import (no creds needed) is the quicker parallel path — needs a real Shopee/Lazada order export sample to build the parser. Verified: FE+BE typecheck, FE build. Migration applies via Render build on push.
+
+Product ↔ marketplace SKU mapping (multi-channel stock foundation) — **new migration `20260602_product_channel_mappings`**:
 
 Product ↔ marketplace SKU mapping (multi-channel stock foundation) — **new migration `20260602_product_channel_mappings`**:
 - Context: chat explored building an OMS/ERP (Shopee/Lazada/TikTok sync → central stock → settlement → accounting). Most of it is gated by external partner approvals/credentials and is a months-long roadmap; the practical, no-external-dependency **foundation** is a central stock master + SKU mapping. Stock master already exists (`Product.currentStock`/`reorderPoint`/`StockMovement`); this adds the missing mapping layer.

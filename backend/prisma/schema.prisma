@@ -240,6 +240,7 @@ model Company {
   payrollRuns           PayrollRun[]
   companyDocuments      CompanyDocument[]
   productChannelMappings ProductChannelMapping[]
+  marketplaceConnections MarketplaceConnection[]
 
   @@map("companies")
 }
@@ -526,6 +527,34 @@ model ProductChannelMapping {
   @@index([companyId])
   @@index([productId])
   @@map("product_channel_mappings")
+}
+
+// One row per (company, sales channel) recording the marketplace connection:
+// status + the shop it is linked to + encrypted OAuth tokens. Tokens are
+// encrypted at rest via companyConfigService.encryptConfigValue. This is the
+// scaffold for live connectors (Shopee first) — no live API calls happen until
+// real credentials + a shop authorization land; until then status stays
+// `disconnected`.
+model MarketplaceConnection {
+  id               String    @id @default(cuid())
+  companyId        String    @map("company_id")
+  channel          String // shopee | lazada | tiktok | line_shopping | shopify | woocommerce | pos | other
+  status           String    @default("disconnected") // disconnected | connected | error
+  externalShopId   String?   @map("external_shop_id")
+  externalShopName String?   @map("external_shop_name")
+  accessTokenEnc   String?   @map("access_token_enc")
+  refreshTokenEnc  String?   @map("refresh_token_enc")
+  tokenExpiresAt   DateTime? @map("token_expires_at")
+  lastSyncedAt     DateTime? @map("last_synced_at")
+  lastError        String?   @map("last_error")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, channel])
+  @@index([companyId])
+  @@map("marketplace_connections")
 }
 
 // Stock ledger — one row per increment / decrement event. currentStock

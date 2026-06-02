@@ -244,6 +244,16 @@ export interface ProductChannelMapping {
   createdAt: string;
 }
 
+export interface MarketplaceConnectionInfo {
+  channel: SalesChannel;
+  label: string;
+  readiness: 'available' | 'coming_soon' | 'planned';
+  status: 'disconnected' | 'connected' | 'error';
+  shopName?: string | null;
+  lastSyncedAt?: string | null;
+  lastError?: string | null;
+}
+
 export type CompanyDocumentType = 'por_por_20' | 'company_cert' | 'bank_book' | 'company_profile' | 'catalog' | 'other';
 
 export interface CompanyDocument {
