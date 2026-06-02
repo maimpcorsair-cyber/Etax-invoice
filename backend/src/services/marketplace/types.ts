@@ -6,6 +6,8 @@ export type SalesChannel =
   | 'shopee'
   | 'lazada'
   | 'tiktok'
+  | 'facebook'
+  | 'instagram'
   | 'line_shopping'
   | 'shopify'
   | 'woocommerce'

@@ -12,7 +12,7 @@ import { logger } from '../config/logger';
 
 export const channelMappingsRouter = Router();
 
-const CHANNELS = ['shopee', 'lazada', 'tiktok', 'line_shopping', 'shopify', 'woocommerce', 'pos', 'other'] as const;
+const CHANNELS = ['shopee', 'lazada', 'tiktok', 'facebook', 'instagram', 'line_shopping', 'shopify', 'woocommerce', 'pos', 'other'] as const;
 
 const createSchema = z.object({
   productId: z.string().min(1),

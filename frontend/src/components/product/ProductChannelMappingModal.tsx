@@ -9,6 +9,8 @@ const CHANNEL_OPTIONS: Array<{ value: SalesChannel; label: string }> = [
   { value: 'shopee', label: 'Shopee' },
   { value: 'lazada', label: 'Lazada' },
   { value: 'tiktok', label: 'TikTok Shop' },
+  { value: 'facebook', label: 'Facebook Shop' },
+  { value: 'instagram', label: 'Instagram Shop' },
   { value: 'line_shopping', label: 'LINE SHOPPING' },
   { value: 'shopify', label: 'Shopify' },
   { value: 'woocommerce', label: 'WooCommerce' },

@@ -76,6 +76,8 @@ const CHANNELS: Array<{ channel: SalesChannel; label: string; connector?: Market
   { channel: 'shopee', label: 'Shopee', connector: shopeeConnector },
   { channel: 'lazada', label: 'Lazada' },
   { channel: 'tiktok', label: 'TikTok Shop' },
+  { channel: 'facebook', label: 'Facebook Shop' },
+  { channel: 'instagram', label: 'Instagram Shop' },
   { channel: 'line_shopping', label: 'LINE SHOPPING' },
   { channel: 'shopify', label: 'Shopify' },
   { channel: 'woocommerce', label: 'WooCommerce' },
@@ -165,7 +167,7 @@ marketplaceRouter.post('/import/preview', upload.single('file'), async (req, res
 });
 
 const importCommitSchema = z.object({
-  channel: z.enum(['shopee', 'lazada', 'tiktok', 'line_shopping', 'shopify', 'woocommerce', 'pos', 'other']),
+  channel: z.enum(['shopee', 'lazada', 'tiktok', 'facebook', 'instagram', 'line_shopping', 'shopify', 'woocommerce', 'pos', 'other']),
   mapping: z.object({
     orderId: z.string().min(1),
     sku: z.string().min(1),

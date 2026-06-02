@@ -232,7 +232,7 @@ export interface Product {
   reorderPoint?: number | null;
 }
 
-export type SalesChannel = 'shopee' | 'lazada' | 'tiktok' | 'line_shopping' | 'shopify' | 'woocommerce' | 'pos' | 'other';
+export type SalesChannel = 'shopee' | 'lazada' | 'tiktok' | 'facebook' | 'instagram' | 'line_shopping' | 'shopify' | 'woocommerce' | 'pos' | 'other';
 
 export interface ProductChannelMapping {
   id: string;
