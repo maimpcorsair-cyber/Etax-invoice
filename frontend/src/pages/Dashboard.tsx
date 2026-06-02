@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { EmptyState, MetricCard, PageHeader, MascotHelperCard } from '../components/ui/AppChrome';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
+import DashboardCharts from '../components/dashboard/DashboardCharts';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus } from '../types';
@@ -196,6 +197,7 @@ export default function Dashboard() {
   const [monthEndError, setMonthEndError] = useState<string | null>(null);
   const [monthEndTab, setMonthEndTab] = useState('inputVat');
   const [driveSummary, setDriveSummary] = useState<DriveSummary | null>(null);
+  const [mpChannels, setMpChannels] = useState<Array<{ label: string; value: number }>>([]);
   const [driveSummaryError, setDriveSummaryError] = useState<string | null>(null);
   const [driveConnecting, setDriveConnecting] = useState(false);
   const [driveOpening, setDriveOpening] = useState(false);
@@ -228,6 +230,21 @@ export default function Dashboard() {
       setSeedingDemo(false);
     }
   }
+
+  useEffect(() => {
+    if (!token) return;
+    const CHANNEL_LABEL: Record<string, string> = {
+      shopee: 'Shopee', lazada: 'Lazada', tiktok: 'TikTok', facebook: 'Facebook',
+      instagram: 'Instagram', line_shopping: 'LINE', shopify: 'Shopify', woocommerce: 'Woo', pos: 'POS', other: 'อื่นๆ',
+    };
+    fetch('/api/marketplace/settlements/summary', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const channels = j?.data?.channels ?? [];
+        setMpChannels(channels.filter((c: { net: number }) => c.net > 0).map((c: { channel: string; net: number }) => ({ label: CHANNEL_LABEL[c.channel] ?? c.channel, value: c.net })));
+      })
+      .catch(() => { /* non-blocking: chart shows empty state */ });
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -740,6 +757,17 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {/* Money charts — revenue trend, AR aging, marketplace net */}
+      {stats && (
+        <DashboardCharts
+          isThai={isThai}
+          formatCurrency={formatCurrency}
+          monthlyRevenue={stats.monthlyRevenue ?? []}
+          aging={stats.receivables?.aging ?? { current: 0, days1To30: 0, days31To60: 0, days61To90: 0, days90Plus: 0 }}
+          marketplace={mpChannels}
+        />
+      )}
 
       {/* Company month-end sheet preview */}
       {monthEnd ? (
