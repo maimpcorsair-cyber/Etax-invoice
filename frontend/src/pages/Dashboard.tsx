@@ -731,34 +731,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-sm font-bold text-slate-950">
-                {isThai ? 'e-Tax เปิดใช้ได้เมื่อบริษัทพร้อม' : 'e-Tax is available when the company is ready'}
-              </p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                {isThai
-                  ? 'เริ่มจากสร้างเอกสารขายและจัดการภาษีได้เลย ส่วนการส่ง e-Tax ไป RD ต้องกรอกข้อมูลบริษัทและลงทะเบียนกับกรมสรรพากรให้เรียบร้อย ระบบจะช่วยพาไปทีละขั้น'
-                  : 'You can start creating sales documents and tracking VAT right away. RD e-Tax submission only kicks in once your company details and RD registration are complete — the system will walk you through each step.'}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/app/settings" className="btn-secondary text-sm">
-              {isThai ? 'ไปที่การตั้งค่า' : 'Open Settings'}
-            </Link>
-            <Link to="/app/admin" className="btn-primary text-sm">
-              {isThai ? 'ดูขั้นตอน e-Tax' : 'View e-Tax setup'}
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* Money charts — revenue trend, AR aging, marketplace net */}
       {stats && (
         <DashboardCharts
@@ -1159,20 +1131,6 @@ export default function Dashboard() {
               <p className="mt-2 text-2xl font-bold text-emerald-900">{formatCurrency(stats.receivables.currentOutstanding)}</p>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
-            {[
-              { label: 'Current', value: stats.receivables.aging.current },
-              { label: '1-30', value: stats.receivables.aging.days1To30 },
-              { label: '31-60', value: stats.receivables.aging.days31To60 },
-              { label: '61-90', value: stats.receivables.aging.days61To90 },
-              { label: '90+', value: stats.receivables.aging.days90Plus },
-            ].map((bucket) => (
-              <div key={bucket.label} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{bucket.label}</p>
-                <p className="mt-2 text-sm font-semibold text-gray-900">{formatCurrency(bucket.value)}</p>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -1181,11 +1139,13 @@ export default function Dashboard() {
         title={isThai ? 'Billoy พร้อมช่วยปิดงานเอกสารวันนี้' : 'Billoy is ready to help close today’s paperwork'}
         description={isThai ? 'เลือก workflow ที่ใช้บ่อยได้จากที่นี่ ระบบจะพาไปหน้าที่ถูกต้องโดยไม่ต้องจำเมนู' : 'Jump into the common workflows without remembering where each menu lives.'}
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {[
             { label: isThai ? 'เอกสารขาย' : 'Sales document', href: '/app/invoices/new' },
             { label: isThai ? 'ใบเสร็จรับเงิน' : 'Receipt', href: '/app/invoices/new?type=receipt' },
             { label: isThai ? 'ใบลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note' },
+            { label: isThai ? 'ภาพรวมการเงิน' : 'Finance overview', href: '/app/reports/finance-overview' },
+            { label: isThai ? 'ออเดอร์ช่องทางขาย' : 'Marketplace orders', href: '/app/marketplace-orders' },
             { label: isThai ? 'รายการ/ส่งออก' : 'List / Export', href: '/app/invoices' },
           ].map((action) => (
             <Link
