@@ -1422,13 +1422,14 @@ export async function askBillboy(
   userQuestion: string,
   options: { channel?: 'line' | 'web' } = {},
 ): Promise<string> {
+  const channel = options.channel ?? 'line';
   if (!apiKey) {
+    logger.warn('[AI Chat] provider unavailable', { companyId, channel });
     return '⚠️ AI ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแล';
   }
 
   try {
     const context = await buildCompanyContext(companyId);
-    const channel = options.channel ?? 'line';
     const channelInstruction = channel === 'web'
       ? `ช่องทาง: Web app
 - ผู้ใช้อยู่ในเว็บแล้ว ห้ามแนะนำลิงก์เข้าระบบ/หน้ารายการเอกสาร เว้นแต่ผู้ใช้ถามหาลิงก์โดยตรง
@@ -1471,10 +1472,16 @@ ${context}`,
     ];
 
     const answer = await callOpenRouter(CHAT_MODELS, messages, channel === 'web' ? 1000 : 450, chatTimeoutMs);
+    logger.info('[AI Chat] completed', {
+      companyId,
+      channel,
+      questionLength: userQuestion.length,
+      answerLength: answer.length,
+    });
     return answer || 'ขอโทษ ไม่สามารถตอบได้ในขณะนี้';
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error('askBillboy failed', { error: msg, companyId });
+    logger.error('askBillboy failed', { error: msg, companyId, channel });
     return 'ขอโทษ ตอนนี้ Billboy ตอบช้า/ไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้งในอีกสักครู่';
   }
 }

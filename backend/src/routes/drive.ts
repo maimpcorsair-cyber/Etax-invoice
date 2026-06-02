@@ -14,6 +14,7 @@ import {
   isUserDriveOAuthConfigured,
 } from '../services/googleDriveService';
 import { logger } from '../config/logger';
+import { encryptGoogleRefreshToken } from '../services/googleDriveTokenService';
 
 export const driveRouter = Router();
 
@@ -179,7 +180,7 @@ driveRouter.get('/callback', async (req, res) => {
       const now = new Date();
       await tx.user.update({
         where: { id: pending.userId },
-        data: { googleRefreshToken: refreshToken, googleDriveLinkedAt: now },
+        data: { googleRefreshToken: encryptGoogleRefreshToken(refreshToken), googleDriveLinkedAt: now },
       });
       await tx.company.updateMany({
         where: { id: pending.companyId, googleDriveOwnerUserId: null },

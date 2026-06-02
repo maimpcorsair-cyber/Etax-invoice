@@ -8,6 +8,7 @@ import {
   isDriveServiceAccountConfigured,
   isUserDriveOAuthConfigured,
 } from './googleDriveService';
+import { decryptGoogleRefreshToken } from './googleDriveTokenService';
 
 interface InvoiceSheetRow {
   invoiceNumber: string;
@@ -196,7 +197,7 @@ export interface ExpenseSheetRow {
 function getAuthWithDrive(userRefreshToken?: string | null) {
   if (userRefreshToken && isUserDriveOAuthConfigured()) {
     const oauthClient = buildOAuth2Client();
-    oauthClient.setCredentials({ refresh_token: userRefreshToken });
+    oauthClient.setCredentials({ refresh_token: decryptGoogleRefreshToken(userRefreshToken) });
     return oauthClient;
   }
   return buildGoogleServiceAccountAuth([

@@ -1,6 +1,7 @@
 import { google, Auth } from 'googleapis';
 import { Readable } from 'stream';
 import { logger } from '../config/logger';
+import { decryptGoogleRefreshToken } from './googleDriveTokenService';
 
 export function isDriveConfigured(): boolean {
   // Configured if service account OR user OAuth credentials are set
@@ -276,7 +277,7 @@ export async function shareServiceAccountDriveItem(
 function buildDriveAuth(userRefreshToken?: string | null): { auth: Auth.OAuth2Client | Auth.GoogleAuth; userDrive: boolean } {
   if (userRefreshToken && isUserDriveOAuthConfigured()) {
     const oauthClient = buildOAuth2Client();
-    oauthClient.setCredentials({ refresh_token: userRefreshToken });
+    oauthClient.setCredentials({ refresh_token: decryptGoogleRefreshToken(userRefreshToken) });
     return { auth: oauthClient, userDrive: true };
   }
   if (!isDriveServiceAccountConfigured()) {

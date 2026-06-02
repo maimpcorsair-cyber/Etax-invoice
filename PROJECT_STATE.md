@@ -1,8 +1,17 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (marketplace connector scaffold — Shopee first)
+Last updated: 2026-06-02 (workflow security hardening before marketplace expansion)
 
 ## Latest work (2026-06-02)
+
+Workflow security hardening before Marketplace expansion:
+- **Stripe PromptPay auto-verify:** self-serve PromptPay already routes through Stripe Checkout. Webhook fulfillment now fails closed and idempotent: `checkout.session.completed` provisions access only when `payment_status` is `paid` / `no_payment_required`; delayed PromptPay waits for `checkout.session.async_payment_succeeded`; failed delayed scans stay unprovisioned; duplicate/out-of-order events cannot activate twice, extend renewals twice, or downgrade an activated signup. Manual owner `mark-paid` remains fallback only for legacy/manual QR transactions.
+- **LINE OTP audit:** user, group, and project-group OTP generation now uses `crypto.randomInt()` with unique-collision retry instead of `Math.random()`. Existing 10-minute expiry, single-use consume, and cross-user hijack guard remain in place.
+- **Google Drive refresh-token encryption:** new OAuth writes store `User.googleRefreshToken` AES-256-GCM encrypted through the existing config encryption helper; Drive and Sheets decrypt only at the Google API boundary. API startup upgrades legacy plaintext rows automatically. Keep key material stable across API + worker; `CONFIG_ENCRYPTION_KEY` is recommended, with existing `JWT_SECRET` as compatibility fallback.
+- **OCR real-sample corpus:** added ignored local-only corpus tooling (`backend/private/ocr-real-samples/`, `npm run ocr:corpus:manifest`) and review guide `docs/testing/ocr-real-sample-corpus.md`. Local corpus currently has 4 private PDF samples; raw files and manifest are ignored and must never be committed.
+- **AskBillboy AI chat audit:** web and LINE assistant calls remain tenant-scoped; structured completion telemetry now logs company/channel and input/output lengths only, never the message body.
+- **GitHub Actions runtime:** all workflow JavaScript actions moved from `actions/checkout@v4` / `actions/setup-node@v4` to `@v6` (Node 24 action runtime). Application build still intentionally tests Node 20.
+- **Local verification:** backend typecheck + build, scoped lint, backend unit tests (`119/119`), `git diff --check`, legacy plaintext-write scan, insecure OTP scan, Actions `@v4` scan, and private-corpus ignore check pass. Full backend lint still reports the pre-existing irregular whitespace in dirty Marketplace work (`backend/src/routes/marketplace.ts:39`); that file is intentionally left for the Marketplace session.
 
 Delivery-note operational flow hardening — **new migration `20260602_delivery_note_tracking_progress`**:
 - **Operational tracking:** delivery notes now store `carrierName`, `trackingNo`, and `trackingUrl`; issued notes keep these fields editable through `PATCH /api/delivery-notes/:id/progress`. Seller actions copy/share a tracking update through LINE, and the customer portal exposes a clickable tracking link.

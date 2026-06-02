@@ -40,6 +40,8 @@ tmp/
 temp/
 coverage/
 .tools/
+backend/private/ocr-real-samples/
+backend/private/ocr-real-samples-manifest.json
 
 # Local certificates and secrets
 backend/certs/

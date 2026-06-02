@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -257,27 +258,34 @@ async function safeRedisSetex(key: string, ttlSeconds: number, value: string) {
 }
 
 async function createLineLinkOtp(payload: LineOtpPayload) {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
   // Clean up any expired OTPs for this user (prevent stale buildup)
   if (payload.userId) {
     await prisma.lineOtp.deleteMany({ where: { userId: payload.userId } });
   }
 
-  await prisma.lineOtp.create({
-    data: {
-      otp,
-      type: payload.type ?? 'user',
-      userId: payload.userId,
-      companyId: payload.companyId,
-      projectId: payload.projectId ?? null,
-      issuedBy: payload.issuedBy,
-      expiresAt: new Date(Date.now() + OTP_TTL * 1000),
-    },
-  });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    try {
+      await prisma.lineOtp.create({
+        data: {
+          otp,
+          type: payload.type ?? 'user',
+          userId: payload.userId,
+          companyId: payload.companyId,
+          projectId: payload.projectId ?? null,
+          issuedBy: payload.issuedBy,
+          expiresAt: new Date(Date.now() + OTP_TTL * 1000),
+        },
+      });
 
-  logger.info('[Line] OTP created in DB', { otp: otp.slice(0, 3) + '***', type: payload.type });
-  return otp;
+      logger.info('[Line] OTP created in DB', { otp: otp.slice(0, 3) + '***', type: payload.type });
+      return otp;
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'P2002' || attempt === 4) throw err;
+    }
+  }
+
+  throw new Error('Failed to generate a unique LINE OTP');
 }
 
 async function getLineConversationInfo(context: LineMessageContext) {

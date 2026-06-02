@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
@@ -106,7 +107,6 @@ function buildProjectPortalUrl(input: { companyId: string; projectId: string; gr
 }
 
 async function createProjectLineGroupOtp(input: { companyId: string; projectId: string; issuedBy: string }) {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
   await prisma.lineOtp.deleteMany({
     where: {
       companyId: input.companyId,
@@ -115,17 +115,27 @@ async function createProjectLineGroupOtp(input: { companyId: string; projectId: 
       expiresAt: { lt: new Date() },
     },
   });
-  await prisma.lineOtp.create({
-    data: {
-      otp,
-      type: 'group',
-      companyId: input.companyId,
-      projectId: input.projectId,
-      issuedBy: input.issuedBy,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-    },
-  });
-  return otp;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    try {
+      await prisma.lineOtp.create({
+        data: {
+          otp,
+          type: 'group',
+          companyId: input.companyId,
+          projectId: input.projectId,
+          issuedBy: input.issuedBy,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+      return otp;
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'P2002' || attempt === 4) throw err;
+    }
+  }
+
+  throw new Error('Failed to generate a unique project LINE OTP');
 }
 
 function normalizeCode(input?: string | null) {

@@ -47,6 +47,7 @@ import { invoiceSharePublicRouter } from './routes/invoiceShare';
 import { quotationSharePublicRouter } from './routes/quotationShare';
 import { deliveryNotesRouter } from './routes/deliveryNotes';
 import { recurringInvoicesRouter } from './routes/recurringInvoices';
+import { migrateLegacyGoogleRefreshTokens } from './services/googleDriveTokenMigration';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -279,6 +280,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, next: express
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info(`e-Tax Invoice API running on port ${PORT}`);
+  void migrateLegacyGoogleRefreshTokens().catch((error) => {
+    logger.error('Failed to encrypt legacy Google Drive refresh tokens', { error });
+  });
 
   // Always start the stuck-intake recovery loop on the web dyno —
   // it's the safety net for BullMQ jobs the worker dyno misses, so it

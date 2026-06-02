@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { Router, type Request, type Response } from 'express';
+import type Stripe from 'stripe';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
@@ -26,6 +27,7 @@ import {
   type BillingPlanKey,
   type BillingPaymentMethod,
 } from '../services/billingService';
+import { shouldFulfillStripeCheckout } from '../services/stripeCheckoutService';
 import { getMonthStart, resolveCompanyAccessPolicy } from '../services/accessPolicyService';
 import { buildPromptPayQr } from '../services/promptPayService';
 import {
@@ -543,6 +545,94 @@ async function syncSubscriptionFromStripeSubscription(subscriptionId: string) {
   }), { role: 'billing-webhook' });
 }
 
+async function fulfillStripeCheckoutSession(session: Stripe.Checkout.Session) {
+  const pendingSignupId = session.metadata?.pendingSignupId;
+  const renewalCompanyId = session.metadata?.renewalCompanyId;
+  if (pendingSignupId) {
+    const pendingSignup = await prisma.pendingSignup.findUnique({
+      where: { id: pendingSignupId },
+      select: { status: true },
+    });
+    if (pendingSignup?.status !== 'activated') {
+      await prisma.pendingSignup.update({
+        where: { id: pendingSignupId },
+        data: {
+          status: 'paid',
+          stripeCheckoutSessionId: session.id,
+          stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+          stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : null,
+        },
+      });
+      await syncBillingTransactionByReference(session.id, {
+        status: 'paid',
+        paidAt: new Date(),
+      });
+      await provisionSignupFromPendingSignup(pendingSignupId);
+      if (typeof session.subscription === 'string') {
+        await syncSubscriptionFromStripeSubscription(session.subscription);
+      }
+    }
+  }
+  if (renewalCompanyId) {
+    const existingRenewal = await withSystemRlsContext(prisma, (tx) => tx.billingTransaction.findFirst({
+      where: { externalReference: session.id, companyId: renewalCompanyId, status: 'paid' },
+      select: { id: true },
+    }), { role: 'billing-webhook' });
+    if (existingRenewal) return;
+
+    const subscription = await withSystemRlsContext(prisma, (tx) => tx.companySubscription.findUnique({
+      where: { companyId: renewalCompanyId },
+    }), { role: 'billing-webhook' });
+
+    if (subscription) {
+      const periodStart = subscription.currentPeriodEnd ?? new Date();
+      const periodEnd = addMonths(periodStart, 1);
+
+      await withSystemRlsContext(prisma, (tx) => tx.companySubscription.update({
+        where: { companyId: renewalCompanyId },
+        data: {
+          status: 'active',
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+        },
+      }), { role: 'billing-webhook' });
+
+      await upsertBillingTransactionByReference(session.id, {
+        companyId: renewalCompanyId,
+        plan: subscription.plan as BillingPlanKey,
+        channel: session.metadata?.paymentMethod === 'stripe_promptpay' ? 'stripe_promptpay' : 'stripe',
+        status: 'paid',
+        subtotalAmount: Number(session.metadata?.subtotalAmount ?? 0),
+        discountAmount: Number(session.metadata?.discountAmount ?? 0),
+        totalAmount: Number(session.metadata?.totalAmount ?? 0),
+        couponCode: session.metadata?.couponCode || null,
+        paidAt: new Date(),
+        metadata: {
+          renewal: true,
+          locale: session.locale,
+        },
+      });
+    }
+  }
+}
+
+async function markStripeCheckoutSessionFailed(session: Stripe.Checkout.Session) {
+  const pendingSignupId = session.metadata?.pendingSignupId;
+  if (!pendingSignupId) return;
+
+  await prisma.pendingSignup.updateMany({
+    where: { id: pendingSignupId, status: { not: 'activated' } },
+    data: {
+      status: 'failed',
+      stripeCheckoutSessionId: session.id,
+    },
+  });
+  await withSystemRlsContext(prisma, (tx) => tx.billingTransaction.updateMany({
+    where: { externalReference: session.id, status: { not: 'activated' } },
+    data: { status: 'payment_failed' },
+  }), { role: 'billing-webhook' });
+}
+
 // Stripe webhook handler. Registered on BOTH the canonical mount path and
 // the legacy doubled path below — the router is mounted at
 // `/api/billing/stripe/webhook` in index.ts, so a relative `/` here is the
@@ -575,64 +665,16 @@ const handleStripeWebhook = async (req: Request, res: Response) => {
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed': {
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded': {
         const session = event.data.object;
-        const pendingSignupId = session.metadata?.pendingSignupId;
-        const renewalCompanyId = session.metadata?.renewalCompanyId;
-        if (pendingSignupId) {
-          await prisma.pendingSignup.update({
-            where: { id: pendingSignupId },
-            data: {
-              status: 'paid',
-              stripeCheckoutSessionId: session.id,
-              stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
-              stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : null,
-            },
-          });
-          await syncBillingTransactionByReference(session.id, {
-            status: 'paid',
-            paidAt: new Date(),
-          });
-          await provisionSignupFromPendingSignup(pendingSignupId);
-          if (typeof session.subscription === 'string') {
-            await syncSubscriptionFromStripeSubscription(session.subscription);
-          }
+        if (shouldFulfillStripeCheckout(event.type, session.payment_status)) {
+          await fulfillStripeCheckoutSession(session);
         }
-        if (renewalCompanyId) {
-          const subscription = await withSystemRlsContext(prisma, (tx) => tx.companySubscription.findUnique({
-            where: { companyId: renewalCompanyId },
-          }), { role: 'billing-webhook' });
-
-          if (subscription) {
-            const periodStart = subscription.currentPeriodEnd ?? new Date();
-            const periodEnd = addMonths(periodStart, 1);
-
-            await withSystemRlsContext(prisma, (tx) => tx.companySubscription.update({
-              where: { companyId: renewalCompanyId },
-              data: {
-                status: 'active',
-                currentPeriodStart: periodStart,
-                currentPeriodEnd: periodEnd,
-              },
-            }), { role: 'billing-webhook' });
-
-            await upsertBillingTransactionByReference(session.id, {
-              companyId: renewalCompanyId,
-              plan: subscription.plan as BillingPlanKey,
-              channel: session.metadata?.paymentMethod === 'stripe_promptpay' ? 'stripe_promptpay' : 'stripe',
-              status: 'paid',
-              subtotalAmount: Number(session.metadata?.subtotalAmount ?? 0),
-              discountAmount: Number(session.metadata?.discountAmount ?? 0),
-              totalAmount: Number(session.metadata?.totalAmount ?? 0),
-              couponCode: session.metadata?.couponCode || null,
-              paidAt: new Date(),
-              metadata: {
-                renewal: true,
-                locale: session.locale,
-              },
-            });
-          }
-        }
+        break;
+      }
+      case 'checkout.session.async_payment_failed': {
+        await markStripeCheckoutSessionFailed(event.data.object);
         break;
       }
       case 'checkout.session.expired': {
@@ -640,12 +682,13 @@ const handleStripeWebhook = async (req: Request, res: Response) => {
         const pendingSignupId = session.metadata?.pendingSignupId;
         if (pendingSignupId) {
           await prisma.pendingSignup.updateMany({
-            where: { id: pendingSignupId },
+            where: { id: pendingSignupId, status: { not: 'activated' } },
             data: { status: 'expired', stripeCheckoutSessionId: session.id },
           });
-          await syncBillingTransactionByReference(session.id, {
-            status: 'expired',
-          });
+          await withSystemRlsContext(prisma, (tx) => tx.billingTransaction.updateMany({
+            where: { externalReference: session.id, status: { not: 'activated' } },
+            data: { status: 'expired' },
+          }), { role: 'billing-webhook' });
         }
         break;
       }

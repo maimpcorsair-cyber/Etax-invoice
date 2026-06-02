@@ -33,6 +33,8 @@ http://localhost:4000/api/billing/stripe/webhook
 Listen for these events:
 
 - `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
 - `checkout.session.expired`
 - `customer.subscription.created`
 - `customer.subscription.updated`
@@ -59,6 +61,11 @@ When checkout succeeds, the backend:
 3. Creates the admin user from the checkout email
 4. Creates or updates `company_subscriptions`
 5. Lets the admin sign in with Google using the same email
+
+For delayed methods such as Stripe PromptPay, `checkout.session.completed`
+alone does not activate the tenant unless Stripe reports `payment_status=paid`.
+The backend waits for `checkout.session.async_payment_succeeded`; failed scans
+remain unprovisioned.
 
 ## 6. Admin billing portal
 

@@ -14,6 +14,7 @@ GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-web-client-secret
 GOOGLE_DRIVE_REDIRECT_URI=https://etax-invoice-api.onrender.com/api/drive/callback
 FRONTEND_URLS=https://etax-invoice.vercel.app
+CONFIG_ENCRYPTION_KEY=use-a-long-random-secret # recommended before first encrypted deploy
 ```
 
 For service-account project folders and Google Sheets export, set one of:
@@ -39,3 +40,9 @@ https://etax-invoice-api.onrender.com/api/drive/callback
 ```
 
 After Render redeploys, check `/api/drive/status` while logged in. It should show `oauthConfigured: true` for the personal Drive connect button, and `serviceAccountConfigured: true` for project folder sync without user OAuth.
+
+`CONFIG_ENCRYPTION_KEY` encrypts per-user Google refresh tokens at rest. If it
+is omitted, the backend uses the existing `JWT_SECRET` as a compatibility
+fallback. On deploy, the API upgrades legacy plaintext token rows
+automatically. Keep the same encryption key material across web and worker
+services. Do not rotate it without a planned re-encryption migration.
