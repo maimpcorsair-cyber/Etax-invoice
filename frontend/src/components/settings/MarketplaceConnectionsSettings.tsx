@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Store, CheckCircle2, Clock } from 'lucide-react';
+import { Loader2, Store, CheckCircle2, Clock, Upload } from 'lucide-react';
 import type { MarketplaceConnectionInfo } from '../../types';
+import MarketplaceImportModal from '../marketplace/MarketplaceImportModal';
 
 // Marketplace connection status board. Scaffold only — live "Connect" (OAuth)
 // is enabled per platform once partner credentials are configured on the server.
@@ -15,6 +16,7 @@ export default function MarketplaceConnectionsSettings({ token, isThai }: Props)
   const [rows, setRows] = useState<MarketplaceConnectionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const fetchRows = useCallback(async () => {
     if (!token) return;
@@ -57,11 +59,25 @@ export default function MarketplaceConnectionsSettings({ token, isThai }: Props)
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowImport(true)}
+          className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+        >
+          <Upload className="h-4 w-4" />
+          {isThai ? 'นำเข้าออเดอร์ (CSV)' : 'Import orders (CSV)'}
+        </button>
+      </div>
       <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
         {isThai
           ? 'เชื่อมร้านจาก Shopee/Lazada/TikTok เพื่อดึงออเดอร์มาตัดสต็อกอัตโนมัติ (ใช้ร่วมกับ SKU ช่องทางขายในหน้าสินค้า) — การเชื่อมจริงเปิดทีละช่องทางเมื่อใส่ App Key ของแพลตฟอร์มนั้นแล้ว'
           : 'Connect Shopee/Lazada/TikTok shops to pull orders and auto-decrement stock (uses the channel SKUs set on products). Live connect opens per platform once that platform’s App Key is configured.'}
       </p>
+      <button type="button" onClick={() => setShowImport(true)} className="btn-secondary">
+        <Upload className="h-4 w-4" />
+        {isThai ? 'นำเข้าออเดอร์ CSV' : 'Import orders CSV'}
+      </button>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
@@ -77,6 +93,9 @@ export default function MarketplaceConnectionsSettings({ token, isThai }: Props)
             </div>
           ))}
         </div>
+      )}
+      {showImport && (
+        <MarketplaceImportModal token={token} isThai={isThai} onClose={() => setShowImport(false)} />
       )}
     </div>
   );

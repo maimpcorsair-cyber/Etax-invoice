@@ -241,6 +241,7 @@ model Company {
   companyDocuments      CompanyDocument[]
   productChannelMappings ProductChannelMapping[]
   marketplaceConnections MarketplaceConnection[]
+  marketplaceOrders      MarketplaceOrder[]
 
   @@map("companies")
 }
@@ -555,6 +556,32 @@ model MarketplaceConnection {
   @@unique([companyId, channel])
   @@index([companyId])
   @@map("marketplace_connections")
+}
+
+// An order pulled from a channel (CSV import now, live connectors later). The
+// unique (company, channel, externalOrderId) guards against decrementing stock
+// twice if the same export is uploaded again. itemsJson keeps the normalized
+// line items; unmappedSkus records SKUs with no ProductChannelMapping so the
+// user can fix the mapping and re-import.
+model MarketplaceOrder {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  channel         String
+  externalOrderId String   @map("external_order_id")
+  status          String   @default("unknown")
+  buyerName       String?  @map("buyer_name")
+  total           Float?
+  itemsJson       Json     @map("items_json")
+  stockApplied    Boolean  @default(false) @map("stock_applied")
+  unmappedSkus    String[] @map("unmapped_skus")
+  source          String   @default("csv")
+  importedAt      DateTime @default(now()) @map("imported_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, channel, externalOrderId])
+  @@index([companyId])
+  @@map("marketplace_orders")
 }
 
 // Stock ledger — one row per increment / decrement event. currentStock

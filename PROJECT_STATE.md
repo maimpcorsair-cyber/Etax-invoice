@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (workflow security hardening before marketplace expansion)
+Last updated: 2026-06-02 (CSV order import → stock; no-API loop complete)
 
 ## Latest work (2026-06-02)
+
+Marketplace CSV order import (completes the no-credentials loop) — **new migration `20260602_marketplace_orders`**. Makes the whole foundation usable today without any marketplace API: export orders → upload CSV → map columns → decrement stock via SKU mappings.
+- **Model:** `MarketplaceOrder` (unique `(companyId, channel, externalOrderId)` → re-uploading the same export skips duplicates so stock never double-decrements; stores `itemsJson`, `unmappedSkus`, `stockApplied`, `source`).
+- **Backend (`routes/marketplace.ts`):** `POST /import/preview` (parse headers + auto-guess column mapping + sample rows) and `POST /import/commit` (group rows by order id → dedupe → `applyOrderToStock` per order in its own RLS tx → persist). Generic column mapping (no hardcoded per-platform format); status normalized (`paid/shipped/completed`→decrement, `cancelled/returned`→skip, else `assumePaid` default). Hand-rolled CSV splitter (quotes/escapes); 10MB.
+- **Frontend:** `components/marketplace/MarketplaceImportModal.tsx` (channel → upload → map columns w/ auto-guess → preview → commit → summary: imported/duplicate/stock-moves + unmapped-SKU list w/ "map then re-import" hint). Launched from Settings "ช่องทางขาย" card → "นำเข้าออเดอร์ (CSV)".
+- **Now functional end-to-end (no API):** map product channel SKUs (Products → "SKU ช่องทางขาย") → import a marketplace CSV → stock decrements via canonical `inventoryService.moveStock`. Only live API connectors remain credential-gated. Verified: FE+BE typecheck, FE build. Migration applies via Render build on push.
 
 Workflow security hardening before Marketplace expansion:
 - **Stripe PromptPay auto-verify:** self-serve PromptPay already routes through Stripe Checkout. Webhook fulfillment now fails closed and idempotent: `checkout.session.completed` provisions access only when `payment_status` is `paid` / `no_payment_required`; delayed PromptPay waits for `checkout.session.async_payment_succeeded`; failed delayed scans stay unprovisioned; duplicate/out-of-order events cannot activate twice, extend renewals twice, or downgrade an activated signup. Manual owner `mark-paid` remains fallback only for legacy/manual QR transactions.
