@@ -1,8 +1,17 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (company document library + quotation attachments)
+Last updated: 2026-06-02 (product channel SKU mapping — multi-channel foundation)
 
 ## Latest work (2026-06-02)
+
+Product ↔ marketplace SKU mapping (multi-channel stock foundation) — **new migration `20260602_product_channel_mappings`**:
+- Context: chat explored building an OMS/ERP (Shopee/Lazada/TikTok sync → central stock → settlement → accounting). Most of it is gated by external partner approvals/credentials and is a months-long roadmap; the practical, no-external-dependency **foundation** is a central stock master + SKU mapping. Stock master already exists (`Product.currentStock`/`reorderPoint`/`StockMovement`); this adds the missing mapping layer.
+- **Model:** `ProductChannelMapping` (companyId, productId, channel, externalSku, externalProductId?, note) with `@@unique([companyId, channel, externalSku])` so one channel SKU resolves to exactly one Product (prevents oversell once a connector exists). Channels: shopee/lazada/tiktok/line_shopping/shopify/woocommerce/pos/other.
+- **Backend:** `routes/channelMappings.ts` mounted `/api/channel-mappings` (GET ?productId, POST with P2002 dup→409, DELETE).
+- **Frontend:** `components/product/ProductChannelMappingModal.tsx`; Products list rows (table + mobile) get a Link2 "SKU ช่องทางขาย" button to manage per-channel SKUs.
+- **Not built (deliberately):** live marketplace API/webhook connectors (need partner apps + OAuth), CSV order import (needs a real export sample to parse correctly — asked user to provide), payment-gateway/bank-API. Bank-statement import + auto-match already exists (`Reconciliation.tsx` + `/api/reconciliation/*`). Verified: frontend + backend typecheck, frontend build. Not click-tested live (no prod login). New migration applies via Render build `prisma migrate deploy` on push; confirm `20260602_product_channel_mappings` after deploy.
+
+Company document library + quotation customer-facing attachments (Phase 1) — **new migration `20260602_company_documents`**
 
 Company document library + quotation customer-facing attachments (Phase 1) — **new migration `20260602_company_documents`** (CREATE `company_documents` + add `quotations.attachment_document_ids TEXT[]`; applied in prod by the render-deploy `prisma migrate deploy` step):
 - **Model:** `CompanyDocument` (companyId, docType, label, fileName, mimeType, fileSize, s3Key, attachByDefault) — reusable library (ภ.พ.20 / cert / bank book / profile / catalog / other). Stored once in object storage (R2), attached to quotations **by reference** — never copied per document (library model = dedup by design, no refcount cache).

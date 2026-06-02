@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent, FileSpreadsheet, Users } from 'lucide-react';
+import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent, FileSpreadsheet, Users, Link2 } from 'lucide-react';
+import ProductChannelMappingModal from '../components/product/ProductChannelMappingModal';
 import SectionSubNav from '../components/SectionSubNav';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -61,6 +62,7 @@ export default function Products() {
   const [sheetExporting, setSheetExporting] = useState(false);
   const [error, setError] = useState('');
   const [stockAdjustProduct, setStockAdjustProduct] = useState<Product | null>(null);
+  const [channelProduct, setChannelProduct] = useState<Product | null>(null);
   const [stockDelta, setStockDelta] = useState<string>('');
   const [stockNote, setStockNote] = useState('');
   const [stockSaving, setStockSaving] = useState(false);
@@ -353,14 +355,24 @@ export default function Products() {
                 <span className={p.isActive ? 'badge-success' : 'badge-error'}>
                   {p.isActive ? t('common.active') : t('common.inactive')}
                 </span>
-                <button
-                  onClick={() => openEdit(p)}
-                  className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
-                  title={t('common.edit')}
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  {t('common.edit')}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setChannelProduct(p)}
+                    className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                    title={isThai ? 'SKU ช่องทางขาย' : 'Channel SKUs'}
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    SKU
+                  </button>
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                    title={t('common.edit')}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    {t('common.edit')}
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -453,6 +465,13 @@ export default function Products() {
                             <Package className="h-4 w-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => setChannelProduct(p)}
+                          className="p-1 text-primary-600 hover:text-primary-800"
+                          title={isThai ? 'SKU ช่องทางขาย' : 'Channel SKUs'}
+                        >
+                          <Link2 className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => openEdit(p)}
                           className="p-1 text-primary-600 hover:text-primary-800"
@@ -790,6 +809,16 @@ export default function Products() {
             </div>
           </div>
         </div>
+      )}
+
+      {channelProduct && (
+        <ProductChannelMappingModal
+          product={channelProduct}
+          token={token}
+          isThai={isThai}
+          canManage
+          onClose={() => setChannelProduct(null)}
+        />
       )}
     </div>
   );

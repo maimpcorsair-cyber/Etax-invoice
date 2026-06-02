@@ -232,6 +232,18 @@ export interface Product {
   reorderPoint?: number | null;
 }
 
+export type SalesChannel = 'shopee' | 'lazada' | 'tiktok' | 'line_shopping' | 'shopify' | 'woocommerce' | 'pos' | 'other';
+
+export interface ProductChannelMapping {
+  id: string;
+  productId: string;
+  channel: SalesChannel;
+  externalSku: string;
+  externalProductId?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
 export type CompanyDocumentType = 'por_por_20' | 'company_cert' | 'bank_book' | 'company_profile' | 'catalog' | 'other';
 
 export interface CompanyDocument {

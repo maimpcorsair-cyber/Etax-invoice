@@ -239,6 +239,7 @@ model Company {
   employees             Employee[]
   payrollRuns           PayrollRun[]
   companyDocuments      CompanyDocument[]
+  productChannelMappings ProductChannelMapping[]
 
   @@map("companies")
 }
@@ -491,6 +492,7 @@ model Product {
   deliveryNoteItems     DeliveryNoteItem[]
   recurringInvoiceItems RecurringInvoiceItem[]
   stockMovements        StockMovement[]
+  channelMappings       ProductChannelMapping[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -498,6 +500,32 @@ model Product {
   @@index([companyId, category])
   @@index([companyId, trackInventory])
   @@map("products")
+}
+
+// Maps an internal Product (SKU) to its per-channel SKU on external sales
+// channels (Shopee / Lazada / TikTok Shop / LINE Shopping / Shopify / …). This
+// is the foundation for multi-channel stock sync: when an order arrives from a
+// channel carrying its own SKU, we resolve it back to one central Product so
+// stock never oversells across channels. No external API is required to record
+// these mappings; future connectors consume them.
+model ProductChannelMapping {
+  id                String   @id @default(cuid())
+  companyId         String   @map("company_id")
+  productId         String   @map("product_id")
+  channel           String // shopee | lazada | tiktok | line_shopping | shopify | woocommerce | pos | other
+  externalSku       String   @map("external_sku")
+  externalProductId String?  @map("external_product_id")
+  note              String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, channel, externalSku])
+  @@index([companyId])
+  @@index([productId])
+  @@map("product_channel_mappings")
 }
 
 // Stock ledger — one row per increment / decrement event. currentStock
