@@ -23,6 +23,7 @@ import {
   FolderOpen,
   FileText,
   Link as LinkIcon,
+  ChevronDown,
 } from 'lucide-react';
 import { EmptyState, MetricCard, PageHeader, MascotHelperCard } from '../components/ui/AppChrome';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
@@ -1199,9 +1200,9 @@ export default function Dashboard() {
         </div>
       </MascotHelperCard>
 
-      {/* RD Compliance Panel */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-5">
+      {/* RD Compliance Panel — collapsed by default to keep the dashboard light */}
+      <details className="card group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold text-gray-900">
               {isThai ? 'สถานะส่งเอกสารให้ RD เมื่อเปิดใช้ e-Tax' : 'RD submission status when e-Tax is enabled'}
@@ -1210,8 +1211,15 @@ export default function Dashboard() {
               {isThai ? 'สำหรับบริษัทที่ตั้งค่า e-Tax/RD แล้ว · กำหนดส่งทุกวันที่ 15 ของเดือนถัดไป' : 'For companies with e-Tax/RD settings enabled · Deadline: 15th of following month'}
             </p>
           </div>
-        </div>
+          <span className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-slate-500">
+            {compliance.length === 0
+              ? (isThai ? 'ยังไม่มีข้อมูล' : 'No data')
+              : (isThai ? `${compliance.length} เดือน` : `${compliance.length} mo`)}
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+          </span>
+        </summary>
 
+        <div className="mt-5">
         {complianceLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
@@ -1307,7 +1315,8 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </details>
 
       {/* Recent Invoices */}
       <div className="card">
