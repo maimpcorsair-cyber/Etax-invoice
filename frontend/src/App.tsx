@@ -24,6 +24,7 @@ const Login = React.lazy(() => import('./pages/Login'));
 const Customers = React.lazy(() => import('./pages/Customers'));
 const CustomerStatementPage = React.lazy(() => import('./pages/CustomerStatement'));
 const Products = React.lazy(() => import('./pages/Products'));
+const MarketplaceOrders = React.lazy(() => import('./pages/MarketplaceOrders'));
 const BillingSuccess = React.lazy(() => import('./pages/BillingSuccess'));
 const BillingCancel = React.lazy(() => import('./pages/BillingCancel'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
@@ -207,6 +208,7 @@ export default function App() {
             <Route path="customers" element={<Customers />} />
             <Route path="customers/:id/statement" element={<CustomerStatementPage />} />
             <Route path="products" element={<Products />} />
+            <Route path="marketplace-orders" element={<MarketplaceOrders />} />
             <Route path="purchase-invoices" element={<PurchaseInvoices />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />

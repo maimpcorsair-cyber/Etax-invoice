@@ -119,6 +119,70 @@ marketplaceRouter.get('/connections', async (req, res) => {
   }
 });
 
+// ── Imported orders list ──────────────────────────────────────────────
+marketplaceRouter.get('/orders', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const channel = typeof req.query.channel === 'string' && req.query.channel ? req.query.channel : undefined;
+    const where = { companyId: req.user!.companyId, ...(channel ? { channel } : {}) };
+    const result = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const [rows, total] = await Promise.all([
+        tx.marketplaceOrder.findMany({
+          where,
+          orderBy: { importedAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+          select: {
+            id: true, channel: true, externalOrderId: true, status: true, buyerName: true,
+            total: true, itemsJson: true, stockApplied: true, unmappedSkus: true, source: true, importedAt: true,
+          },
+        }),
+        tx.marketplaceOrder.count({ where }),
+      ]);
+      return { rows, total };
+    });
+    res.json({ data: result.rows, pagination: { page, limit, total: result.total, totalPages: Math.ceil(result.total / limit) } });
+  } catch (err) {
+    logger.error('[marketplace] list orders failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to list orders' });
+  }
+});
+
+// ── Sales summary per channel + low-stock alerts ──────────────────────
+marketplaceRouter.get('/summary', async (req, res) => {
+  try {
+    const data = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const [totals, applied, withUnmapped, trackedProducts] = await Promise.all([
+        tx.marketplaceOrder.groupBy({ by: ['channel'], where: { companyId: req.user!.companyId }, _count: { _all: true } }),
+        tx.marketplaceOrder.groupBy({ by: ['channel'], where: { companyId: req.user!.companyId, stockApplied: true }, _count: { _all: true } }),
+        tx.marketplaceOrder.count({ where: { companyId: req.user!.companyId, NOT: { unmappedSkus: { isEmpty: true } } } }),
+        tx.product.findMany({
+          where: { companyId: req.user!.companyId, trackInventory: true, reorderPoint: { not: null }, isActive: true },
+          select: { id: true, code: true, nameTh: true, nameEn: true, currentStock: true, reorderPoint: true },
+        }),
+      ]);
+      const appliedMap = new Map(applied.map((a) => [a.channel, a._count._all]));
+      const channels = totals
+        .map((t) => ({ channel: t.channel, orders: t._count._all, stockApplied: appliedMap.get(t.channel) ?? 0 }))
+        .sort((a, b) => b.orders - a.orders);
+      const lowStock = trackedProducts
+        .filter((p) => p.reorderPoint != null && p.currentStock <= p.reorderPoint)
+        .sort((a, b) => a.currentStock - b.currentStock);
+      return {
+        channels,
+        totalOrders: totals.reduce((s, t) => s + t._count._all, 0),
+        ordersWithUnmapped: withUnmapped,
+        lowStock,
+      };
+    });
+    res.json({ data });
+  } catch (err) {
+    logger.error('[marketplace] summary failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to build summary' });
+  }
+});
+
 // ── Disconnect a channel ──────────────────────────────────────────────
 marketplaceRouter.delete('/connections/:channel', requireRole('admin', 'super_admin'), async (req, res) => {
   try {

@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (CSV order import → stock; no-API loop complete)
+Last updated: 2026-06-02 (marketplace orders view + sales summary + low-stock)
 
 ## Latest work (2026-06-02)
+
+Marketplace orders view + per-channel sales summary + low-stock alerts — no migration (read-only over existing tables):
+- **Backend (`routes/marketplace.ts`):** `GET /orders` (paginated MarketplaceOrder list) and `GET /summary` (per-channel order/stock-applied counts via groupBy, ordersWithUnmapped count, and low-stock products where `trackInventory && currentStock <= reorderPoint`).
+- **Frontend:** new page `pages/MarketplaceOrders.tsx` (route `/app/marketplace-orders`) — per-channel summary cards, unmapped-SKU warning, low-stock list, imported-orders table, and the CSV import modal. Reached via Settings "ช่องทางขาย" card → "ดูออเดอร์ที่นำเข้า".
+- **Verified end-to-end on a local stack** (Docker pg/redis + Playwright, accountant@siamtech): customer popup (vendor toggle hidden), product picker (fills price), SKU mapping persists, **CSV import decremented ACC-001 100→97 with correct StockMovement ledger + unmapped flag, and re-import dedupe kept stock at 97**; the new orders page shows "Shopee 2 orders · 1 stock-applied" + unmapped warning + 2 rows. Also fixed a pre-existing seed bug (`discount`→`discountAmount`, commit `8c1c070`) that blocked local seeding. Local-only verification gap remaining: company-doc upload (needs R2, prod-only).
+
+Marketplace CSV order import (completes the no-credentials loop) — **new migration `20260602_marketplace_orders`**. Makes the whole foundation usable today without any marketplace API: export orders → upload CSV → map columns → decrement stock via SKU mappings.
 
 Marketplace CSV order import (completes the no-credentials loop) — **new migration `20260602_marketplace_orders`**. Makes the whole foundation usable today without any marketplace API: export orders → upload CSV → map columns → decrement stock via SKU mappings.
 - **Model:** `MarketplaceOrder` (unique `(companyId, channel, externalOrderId)` → re-uploading the same export skips duplicates so stock never double-decrements; stores `itemsJson`, `unmappedSkus`, `stockApplied`, `source`).

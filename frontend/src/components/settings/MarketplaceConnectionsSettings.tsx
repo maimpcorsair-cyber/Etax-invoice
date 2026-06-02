@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Store, CheckCircle2, Clock, Upload } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Store, CheckCircle2, Clock, Upload, ListOrdered } from 'lucide-react';
 import type { MarketplaceConnectionInfo } from '../../types';
 import MarketplaceImportModal from '../marketplace/MarketplaceImportModal';
 
@@ -59,7 +60,14 @@ export default function MarketplaceConnectionsSettings({ token, isThai }: Props)
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Link
+          to="/app/marketplace-orders"
+          className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+        >
+          <ListOrdered className="h-4 w-4" />
+          {isThai ? 'ดูออเดอร์ที่นำเข้า' : 'View imported orders'}
+        </Link>
         <button
           type="button"
           onClick={() => setShowImport(true)}
