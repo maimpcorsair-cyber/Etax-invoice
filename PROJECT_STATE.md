@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-06-02 (Finance Overview — CFO view)
+Last updated: 2026-06-03 (Marketplace settlement reconciliation)
 
-## Latest work (2026-06-02)
+## Latest work (2026-06-03)
+
+Marketplace settlement reconciliation — shipped to production (`7e809a1`; Render deploy workflow `26836709447`):
+- **Model/migration:** `MarketplaceSettlement` + migration `20260602_marketplace_settlements` stores payout/settlement CSV lines per company/channel with unique `(companyId, channel, externalRef)` dedupe. Fields split gross sales, platform fee, refund, adjustment, net payout, settled date, source, importedAt.
+- **Backend:** `routes/marketplace.ts` adds `GET /api/marketplace/settlements`, `GET /api/marketplace/settlements/summary`, `POST /api/marketplace/settlements/import/preview`, and `POST /api/marketplace/settlements/import/commit`. `services/marketplace/settlementCsvService.ts` parses quoted CSV, UTF-8 BOM, Thai/Buddhist dates, currency strings, negative parentheses, auto-guesses common marketplace payout columns, computes net when absent, and skips duplicate refs. Finance Overview now includes `marketplace.total/channels` for sales vs money actually received.
+- **Frontend:** Marketplace Orders page now has a second CSV flow for "นำเข้าเงินเข้า (CSV)", gross/fee/refund/net reconciliation cards, per-channel payout summary, and latest settlement lines table. Finance Overview shows Marketplace sales vs net payout when settlement data exists.
+- **Verification:** backend Prisma generate + typecheck + build + unit tests (`123/123`), frontend typecheck + build, touched-file backend/frontend eslint, `git diff --check`, GitHub Typecheck + Unit tests + Prod smoke all green for `7e809a1`. Production Render workflow applied migrations before deploy and passed backend health smoke. Manual prod checks: frontend root `200`, frontend `/api/health` rewrite `200`, backend `/api/health` `200`, backend `/api/health/deep` `200` with `notConfigured: []`, authenticated login `200`, settlement summary/list `200`, settlement preview import `200` with guessed `order_id`, and finance overview `200` with `marketplace` data field. Local DB was not migrated because this machine's local Postgres has many older unapplied migrations, not just the new one; production migration path is verified.
+
+## Previous work (2026-06-02)
 
 Finance Overview (CFO view) — one consolidated management-finance page; no migration (read-only aggregation over existing docs). Direction chosen over full double-entry: Billboy stays "ops → tax → management finance" (FlowAccount/PEAK remain the formal-books option).
 - **Backend:** `GET /api/reports/finance-overview?from&to` (`routes/reports.ts`) — cashflow (payments in vs approved-expenses + paid-purchases out), P&L summary (revenue/COGS/opex/operating profit, mirrors existing `/p-and-l`), AR + AP aging buckets, VAT position, and a 6-month revenue trend. Reuses the same naïve-sum approach as the existing P&L/balance-sheet (cancelled/rejected excluded).
