@@ -9,6 +9,11 @@ import { logger } from '../config/logger';
 import { shopeeConnector } from '../services/marketplace/shopeeConnector';
 import { applyOrderToStock } from '../services/marketplace/applyOrderToStock';
 import type { MarketplaceConnector, NormalizedOrder, SalesChannel } from '../services/marketplace/types';
+import {
+  guessSettlementMapping,
+  parseCsvRows as parseSettlementCsvRows,
+  parseSettlementCsv,
+} from '../services/marketplace/settlementCsvService';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -36,7 +41,7 @@ function splitCsvLine(line: string): string[] {
 }
 
 function parseCsvRows(buffer: Buffer): { headers: string[]; rows: string[][] } {
-  const text = buffer.toString('utf8').replace(/^﻿/, '');
+  const text = buffer.toString('utf8').replace(/^\uFEFF/, '');
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
   const headers = splitCsvLine(lines[0]);
@@ -82,6 +87,8 @@ const CHANNELS: Array<{ channel: SalesChannel; label: string; connector?: Market
   { channel: 'shopify', label: 'Shopify' },
   { channel: 'woocommerce', label: 'WooCommerce' },
 ];
+
+const salesChannelSchema = z.enum(['shopee', 'lazada', 'tiktok', 'facebook', 'instagram', 'line_shopping', 'shopify', 'woocommerce', 'pos', 'other']);
 
 // ── List channels + connection status ─────────────────────────────────
 marketplaceRouter.get('/connections', async (req, res) => {
@@ -183,6 +190,199 @@ marketplaceRouter.get('/summary', async (req, res) => {
   }
 });
 
+// ── Marketplace settlement / payout list ─────────────────────────────
+marketplaceRouter.get('/settlements', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const channel = typeof req.query.channel === 'string' && req.query.channel ? req.query.channel : undefined;
+    const where = { companyId: req.user!.companyId, ...(channel ? { channel } : {}) };
+    const result = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const [rows, total] = await Promise.all([
+        tx.marketplaceSettlement.findMany({
+          where,
+          orderBy: [{ settledAt: 'desc' }, { importedAt: 'desc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        tx.marketplaceSettlement.count({ where }),
+      ]);
+      return { rows, total };
+    });
+    res.json({ data: result.rows, pagination: { page, limit, total: result.total, totalPages: Math.ceil(result.total / limit) } });
+  } catch (err) {
+    logger.error('[marketplace] list settlements failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to list settlements' });
+  }
+});
+
+// ── Marketplace settlement summary ───────────────────────────────────
+marketplaceRouter.get('/settlements/summary', async (req, res) => {
+  try {
+    const data = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const rows = await tx.marketplaceSettlement.groupBy({
+        by: ['channel'],
+        where: { companyId: req.user!.companyId },
+        _count: { _all: true },
+        _sum: { gross: true, fee: true, refund: true, adjustment: true, net: true },
+      });
+      const channels = rows
+        .map((row) => {
+          const gross = row._sum.gross ?? 0;
+          const fee = row._sum.fee ?? 0;
+          const refund = row._sum.refund ?? 0;
+          const adjustment = row._sum.adjustment ?? 0;
+          const net = row._sum.net ?? 0;
+          return {
+            channel: row.channel,
+            count: row._count._all,
+            gross,
+            fee,
+            refund,
+            adjustment,
+            net,
+            takeRate: gross > 0 ? fee / gross : 0,
+            gap: gross - net,
+          };
+        })
+        .sort((a, b) => b.net - a.net);
+      return {
+        channels,
+        total: channels.reduce((sum, row) => ({
+          count: sum.count + row.count,
+          gross: sum.gross + row.gross,
+          fee: sum.fee + row.fee,
+          refund: sum.refund + row.refund,
+          adjustment: sum.adjustment + row.adjustment,
+          net: sum.net + row.net,
+          gap: sum.gap + row.gap,
+        }), { count: 0, gross: 0, fee: 0, refund: 0, adjustment: 0, net: 0, gap: 0 }),
+      };
+    });
+    res.json({ data });
+  } catch (err) {
+    logger.error('[marketplace] settlements summary failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'Failed to build settlement summary' });
+  }
+});
+
+// ── CSV settlement import: preview ───────────────────────────────────
+marketplaceRouter.post('/settlements/import/preview', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'File is required' });
+      return;
+    }
+    const { headers, rows } = parseSettlementCsvRows(req.file.buffer);
+    if (headers.length === 0) {
+      res.status(400).json({ error: 'ไฟล์ว่างหรืออ่านไม่ได้' });
+      return;
+    }
+    res.json({
+      data: {
+        headers,
+        sampleRows: rows.slice(0, 15),
+        rowCount: rows.length,
+        guessedMapping: guessSettlementMapping(headers),
+      },
+    });
+  } catch (err) {
+    logger.error('[marketplace] settlement import preview failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'อ่านไฟล์ settlement ไม่สำเร็จ' });
+  }
+});
+
+const settlementImportCommitSchema = z.object({
+  channel: salesChannelSchema,
+  mapping: z.object({
+    externalRef: z.string().min(1),
+    settledAt: z.string().optional().nullable(),
+    gross: z.string().optional().nullable(),
+    fee: z.string().optional().nullable(),
+    refund: z.string().optional().nullable(),
+    adjustment: z.string().optional().nullable(),
+    net: z.string().optional().nullable(),
+  }).refine((m) => !!m.gross || !!m.net, { message: 'gross or net column is required' }),
+});
+
+// ── CSV settlement import: commit (parse → dedupe → persist) ─────────
+marketplaceRouter.post('/settlements/import/commit', requireRole('admin', 'super_admin', 'accountant'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'File is required' });
+      return;
+    }
+    const parsedBody = settlementImportCommitSchema.parse({
+      channel: req.body.channel,
+      mapping: typeof req.body.mapping === 'string' ? JSON.parse(req.body.mapping) : req.body.mapping,
+    });
+    const parsedRows = parseSettlementCsv(req.file.buffer, parsedBody.mapping);
+    const seen = new Set<string>();
+    const rows = parsedRows.filter((row) => {
+      if (seen.has(row.externalRef)) return false;
+      seen.add(row.externalRef);
+      return true;
+    });
+
+    const result = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+      const existing = rows.length
+        ? await tx.marketplaceSettlement.findMany({
+          where: {
+            companyId: req.user!.companyId,
+            channel: parsedBody.channel,
+            externalRef: { in: rows.map((row) => row.externalRef) },
+          },
+          select: { externalRef: true },
+        })
+        : [];
+      const existingRefs = new Set(existing.map((row) => row.externalRef));
+      const toCreate = rows.filter((row) => !existingRefs.has(row.externalRef));
+      if (toCreate.length) {
+        await tx.marketplaceSettlement.createMany({
+          data: toCreate.map((row) => ({
+            companyId: req.user!.companyId,
+            channel: parsedBody.channel,
+            externalRef: row.externalRef,
+            settledAt: row.settledAt,
+            gross: row.gross,
+            fee: row.fee,
+            refund: row.refund,
+            adjustment: row.adjustment,
+            net: row.net,
+            source: 'csv',
+          })),
+        });
+      }
+      return { toCreate, existingCount: existingRefs.size };
+    });
+
+    const totals = result.toCreate.reduce((sum, row) => ({
+      gross: sum.gross + row.gross,
+      fee: sum.fee + row.fee,
+      refund: sum.refund + row.refund,
+      adjustment: sum.adjustment + row.adjustment,
+      net: sum.net + row.net,
+    }), { gross: 0, fee: 0, refund: 0, adjustment: 0, net: 0 });
+
+    res.json({
+      data: {
+        totalRows: parsedRows.length,
+        uniqueRows: rows.length,
+        imported: result.toCreate.length,
+        skippedDuplicate: result.existingCount + (parsedRows.length - rows.length),
+        totals,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'ข้อมูล settlement ไม่ถูกต้อง', details: err.errors });
+      return;
+    }
+    logger.error('[marketplace] settlement import commit failed', { err: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: 'นำเข้า settlement ไม่สำเร็จ' });
+  }
+});
+
 // ── Disconnect a channel ──────────────────────────────────────────────
 marketplaceRouter.delete('/connections/:channel', requireRole('admin', 'super_admin'), async (req, res) => {
   try {
@@ -231,7 +431,7 @@ marketplaceRouter.post('/import/preview', upload.single('file'), async (req, res
 });
 
 const importCommitSchema = z.object({
-  channel: z.enum(['shopee', 'lazada', 'tiktok', 'facebook', 'instagram', 'line_shopping', 'shopify', 'woocommerce', 'pos', 'other']),
+  channel: salesChannelSchema,
   mapping: z.object({
     orderId: z.string().min(1),
     sku: z.string().min(1),

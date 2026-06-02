@@ -177,6 +177,7 @@ reportsRouter.get('/finance-overview', async (req, res) => {
       const [
         paymentsIn, expensesOut, purchasesPaidOut,
         revenueAgg, cogsAgg, arInvoices, apPurchases, outputAgg, inputAgg,
+        marketplaceSettlementRows,
       ] = await Promise.all([
         tx.payment.aggregate({ where: { paidAt: { gte: from, lte: to }, invoice: { companyId } }, _sum: { amount: true } }),
         tx.expenseVoucher.aggregate({ where: { companyId, status: 'approved', voucherDate: { gte: from, lte: to } }, _sum: { totalAmount: true } }),
@@ -187,6 +188,18 @@ reportsRouter.get('/finance-overview', async (req, res) => {
         tx.purchaseInvoice.findMany({ where: { companyId, isPaid: false, invoiceDate: { lte: to } }, select: { total: true, dueDate: true, invoiceDate: true } }),
         tx.invoice.aggregate({ where: { companyId, invoiceDate: { lte: to }, status: { notIn: ['cancelled', 'rejected'] } }, _sum: { vatAmount: true } }),
         tx.purchaseInvoice.aggregate({ where: { companyId, invoiceDate: { lte: to } }, _sum: { vatAmount: true } }),
+        tx.marketplaceSettlement.groupBy({
+          by: ['channel'],
+          where: {
+            companyId,
+            OR: [
+              { settledAt: { gte: from, lte: to } },
+              { settledAt: null, importedAt: { gte: from, lte: to } },
+            ],
+          },
+          _count: { _all: true },
+          _sum: { gross: true, fee: true, refund: true, adjustment: true, net: true },
+        }),
       ]);
 
       // 6-month revenue trend (ending in the `to` month).
@@ -199,7 +212,19 @@ reportsRouter.get('/finance-overview', async (req, res) => {
         trend.push({ month: `${mStart.getFullYear()}-${String(mStart.getMonth() + 1).padStart(2, '0')}`, revenue: agg._sum.subtotal ?? 0 });
       }
 
-      return { paymentsIn, expensesOut, purchasesPaidOut, revenueAgg, cogsAgg, arInvoices, apPurchases, outputAgg, inputAgg, trend };
+      return {
+        paymentsIn,
+        expensesOut,
+        purchasesPaidOut,
+        revenueAgg,
+        cogsAgg,
+        arInvoices,
+        apPurchases,
+        outputAgg,
+        inputAgg,
+        marketplaceSettlementRows,
+        trend,
+      };
     });
 
     const cashIn = data.paymentsIn._sum.amount ?? 0;
@@ -222,6 +247,34 @@ reportsRouter.get('/finance-overview', async (req, res) => {
 
     const outputVat = data.outputAgg._sum.vatAmount ?? 0;
     const inputVat = data.inputAgg._sum.vatAmount ?? 0;
+    const marketplaceChannels = data.marketplaceSettlementRows
+      .map((row) => {
+        const gross = row._sum.gross ?? 0;
+        const fee = row._sum.fee ?? 0;
+        const refund = row._sum.refund ?? 0;
+        const adjustment = row._sum.adjustment ?? 0;
+        const net = row._sum.net ?? 0;
+        return {
+          channel: row.channel,
+          count: row._count._all,
+          gross,
+          fee,
+          refund,
+          adjustment,
+          net,
+          gap: gross - net,
+        };
+      })
+      .sort((a, b) => b.net - a.net);
+    const marketplaceTotal = marketplaceChannels.reduce((sum, row) => ({
+      count: sum.count + row.count,
+      gross: sum.gross + row.gross,
+      fee: sum.fee + row.fee,
+      refund: sum.refund + row.refund,
+      adjustment: sum.adjustment + row.adjustment,
+      net: sum.net + row.net,
+      gap: sum.gap + row.gap,
+    }), { count: 0, gross: 0, fee: 0, refund: 0, adjustment: 0, net: 0, gap: 0 });
 
     res.json({
       data: {
@@ -231,6 +284,7 @@ reportsRouter.get('/finance-overview', async (req, res) => {
         ar: { total: arTotal, aging: arAging },
         ap: { total: apTotal, aging: apAging },
         vat: { output: outputVat, input: inputVat, payable: Math.max(0, outputVat - inputVat) },
+        marketplace: { total: marketplaceTotal, channels: marketplaceChannels },
         trend: data.trend,
       },
     });

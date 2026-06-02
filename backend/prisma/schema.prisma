@@ -242,6 +242,7 @@ model Company {
   productChannelMappings ProductChannelMapping[]
   marketplaceConnections MarketplaceConnection[]
   marketplaceOrders      MarketplaceOrder[]
+  marketplaceSettlements MarketplaceSettlement[]
 
   @@map("companies")
 }
@@ -582,6 +583,32 @@ model MarketplaceOrder {
   @@unique([companyId, channel, externalOrderId])
   @@index([companyId])
   @@map("marketplace_orders")
+}
+
+// A settled line from a marketplace payout/settlement report (CSV): the gross
+// sale, platform fee, refund, and the net amount actually transferred. Lets the
+// owner reconcile "sales vs money received" - net = gross - fee - refund +
+// adjustment. externalRef (order id / transaction id / payout line) dedupes
+// re-uploads.
+model MarketplaceSettlement {
+  id          String    @id @default(cuid())
+  companyId   String    @map("company_id")
+  channel     String
+  externalRef String    @map("external_ref")
+  settledAt   DateTime? @map("settled_at")
+  gross       Float     @default(0)
+  fee         Float     @default(0)
+  refund      Float     @default(0)
+  adjustment  Float     @default(0)
+  net         Float     @default(0)
+  source      String    @default("csv")
+  importedAt  DateTime  @default(now()) @map("imported_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, channel, externalRef])
+  @@index([companyId])
+  @@map("marketplace_settlements")
 }
 
 // Stock ledger — one row per increment / decrement event. currentStock

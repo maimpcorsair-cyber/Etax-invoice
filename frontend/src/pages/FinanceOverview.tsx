@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, Receipt, FileText, ExternalLink, Calculator, Link2 } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, Receipt, FileText, ExternalLink, Calculator, Link2, Store } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
@@ -13,6 +13,10 @@ interface Overview {
   ar: { total: number; aging: Aging };
   ap: { total: number; aging: Aging };
   vat: { output: number; input: number; payable: number };
+  marketplace?: {
+    total: { count: number; gross: number; fee: number; refund: number; adjustment: number; net: number; gap: number };
+    channels: Array<{ channel: string; count: number; gross: number; fee: number; refund: number; adjustment: number; net: number; gap: number }>;
+  };
   trend: Array<{ month: string; revenue: number }>;
 }
 
@@ -125,6 +129,36 @@ export default function FinanceOverview() {
             </div>
           </div>
 
+          {data.marketplace && data.marketplace.total.count > 0 && (
+            <div className="card">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Store className="h-4 w-4 text-primary-600" />
+                  {isThai ? 'Marketplace: ยอดขายเทียบเงินเข้าจริง' : 'Marketplace: sales vs net payout'}
+                </h2>
+                <Link to="/app/marketplace-orders" className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-800">
+                  {isThai ? 'ดูรายการ settlement' : 'Settlement details'} <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniMetric label="Gross" value={formatCurrency(data.marketplace.total.gross)} />
+                <MiniMetric label="Fee" value={`- ${formatCurrency(data.marketplace.total.fee)}`} tone="text-rose-700" />
+                <MiniMetric label="Refund" value={`- ${formatCurrency(data.marketplace.total.refund)}`} tone="text-rose-700" />
+                <MiniMetric label="Net payout" value={formatCurrency(data.marketplace.total.net)} tone="text-emerald-700" />
+              </div>
+              {data.marketplace.channels.length > 0 && (
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {data.marketplace.channels.slice(0, 6).map((channel) => (
+                    <div key={channel.channel} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                      <span className="font-semibold text-slate-800">{channel.channel}</span>
+                      <span className="font-bold text-emerald-700">{formatCurrency(channel.net)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* AR / AP aging */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <AgingCard title={isThai ? 'ลูกหนี้ (AR) ค้างรับ' : 'Receivables (AR)'} total={data.ar.total} rows={agingRows(data.ar.aging)} fmt={formatCurrency} icon={<FileText className="h-4 w-4 text-primary-600" />} />
@@ -177,6 +211,15 @@ function Row({ label, value, sub, bold, tone }: { label: string; value: string; 
     <div className="flex items-center justify-between py-1 text-sm">
       <span className="text-slate-600">{label}{sub && <span className="ml-1 text-xs text-slate-400">· {sub}</span>}</span>
       <span className={`${bold ? 'font-bold' : 'font-medium'} ${tone ?? 'text-slate-900'}`}>{value}</span>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className={`mt-1 text-sm font-bold ${tone ?? 'text-slate-900'}`}>{value}</div>
     </div>
   );
 }
