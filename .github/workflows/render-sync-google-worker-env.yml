@@ -1,0 +1,36 @@
+name: Sync Google Drive env to Render worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Trigger worker deploy after sync
+        required: true
+        default: true
+        type: boolean
+      dry_run:
+        description: Print planned key changes without updating Render
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  sync-google-worker-env:
+    name: Sync Google/Drive env
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Copy API Google env to worker
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_API_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_WORKER_SERVICE_ID: ${{ secrets.RENDER_WORKER_SERVICE_ID }}
+          RENDER_DEPLOY_AFTER_SYNC: ${{ inputs.deploy }}
+          RENDER_SYNC_GOOGLE_DRY_RUN: ${{ inputs.dry_run }}
+        run: node scripts/render-sync-google-worker-env.mjs
