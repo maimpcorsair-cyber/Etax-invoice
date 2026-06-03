@@ -133,7 +133,7 @@ export async function syncDocumentIntakeToProjectDrive(
     },
   }));
 
-  if (!intake || !intake.projectId) return null;
+  if (!intake) return null;
   if (!options.force && intake.driveSyncStatus === 'synced' && intake.driveFileId) return null;
 
   await withSystemRlsContext(prisma, (tx) => tx.documentIntake.update({
@@ -148,10 +148,12 @@ export async function syncDocumentIntakeToProjectDrive(
           where: { id: intake.companyId },
           select: { nameTh: true, nameEn: true, taxId: true, email: true, googleDriveOwnerUserId: true },
         }),
-        tx.project.findFirst({
-          where: { id: intake.projectId!, companyId: intake.companyId },
-          select: { id: true, code: true, name: true },
-        }),
+        intake.projectId
+          ? tx.project.findFirst({
+              where: { id: intake.projectId, companyId: intake.companyId },
+              select: { id: true, code: true, name: true },
+            })
+          : Promise.resolve(null),
         (() => {
           const userId = usableDriveUserId(intake.userId, options.preferredUserId);
           return userId
@@ -168,7 +170,7 @@ export async function syncDocumentIntakeToProjectDrive(
       return { company: companyRecord, project: projectRecord, user: preferredUser, companyOwner: owner };
     });
 
-    if (!project) throw new Error('Project not found for Drive sync');
+    if (intake.projectId && !project) throw new Error('Project not found for Drive sync');
     const buffer = await readIntakeBuffer(intake);
     if (!buffer) throw new Error('No stored file buffer available for Drive sync');
 
@@ -188,8 +190,8 @@ export async function syncDocumentIntakeToProjectDrive(
       }),
       {
         companyTaxId: company?.taxId,
-        projectCode: project.code,
-        projectName: project.name,
+        projectCode: project?.code,
+        projectName: project?.name,
         documentFolder: driveFolderForIntake(intake),
         taxFolder: driveTaxFolderForIntake(intake),
         transactionDate: transactionDateFromIntake(intake),
@@ -226,7 +228,7 @@ export async function syncDocumentIntakeToProjectDrive(
       },
     }));
 
-    if (result.projectFolderId && result.projectFolderUrl) {
+    if (project && result.projectFolderId && result.projectFolderUrl) {
       await withSystemRlsContext(prisma, (tx) => tx.project.updateMany({
         where: { id: project.id, companyId: intake.companyId },
         data: {
