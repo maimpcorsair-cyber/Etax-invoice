@@ -5,6 +5,8 @@ import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { authenticate, requireRole } from '../middleware/auth';
 import { auditLog } from '../services/auditService';
 import { generateWhtCertificatePdf } from '../services/whtCertificatePdf';
+import { syncWhtCertificateToDrive } from '../services/projectDriveSyncService';
+import { enqueueMasterSheetSync } from '../queues';
 import { logger } from '../config/logger';
 
 export const whtCertificatesRouter = Router();
@@ -198,6 +200,11 @@ whtCertificatesRouter.post('/', requireRole('admin', 'accountant'), async (req, 
       userAgent: req.get('user-agent') ?? '',
       language: 'th',
     });
+
+    void syncWhtCertificateToDrive(cert.id)
+      .then(() => enqueueMasterSheetSync(req.user!.companyId))
+      .catch((error) => logger.warn('Failed to sync WHT certificate to Drive', { error, whtCertificateId: cert.id }));
+    void enqueueMasterSheetSync(req.user!.companyId);
 
     res.status(201).json({ data: cert });
   } catch (err) {

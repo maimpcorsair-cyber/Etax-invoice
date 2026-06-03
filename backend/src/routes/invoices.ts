@@ -6,6 +6,7 @@ import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../confi
 import { logger } from '../config/logger';
 import { applyInvoiceStockMovements, reverseStockMovementsFor } from '../services/inventoryService';
 import { invoiceQueue, rdSubmissionQueue, enqueueMasterSheetSync } from '../queues';
+import { syncWhtCertificateToDrive } from '../services/projectDriveSyncService';
 import { auditLog } from '../services/auditService';
 import { requireRole } from '../middleware/auth';
 import { generateInvoiceNumber } from '../services/invoiceService';
@@ -1164,6 +1165,11 @@ invoicesRouter.post('/:id/wht-certificate', requireRole('admin', 'accountant'), 
       userAgent: req.get('user-agent') ?? '',
       language: 'th',
     });
+
+    void syncWhtCertificateToDrive(cert.id)
+      .then(() => enqueueMasterSheetSync(req.user!.companyId))
+      .catch((error) => logger.warn('Failed to sync WHT certificate to Drive', { error, whtCertificateId: cert.id }));
+    void enqueueMasterSheetSync(req.user!.companyId);
 
     res.status(201).json({ data: cert });
   } catch (err) {

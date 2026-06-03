@@ -1,8 +1,30 @@
 # Project State Handoff
 
-Last updated: 2026-06-04 (Drive + master sheet worker wiring)
+Last updated: 2026-06-04 (WHT Drive mirror + audit-correctness fixes)
 
 ## Latest work (2026-06-04)
+
+Drive audit-correctness fixes (repo-local — not deployed, batched with the WHT work below):
+- **Sales XML retry (M1):** `syncInvoiceToDrive` previously short-circuited on `driveFileId` alone, so if the PDF filed but the XML wasn't yet in storage the legally-binding XML (ขมธอ.3-2560) could be lost forever. It now skips only when BOTH `driveFileId` and `driveXmlFileId` are set and uploads each artifact independently, so a later re-run still backfills a missing XML.
+- **Cancelled invoices in register (M2):** `masterSheetWorker` output-VAT query now includes `cancelled` (alongside approved/submitted/pending). A cancelled tax invoice still consumed a number; dropping it left a sequence gap auditors read as hidden sales. The row carries its `cancelled` status. Draft/rejected stay excluded (never issued).
+- **Project folder shortcut (M3):** tax-period project uploads put the file in the audit spine (`YYYY/เดือน/tax-class`) and now also drop a Drive **shortcut** into `Projects/<proj>` via `ensureDriveShortcut`, so browsing the project folder shows the file without duplicating bytes. Best-effort + idempotent (skips if a same-named item exists).
+
+WHT certificate Drive mirror (P1, repo-local — not deployed):
+- **Schema:** migration `20260604_wht_payslip_drive_mirror` adds `drive_file_id/drive_url/drive_folder_id/drive_folder_url` to `wht_certificates` and `payslips`. Local `prisma db push` applied; SQL ready for prod `render-deploy.yml`.
+- **Backend:** new `syncWhtCertificateToDrive(certId)` in `projectDriveSyncService.ts` renders the 50ทวิ PDF (`generateWhtCertificatePdf`) and uploads it to the audit-period `4_หัก ณ ที่จ่าย (ภ.ง.ด.3-53)` folder bucketed by payment date, then persists the cert's Drive file/folder URLs. Wired fire-and-forget into both WHT create routes (`routes/whtCertificates.ts`, `routes/invoices.ts`) followed by a master-sheet re-sync.
+- **Master Sheet:** WHT + payroll tabs now prefer Drive URLs (via `preferredDriveFirstUrl`) over the legacy `pdfUrl`, and both gained a `โฟลเดอร์` (folder link) column.
+- **Deferred (next P1):** payslip Drive mirror needs a payslip PDF generator built first (none exists today; `Payslip.pdfUrl` is never written). PP30 "filed forms" → `9_แบบที่ยื่นแล้ว` needs a persisted VAT-filing model + route (PP30 is export-only on demand, not stored). Drive fields for both already exist in schema so those PRs are additive.
+- **Verification:** `cd backend && npx prisma generate`, `npm run typecheck`, `npx tsx --test src/services/driveAuditRegister.test.ts` (3/3), and `npm run test:unit` (126/126) pass. Not yet committed/pushed/deployed. Live check after deploy: issue a WHT certificate with a connected Drive owner, confirm a PDF lands in `4_หัก ณ ที่จ่าย` and the master sheet WHT tab shows file + folder links.
+
+Drive register audit-ready P0:
+- **Backend:** Drive filing now uses a single `Projects` folder name for project workspace creation from both normal project uploads and tax-period uploads; the old tax-folder path no longer creates a separate `_โปรเจค` sibling.
+- **Master Sheet:** added `driveAuditRegister` helpers so register rows prefer Drive links first with S3/app URLs only as fallback. Customer/Vendor tabs now emit one row per uploaded document instead of only the newest/first document. Project summary now includes Drive folder links and synced-file counts. AI Inbox rows now include both file and folder links, preferring `DocumentIntake.driveUrl` over `fileUrl`.
+- **Verification:** `cd backend && npm run typecheck`, focused `npx tsx --test src/services/driveAuditRegister.test.ts`, and `cd backend && npm run test:unit` pass (`126/126`). Next live check after deploy: connect Drive owner, click Dashboard → "คลังหลักฐาน Drive + สมุดทะเบียนภาษี" → create/open sheet, then confirm AI Inbox has file+folder links, Project Summary has folder links, and Customer/Vendor tabs show all evidence documents.
+
+PDF line-item pre-VAT label:
+- **Backend PDF:** standard document line-item table now labels the final line amount as `ยอดก่อน VAT` / `Amount excl. VAT`, making explicit that each row shows pre-VAT value only. VAT-inclusive line totals remain hidden from the item table and VAT stays summarized below.
+- **Regression:** `pdfService.test.ts` now asserts the pre-VAT header is present and the fixture item VAT-inclusive totals (`32,100.00`, `16,050.00`) do not render in the item table output.
+- **Verification:** backend typecheck, backend build, focused `pdfService.test.ts` (`19/19`), touched-file eslint, and `git diff --check` pass.
 
 Drive/Master Sheet worker wiring follow-up:
 - **Finding:** `masterSheetWorker` was not loaded by the Render worker entrypoint (`backend/src/worker.ts`); only the API web process had a conditional dynamic import, while Render sets `ENABLE_WORKERS=false` on web. Dashboard routes also imported the worker module directly, making queue enqueueing and worker side effects hard to reason about.

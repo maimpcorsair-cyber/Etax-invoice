@@ -5,6 +5,7 @@ import { withSystemRlsContext } from '../../config/rls';
 import { logger } from '../../config/logger';
 import { exportCompanyWorkspaceToSheets, linkCell } from '../../services/googleSheetsService';
 import { ensureCompanyDriveFolder } from '../../services/googleDriveService';
+import { buildPartyDirectoryRows, buildProjectRollupRows, preferredDriveFirstUrl } from '../../services/driveAuditRegister';
 import { MASTER_SHEET_QUEUE_NAME } from '../masterSheetQueue';
 
 function formatDate(date: Date | null | undefined): string {
@@ -80,8 +81,13 @@ async function buildWorkspaceData(companyId: string) {
       orderBy: { invoiceDate: 'desc' },
       take: 5000,
     })),
+    // Include cancelled invoices in the output-VAT register. A cancelled tax
+    // invoice still consumed a number in the sequence; dropping it leaves a
+    // gap that auditors read as "hidden sales". The row carries its status so
+    // the cancellation is explicit. Draft/rejected are excluded — they were
+    // never issued, so they never took a number.
     withSystemRlsContext(prisma, (tx) => tx.invoice.findMany({
-      where: { companyId, status: { in: ['approved', 'submitted', 'pending'] } },
+      where: { companyId, status: { in: ['approved', 'submitted', 'pending', 'cancelled'] } },
       include: {
         project: { select: { code: true, name: true } },
         buyer: { select: { nameTh: true, nameEn: true } },
@@ -100,7 +106,12 @@ async function buildWorkspaceData(companyId: string) {
     })),
     withSystemRlsContext(prisma, (tx) => tx.customer.findMany({
       where: { companyId, isActive: true },
-      include: { documents: { select: { documentType: true, status: true, s3Url: true, driveUrl: true, driveFolderUrl: true } } },
+      include: {
+        documents: {
+          select: { documentType: true, status: true, s3Url: true, driveUrl: true, driveFolderUrl: true },
+          orderBy: { uploadedAt: 'desc' },
+        },
+      },
       take: 2000,
     })),
     // Projects feed the "สรุปโปรเจค" rollup tab — every active or recently
@@ -113,6 +124,7 @@ async function buildWorkspaceData(companyId: string) {
         invoices: { select: { total: true, status: true, vatAmount: true } },
         purchaseInvoices: { select: { total: true } },
         expenseVouchers: { select: { totalAmount: true, status: true } },
+        documentIntakes: { select: { driveUrl: true, driveSyncStatus: true } },
       },
     })),
     // Recent document intakes power the AI Inbox tab — only show items
@@ -180,9 +192,9 @@ async function buildWorkspaceData(companyId: string) {
     updatedAt: formatDate(p.updatedAt),
   }));
 
-  // attachmentLink is the column the new sheetDefs read — it's the clickable
-  // HYPERLINK formula. Falls back through s3Url (system of record), driveUrl
-  // (mirror), then pdfUrl (legacy field still used for sales PDFs).
+  // attachmentLink is the column the sheetDefs read. Prefer Drive because this
+  // register is an audit map for the customer's Drive workspace; S3/app URLs
+  // stay as fallback when a mirror has not synced yet.
   const inputVatTab = purchaseInvoices.map((pi) => ({
     period: periodKey(pi.invoiceDate),
     date: formatDate(pi.invoiceDate),
@@ -195,7 +207,7 @@ async function buildWorkspaceData(companyId: string) {
     vat: pi.vatAmount,
     total: pi.total,
     taxStatus: taxStatusLabel(pi.vatType),
-    attachmentLink: linkCell(pi.driveUrl ?? purchaseEvidenceById.get(pi.id) ?? pi.pdfUrl),
+    attachmentLink: linkCell(preferredDriveFirstUrl({ driveUrl: pi.driveUrl ?? purchaseEvidenceById.get(pi.id), pdfUrl: pi.pdfUrl })),
     docId: pi.id,
   }));
 
@@ -228,8 +240,7 @@ async function buildWorkspaceData(companyId: string) {
     amount: Number(ev.totalAmount),
     wht: ev.items.reduce((sum, item) => sum + Number(item.whtAmount ?? 0), 0),
     status: ev.status,
-    attachmentLink: linkCell(ev.items.flatMap((item) => item.attachments).find((attachment) => attachment.driveUrl || attachment.url)?.driveUrl
-      ?? ev.items.flatMap((item) => item.attachments).find((attachment) => attachment.driveUrl || attachment.url)?.url),
+    attachmentLink: linkCell(preferredDriveFirstUrl(ev.items.flatMap((item) => item.attachments).find((attachment) => attachment.driveUrl || attachment.url))),
     docId: ev.id,
   }));
 
@@ -244,7 +255,8 @@ async function buildWorkspaceData(companyId: string) {
     rate: cert.whtRate,
     withheld: cert.whtAmount,
     pndFlag: '3/53',
-    attachmentLink: linkCell(cert.pdfUrl),
+    attachmentLink: linkCell(preferredDriveFirstUrl({ driveUrl: cert.driveUrl, pdfUrl: cert.pdfUrl })),
+    folderLink: linkCell(cert.driveFolderUrl),
     docId: cert.id,
   }));
 
@@ -259,58 +271,28 @@ async function buildWorkspaceData(companyId: string) {
     pvd: payslip.pvdAmount,
     net: payslip.net,
     status: payslip.payrollRun.status,
-    attachmentLink: linkCell(payslip.pdfUrl),
+    attachmentLink: linkCell(preferredDriveFirstUrl({ driveUrl: payslip.driveUrl, pdfUrl: payslip.pdfUrl })),
+    folderLink: linkCell(payslip.driveFolderUrl),
     docId: payslip.id,
   }));
 
   // Split customers vs vendors so each tab is scoped to its mental model.
-  // `both` shows up in both (it really is both per Prisma's `partyRole` enum).
-  const buildDirectoryRow = (c: typeof customers[number]) => {
-    const doc = c.documents[0] ?? null;
-    const url = doc?.s3Url ?? doc?.driveUrl ?? null;
-    return {
-      name: c.nameTh || c.nameEn || '',
-      taxId: c.taxId ?? '',
-      useCase: c.useCase ?? '',
-      documentType: doc?.documentType ?? '',
-      status: doc?.status ?? '',
-      readiness: c.verificationStatus ?? '',
-      attachmentLink: linkCell(url),
-      folderLink: linkCell(doc?.driveFolderUrl),
-    };
-  };
-  const customersTab = customers
-    .filter((c) => c.partyRole === 'customer' || c.partyRole === 'both')
-    .map(buildDirectoryRow);
-  const vendorsTab = customers
-    .filter((c) => c.partyRole === 'supplier' || c.partyRole === 'both')
-    .map(buildDirectoryRow);
+  // One row per uploaded document keeps the register complete for auditors.
+  const customersTab = buildPartyDirectoryRows(customers, 'customer').map((row) => ({
+    ...row,
+    attachmentLink: linkCell(row.attachmentUrl),
+    folderLink: linkCell(row.folderUrl),
+  }));
+  const vendorsTab = buildPartyDirectoryRows(customers, 'supplier').map((row) => ({
+    ...row,
+    attachmentLink: linkCell(row.attachmentUrl),
+    folderLink: linkCell(row.folderUrl),
+  }));
 
-  // Project rollup — per-project revenue, cost, balance, forecast. Replaces
-  // the previously hardcoded empty array. Mirror of the dashboard's logic
-  // so master + dashboard report the same numbers.
-  const projectSummaryTab = projects.map((p) => {
-    const revenue = p.invoices
-      .filter((i) => i.status !== 'cancelled' && i.status !== 'rejected')
-      .reduce((sum, i) => sum + (i.total ?? 0), 0);
-    const purchaseCost = p.purchaseInvoices.reduce((sum, pi) => sum + (pi.total ?? 0), 0);
-    const expenseCost = p.expenseVouchers
-      .filter((ev) => ev.status !== 'rejected')
-      .reduce((sum, ev) => sum + Number(ev.totalAmount ?? 0), 0);
-    const actual = purchaseCost + expenseCost;
-    const budget = Number((p as { budget?: unknown }).budget ?? 0);
-    return {
-      project: `${p.code} ${p.name}`,
-      status: p.status,
-      budget,
-      revenue,
-      actual,
-      balance: budget - actual,
-      forecastProfit: revenue - actual,
-      files: '',
-      folderLink: '',
-    };
-  });
+  const projectSummaryTab = buildProjectRollupRows(projects).map((row) => ({
+    ...row,
+    folderLink: linkCell(row.folderUrl),
+  }));
 
   // AI Inbox — recent intakes still needing human action. Distinct from the
   // saved-and-done intakes that already appear in ขาย/ซื้อ.
@@ -321,7 +303,8 @@ async function buildWorkspaceData(companyId: string) {
     source: di.source ?? '',
     status: di.status,
     issue: di.error ?? '',
-    attachmentLink: linkCell(di.fileUrl),
+    attachmentLink: linkCell(preferredDriveFirstUrl(di)),
+    folderLink: linkCell(di.driveFolderUrl),
   }));
 
   return {
