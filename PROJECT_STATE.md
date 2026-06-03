@@ -1,8 +1,12 @@
 # Project State Handoff
 
-Last updated: 2026-06-03 (Product catalog ledger polish)
+Last updated: 2026-06-03 (Ledger Banner redesign deployed to production)
 
 ## Latest work (2026-06-03)
+
+Ledger Banner redesign production deploy:
+- **Production:** frontend redesign commit `fd087e3` (`feat(frontend): apply ledger banner redesign`) was pushed to `main` after the local Ledger Banner passes were still only uncommitted working-tree changes. GitHub Actions for the push are green: Typecheck run `26887086075`, Unit tests run `26887085876`, and Prod smoke test run `26887085700`.
+- **Verification:** Vercel production alias `https://etax-invoice.vercel.app` refreshed after the push; root, `/app/dashboard`, and `/app/products` return `200` with `last-modified` around `2026-06-03T13:14:46Z` and the HTML points at new app bundle `/assets/index-0r9pWr2u.js`.
 
 Dashboard redesign — Ledger Banner P0/P1 composition pass:
 - **Frontend:** `frontend/src/pages/Dashboard.tsx` now leads with a navy Ledger Banner focused on `ยอดต้องตามเก็บ` / total AR outstanding, with monthly revenue + net VAT subordinate stats, mascot retained, and primary AI Inbox / sales-document actions on the right.
