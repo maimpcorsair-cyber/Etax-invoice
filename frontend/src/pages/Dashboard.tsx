@@ -338,7 +338,6 @@ export default function Dashboard() {
 
   // Current month compliance (last item)
   const currentMonth = compliance[compliance.length - 1];
-  const hasComplianceIssue = currentMonth && (currentMonth.failed > 0 || currentMonth.unsubmitted > 0);
   const pendingRdCount = currentMonth ? currentMonth.failed + currentMonth.unsubmitted : stats?.rdPendingCount ?? 0;
   const aiReviewCount = documentStats
     ? ['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed']
@@ -964,23 +963,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* RD Compliance Alert (if there are issues) */}
-      {!complianceLoading && hasComplianceIssue && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 shadow-sm">
-          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-sm">
-            <p className="font-semibold text-amber-800">
-              {isThai ? `มีเอกสารยังไม่ส่ง RD เดือน ${currentMonth.month}` : `Pending RD submissions for ${currentMonth.month}`}
-            </p>
-            <p className="text-amber-700 mt-0.5">
-              {isThai
-                ? `ยังไม่ส่ง ${currentMonth.failed + currentMonth.unsubmitted} ใบ · กำหนดส่งวันที่ 15 (เหลือ ${currentMonth.daysLeft} วัน)`
-                : `${currentMonth.failed + currentMonth.unsubmitted} documents pending · Deadline: 15th (${currentMonth.daysLeft} days left)`}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Autopilot lanes */}
       <section className="card">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -1032,78 +1014,6 @@ export default function Dashboard() {
               />
             ))}
       </div>
-
-      {integrations && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-gray-900">
-                {isThai ? 'สถานะการเชื่อมต่อของระบบ' : 'Connection Status'}
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {isThai ? 'ดูว่าบัญชีนี้เชื่อม LINE AI, Google Sheets และ Drive พร้อมใช้งานหรือยัง' : 'Check whether this account is connected to LINE AI, Google Sheets, and Drive.'}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            {[
-              {
-                key: 'line',
-                icon: Bot,
-                title: isThai ? 'LINE AI' : 'LINE AI',
-                ok: integrations.lineAi.connected,
-                detail: integrations.lineAi.connected
-                  ? (integrations.lineAi.displayName || (isThai ? 'ผูกบัญชีแล้ว' : 'Connected'))
-                  : (isThai ? 'ยังไม่ได้ผูก' : 'Not connected'),
-              },
-              {
-                key: 'google',
-                icon: UserCheck,
-                title: isThai ? 'บัญชี Google' : 'Google Account',
-                ok: integrations.googleAccount.connected,
-                detail: integrations.googleAccount.connected
-                  ? (integrations.googleAccount.email || (isThai ? 'เชื่อมแล้ว' : 'Connected'))
-                  : (isThai ? 'ยังไม่ได้เชื่อม Google OAuth' : 'Google OAuth not connected'),
-              },
-              {
-                key: 'sheets',
-                icon: Table2,
-                title: 'Google Sheets',
-                ok: integrations.googleSheets.connected,
-                detail: integrations.googleSheets.connected
-                  ? (isThai ? 'พร้อม export' : 'Export ready')
-                  : (isThai ? 'ยังไม่ตั้งค่า export' : 'Export not configured'),
-              },
-              {
-                key: 'drive',
-                icon: HardDrive,
-                title: 'Google Drive',
-                ok: integrations.googleDrive.connected,
-                detail: integrations.googleDrive.connected
-                  ? (isThai ? 'พร้อม sync ไฟล์' : 'File sync ready')
-                  : (isThai ? 'ยังไม่เชื่อม Drive' : 'Drive not connected'),
-              },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.key} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
-                      <Icon className="w-4 h-4 text-primary-600" />
-                      {item.title}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.ok ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                      {item.ok ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                      {item.ok ? (isThai ? 'พร้อม' : 'Ready') : (isThai ? 'รอตั้งค่า' : 'Pending')}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500 truncate">{item.detail}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {!loading && stats && (
         <div className="card">
