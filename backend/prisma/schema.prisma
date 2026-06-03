@@ -1748,6 +1748,10 @@ model WhtCertificate {
   incomeType        String?  @map("income_type")
   paymentDate       DateTime @map("payment_date")
   pdfUrl            String?  @map("pdf_url")
+  driveFileId       String?  @map("drive_file_id")
+  driveUrl          String?  @map("drive_url")
+  driveFolderId     String?  @map("drive_folder_id")
+  driveFolderUrl    String?  @map("drive_folder_url")
   createdBy         String   @map("created_by")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -1856,6 +1860,10 @@ model Payslip {
   pvdAmount    Float     @default(0) @map("pvd_amount")
   net          Float
   pdfUrl       String?   @map("pdf_url")
+  driveFileId    String?   @map("drive_file_id")
+  driveUrl       String?   @map("drive_url")
+  driveFolderId  String?   @map("drive_folder_id")
+  driveFolderUrl String?   @map("drive_folder_url")
   emailedAt    DateTime? @map("emailed_at")
   createdAt    DateTime  @default(now()) @map("created_at")
 

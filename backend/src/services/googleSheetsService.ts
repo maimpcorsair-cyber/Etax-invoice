@@ -337,6 +337,7 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
         { key: 'withheld', label: 'ภาษีหัก' },
         { key: 'pndFlag', label: '3/53' },
         { key: 'attachmentLink', label: 'ไฟล์' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
         { key: 'docId', label: 'docId' },
       ]),
     },
@@ -354,6 +355,7 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
         { key: 'net', label: 'net' },
         { key: 'status', label: 'สถานะ' },
         { key: 'attachmentLink', label: 'ไฟล์' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
         { key: 'docId', label: 'docId' },
       ]),
     },
@@ -412,6 +414,7 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
         { key: 'status', label: 'สถานะ' },
         { key: 'issue', label: 'สิ่งที่ต้องทำ' },
         { key: 'attachmentLink', label: 'เปิด' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
       ]),
     },
     {

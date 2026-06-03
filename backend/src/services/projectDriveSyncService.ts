@@ -327,6 +327,7 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
       invoiceNumber: true,
       invoiceDate: true,
       driveFileId: true,
+      driveXmlFileId: true,
       company: {
         select: {
           nameTh: true,
@@ -340,7 +341,11 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
   }));
 
   if (!invoice) return;
-  if (invoice.driveFileId) return; // Already synced — skip
+  // Skip only when BOTH artifacts are filed. The XML is the legally-binding
+  // document (ขมธอ.3-2560), so if the first sync uploaded the PDF but the XML
+  // wasn't ready in storage yet, later runs must still retry the XML — never
+  // short-circuit on the PDF alone.
+  if (invoice.driveFileId && invoice.driveXmlFileId) return;
 
   const companyName = invoice.company.nameTh || invoice.company.nameEn || 'Company';
   const storageKeyPdf = `invoices/${invoice.companyId}/${invoice.invoiceNumber}.pdf`;
@@ -358,52 +363,56 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
 
   const updates: Record<string, string> = {};
 
-  // Upload PDF
-  try {
-    const pdfBuffer = await downloadFromStorage(storageKeyPdf);
-    const pdfResult = await uploadToDrive(
-      pdfBuffer,
-      `${invoice.invoiceNumber}.pdf`,
-      'application/pdf',
-      companyName,
-      userRefreshToken,
-      {
-        taxFolder: 'output_vat',
-        transactionDate: invoice.invoiceDate,
-        companyTaxId: invoice.company.taxId,
-        duplicatePolicy: 'skip',
-      },
-    );
-    if (pdfResult.fileId) {
-      updates.driveFileId = pdfResult.fileId;
-      updates.driveUrl = pdfResult.url;
+  // Upload PDF (only if not already filed)
+  if (!invoice.driveFileId) {
+    try {
+      const pdfBuffer = await downloadFromStorage(storageKeyPdf);
+      const pdfResult = await uploadToDrive(
+        pdfBuffer,
+        `${invoice.invoiceNumber}.pdf`,
+        'application/pdf',
+        companyName,
+        userRefreshToken,
+        {
+          taxFolder: 'output_vat',
+          transactionDate: invoice.invoiceDate,
+          companyTaxId: invoice.company.taxId,
+          duplicatePolicy: 'skip',
+        },
+      );
+      if (pdfResult.fileId) {
+        updates.driveFileId = pdfResult.fileId;
+        updates.driveUrl = pdfResult.url;
+      }
+    } catch (err) {
+      logger.warn('[syncInvoiceToDrive] PDF not ready or upload failed', { error: err, invoiceId, storageKeyPdf });
     }
-  } catch (err) {
-    logger.warn('[syncInvoiceToDrive] PDF not ready or upload failed', { error: err, invoiceId, storageKeyPdf });
   }
 
-  // Upload XML
-  try {
-    const xmlBuffer = await downloadFromStorage(storageKeyXml);
-    const xmlResult = await uploadToDrive(
-      xmlBuffer,
-      `${invoice.invoiceNumber}.xml`,
-      'application/xml',
-      companyName,
-      userRefreshToken,
-      {
-        taxFolder: 'output_vat',
-        transactionDate: invoice.invoiceDate,
-        companyTaxId: invoice.company.taxId,
-        duplicatePolicy: 'skip',
-      },
-    );
-    if (xmlResult.fileId) {
-      updates.driveXmlFileId = xmlResult.fileId;
-      updates.driveXmlUrl = xmlResult.url;
+  // Upload XML (only if not already filed). Retries independently of the PDF.
+  if (!invoice.driveXmlFileId) {
+    try {
+      const xmlBuffer = await downloadFromStorage(storageKeyXml);
+      const xmlResult = await uploadToDrive(
+        xmlBuffer,
+        `${invoice.invoiceNumber}.xml`,
+        'application/xml',
+        companyName,
+        userRefreshToken,
+        {
+          taxFolder: 'output_vat',
+          transactionDate: invoice.invoiceDate,
+          companyTaxId: invoice.company.taxId,
+          duplicatePolicy: 'skip',
+        },
+      );
+      if (xmlResult.fileId) {
+        updates.driveXmlFileId = xmlResult.fileId;
+        updates.driveXmlUrl = xmlResult.url;
+      }
+    } catch (err) {
+      logger.warn('[syncInvoiceToDrive] XML not ready or upload failed', { error: err, invoiceId, storageKeyXml });
     }
-  } catch (err) {
-    logger.warn('[syncInvoiceToDrive] XML not ready or upload failed', { error: err, invoiceId, storageKeyXml });
   }
 
   if (Object.keys(updates).length > 0) {
@@ -538,5 +547,91 @@ export async function syncPurchaseInvoiceToDrive(purchaseInvoiceId: string): Pro
     purchaseInvoiceId,
     intakeId: intake.id,
     fileId: result.fileId,
+  });
+}
+
+/**
+ * Generate the หนังสือรับรองหัก ณ ที่จ่าย (50ทวิ) PDF and mirror it into the
+ * audit-period "4_หัก ณ ที่จ่าย" Drive folder, bucketed by payment date.
+ * The WHT cert PDF is rendered on demand elsewhere and never stored, so we
+ * generate a fresh copy here and persist driveFileId/driveUrl/driveFolderUrl
+ * so the master sheet can link both the file and its folder.
+ */
+export async function syncWhtCertificateToDrive(whtCertificateId: string): Promise<void> {
+  if (!isDriveConfigured()) return;
+
+  const cert = await withSystemRlsContext(prisma, (tx) => tx.whtCertificate.findFirst({
+    where: { id: whtCertificateId },
+    include: {
+      company: {
+        select: {
+          nameTh: true,
+          nameEn: true,
+          taxId: true,
+          email: true,
+          branchCode: true,
+          addressTh: true,
+          googleDriveOwnerUserId: true,
+        },
+      },
+      invoice: {
+        select: {
+          id: true,
+          invoiceNumber: true,
+          total: true,
+          invoiceDate: true,
+          buyer: { select: { nameTh: true, nameEn: true, taxId: true, branchCode: true } },
+        },
+      },
+    },
+  }));
+
+  if (!cert) return;
+  if (cert.driveFileId) return;
+
+  let userRefreshToken: string | null = null;
+  let ownerEmail: string | null = null;
+  if (cert.company.googleDriveOwnerUserId) {
+    const owner = await withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+      where: { id: cert.company.googleDriveOwnerUserId! },
+      select: { email: true, googleRefreshToken: true },
+    }));
+    userRefreshToken = owner?.googleRefreshToken ?? null;
+    ownerEmail = owner?.email ?? null;
+  }
+
+  const { generateWhtCertificatePdf } = await import('./whtCertificatePdf');
+  const pdfBuffer = await generateWhtCertificatePdf(cert);
+
+  const companyName = cert.company.nameTh || cert.company.nameEn || 'Company';
+  const result = await uploadToDrive(
+    pdfBuffer,
+    `${cert.certificateNumber}.pdf`,
+    'application/pdf',
+    companyName,
+    userRefreshToken,
+    {
+      taxFolder: 'withholding_tax',
+      transactionDate: cert.paymentDate,
+      companyTaxId: cert.company.taxId,
+      shareWithEmails: [cert.company.email, ownerEmail].filter(Boolean) as string[],
+      duplicatePolicy: 'replace',
+    },
+  );
+
+  await withSystemRlsContext(prisma, (tx) => tx.whtCertificate.update({
+    where: { id: cert.id },
+    data: {
+      driveFileId: result.fileId,
+      driveUrl: result.url,
+      driveFolderId: result.folderId,
+      driveFolderUrl: result.folderUrl,
+    },
+  }));
+
+  logger.info('[syncWhtCertificateToDrive] WHT certificate synced to Drive', {
+    whtCertificateId,
+    fileId: result.fileId,
+    folderId: result.folderId,
   });
 }

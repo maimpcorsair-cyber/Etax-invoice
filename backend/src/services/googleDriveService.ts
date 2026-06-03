@@ -228,25 +228,58 @@ function driveFolderUrl(folderId: string) {
   return `https://drive.google.com/drive/folders/${folderId}`;
 }
 
+/**
+ * Place a Drive shortcut to `targetId` inside `parentId`. Used so the audit
+ * spine (YYYY/เดือน/tax-class) stays the single source of truth for a file
+ * while the project folder still surfaces it as a secondary view. Best-effort
+ * and idempotent: skips if a same-named item already lives in the folder.
+ */
+async function ensureDriveShortcut(
+  driveClient: ReturnType<typeof google.drive>,
+  name: string,
+  targetId: string,
+  parentId: string,
+) {
+  try {
+    const existing = await findDriveFileByName(driveClient, parentId, name);
+    if (existing) return;
+    await driveClient.files.create({
+      requestBody: {
+        name: sanitizeDriveName(name),
+        mimeType: 'application/vnd.google-apps.shortcut',
+        parents: [parentId],
+        shortcutDetails: { targetId },
+      },
+      fields: 'id',
+    });
+  } catch (err) {
+    logger.warn('Could not create Drive shortcut in project folder', { targetId, parentId, error: err });
+  }
+}
+
 async function ensureProjectFolder(
   driveClient: ReturnType<typeof google.drive>,
   companyName: string,
   options: DriveUploadOptions = {},
-): Promise<{ projectFolderId?: string; projectFolderUrl?: string; targetFolderId: string; targetFolderUrl: string }> {
+): Promise<{ projectFolderId?: string; projectFolderUrl?: string; targetFolderId: string; targetFolderUrl: string; shortcutFolderId?: string }> {
   const rootId = await ensureChildFolder(driveClient, FOLDER_NAME);
   const companyId = await ensureChildFolder(driveClient, companyFolderName(companyName, options.companyTaxId), rootId);
 
   if (options.taxFolder) {
     const taxFolder = await ensureAuditTaxFolder(driveClient, companyId, options);
     if (options.projectCode || options.projectName) {
-      const projectsId = await ensureChildFolder(driveClient, '_โปรเจค', companyId);
+      const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId);
       const projectFolderName = sanitizeDriveName(
         [options.projectCode, options.projectName].filter(Boolean).join(' '),
       );
       const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId);
+      // The file itself lives in the tax folder (taxFolder.targetFolderId).
+      // Drop a shortcut into the project folder so browsing the project still
+      // shows it, without duplicating the actual bytes.
       return {
         projectFolderId: projectId,
         projectFolderUrl: driveFolderUrl(projectId),
+        shortcutFolderId: projectId,
         ...taxFolder,
       };
     }
@@ -500,10 +533,14 @@ export async function uploadToDrive(
 
   if (duplicateResolution.existing && duplicateResolution.duplicate?.policy === 'skip') {
     const fileId = duplicateResolution.existing.id!;
+    const fileName = duplicateResolution.existing.name ?? duplicateResolution.fileName;
+    if (folder.shortcutFolderId) {
+      await ensureDriveShortcut(driveClient, fileName, fileId, folder.shortcutFolderId);
+    }
     return {
       fileId,
       url: duplicateResolution.existing.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`,
-      fileName: duplicateResolution.existing.name ?? duplicateResolution.fileName,
+      fileName,
       folderId: folder.targetFolderId,
       folderUrl: folder.targetFolderUrl,
       projectFolderId: folder.projectFolderId,
@@ -540,6 +577,10 @@ export async function uploadToDrive(
     } catch {
       logger.warn('Could not set Drive file to public', { fileId });
     }
+  }
+
+  if (folder.shortcutFolderId) {
+    await ensureDriveShortcut(driveClient, fileName, fileId, folder.shortcutFolderId);
   }
 
   const url = res.data.webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`;
