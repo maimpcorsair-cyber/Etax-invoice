@@ -259,7 +259,13 @@ model CompanyDocument {
   fileName        String   @map("file_name")
   mimeType        String   @map("mime_type")
   fileSize        Int      @map("file_size")
-  s3Key           String   @map("s3_key")
+  // Drive-first storage: bulky owner-uploaded library files live in the
+  // connected owner's Google Drive (00_เอกสารบริษัท) so they don't sit in our
+  // R2 quota. s3Key is the fallback when no Drive owner is connected, so it is
+  // now optional — a row always has EXACTLY one of driveUrl / s3Key.
+  s3Key           String?  @map("s3_key")
+  driveFileId     String?  @map("drive_file_id")
+  driveUrl        String?  @map("drive_url")
   attachByDefault Boolean  @default(false) @map("attach_by_default")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")

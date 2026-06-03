@@ -84,6 +84,7 @@ function getServiceAccountAuth() {
 }
 
 const FOLDER_NAME = 'Billboy';
+const COMPANY_DOCS_FOLDER = '00_เอกสารบริษัท';
 
 function escapeDriveQuery(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -225,6 +226,8 @@ export interface DriveUploadOptions {
   customerCode?: string | null;
   customerName?: string | null;
   customerDocumentFolder?: DriveCustomerDocumentFolder | null;
+  /** Permanent company library docs (ภ.พ.20, cert, …) → 00_เอกสารบริษัท. */
+  companyDocFolder?: boolean | null;
   shareAnyone?: boolean;
   shareWithEmails?: string[];
   duplicatePolicy?: 'rename' | 'replace' | 'skip' | 'error';
@@ -340,6 +343,11 @@ async function ensureProjectFolder(
   const scopeKey = options.companyTaxId ?? null;
   const rootId = await ensureChildFolder(driveClient, FOLDER_NAME, undefined, scopeKey);
   const companyId = await ensureChildFolder(driveClient, companyFolderName(companyName, options.companyTaxId), rootId, scopeKey);
+
+  if (options.companyDocFolder) {
+    const target = await ensureChildFolder(driveClient, COMPANY_DOCS_FOLDER, companyId, scopeKey);
+    return { targetFolderId: target, targetFolderUrl: driveFolderUrl(target) };
+  }
 
   if (options.taxFolder) {
     const taxFolder = await ensureAuditTaxFolder(driveClient, companyId, options);
@@ -671,4 +679,20 @@ export async function uploadToDrive(
     userDrive,
     duplicate: duplicateResolution.duplicate,
   };
+}
+
+/**
+ * Best-effort: move a Drive file to the owner's trash. Used when a Drive-hosted
+ * record is deleted in Billboy so the user's Drive doesn't accumulate orphans.
+ * Never throws — a failed cleanup must not block the delete in our DB.
+ */
+export async function trashDriveFile(fileId: string, userRefreshToken?: string | null): Promise<void> {
+  if (!fileId) return;
+  try {
+    const { auth } = buildDriveAuth(userRefreshToken);
+    const driveClient = google.drive({ version: 'v3', auth: auth as never });
+    await driveClient.files.update({ fileId, requestBody: { trashed: true } });
+  } catch (err) {
+    logger.warn('Could not trash Drive file', { fileId, error: err });
+  }
 }

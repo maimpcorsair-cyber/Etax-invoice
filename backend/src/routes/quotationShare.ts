@@ -172,7 +172,7 @@ quotationSharePublicRouter.get('/quotation/:token/attachment/:docId', async (req
     const doc = await withSystemRlsContext(prisma, async (tx) =>
       tx.companyDocument.findFirst({
         where: { id: req.params.docId, companyId: payload.companyId },
-        select: { s3Key: true },
+        select: { s3Key: true, driveUrl: true },
       }),
     );
     if (!doc) {
@@ -180,8 +180,17 @@ quotationSharePublicRouter.get('/quotation/:token/attachment/:docId', async (req
       return;
     }
 
-    // Redirect to a short-lived presigned URL (R2 — egress is free). The raw
-    // object URL is never exposed; access is gated by the timeout share token.
+    // Drive-hosted docs are shared "anyone with link", so the customer opens
+    // them directly. R2-hosted docs go through a short-lived presigned URL
+    // (egress is free); the raw object URL is never exposed.
+    if (doc.driveUrl) {
+      res.redirect(doc.driveUrl);
+      return;
+    }
+    if (!doc.s3Key) {
+      res.status(404).json({ error: 'ไม่พบไฟล์เอกสารแนบ' });
+      return;
+    }
     const url = await getPresignedUrl(doc.s3Key, 300);
     res.redirect(url);
   } catch (err) {

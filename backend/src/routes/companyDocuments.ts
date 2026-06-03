@@ -6,6 +6,7 @@ import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
 import { logger } from '../config/logger';
 import { isStorageConfigured, uploadToStorage, getPresignedUrl } from '../services/storageService';
+import { isUserDriveOAuthConfigured, uploadToDrive, trashDriveFile } from '../services/googleDriveService';
 
 // Reusable company library documents (ภ.พ.20, company certificate, bank book,
 // company profile, catalog, …). Stored in object storage (R2) — the system of
@@ -45,6 +46,22 @@ function toBool(value: unknown): boolean {
   return value === true || value === 'true' || value === '1';
 }
 
+// Resolve the company name/taxId and the connected Drive owner's refresh token.
+// A non-null ownerToken means we can store the file in the owner's own Drive
+// instead of our R2 quota.
+async function resolveCompanyDriveTarget(tx: Parameters<Parameters<typeof withRlsContext>[2]>[0], companyId: string) {
+  const company = await tx.company.findUnique({
+    where: { id: companyId },
+    select: { nameTh: true, nameEn: true, taxId: true, googleDriveOwnerUserId: true },
+  });
+  if (!company?.googleDriveOwnerUserId) return { company, ownerToken: null as string | null };
+  const owner = await tx.user.findFirst({
+    where: { id: company.googleDriveOwnerUserId, companyId },
+    select: { googleRefreshToken: true },
+  });
+  return { company, ownerToken: owner?.googleRefreshToken ?? null };
+}
+
 // ── List ──────────────────────────────────────────────────────────────
 companyDocumentsRouter.get('/', async (req, res) => {
   try {
@@ -80,15 +97,41 @@ companyDocumentsRouter.post(
         res.status(400).json({ error: 'รองรับเฉพาะ PDF, รูปภาพ, Word และ Excel' });
         return;
       }
-      if (!isStorageConfigured()) {
-        res.status(503).json({ error: 'File storage is not configured' });
+      const body = uploadBodySchema.parse(req.body);
+
+      // Drive-first: store bulky library files in the connected owner's Google
+      // Drive (00_เอกสารบริษัท) so they don't sit in our R2 quota. Fall back to
+      // R2 only when no Drive owner is connected (a service account cannot
+      // create Drive files). Every row ends up with exactly one of the two.
+      const { company, ownerToken } = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) =>
+        resolveCompanyDriveTarget(tx, req.user!.companyId),
+      );
+      const useDrive = !!ownerToken && isUserDriveOAuthConfigured();
+
+      let s3Key: string | null = null;
+      let driveFileId: string | null = null;
+      let driveUrl: string | null = null;
+
+      if (useDrive) {
+        const companyName = company?.nameTh || company?.nameEn || 'Company';
+        const result = await uploadToDrive(
+          req.file.buffer,
+          req.file.originalname,
+          req.file.mimetype,
+          companyName,
+          ownerToken,
+          { companyDocFolder: true, companyTaxId: company?.taxId, shareAnyone: true, duplicatePolicy: 'rename' },
+        );
+        driveFileId = result.fileId;
+        driveUrl = result.url;
+      } else if (isStorageConfigured()) {
+        const safeName = req.file.originalname.replace(/[^A-Za-z0-9._-]+/g, '_');
+        s3Key = `companies/${req.user!.companyId}/company-documents/${Date.now()}-${safeName}`;
+        await uploadToStorage(s3Key, req.file.buffer, req.file.mimetype);
+      } else {
+        res.status(503).json({ error: 'File storage is not configured (connect Google Drive or configure object storage)' });
         return;
       }
-
-      const body = uploadBodySchema.parse(req.body);
-      const safeName = req.file.originalname.replace(/[^A-Za-z0-9._-]+/g, '_');
-      const s3Key = `companies/${req.user!.companyId}/company-documents/${Date.now()}-${safeName}`;
-      await uploadToStorage(s3Key, req.file.buffer, req.file.mimetype);
 
       const created = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
         tx.companyDocument.create({
@@ -100,6 +143,8 @@ companyDocumentsRouter.post(
             mimeType: req.file!.mimetype,
             fileSize: req.file!.size,
             s3Key,
+            driveFileId,
+            driveUrl,
             attachByDefault: toBool(body.attachByDefault),
           },
           select: {
@@ -159,10 +204,18 @@ companyDocumentsRouter.patch('/:id', requireRole('admin', 'super_admin', 'accoun
 companyDocumentsRouter.get('/:id/download', async (req, res) => {
   try {
     const doc = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) =>
-      tx.companyDocument.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId }, select: { s3Key: true } }),
+      tx.companyDocument.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId }, select: { s3Key: true, driveUrl: true } }),
     );
     if (!doc) {
       res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+    if (doc.driveUrl) {
+      res.redirect(doc.driveUrl);
+      return;
+    }
+    if (!doc.s3Key) {
+      res.status(404).json({ error: 'Document file is not available' });
       return;
     }
     const url = await getPresignedUrl(doc.s3Key, 300);
@@ -176,15 +229,22 @@ companyDocumentsRouter.get('/:id/download', async (req, res) => {
 // ── Delete ────────────────────────────────────────────────────────────
 companyDocumentsRouter.delete('/:id', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
   try {
-    const deleted = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
+    const { deleted, ownerToken } = await withRlsContext(prisma, tenantRlsContext(req.user!), async (tx) => {
       const existing = await tx.companyDocument.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId } });
-      if (!existing) return null;
+      if (!existing) return { deleted: null, ownerToken: null as string | null };
+      const target = existing.driveFileId
+        ? await resolveCompanyDriveTarget(tx, req.user!.companyId)
+        : { ownerToken: null as string | null };
       await tx.companyDocument.delete({ where: { id: existing.id } });
-      return existing;
+      return { deleted: existing, ownerToken: target.ownerToken };
     });
     if (!deleted) {
       res.status(404).json({ error: 'Document not found' });
       return;
+    }
+    // Best-effort tidy-up of the owner's Drive so deletes don't leave orphans.
+    if (deleted.driveFileId) {
+      void trashDriveFile(deleted.driveFileId, ownerToken);
     }
     res.json({ data: { id: deleted.id } });
   } catch (err) {
