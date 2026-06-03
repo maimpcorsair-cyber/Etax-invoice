@@ -39,6 +39,10 @@ Purchase slip matching workflow follow-up:
 - **Backend:** `POST /api/purchase-invoices/document-intakes/:id/attach-purchase` detects payment evidence OCR. Matching a slip now links `DocumentIntake.purchaseInvoiceId` and syncs that file through `syncDocumentIntakeToProjectDrive` into the payment-evidence folder; it no longer backfills `PurchaseInvoice.pdfUrl` or calls `syncPurchaseInvoiceToDrive` as if the slip were the input-VAT document.
 - **Production:** commit `013e89d` pushed to `main`; GitHub Typecheck `26918334569`, Unit tests `26918334583`, and Prod smoke `26918334570` passed. Render deploy workflow `26918393599` applied migrations, deployed backend, and passed backend health smoke. Manual production checks returned backend `/api/health` `200`, backend `/api/health/workers` `200`, frontend `/api/health` rewrite `200`, and Vercel `/app/purchase-invoices` `200`.
 
+Drive vault canonical folder link follow-up:
+- **Backend:** Dashboard `POST /api/dashboard/drive/folder` now resolves the company evidence vault with `company.nameTh` first and passes `company.taxId` into `ensureCompanyDriveFolder`, so the "เปิดคลังหลักฐาน" button opens the canonical `Billboy/<ชื่อไทย> (<เลขผู้เสียภาษี>)` folder instead of an older English-name folder such as `Billboy/Dom`.
+- **Verification:** local `cd backend && npm run typecheck` passes. After deploy, click Dashboard → "เปิดคลังหลักฐาน" and confirm it opens the tax-id folder, e.g. `Billboy/ดม (1111111111111)`.
+
 Drive register audit-ready P0:
 - **Backend:** Drive filing now uses a single `Projects` folder name for project workspace creation from both normal project uploads and tax-period uploads; the old tax-folder path no longer creates a separate `_โปรเจค` sibling.
 - **Master Sheet:** added `driveAuditRegister` helpers so register rows prefer Drive links first with S3/app URLs only as fallback. Customer/Vendor tabs now emit one row per uploaded document instead of only the newest/first document. Project summary now includes Drive folder links and synced-file counts. AI Inbox rows now include both file and folder links, preferring `DocumentIntake.driveUrl` over `fileUrl`.

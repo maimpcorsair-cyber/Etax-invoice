@@ -735,6 +735,7 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
           select: {
             nameTh: true,
             nameEn: true,
+            taxId: true,
             email: true,
             googleDriveOwnerUserId: true,
             googleDriveOwnerLinkedAt: true,
@@ -800,7 +801,7 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
 
     res.json({
       data: {
-        companyName: company?.nameEn ?? company?.nameTh ?? null,
+        companyName: company?.nameTh ?? company?.nameEn ?? null,
         driveConnected,
         driveConfigured,
         oauthConfigured,
@@ -859,7 +860,7 @@ dashboardRouter.post('/drive/folder', async (req, res) => {
       const [companyRecord, userRecord] = await Promise.all([
         tx.company.findUnique({
           where: { id: companyId },
-          select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
+          select: { nameTh: true, nameEn: true, taxId: true, email: true, googleDriveOwnerUserId: true },
         }),
         tx.user.findUnique({
           where: { id: req.user!.userId },
@@ -875,10 +876,11 @@ dashboardRouter.post('/drive/folder', async (req, res) => {
       return { company: companyRecord, currentUser: userRecord, companyOwner: owner };
     });
 
-    const companyName = company?.nameEn ?? company?.nameTh ?? companyId;
+    const companyName = company?.nameTh ?? company?.nameEn ?? companyId;
     const selectedRefreshToken = companyOwner?.googleRefreshToken ?? currentUser?.googleRefreshToken ?? null;
     const folder = await ensureCompanyDriveFolder({
       companyName,
+      companyTaxId: company?.taxId ?? null,
       userRefreshToken: selectedRefreshToken,
       shareWithEmails: [company?.email, companyOwner?.email, currentUser?.email].filter(Boolean) as string[],
     });
