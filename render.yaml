@@ -34,6 +34,14 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID
         value: 420889491125-p2pgamg2kb3574o213ep0om8pn94suar.apps.googleusercontent.com
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_DRIVE_REDIRECT_URI
+        value: https://etax-invoice-api.onrender.com/api/drive/callback
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: CONFIG_ENCRYPTION_KEY
+        sync: false
       - key: GOOGLE_AI_API_KEY
         sync: false
       - key: RD_VAT_DATA_URLS
@@ -117,6 +125,17 @@ services:
           name: etax-postgres
           property: connectionString
       - key: REDIS_URL
+        sync: false
+      # Master Sheet and Drive sync workers run in this separate Render
+      # service, so Google/OAuth secrets must exist here too. API-only env vars
+      # make the dashboard look configured while jobs still fail in the worker.
+      - key: GOOGLE_CLIENT_ID
+        value: 420889491125-p2pgamg2kb3574o213ep0om8pn94suar.apps.googleusercontent.com
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: CONFIG_ENCRYPTION_KEY
         sync: false
       - key: RD_ENVIRONMENT
         value: sandbox
