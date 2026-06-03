@@ -41,7 +41,7 @@ Purchase slip matching workflow follow-up:
 
 Drive vault canonical folder link follow-up:
 - **Backend:** Dashboard `POST /api/dashboard/drive/folder` now resolves the company evidence vault with `company.nameTh` first and passes `company.taxId` into `ensureCompanyDriveFolder`, so the "เปิดคลังหลักฐาน" button opens the canonical `Billboy/<ชื่อไทย> (<เลขผู้เสียภาษี>)` folder instead of an older English-name folder such as `Billboy/Dom`.
-- **Verification:** local `cd backend && npm run typecheck` passes. After deploy, click Dashboard → "เปิดคลังหลักฐาน" and confirm it opens the tax-id folder, e.g. `Billboy/ดม (1111111111111)`.
+- **Production:** commit `dc9305d` pushed to `main`; GitHub Typecheck `26918944150`, Unit tests `26918944147`, and Prod smoke `26918944118` passed. Render deploy workflow `26919005542` applied migrations, deployed backend, and passed backend health smoke. Authenticated production `POST /api/dashboard/drive/folder` returned `200` with a Drive folder URL from the canonical resolver. Manual browser check: click Dashboard → "เปิดคลังหลักฐาน" and confirm it opens the tax-id folder, e.g. `Billboy/ดม (1111111111111)`.
 
 Drive register audit-ready P0:
 - **Backend:** Drive filing now uses a single `Projects` folder name for project workspace creation from both normal project uploads and tax-period uploads; the old tax-folder path no longer creates a separate `_โปรเจค` sibling.
