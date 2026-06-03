@@ -207,7 +207,7 @@ function getAuthWithDrive(userRefreshToken?: string | null) {
 }
 
 export function isSheetsConfigured(): boolean {
-  return isDriveServiceAccountConfigured();
+  return isDriveServiceAccountConfigured() || isUserDriveOAuthConfigured();
 }
 
 export interface CompanyWorkspaceSheetData {

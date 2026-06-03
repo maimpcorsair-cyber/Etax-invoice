@@ -24,7 +24,7 @@ export const rdSubmissionQueue = new Queue('rd-submission', {
   },
 });
 
-export { masterSheetQueue, enqueueMasterSheetSync } from './workers/masterSheetWorker';
+export { masterSheetQueue, enqueueMasterSheetSync } from './masterSheetQueue';
 export { lineOcrQueue, enqueueLineOcrJob, type LineOcrJobData } from './lineOcrQueue';
 
 logger.info('BullMQ queues initialized');

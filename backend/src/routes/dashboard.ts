@@ -6,8 +6,14 @@ import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { rdComplianceQueue } from '../queues/rdComplianceQueue';
-import { enqueueMasterSheetSync, masterSheetQueue } from '../queues/workers/masterSheetWorker';
-import { ensureCompanyDriveFolder, isDriveConfigured, isUserDriveOAuthConfigured } from '../services/googleDriveService';
+import { enqueueMasterSheetSync, masterSheetQueue } from '../queues/masterSheetQueue';
+import {
+  ensureCompanyDriveFolder,
+  isDriveConfigured,
+  isDriveServiceAccountConfigured,
+  isUserDriveOAuthConfigured,
+} from '../services/googleDriveService';
+import { isSheetsConfigured } from '../services/googleSheetsService';
 import { resolveCompanyRuntimeConfig } from '../services/companyConfigService';
 import { getCertificateInfo } from '../services/signatureService';
 
@@ -782,6 +788,8 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
 
     const driveConnected = !!currentUser?.googleRefreshToken;
     const driveConfigured = isDriveConfigured();
+    const serviceAccountConfigured = isDriveServiceAccountConfigured();
+    const oauthConfigured = isUserDriveOAuthConfigured();
     const companyDriveOwner = company?.googleDriveOwnerUserId
       ? await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.user.findFirst({
         where: { id: company.googleDriveOwnerUserId!, companyId },
@@ -794,7 +802,9 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
         companyName: company?.nameEn ?? company?.nameTh ?? null,
         driveConnected,
         driveConfigured,
-        oauthConfigured: isUserDriveOAuthConfigured(),
+        oauthConfigured,
+        serviceAccountConfigured,
+        sheetsConfigured: isSheetsConfigured(),
         linkedAt: currentUser?.googleDriveLinkedAt ?? null,
         companyDriveOwner: companyDriveOwner
           ? {
@@ -804,7 +814,11 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
               linkedAt: companyDriveOwner.googleDriveLinkedAt,
             }
           : null,
-        driveMode: companyDriveOwner ? 'company_owner' : (driveConnected ? 'current_user' : (driveConfigured ? 'service_account' : 'not_configured')),
+        driveMode: companyDriveOwner
+          ? 'company_owner'
+          : (driveConnected
+              ? 'current_user'
+              : (serviceAccountConfigured ? 'service_account' : (oauthConfigured ? 'oauth_ready' : 'not_configured'))),
         workspaceSheetUrl: company?.googleWorkspaceSheetUrl ?? null,
         workspaceSheetSyncedAt: company?.googleWorkspaceSheetSyncedAt ?? null,
         projects: projects.map((p) => ({
@@ -892,14 +906,30 @@ dashboardRouter.post('/workspace-sheet/sync', async (req, res) => {
     const companyId = req.user!.companyId;
     const company = await prisma.company.findUnique({
       where: { id: companyId },
-      select: { googleWorkspaceSheetUrl: true },
+      select: { googleWorkspaceSheetUrl: true, googleDriveOwnerUserId: true },
     });
+
+    if (!isDriveServiceAccountConfigured() && !company?.googleDriveOwnerUserId) {
+      res.status(409).json({
+        error: 'Connect a company Google Drive owner before creating the master tax register sheet.',
+        data: { status: 'needs_drive_owner' },
+      });
+      return;
+    }
 
     // Bypass the worker queue's debounce by removing the existing
     // scheduled job (if any) before re-enqueueing. The worker dedupes
     // on jobId, so this guarantees a fresh run.
     await masterSheetQueue.remove(`master-sheet-${companyId}`).catch(() => undefined);
-    await enqueueMasterSheetSync(companyId, { immediate: true });
+    const queued = await enqueueMasterSheetSync(companyId, { immediate: true });
+
+    if (!queued) {
+      res.status(409).json({
+        error: 'Google Sheets is not configured for this environment.',
+        data: { status: 'not_configured' },
+      });
+      return;
+    }
 
     res.json({
       data: {

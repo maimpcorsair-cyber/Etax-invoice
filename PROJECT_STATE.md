@@ -1,8 +1,13 @@
 # Project State Handoff
 
-Last updated: 2026-06-03 (Drive + master sheet audit P0)
+Last updated: 2026-06-04 (Drive + master sheet worker wiring)
 
-## Latest work (2026-06-03)
+## Latest work (2026-06-04)
+
+Drive/Master Sheet worker wiring follow-up:
+- **Finding:** `masterSheetWorker` was not loaded by the Render worker entrypoint (`backend/src/worker.ts`); only the API web process had a conditional dynamic import, while Render sets `ENABLE_WORKERS=false` on web. Dashboard routes also imported the worker module directly, making queue enqueueing and worker side effects hard to reason about.
+- **Fix in progress:** queue-only exports moved to `backend/src/queues/masterSheetQueue.ts`, `backend/src/worker.ts` now imports `masterSheetWorker`, `/api/health/workers` reports `master-sheet-sync`, and `POST /api/dashboard/workspace-sheet/sync` now returns a clear `needs_drive_owner`/`not_configured` 409 instead of pretending first-time sheet creation was queued when no usable Drive owner/service-account path exists. Dashboard copy now labels this area as the Drive evidence vault + tax register, not a generic workspace.
+- **Verification:** local `cd backend && npm run typecheck` and `cd frontend && npm run typecheck` pass. After deploy, verify `GET /api/health/workers` includes `master-sheet-sync`, connect a company Drive owner if no service account is configured, then use Dashboard → "คลังหลักฐาน Drive + สมุดทะเบียนภาษี" → "สร้างสมุดทะเบียนภาษี".
 
 Drive folder architecture + master sheet audit P0:
 - **Backend:** Drive uploads can now target the audit-period spine `Billboy/<company> (taxId)/<ปีภาษี พ.ศ.>/<เดือน>/<tax class>` using the transaction date. Sales invoice PDF/XML sync now goes to `1_ภาษีขาย (Output VAT)` with PDF and XML paired in the same monthly folder. Project/intake Drive sync now supplies a tax class from OCR document type and uses OCR invoice date as the transaction-date bucket. Service-account uploads share both project and tax target folders with company/owner emails.

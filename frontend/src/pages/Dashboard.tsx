@@ -129,6 +129,8 @@ interface DriveSummary {
   driveConnected: boolean;
   driveConfigured: boolean;
   oauthConfigured: boolean;
+  serviceAccountConfigured?: boolean;
+  sheetsConfigured?: boolean;
   linkedAt: string | null;
   companyDriveOwner: {
     id: string;
@@ -136,7 +138,7 @@ interface DriveSummary {
     name: string;
     linkedAt: string | null;
   } | null;
-  driveMode: 'company_owner' | 'current_user' | 'service_account' | 'not_configured';
+  driveMode: 'company_owner' | 'current_user' | 'service_account' | 'oauth_ready' | 'not_configured';
   workspaceSheetUrl: string | null;
   workspaceSheetSyncedAt: string | null;
   projects: DriveSummaryProject[];
@@ -494,7 +496,9 @@ export default function Dashboard() {
       ? (isThai ? 'Drive ผู้ใช้นี้' : 'Current user Drive')
       : driveSummary?.driveMode === 'service_account'
         ? (isThai ? 'Drive กลางระบบ' : 'Service account Drive')
-        : (isThai ? 'ยังไม่ตั้งค่า Drive' : 'Drive not configured');
+        : driveSummary?.driveMode === 'oauth_ready'
+          ? (isThai ? 'รอเชื่อมเจ้าของ Drive' : 'Waiting for Drive owner')
+          : (isThai ? 'ยังไม่ตั้งค่า Drive' : 'Drive not configured');
   const statusDotClass: Record<string, string> = {
     red: 'bg-red-500',
     amber: 'bg-amber-500',
@@ -585,7 +589,17 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!syncRes.ok) {
-        const j = await syncRes.json().catch(() => ({})) as { error?: string };
+        const j = await syncRes.json().catch(() => ({})) as { error?: string; data?: { status?: string } };
+        if (j.data?.status === 'needs_drive_owner') {
+          throw new Error(isThai
+            ? 'ต้องเชื่อม Google Drive เจ้าของบริษัทก่อนสร้างสมุดทะเบียนภาษี'
+            : 'Connect the company Google Drive owner before creating the master tax register.');
+        }
+        if (j.data?.status === 'not_configured') {
+          throw new Error(isThai
+            ? 'ยังไม่ได้ตั้งค่า Google Sheets สำหรับระบบนี้'
+            : 'Google Sheets is not configured for this environment.');
+        }
         throw new Error(j.error ?? `HTTP ${syncRes.status}`);
       }
       const json = await syncRes.json() as { data: { url: string | null; status: 'queued' | 'ready' } };
@@ -1027,10 +1041,10 @@ export default function Dashboard() {
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-gray-900">
-                  {isThai ? 'คลัง Google Drive ของบริษัท' : 'Company Google Drive Workspace'}
+                  {isThai ? 'คลังหลักฐาน Drive + สมุดทะเบียนภาษี' : 'Drive Evidence Vault + Master Tax Register'}
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-600">
-                  {driveSummary?.projects?.length ?? 0} {isThai ? 'โปรเจค' : 'projects'} · {driveModeLabel}
+                  {driveSummary?.projects?.length ?? 0} {isThai ? 'โปรเจคพร้อมแฟ้มหลักฐาน' : 'project evidence folders'} · {driveModeLabel}
                 </p>
               </div>
               <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
@@ -1038,7 +1052,7 @@ export default function Dashboard() {
             <div className="mt-4 space-y-4">
               {driveSummaryError && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                  <p className="font-bold">{isThai ? 'ยังโหลด/เปิด Drive workspace ไม่สำเร็จ' : 'Drive workspace is not ready yet'}</p>
+                  <p className="font-bold">{isThai ? 'ยังเปิดคลังหลักฐานหรือสมุดทะเบียนไม่ได้' : 'Evidence vault or master register is not ready yet'}</p>
                   <p className="mt-1 font-mono text-xs">{driveSummaryError}</p>
                 </div>
               )}
@@ -1046,7 +1060,7 @@ export default function Dashboard() {
                 {driveSummary?.driveConnected ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    {isThai ? 'Drive user พร้อม' : 'User Drive ready'}
+                    {isThai ? 'Drive ผู้ใช้นี้พร้อม' : 'Current user Drive ready'}
                   </span>
                 ) : (
                   <button
@@ -1056,7 +1070,7 @@ export default function Dashboard() {
                     className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <UserCheck className="h-4 w-4" />
-                    {driveConnecting ? (isThai ? 'กำลังเชื่อม...' : 'Connecting...') : (isThai ? 'เชื่อม Drive' : 'Connect Drive')}
+                    {driveConnecting ? (isThai ? 'กำลังเชื่อม...' : 'Connecting...') : (isThai ? 'เชื่อม Drive เจ้าของ' : 'Connect owner Drive')}
                   </button>
                 )}
                 <button
@@ -1066,7 +1080,7 @@ export default function Dashboard() {
                   className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  {driveOpening ? (isThai ? 'กำลังเปิด...' : 'Opening...') : (isThai ? 'เปิด Drive บริษัท' : 'Open Drive')}
+                  {driveOpening ? (isThai ? 'กำลังเปิด...' : 'Opening...') : (isThai ? 'เปิดคลังหลักฐาน' : 'Open Evidence Vault')}
                 </button>
                 <button
                   type="button"
@@ -1078,8 +1092,8 @@ export default function Dashboard() {
                   {sheetOpening
                     ? (isThai ? 'กำลังเปิด...' : 'Opening...')
                     : driveSummary?.workspaceSheetUrl
-                      ? (isThai ? 'เปิด Master Sheet' : 'Open Master Sheet')
-                      : (isThai ? 'สร้าง Master Sheet' : 'Create Master Sheet')}
+                      ? (isThai ? 'เปิดสมุดทะเบียนภาษี' : 'Open Tax Register')
+                      : (isThai ? 'สร้างสมุดทะเบียนภาษี' : 'Create Tax Register')}
                 </button>
               </div>
               {driveSummary?.projects?.length ? (
@@ -1088,14 +1102,14 @@ export default function Dashboard() {
                     <div key={project.id} className="rounded-xl border border-slate-200 bg-white p-3">
                       <p className="truncate text-sm font-bold text-slate-950">{project.code} · {project.name}</p>
                       <p className="mt-1 text-xs text-slate-600">
-                        {isThai ? `${project.fileCount} ไฟล์ใน Drive` : `${project.fileCount} Drive files`} · {project.status}
+                        {isThai ? `${project.fileCount} ไฟล์หลักฐานใน Drive` : `${project.fileCount} evidence files in Drive`} · {project.status}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">
-                  {isThai ? 'ยังไม่มีโฟลเดอร์โปรเจคที่ sync เข้า Drive' : 'No project Drive folders have been synced yet.'}
+                  {isThai ? 'ยังไม่มีแฟ้มหลักฐานโปรเจคที่ sync เข้า Drive' : 'No project evidence folders have been synced yet.'}
                 </div>
               )}
             </div>
