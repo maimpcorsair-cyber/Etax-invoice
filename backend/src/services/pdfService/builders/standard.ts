@@ -95,7 +95,7 @@ export function buildHtml(data: PdfInvoiceData): string {
     unit: isTh ? 'หน่วย' : isEn ? 'Unit' : 'Unit',
     price: isTh ? 'ราคา/หน่วย' : isEn ? 'Unit Price' : 'Unit Price',
     disc: isTh ? 'ส่วนลด' : isEn ? 'Disc.' : 'Disc.',
-    amount: isTh ? 'ราคา' : isEn ? 'Amount' : 'Amount',
+    amount: isTh ? 'ยอดก่อน VAT' : isEn ? 'Amount excl. VAT' : 'ยอดก่อน VAT / Amount excl. VAT',
     vatAmt: isTh ? 'ภาษี' : isEn ? 'Tax' : 'Tax',
     subtotal: isTh ? 'ยอดรวมก่อน VAT' : isEn ? 'Subtotal (excl. VAT)' : 'Subtotal',
     vatTotal: isTh ? 'ภาษีมูลค่าเพิ่ม (7%)' : isEn ? 'VAT (7%)' : 'VAT (7%)',

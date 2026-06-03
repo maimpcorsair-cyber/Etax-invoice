@@ -356,10 +356,10 @@ export default function PurchaseInvoices() {
     (p.description ?? '').includes('LINE OCR') && !(p.notes ?? '').includes('AI reviewed'),
   );
   const actionStatuses = new Set(['received', 'processing', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed']);
-  const actionDocuments = documentLibrary.filter((doc) => actionStatuses.has(doc.status));
-  const awaitingDocuments = documentLibrary.filter((doc) => ['awaiting_input', 'awaiting_confirmation', 'needs_review'].includes(doc.status));
+  const actionDocuments = documentLibrary.filter((doc) => actionStatuses.has(doc.status) || needsManualPaymentMatch(doc));
+  const awaitingDocuments = documentLibrary.filter((doc) => ['awaiting_input', 'awaiting_confirmation', 'needs_review'].includes(doc.status) || needsManualPaymentMatch(doc));
   const filteredDocumentLibrary = documentLibrary.filter((doc) => {
-    if (documentStatusFilter === 'action') return actionStatuses.has(doc.status);
+    if (documentStatusFilter === 'action') return actionStatuses.has(doc.status) || needsManualPaymentMatch(doc);
     if (documentStatusFilter === 'saved') return doc.status === 'saved';
     if (documentStatusFilter === 'failed') return doc.status === 'failed';
     return true;
@@ -439,9 +439,37 @@ export default function PurchaseInvoices() {
       || (isThai ? 'ยังไม่ทราบประเภทเอกสาร' : 'Unclassified document');
   }
 
+  function isPaymentEvidenceDocument(doc: DocumentIntake) {
+    const documentType = String(doc.ocrResult?.documentType ?? '').toLowerCase();
+    const text = JSON.stringify(doc.ocrResult ?? {}).toLowerCase();
+    return documentType.includes('bank_transfer')
+      || documentType.includes('payment')
+      || text.includes('promptpay')
+      || text.includes('สลิป');
+  }
+
+  function needsManualPaymentMatch(doc: DocumentIntake) {
+    const markers = [doc.error, ...(doc.warnings ?? []), ...(doc.ocrResult?.validationWarnings ?? [])]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return isPaymentEvidenceDocument(doc) && (
+      markers.includes('pending_manual_match')
+      || !doc.purchaseInvoiceId
+    );
+  }
+
   function missingDocumentFields(doc: DocumentIntake) {
     const result = doc.ocrResult;
     if (!result) return [isThai ? 'ยังไม่มีผลอ่านเอกสาร' : 'No OCR result yet'];
+    if (isPaymentEvidenceDocument(doc)) {
+      const missing = [
+        result.documentMetadata?.sellerName || result.supplierName ? null : (isThai ? 'ชื่อคู่ค้า' : 'Counterparty'),
+        result.invoiceDate ? null : (isThai ? 'วันที่โอน' : 'Transfer date'),
+        result.total ? null : (isThai ? 'ยอดโอน' : 'Transfer amount'),
+      ].filter(Boolean) as string[];
+      return missing;
+    }
     const missing = [
       result.supplierName ? null : (isThai ? 'ชื่อผู้ขาย' : 'Supplier'),
       result.supplierTaxId ? null : (isThai ? 'เลขผู้เสียภาษี' : 'Tax ID'),
@@ -588,6 +616,10 @@ export default function PurchaseInvoices() {
 
   function canReviewDocument(doc: DocumentIntake) {
     return ['received', 'awaiting_input', 'awaiting_confirmation', 'needs_review', 'failed'].includes(doc.status);
+  }
+
+  function canAttachDocument(doc: DocumentIntake) {
+    return doc.status !== 'rejected' && (doc.status !== 'saved' || needsManualPaymentMatch(doc));
   }
 
   async function runDocumentAction(path: string, errorFallback: string) {
@@ -1210,6 +1242,8 @@ export default function PurchaseInvoices() {
             <div className="space-y-2">
               {filteredDocumentLibrary.slice(0, 12).map((doc) => {
                 const busy = documentActionId === doc.id || doc.status === 'processing';
+                const isPaymentEvidence = isPaymentEvidenceDocument(doc);
+                const requiresPaymentMatch = needsManualPaymentMatch(doc);
                 return (
                   <div key={doc.id} className="rounded-lg border border-gray-200 bg-white p-3">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -1241,6 +1275,13 @@ export default function PurchaseInvoices() {
                               {doc.error || doc.warnings?.join(', ')}
                             </p>
                           ) : null}
+                          {requiresPaymentMatch ? (
+                            <p className="mt-1 text-xs font-medium text-amber-700">
+                              {isThai
+                                ? 'สลิปรอจับคู่: แนบกับเอกสารซื้อที่มีอยู่ หรือเก็บไว้รอใบกำกับภาษี/ใบเสร็จที่จะอัปโหลดตามมา'
+                                : 'Slip waiting to match: attach it to an existing purchase record or keep it until the supplier invoice/receipt is uploaded.'}
+                            </p>
+                          ) : null}
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${confidenceClass(doc.ocrResult?.confidence)}`}>
                               {confidenceLabel(doc.ocrResult?.confidence)}
@@ -1259,7 +1300,7 @@ export default function PurchaseInvoices() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        {doc.status !== 'saved' && (
+                        {(doc.status !== 'saved' || canAttachDocument(doc)) && (
                           <>
                             {busy && (
                               <span className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700">
@@ -1279,22 +1320,28 @@ export default function PurchaseInvoices() {
                                   : (isThai ? 'กรอกเอง' : 'Manual entry')}
                               </button>
                             )}
-                            <button
-                              onClick={() => openAttachDialog(doc)}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              {isThai ? 'แนบ' : 'Attach'}
-                            </button>
-                            <button
-                              onClick={() => void rejectDocument(doc)}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              {isThai ? 'ไม่ใช้' : 'Reject'}
-                            </button>
+                            {canAttachDocument(doc) && (
+                              <button
+                                onClick={() => openAttachDialog(doc)}
+                                disabled={busy}
+                                className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                              >
+                                {isPaymentEvidence ? <Wallet className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                                {isPaymentEvidence
+                                  ? (isThai ? 'จับคู่สลิป' : 'Match slip')
+                                  : (isThai ? 'แนบ' : 'Attach')}
+                              </button>
+                            )}
+                            {doc.status !== 'saved' && (
+                              <button
+                                onClick={() => void rejectDocument(doc)}
+                                disabled={busy}
+                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                {isThai ? 'ไม่ใช้' : 'Reject'}
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -1833,13 +1880,22 @@ export default function PurchaseInvoices() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">
-                {isThai ? 'แนบเอกสารกับรายการ' : 'Attach document'}
+                {isPaymentEvidenceDocument(attachDoc)
+                  ? (isThai ? 'จับคู่สลิปกับรายการ' : 'Match payment slip')
+                  : (isThai ? 'แนบเอกสารกับรายการ' : 'Attach document')}
               </h2>
               <button onClick={() => setAttachDoc(null)} className="p-1 rounded-lg hover:bg-gray-100">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
             <div className="p-5 space-y-4">
+              {isPaymentEvidenceDocument(attachDoc) ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {isThai
+                    ? 'สลิปเป็นหลักฐานการจ่าย ไม่ใช่ใบกำกับภาษีซื้อหลัก เลือกรายการซื้อที่สลิปนี้จ่ายให้ ระบบจะเก็บไฟล์ไว้ในหมวดหลักฐานจ่าย'
+                    : 'A slip is payment evidence, not the main input VAT document. Choose the purchase it paid for; the file will stay in payment evidence.'}
+                </div>
+              ) : null}
               <div>
                 <label className="label">{isThai ? 'ประเภทปลายทาง' : 'Target type'}</label>
                 <select
@@ -1881,8 +1937,10 @@ export default function PurchaseInvoices() {
                   {isThai ? 'ยกเลิก' : 'Cancel'}
                 </button>
                 <button onClick={() => void submitAttachDocument()} disabled={!attachTargetId || documentActionId === attachDoc.id} className="btn-primary">
-                  {documentActionId === attachDoc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                  {isThai ? 'แนบเอกสาร' : 'Attach'}
+                  {documentActionId === attachDoc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : (isPaymentEvidenceDocument(attachDoc) ? <Wallet className="w-4 h-4" /> : <FileText className="w-4 h-4" />)}
+                  {isPaymentEvidenceDocument(attachDoc)
+                    ? (isThai ? 'จับคู่สลิป' : 'Match slip')
+                    : (isThai ? 'แนบเอกสาร' : 'Attach')}
                 </button>
               </div>
             </div>

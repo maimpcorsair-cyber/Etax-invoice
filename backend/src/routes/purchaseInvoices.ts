@@ -71,6 +71,18 @@ const attachSalesDocumentSchema = z.object({
   message: 'invoiceId is required',
 });
 
+function isPaymentEvidenceOcr(ocrResult: Prisma.JsonValue | null | undefined) {
+  const ocr = ocrResult && typeof ocrResult === 'object' && !Array.isArray(ocrResult)
+    ? ocrResult as Record<string, unknown>
+    : {};
+  const documentType = String(ocr.documentType ?? '').toLowerCase();
+  const text = JSON.stringify(ocr).toLowerCase();
+  return documentType.includes('bank_transfer')
+    || documentType.includes('payment')
+    || text.includes('promptpay')
+    || text.includes('สลิป');
+}
+
 function documentFileUrl(item: { id: string }) {
   return `/api/purchase-invoices/document-intakes/${item.id}/file`;
 }
@@ -968,7 +980,7 @@ purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole
     const [item, purchase] = await Promise.all([
       prisma.documentIntake.findFirst({
         where: { id: req.params.id, companyId: req.user!.companyId },
-        select: { id: true, fileUrl: true },
+        select: { id: true, companyId: true, userId: true, fileUrl: true, ocrResult: true },
       }),
       prisma.purchaseInvoice.findFirst({
         where: { id: body.purchaseInvoiceId, companyId: req.user!.companyId },
@@ -981,8 +993,9 @@ purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole
     }
 
     const file = documentFileUrl(item);
-    const [updated] = await prisma.$transaction([
-      prisma.documentIntake.update({
+    const paymentEvidence = isPaymentEvidenceOcr(item.ocrResult);
+    const updated = await prisma.$transaction(async (tx) => {
+      const documentIntake = await tx.documentIntake.update({
         where: { id: item.id },
         data: {
           status: 'saved',
@@ -992,14 +1005,25 @@ purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole
           error: null,
           processedAt: new Date(),
         },
-      }),
-      prisma.purchaseInvoice.update({
-        where: { id: purchase.id },
-        data: purchase.pdfUrl ? {} : { pdfUrl: file },
-      }),
-    ]);
+      });
+      if (!paymentEvidence && !purchase.pdfUrl) {
+        await tx.purchaseInvoice.update({
+          where: { id: purchase.id },
+          data: { pdfUrl: file },
+        });
+      }
+      return documentIntake;
+    });
 
-    void syncPurchaseInvoiceToDrive(purchase.id)
+    const sync = paymentEvidence
+      ? syncDocumentIntakeToProjectDrive(updated.id, {
+        companyId: item.companyId,
+        preferredUserId: item.userId,
+        force: true,
+        duplicatePolicy: 'skip',
+      })
+      : syncPurchaseInvoiceToDrive(purchase.id);
+    void sync
       .then(() => enqueueMasterSheetSync(req.user!.companyId))
       .catch((error) => logger.warn('Failed to sync attached purchase invoice to Drive', { error, purchaseInvoiceId: purchase.id }));
     res.json({ data: updated });

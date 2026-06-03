@@ -222,6 +222,9 @@ test('standard document hides empty discount column and keeps it only when neede
   assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:52px;text-align:center">VAT</th>`), 'line-item VAT type should not render');
   assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:72px;text-align:right">ภาษี</th>`), 'line-item tax amount column should not render');
   assert.ok(!htmlWithoutDiscounts.includes(`<th style="width:96px;text-align:right">รวม</th>`), 'line-item VAT-inclusive total should not render');
+  assert.ok(htmlWithoutDiscounts.includes('ยอดก่อน VAT'), 'line-item amount header should identify pre-VAT amount');
+  assert.ok(!htmlWithoutDiscounts.includes('32,100.00'), 'line-item VAT-inclusive amount should not render for item 1');
+  assert.ok(!htmlWithoutDiscounts.includes('16,050.00'), 'line-item VAT-inclusive amount should not render for item 2');
 
   const htmlWithDiscount = buildHtml({
     ...FIXTURE,

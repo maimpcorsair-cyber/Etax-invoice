@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-06-04 (Drive folder-id cache)
+Last updated: 2026-06-04 (purchase slip matching workflow)
 
 ## Latest work (2026-06-04)
 
@@ -30,7 +30,14 @@ WHT certificate Drive mirror (P1, repo-local — not deployed):
 
 Purchase/LINE Drive coverage follow-up:
 - **Backend:** `syncDocumentIntakeToProjectDrive` no longer drops intakes that lack `projectId`. LINE/direct AI intake documents now still file into the company audit tax spine (`2_ภาษีซื้อ`, `3_ค่าใช้จ่าย`, `4_หัก ณ ที่จ่าย`, `6_สลิป-หลักฐานจ่าย`) using the OCR document type and transaction date. If the intake has a project, it still records the project Drive folder and shortcut; if not, it becomes company-level evidence only.
-- **Verification:** `cd backend && npm run typecheck` passes. Next live check: send a purchase tax invoice and a payment slip through LINE without a project-bound group, then confirm `DocumentIntake.driveUrl/driveFolderUrl` and the Drive folders under `Billboy/<company>/<ปี>/<เดือน>/`.
+- **Production:** commit `f25480f` pushed to `main`; GitHub Typecheck `26916953101`, Unit tests `26916953076`, and Prod smoke `26916953077` passed. Render deploy workflow `26917037925` applied migrations, deployed backend, and passed backend health smoke. Manual checks returned `/api/health` `200` and `/api/health/workers` `200`. Existing `master-sheet-sync.failed=3` still reflects the known old permission failure when no usable Drive owner/service-account path existed; it is not a deploy failure.
+- **Next live check:** send a purchase tax invoice and a payment slip through LINE without a project-bound group, then confirm `DocumentIntake.driveUrl/driveFolderUrl` and the Drive folders under `Billboy/<company>/<ปี>/<เดือน>/`.
+
+Purchase slip matching workflow follow-up:
+- **Accounting rule:** a bank transfer slip is payment evidence, not the main input-VAT purchase document. Saved-but-unmatched slips (`pending_manual_match` or no linked purchase) must stay actionable until paired with a purchase invoice/bill or until the later supplier invoice/receipt is uploaded.
+- **Frontend:** `PurchaseInvoices.tsx` now includes unmatched saved slips in the "ต้องจัดการ" view, shows an explicit "สลิปรอจับคู่" note, and exposes a "จับคู่สลิป" action/modal copy instead of hiding all actions behind `status === saved`.
+- **Backend:** `POST /api/purchase-invoices/document-intakes/:id/attach-purchase` detects payment evidence OCR. Matching a slip now links `DocumentIntake.purchaseInvoiceId` and syncs that file through `syncDocumentIntakeToProjectDrive` into the payment-evidence folder; it no longer backfills `PurchaseInvoice.pdfUrl` or calls `syncPurchaseInvoiceToDrive` as if the slip were the input-VAT document.
+- **Verification:** `cd backend && npm run typecheck`, `cd frontend && npm run typecheck`, `cd backend && npm run test:unit` (126/126), and touched-file `git diff --check` pass.
 
 Drive register audit-ready P0:
 - **Backend:** Drive filing now uses a single `Projects` folder name for project workspace creation from both normal project uploads and tax-period uploads; the old tax-folder path no longer creates a separate `_โปรเจค` sibling.
