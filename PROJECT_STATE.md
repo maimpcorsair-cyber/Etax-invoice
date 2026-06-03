@@ -1,8 +1,13 @@
 # Project State Handoff
 
-Last updated: 2026-06-04 (Master Sheet sync diagnosis + manual-edit guard)
+Last updated: 2026-06-04 (Drive folder-id cache)
 
 ## Latest work (2026-06-04)
+
+Drive folder-id cache (B1 — stops duplicate Thai tax folders on rename):
+- **Schema:** migration `20260604_drive_folder_cache` adds `drive_folder_cache` (`scope_key`=company taxId, `parent_key`=parent Drive id or `ROOT`, `name`, `drive_folder_id`; unique on the triple).
+- **Backend:** `ensureChildFolder` now takes an optional `scopeKey` and, when given, resolves a folder by its cached Drive id first — *following the id even if the user renamed/moved the folder*, which stops Billboy creating duplicate canonical folders. A cached id that no longer resolves (folder deleted/trashed) is dropped and the folder re-created. Without a scopeKey it falls back to the original list-by-name behaviour. `companyTaxId` is threaded as the scopeKey through `ensureAuditTaxFolder` + `ensureProjectFolder`. Cache ops use `withSystemRlsContext` and are best-effort (a cache failure never aborts an upload).
+- **Verification:** `prisma generate`, local `db push`, `npm run typecheck`, `npm run test:unit` (126/126) pass.
 
 Master Sheet sync — production diagnosis + manual-edit guard:
 - **Diagnosis (verified on prod via `/api/health/workers`):** `master-sheet-sync` shows `failed: 3, lastFailedReason: "The caller does not have permission"`. Root cause: a company with NO connected Drive owner falls back to `driveMode: service_account`, and a Google service account cannot create Drive files in its own (quota-less) Drive → 403. The master sheet only materializes when a real Drive owner is connected (sheet then lands in that user's My Drive under `Billboy/<company> (taxId)/`; service-account creation would need a Shared Drive, not yet configured). The Siam Technology demo company has `driveConnected: false`, so its sheet never gets created — this is why "the sheet can't be found".

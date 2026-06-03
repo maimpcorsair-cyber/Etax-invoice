@@ -1,6 +1,8 @@
 import { google, Auth } from 'googleapis';
 import { Readable } from 'stream';
 import { logger } from '../config/logger';
+import prisma from '../config/database';
+import { withSystemRlsContext } from '../config/rls';
 import { decryptGoogleRefreshToken } from './googleDriveTokenService';
 
 export function isDriveConfigured(): boolean {
@@ -91,12 +93,80 @@ function sanitizeDriveName(value: string) {
   return value.replace(/['"\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 180) || 'Untitled';
 }
 
+/** Returns true if the folder id still points at a live (non-trashed) folder. */
+async function folderStillValid(
+  driveClient: ReturnType<typeof google.drive>,
+  folderId: string,
+): Promise<boolean> {
+  try {
+    const meta = await driveClient.files.get({ fileId: folderId, fields: 'id,trashed' });
+    return !meta.data.trashed;
+  } catch {
+    return false; // 404 / no access → treat as gone so the caller re-creates
+  }
+}
+
+async function lookupFolderCache(scopeKey: string, parentKey: string, name: string): Promise<string | null> {
+  try {
+    const row = await withSystemRlsContext(prisma, (tx) => tx.driveFolderCache.findUnique({
+      where: { scopeKey_parentKey_name: { scopeKey, parentKey, name } },
+      select: { driveFolderId: true },
+    }));
+    return row?.driveFolderId ?? null;
+  } catch (err) {
+    logger.warn('Drive folder cache lookup failed', { scopeKey, parentKey, name, error: err });
+    return null;
+  }
+}
+
+async function upsertFolderCache(scopeKey: string, parentKey: string, name: string, driveFolderId: string) {
+  try {
+    await withSystemRlsContext(prisma, (tx) => tx.driveFolderCache.upsert({
+      where: { scopeKey_parentKey_name: { scopeKey, parentKey, name } },
+      create: { scopeKey, parentKey, name, driveFolderId },
+      update: { driveFolderId },
+    }));
+  } catch (err) {
+    logger.warn('Drive folder cache upsert failed', { scopeKey, parentKey, name, error: err });
+  }
+}
+
+async function deleteFolderCache(scopeKey: string, parentKey: string, name: string) {
+  try {
+    await withSystemRlsContext(prisma, (tx) => tx.driveFolderCache.deleteMany({
+      where: { scopeKey, parentKey, name },
+    }));
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Resolve (or create) a child folder by name under `parentId`. When a
+ * `scopeKey` (the company taxId) is given, the resolved id is cached and
+ * reused on later calls — and we follow that id even if the user has renamed
+ * or moved the folder, which is what stops Billboy creating duplicate Thai
+ * tax folders. A cached id that no longer resolves (folder deleted) is
+ * dropped and the folder re-created. Without a scopeKey it falls back to the
+ * original list-by-name behaviour (no cache).
+ */
 async function ensureChildFolder(
   driveClient: ReturnType<typeof google.drive>,
   name: string,
   parentId?: string,
+  scopeKey?: string | null,
 ): Promise<string> {
   const safeName = sanitizeDriveName(name);
+  const parentKey = parentId ?? 'ROOT';
+
+  if (scopeKey) {
+    const cachedId = await lookupFolderCache(scopeKey, parentKey, safeName);
+    if (cachedId) {
+      if (await folderStillValid(driveClient, cachedId)) return cachedId;
+      await deleteFolderCache(scopeKey, parentKey, safeName);
+    }
+  }
+
   const escapedName = escapeDriveQuery(safeName);
   const parentClause = parentId ? ` and '${parentId}' in parents` : '';
   const existing = await driveClient.files.list({
@@ -105,17 +175,21 @@ async function ensureChildFolder(
     spaces: 'drive',
   });
 
-  if (existing.data.files?.length) return existing.data.files[0].id!;
+  let folderId = existing.data.files?.[0]?.id ?? null;
+  if (!folderId) {
+    const created = await driveClient.files.create({
+      requestBody: {
+        name: safeName,
+        mimeType: 'application/vnd.google-apps.folder',
+        ...(parentId ? { parents: [parentId] } : {}),
+      },
+      fields: 'id',
+    });
+    folderId = created.data.id!;
+  }
 
-  const created = await driveClient.files.create({
-    requestBody: {
-      name: safeName,
-      mimeType: 'application/vnd.google-apps.folder',
-      ...(parentId ? { parents: [parentId] } : {}),
-    },
-    fields: 'id',
-  });
-  return created.data.id!;
+  if (scopeKey) await upsertFolderCache(scopeKey, parentKey, safeName, folderId);
+  return folderId;
 }
 
 export type DriveDocumentFolder =
@@ -216,11 +290,12 @@ async function ensureAuditTaxFolder(
   companyFolderId: string,
   options: DriveUploadOptions,
 ): Promise<{ targetFolderId: string; targetFolderUrl: string }> {
+  const scopeKey = options.companyTaxId ?? null;
   const [year, month] = getTransactionMonthBucket(options.transactionDate).split('/');
-  const yearFolder = await ensureChildFolder(driveClient, String(Number(year) + 543), companyFolderId);
+  const yearFolder = await ensureChildFolder(driveClient, String(Number(year) + 543), companyFolderId, scopeKey);
   const monthFolderName = THAI_MONTH_FOLDERS[Number(month) - 1] ?? `${month}_ไม่ทราบเดือน`;
-  const monthFolder = await ensureChildFolder(driveClient, monthFolderName, yearFolder);
-  const taxFolder = await ensureChildFolder(driveClient, TAX_FOLDER_NAMES[options.taxFolder!], monthFolder);
+  const monthFolder = await ensureChildFolder(driveClient, monthFolderName, yearFolder, scopeKey);
+  const taxFolder = await ensureChildFolder(driveClient, TAX_FOLDER_NAMES[options.taxFolder!], monthFolder, scopeKey);
   return { targetFolderId: taxFolder, targetFolderUrl: driveFolderUrl(taxFolder) };
 }
 
@@ -262,17 +337,18 @@ async function ensureProjectFolder(
   companyName: string,
   options: DriveUploadOptions = {},
 ): Promise<{ projectFolderId?: string; projectFolderUrl?: string; targetFolderId: string; targetFolderUrl: string; shortcutFolderId?: string }> {
-  const rootId = await ensureChildFolder(driveClient, FOLDER_NAME);
-  const companyId = await ensureChildFolder(driveClient, companyFolderName(companyName, options.companyTaxId), rootId);
+  const scopeKey = options.companyTaxId ?? null;
+  const rootId = await ensureChildFolder(driveClient, FOLDER_NAME, undefined, scopeKey);
+  const companyId = await ensureChildFolder(driveClient, companyFolderName(companyName, options.companyTaxId), rootId, scopeKey);
 
   if (options.taxFolder) {
     const taxFolder = await ensureAuditTaxFolder(driveClient, companyId, options);
     if (options.projectCode || options.projectName) {
-      const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId);
+      const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId, scopeKey);
       const projectFolderName = sanitizeDriveName(
         [options.projectCode, options.projectName].filter(Boolean).join(' '),
       );
-      const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId);
+      const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId, scopeKey);
       // The file itself lives in the tax folder (taxFolder.targetFolderId).
       // Drop a shortcut into the project folder so browsing the project still
       // shows it, without duplicating the actual bytes.
@@ -287,12 +363,12 @@ async function ensureProjectFolder(
   }
 
   if (options.customerName || options.customerCode) {
-    const customersId = await ensureChildFolder(driveClient, 'Customers', companyId);
+    const customersId = await ensureChildFolder(driveClient, 'Customers', companyId, scopeKey);
     const customerFolderName = sanitizeDriveName(
       [options.customerCode, options.customerName].filter(Boolean).join(' '),
     );
-    const customerId = await ensureChildFolder(driveClient, customerFolderName, customersId);
-    const targetId = await ensureChildFolder(driveClient, options.customerDocumentFolder ?? '03_Contracts_Credit', customerId);
+    const customerId = await ensureChildFolder(driveClient, customerFolderName, customersId, scopeKey);
+    const targetId = await ensureChildFolder(driveClient, options.customerDocumentFolder ?? '03_Contracts_Credit', customerId, scopeKey);
     return {
       projectFolderId: customerId,
       projectFolderUrl: driveFolderUrl(customerId),
@@ -305,12 +381,12 @@ async function ensureProjectFolder(
     return { targetFolderId: companyId, targetFolderUrl: driveFolderUrl(companyId) };
   }
 
-  const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId);
+  const projectsId = await ensureChildFolder(driveClient, 'Projects', companyId, scopeKey);
   const projectFolderName = sanitizeDriveName(
     [options.projectCode, options.projectName].filter(Boolean).join(' '),
   );
-  const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId);
-  const targetId = await ensureChildFolder(driveClient, options.documentFolder ?? '99_Other', projectId);
+  const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId, scopeKey);
+  const targetId = await ensureChildFolder(driveClient, options.documentFolder ?? '99_Other', projectId, scopeKey);
   return {
     projectFolderId: projectId,
     projectFolderUrl: driveFolderUrl(projectId),
