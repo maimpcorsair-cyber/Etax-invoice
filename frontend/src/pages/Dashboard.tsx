@@ -19,6 +19,7 @@ import {
   FileText,
   Link as LinkIcon,
   ChevronDown,
+  RefreshCw,
 } from 'lucide-react';
 import { EmptyState, MascotHelperCard, mascotAssets } from '../components/ui/AppChrome';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
@@ -192,6 +193,8 @@ export default function Dashboard() {
   const [driveConnecting, setDriveConnecting] = useState(false);
   const [driveOpening, setDriveOpening] = useState(false);
   const [sheetOpening, setSheetOpening] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncMsg, setResyncMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [complianceLoading, setComplianceLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -623,6 +626,40 @@ export default function Dashboard() {
       setDriveSummaryError((err as Error).message);
     } finally {
       setSheetOpening(false);
+    }
+  }
+
+  // Force a master-sheet rebuild even when the sheet already exists. The
+  // "Open" button only opens the stored URL; without this there's no way to
+  // pull in newly-added rows on demand or to let the worker re-home a sheet
+  // that landed outside the Billboy folder.
+  async function handleResyncMasterSheet() {
+    if (!token || resyncing) return;
+    setResyncing(true);
+    setResyncMsg(null);
+    setDriveSummaryError(null);
+    try {
+      const res = await fetch('/api/dashboard/workspace-sheet/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await res.json().catch(() => ({})) as { error?: string; data?: { status?: string } };
+      if (!res.ok) {
+        if (j.data?.status === 'needs_drive_owner') {
+          throw new Error(isThai ? 'ต้องเชื่อม Google Drive เจ้าของบริษัทก่อน' : 'Connect the company Google Drive owner first.');
+        }
+        if (j.data?.status === 'not_configured') {
+          throw new Error(isThai ? 'ยังไม่ได้ตั้งค่า Google Sheets สำหรับระบบนี้' : 'Google Sheets is not configured for this environment.');
+        }
+        throw new Error(j.error ?? `HTTP ${res.status}`);
+      }
+      setResyncMsg(isThai
+        ? 'กำลังรีเฟรชสมุดทะเบียน — ระบบจะอัปเดตข้อมูลและจัดไฟล์เข้าโฟลเดอร์ Billboy ภายใน 1-2 นาที'
+        : 'Re-syncing the tax register — data refresh and refiling into the Billboy folder finish within 1-2 minutes.');
+    } catch (err) {
+      setDriveSummaryError((err as Error).message);
+    } finally {
+      setResyncing(false);
     }
   }
 
@@ -1096,7 +1133,23 @@ export default function Dashboard() {
                       ? (isThai ? 'เปิดสมุดทะเบียนภาษี' : 'Open Tax Register')
                       : (isThai ? 'สร้างสมุดทะเบียนภาษี' : 'Create Tax Register')}
                 </button>
+                {driveSummary?.workspaceSheetUrl && (
+                  <button
+                    type="button"
+                    onClick={handleResyncMasterSheet}
+                    disabled={resyncing || driveSummary?.driveConfigured === false}
+                    className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${resyncing ? 'animate-spin' : ''}`} />
+                    {resyncing ? (isThai ? 'กำลังรีเฟรช...' : 'Re-syncing...') : (isThai ? 'รีเฟรช/sync ใหม่' : 'Re-sync')}
+                  </button>
+                )}
               </div>
+              {resyncMsg && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-800">
+                  {resyncMsg}
+                </div>
+              )}
               {driveSummary?.projects?.length ? (
                 <div className="space-y-2">
                   {driveSummary.projects.slice(0, 4).map((project) => (
