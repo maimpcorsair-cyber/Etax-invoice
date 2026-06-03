@@ -569,6 +569,29 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
     },
   });
 
+  // On first creation, flag every tab with a warning-only protected range.
+  // Billboy clear-and-rewrites these tabs on every sync, so anything a user
+  // hand-types into them is lost. warningOnly never blocks our API writes —
+  // it just prompts a human "this may be overwritten" before they edit, which
+  // is exactly the guard rail real users need. Best-effort: a failure here
+  // must not abort the sync. Only on isNew so re-syncs don't stack duplicates.
+  if (isNew) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: spreadsheetId!,
+      requestBody: {
+        requests: sheetDefs.map((def) => ({
+          addProtectedRange: {
+            protectedRange: {
+              range: { sheetId: sheetIdMap.get(def.title) ?? 0 },
+              description: 'อัปเดตอัตโนมัติโดย Billboy — อย่าแก้ด้วยมือ ระบบเขียนทับทุกครั้งที่ sync (Auto-synced by Billboy; manual edits are overwritten)',
+              warningOnly: true,
+            },
+          },
+        })),
+      },
+    }).catch((err) => logger.warn('Could not add protected ranges to workspace sheet', { error: err, spreadsheetId }));
+  }
+
   // Only share on first creation to avoid repeated permission calls
   if (isNew) {
     const shareTargets = Array.from(new Set(
