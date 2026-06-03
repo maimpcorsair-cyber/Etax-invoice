@@ -146,7 +146,7 @@ export async function syncDocumentIntakeToProjectDrive(
       const [companyRecord, projectRecord, preferredUser] = await Promise.all([
         tx.company.findUnique({
           where: { id: intake.companyId },
-          select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
+          select: { nameTh: true, nameEn: true, taxId: true, email: true, googleDriveOwnerUserId: true },
         }),
         tx.project.findFirst({
           where: { id: intake.projectId!, companyId: intake.companyId },
@@ -172,7 +172,11 @@ export async function syncDocumentIntakeToProjectDrive(
     const buffer = await readIntakeBuffer(intake);
     if (!buffer) throw new Error('No stored file buffer available for Drive sync');
 
-    const companyName = company?.nameEn ?? company?.nameTh ?? intake.companyId;
+    // nameTh-first + always pass the taxId so every sync path resolves the
+    // SAME company folder "<nameTh> (taxId)". Mixing nameEn-first here with
+    // nameTh-first elsewhere (and omitting the taxId) created a second,
+    // taxId-less folder like "Dom" alongside "ดม (1111111111111)".
+    const companyName = company?.nameTh ?? company?.nameEn ?? intake.companyId;
     const result = await uploadToDrive(
       buffer,
       intake.fileName ?? `document-${intake.id}`,
@@ -183,6 +187,7 @@ export async function syncDocumentIntakeToProjectDrive(
         preferredUserToken: user?.googleRefreshToken,
       }),
       {
+        companyTaxId: company?.taxId,
         projectCode: project.code,
         projectName: project.name,
         documentFolder: driveFolderForIntake(intake),
@@ -263,7 +268,7 @@ export async function ensureProjectDriveFolderForUser(input: {
     const [companyRecord, projectRecord, preferredUser] = await Promise.all([
       tx.company.findUnique({
         where: { id: input.companyId },
-        select: { nameTh: true, nameEn: true, email: true, googleDriveOwnerUserId: true },
+        select: { nameTh: true, nameEn: true, taxId: true, email: true, googleDriveOwnerUserId: true },
       }),
       tx.project.findFirst({
         where: { id: input.projectId, companyId: input.companyId },
@@ -296,7 +301,8 @@ export async function ensureProjectDriveFolderForUser(input: {
   }
 
   const folder = await ensureProjectDriveFolder({
-    companyName: company?.nameEn ?? company?.nameTh ?? input.companyId,
+    companyName: company?.nameTh ?? company?.nameEn ?? input.companyId,
+    companyTaxId: company?.taxId,
     projectCode: project.code,
     projectName: project.name,
     userRefreshToken: selectedRefreshToken,
