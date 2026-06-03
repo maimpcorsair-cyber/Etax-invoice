@@ -5,6 +5,7 @@ import { logger } from '../config/logger';
 import { downloadFromStorage, isStorageConfigured } from './storageService';
 import {
   DriveDocumentFolder,
+  DriveTaxFolder,
   ensureProjectDriveFolder,
   isDriveConfigured,
   shareServiceAccountDriveItem,
@@ -47,6 +48,34 @@ function driveFolderForIntake(intake: IntakeForDrive): DriveDocumentFolder {
   if (intake.mimeType.includes('image')) return '04_Photos';
   if (intake.mimeType === 'application/pdf') return '02_Tax_Invoices';
   return '99_Other';
+}
+
+function driveTaxFolderForIntake(intake: IntakeForDrive): DriveTaxFolder {
+  const ocr = asObject(intake.ocrResult);
+  const documentType = String(ocr.documentType ?? '').toLowerCase();
+  const text = JSON.stringify(ocr).toLowerCase();
+
+  if (documentType.includes('withholding')) return 'withholding_tax';
+  if (documentType.includes('bank_transfer') || documentType.includes('payment') || text.includes('promptpay') || text.includes('สลิป')) {
+    return 'payment_evidence';
+  }
+  if (
+    documentType.includes('tax_invoice')
+    || documentType.includes('invoice')
+    || documentType.includes('receipt')
+    || documentType.includes('expense')
+  ) {
+    return 'input_vat';
+  }
+  return 'expense_no_vat';
+}
+
+function transactionDateFromIntake(intake: IntakeForDrive): Date | null {
+  const ocr = asObject(intake.ocrResult);
+  const dateText = String(ocr.invoiceDate ?? '');
+  if (!dateText) return null;
+  const parsed = new Date(dateText);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 async function readIntakeBuffer(intake: IntakeForDrive): Promise<Buffer | null> {
@@ -157,6 +186,8 @@ export async function syncDocumentIntakeToProjectDrive(
         projectCode: project.code,
         projectName: project.name,
         documentFolder: driveFolderForIntake(intake),
+        taxFolder: driveTaxFolderForIntake(intake),
+        transactionDate: transactionDateFromIntake(intake),
         shareWithEmails: [company?.email, companyOwner?.email, user?.email].filter(Boolean) as string[],
         duplicatePolicy: options.duplicatePolicy ?? 'rename',
       },
@@ -294,11 +325,13 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
       id: true,
       companyId: true,
       invoiceNumber: true,
+      invoiceDate: true,
       driveFileId: true,
       company: {
         select: {
           nameTh: true,
           nameEn: true,
+          taxId: true,
           googleDriveOwnerUserId: true,
           googleDriveOwnerLinkedAt: true,
         },
@@ -334,7 +367,12 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
       'application/pdf',
       companyName,
       userRefreshToken,
-      { documentFolder: '02_Tax_Invoices', duplicatePolicy: 'skip' },
+      {
+        taxFolder: 'output_vat',
+        transactionDate: invoice.invoiceDate,
+        companyTaxId: invoice.company.taxId,
+        duplicatePolicy: 'skip',
+      },
     );
     if (pdfResult.fileId) {
       updates.driveFileId = pdfResult.fileId;
@@ -353,7 +391,12 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
       'application/xml',
       companyName,
       userRefreshToken,
-      { documentFolder: '02_Tax_Invoices', duplicatePolicy: 'skip' },
+      {
+        taxFolder: 'output_vat',
+        transactionDate: invoice.invoiceDate,
+        companyTaxId: invoice.company.taxId,
+        duplicatePolicy: 'skip',
+      },
     );
     if (xmlResult.fileId) {
       updates.driveXmlFileId = xmlResult.fileId;
@@ -370,4 +413,130 @@ export async function syncInvoiceToDrive(invoiceId: string): Promise<void> {
     }));
     logger.info('[syncInvoiceToDrive] Invoice synced to Drive', { invoiceId, ...updates });
   }
+}
+
+/**
+ * Upload supplier purchase evidence from its linked DocumentIntake into the
+ * audit-period Input VAT folder. Manual purchase invoices without an intake
+ * keep their existing pdfUrl only until a file is attached.
+ */
+export async function syncPurchaseInvoiceToDrive(purchaseInvoiceId: string): Promise<void> {
+  if (!isDriveConfigured()) return;
+
+  const purchase = await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.findFirst({
+    where: { id: purchaseInvoiceId },
+    select: {
+      id: true,
+      companyId: true,
+      invoiceNumber: true,
+      invoiceDate: true,
+      driveFileId: true,
+      company: {
+        select: {
+          nameTh: true,
+          nameEn: true,
+          taxId: true,
+          email: true,
+          googleDriveOwnerUserId: true,
+        },
+      },
+    },
+  }));
+
+  if (!purchase) return;
+  if (purchase.driveFileId) return;
+
+  const intake = await withSystemRlsContext(prisma, (tx) => tx.documentIntake.findFirst({
+    where: { companyId: purchase.companyId, purchaseInvoiceId: purchase.id },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      companyId: true,
+      projectId: true,
+      userId: true,
+      fileName: true,
+      mimeType: true,
+      fileSize: true,
+      fileBase64: true,
+      storageKey: true,
+      ocrResult: true,
+      warnings: true,
+      driveFileId: true,
+      driveUrl: true,
+    },
+  }));
+
+  if (!intake) {
+    logger.warn('[syncPurchaseInvoiceToDrive] no linked intake found', { purchaseInvoiceId });
+    return;
+  }
+
+  if (intake.driveFileId && intake.driveUrl) {
+    await withSystemRlsContext(prisma, (tx) => tx.purchaseInvoice.update({
+      where: { id: purchase.id },
+      data: { driveFileId: intake.driveFileId, driveUrl: intake.driveUrl },
+    }));
+    return;
+  }
+
+  const buffer = await readIntakeBuffer(intake);
+  if (!buffer) {
+    logger.warn('[syncPurchaseInvoiceToDrive] no stored file buffer available', { purchaseInvoiceId, intakeId: intake.id });
+    return;
+  }
+
+  let userRefreshToken: string | null = null;
+  let ownerEmail: string | null = null;
+  if (purchase.company.googleDriveOwnerUserId) {
+    const owner = await withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+      where: { id: purchase.company.googleDriveOwnerUserId! },
+      select: { email: true, googleRefreshToken: true },
+    }));
+    userRefreshToken = owner?.googleRefreshToken ?? null;
+    ownerEmail = owner?.email ?? null;
+  }
+
+  const companyName = purchase.company.nameTh || purchase.company.nameEn || 'Company';
+  const fileName = intake.fileName ?? `${purchase.invoiceNumber}.pdf`;
+  const result = await uploadToDrive(
+    buffer,
+    fileName,
+    intake.mimeType || 'application/pdf',
+    companyName,
+    userRefreshToken,
+    {
+      taxFolder: 'input_vat',
+      transactionDate: purchase.invoiceDate,
+      companyTaxId: purchase.company.taxId,
+      shareWithEmails: [purchase.company.email, ownerEmail].filter(Boolean) as string[],
+      duplicatePolicy: 'skip',
+    },
+  );
+
+  await withSystemRlsContext(prisma, async (tx) => {
+    await tx.purchaseInvoice.update({
+      where: { id: purchase.id },
+      data: { driveFileId: result.fileId, driveUrl: result.url },
+    });
+    await tx.documentIntake.update({
+      where: { id: intake.id },
+      data: {
+        driveFileId: result.fileId,
+        driveUrl: result.url,
+        driveFolderId: result.folderId,
+        driveFolderUrl: result.folderUrl,
+        driveSyncStatus: 'synced',
+        driveSyncError: null,
+        driveSyncedAt: new Date(),
+        driveUserDrive: result.userDrive,
+        fileName: result.fileName,
+      },
+    });
+  });
+
+  logger.info('[syncPurchaseInvoiceToDrive] Purchase invoice synced to Drive', {
+    purchaseInvoiceId,
+    intakeId: intake.id,
+    fileId: result.fileId,
+  });
 }

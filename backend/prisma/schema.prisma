@@ -1081,6 +1081,8 @@ model PurchaseInvoice {
 
   // Document storage
   pdfUrl String? // uploaded supplier invoice scan
+  driveFileId String?
+  driveUrl    String?
 
   // Status
   isPaid Boolean   @default(false)

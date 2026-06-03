@@ -51,6 +51,15 @@ function formatDate(date: Date | null | undefined): string {
   return date.toISOString().slice(0, 10);
 }
 
+function periodKey(date: Date | null | undefined): string {
+  if (!date) return '';
+  return date.toISOString().slice(0, 7);
+}
+
+function payrollPeriod(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
 function vatLabel(vatType: string) {
   if (vatType === 'vat7') return 'VAT 7%';
   if (vatType === 'vatZero') return 'VAT 0%';
@@ -64,12 +73,26 @@ function taxStatusLabel(vatType: string) {
 }
 
 async function buildWorkspaceData(companyId: string) {
-  const [company, currentUser, products, purchaseInvoices, invoices, expenses, customers, projects, documentIntakes] = await Promise.all([
+  const [
+    company,
+    currentUser,
+    products,
+    purchaseInvoices,
+    invoices,
+    expenses,
+    customers,
+    projects,
+    documentIntakes,
+    purchaseEvidenceIntakes,
+    whtCertificates,
+    payslips,
+  ] = await Promise.all([
     withSystemRlsContext(prisma, (tx) => tx.company.findFirst({
       where: { id: companyId },
       select: {
         nameTh: true,
         nameEn: true,
+        taxId: true,
         googleWorkspaceSheetId: true,
         googleDriveOwnerUserId: true,
       },
@@ -108,7 +131,7 @@ async function buildWorkspaceData(companyId: string) {
     withSystemRlsContext(prisma, (tx) => tx.expenseVoucher.findMany({
       where: { companyId },
       include: {
-        items: true,
+        items: { include: { attachments: true } },
         project: { select: { code: true, name: true } },
       },
       orderBy: { voucherDate: 'desc' },
@@ -142,11 +165,41 @@ async function buildWorkspaceData(companyId: string) {
       take: 200,
       include: { project: { select: { code: true, name: true } } },
     })),
+    withSystemRlsContext(prisma, (tx) => tx.documentIntake.findMany({
+      where: {
+        companyId,
+        purchaseInvoiceId: { not: null },
+        status: 'saved',
+      },
+      select: {
+        purchaseInvoiceId: true,
+        driveUrl: true,
+        fileUrl: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5000,
+    })),
+    withSystemRlsContext(prisma, (tx) => tx.whtCertificate.findMany({
+      where: { companyId },
+      orderBy: { paymentDate: 'desc' },
+      take: 5000,
+    })),
+    withSystemRlsContext(prisma, (tx) => tx.payslip.findMany({
+      where: { payrollRun: { companyId, status: { in: ['finalized', 'paid'] } } },
+      include: { payrollRun: { select: { year: true, month: true, payDate: true, status: true } } },
+      orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }, { employeeName: 'asc' }],
+      take: 10000,
+    })),
   ]);
 
   if (!company) return null;
 
   const companyName = company.nameTh || company.nameEn || 'Billboy';
+  const purchaseEvidenceById = new Map(
+    purchaseEvidenceIntakes
+      .filter((item) => item.purchaseInvoiceId)
+      .map((item) => [item.purchaseInvoiceId!, item.driveUrl ?? item.fileUrl ?? '']),
+  );
 
   const productsTab = products.map((p) => ({
     code: p.code,
@@ -170,8 +223,10 @@ async function buildWorkspaceData(companyId: string) {
   // HYPERLINK formula. Falls back through s3Url (system of record), driveUrl
   // (mirror), then pdfUrl (legacy field still used for sales PDFs).
   const inputVatTab = purchaseInvoices.map((pi) => ({
+    period: periodKey(pi.invoiceDate),
     date: formatDate(pi.invoiceDate),
     supplier: pi.supplierName,
+    supplierTaxId: pi.supplierTaxId,
     documentNo: pi.invoiceNumber ?? '',
     project: pi.project ? `${pi.project.code} ${pi.project.name}` : '',
     category: pi.category ?? '',
@@ -179,13 +234,15 @@ async function buildWorkspaceData(companyId: string) {
     vat: pi.vatAmount,
     total: pi.total,
     taxStatus: taxStatusLabel(pi.vatType),
-    attachmentLink: linkCell(pi.pdfUrl),
+    attachmentLink: linkCell(pi.driveUrl ?? purchaseEvidenceById.get(pi.id) ?? pi.pdfUrl),
+    docId: pi.id,
   }));
 
   const outputVatTab = invoices.map((inv) => {
     const buyer = inv.buyer?.nameTh || inv.buyer?.nameEn || '';
     const url = (inv as { driveUrl?: string | null }).driveUrl ?? inv.pdfUrl ?? '';
     return {
+      period: periodKey(inv.invoiceDate),
       date: formatDate(inv.invoiceDate),
       buyer,
       documentNo: inv.invoiceNumber,
@@ -195,18 +252,54 @@ async function buildWorkspaceData(companyId: string) {
       vat: inv.vatAmount,
       total: inv.total,
       attachmentLink: linkCell(url),
+      xmlLink: linkCell((inv as { driveXmlUrl?: string | null }).driveXmlUrl),
+      docId: inv.id,
     };
   });
 
   const expensesTab = expenses.map((ev) => ({
+    period: periodKey(ev.voucherDate),
     date: formatDate(ev.voucherDate),
     voucherNo: ev.voucherNumber,
     project: ev.project ? `${ev.project.code} ${ev.project.name}` : '',
     category: ev.items.map((i) => i.category).filter(Boolean).join(', '),
     description: ev.items.map((i) => i.description).join(', ').slice(0, 200),
     amount: Number(ev.totalAmount),
+    wht: ev.items.reduce((sum, item) => sum + Number(item.whtAmount ?? 0), 0),
     status: ev.status,
-    attachmentLink: '', // populated when expense attachments are wired through worker query
+    attachmentLink: linkCell(ev.items.flatMap((item) => item.attachments).find((attachment) => attachment.driveUrl || attachment.url)?.driveUrl
+      ?? ev.items.flatMap((item) => item.attachments).find((attachment) => attachment.driveUrl || attachment.url)?.url),
+    docId: ev.id,
+  }));
+
+  const whtTab = whtCertificates.map((cert) => ({
+    period: periodKey(cert.paymentDate),
+    certificateNo: cert.certificateNumber,
+    paymentDate: formatDate(cert.paymentDate),
+    recipient: cert.recipientName,
+    recipientTaxId: cert.recipientTaxId,
+    incomeType: cert.incomeType ?? '',
+    base: cert.totalAmount,
+    rate: cert.whtRate,
+    withheld: cert.whtAmount,
+    pndFlag: '3/53',
+    attachmentLink: linkCell(cert.pdfUrl),
+    docId: cert.id,
+  }));
+
+  const payrollTab = payslips.map((payslip) => ({
+    period: payrollPeriod(payslip.payrollRun.year, payslip.payrollRun.month),
+    payDate: formatDate(payslip.payrollRun.payDate),
+    employee: payslip.employeeName,
+    employeeCode: payslip.employeeCode,
+    gross: payslip.gross,
+    wht: payslip.whtAmount,
+    sso: payslip.ssoEmployee,
+    pvd: payslip.pvdAmount,
+    net: payslip.net,
+    status: payslip.payrollRun.status,
+    attachmentLink: linkCell(payslip.pdfUrl),
+    docId: payslip.id,
   }));
 
   // Split customers vs vendors so each tab is scoped to its mental model.
@@ -272,6 +365,7 @@ async function buildWorkspaceData(companyId: string) {
 
   return {
     companyName,
+    companyTaxId: company.taxId,
     existingSheetId: company.googleWorkspaceSheetId,
     userRefreshToken: currentUser?.googleRefreshToken ?? null,
     sharedWithEmails: [currentUser?.email],
@@ -280,6 +374,8 @@ async function buildWorkspaceData(companyId: string) {
       inputVat: inputVatTab,
       outputVat: outputVatTab,
       expenses: expensesTab,
+      wht: whtTab,
+      payroll: payrollTab,
       customers: customersTab,
       vendors: vendorsTab,
       missingDocs: aiInboxTab,
@@ -311,6 +407,7 @@ export const masterSheetWorker = new Worker<{ companyId: string }>(
     try {
       const folder = await ensureCompanyDriveFolder({
         companyName: workspaceData.companyName,
+        companyTaxId: workspaceData.companyTaxId,
         userRefreshToken: workspaceData.userRefreshToken,
       });
       companyFolderId = folder.folderId;

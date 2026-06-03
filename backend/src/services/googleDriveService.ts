@@ -126,6 +126,15 @@ export type DriveDocumentFolder =
   | '05_Exports'
   | '99_Other';
 
+export type DriveTaxFolder =
+  | 'output_vat'
+  | 'input_vat'
+  | 'expense_no_vat'
+  | 'withholding_tax'
+  | 'payroll'
+  | 'payment_evidence'
+  | 'filed_forms';
+
 export type DriveCustomerDocumentFolder =
   | '01_Registration'
   | '02_VAT'
@@ -134,9 +143,11 @@ export type DriveCustomerDocumentFolder =
   | '05_Bank_Accounts';
 
 export interface DriveUploadOptions {
+  companyTaxId?: string | null;
   projectCode?: string | null;
   projectName?: string | null;
   documentFolder?: DriveDocumentFolder | null;
+  taxFolder?: DriveTaxFolder | null;
   customerCode?: string | null;
   customerName?: string | null;
   customerDocumentFolder?: DriveCustomerDocumentFolder | null;
@@ -169,6 +180,50 @@ export function getTransactionMonthBucket(date?: Date | null): string {
   return `${yyyy}/${mm}`;
 }
 
+const THAI_MONTH_FOLDERS = [
+  '01_มกราคม',
+  '02_กุมภาพันธ์',
+  '03_มีนาคม',
+  '04_เมษายน',
+  '05_พฤษภาคม',
+  '06_มิถุนายน',
+  '07_กรกฎาคม',
+  '08_สิงหาคม',
+  '09_กันยายน',
+  '10_ตุลาคม',
+  '11_พฤศจิกายน',
+  '12_ธันวาคม',
+];
+
+const TAX_FOLDER_NAMES: Record<DriveTaxFolder, string> = {
+  output_vat: '1_ภาษีขาย (Output VAT)',
+  input_vat: '2_ภาษีซื้อ (Input VAT)',
+  expense_no_vat: '3_ค่าใช้จ่าย (ไม่มี VAT)',
+  withholding_tax: '4_หัก ณ ที่จ่าย (ภ.ง.ด.3-53)',
+  payroll: '5_เงินเดือน (ภ.ง.ด.1 / สปส.)',
+  payment_evidence: '6_สลิป-หลักฐานจ่าย',
+  filed_forms: '9_แบบที่ยื่นแล้ว (ภ.พ.30)',
+};
+
+function companyFolderName(companyName: string, taxId?: string | null) {
+  const safeCompanyName = sanitizeDriveName(companyName);
+  const cleanTaxId = taxId?.replace(/\D/g, '');
+  return cleanTaxId && cleanTaxId.length === 13 ? `${safeCompanyName} (${cleanTaxId})` : safeCompanyName;
+}
+
+async function ensureAuditTaxFolder(
+  driveClient: ReturnType<typeof google.drive>,
+  companyFolderId: string,
+  options: DriveUploadOptions,
+): Promise<{ targetFolderId: string; targetFolderUrl: string }> {
+  const [year, month] = getTransactionMonthBucket(options.transactionDate).split('/');
+  const yearFolder = await ensureChildFolder(driveClient, String(Number(year) + 543), companyFolderId);
+  const monthFolderName = THAI_MONTH_FOLDERS[Number(month) - 1] ?? `${month}_ไม่ทราบเดือน`;
+  const monthFolder = await ensureChildFolder(driveClient, monthFolderName, yearFolder);
+  const taxFolder = await ensureChildFolder(driveClient, TAX_FOLDER_NAMES[options.taxFolder!], monthFolder);
+  return { targetFolderId: taxFolder, targetFolderUrl: driveFolderUrl(taxFolder) };
+}
+
 function driveFolderUrl(folderId: string) {
   return `https://drive.google.com/drive/folders/${folderId}`;
 }
@@ -179,7 +234,24 @@ async function ensureProjectFolder(
   options: DriveUploadOptions = {},
 ): Promise<{ projectFolderId?: string; projectFolderUrl?: string; targetFolderId: string; targetFolderUrl: string }> {
   const rootId = await ensureChildFolder(driveClient, FOLDER_NAME);
-  const companyId = await ensureChildFolder(driveClient, companyName, rootId);
+  const companyId = await ensureChildFolder(driveClient, companyFolderName(companyName, options.companyTaxId), rootId);
+
+  if (options.taxFolder) {
+    const taxFolder = await ensureAuditTaxFolder(driveClient, companyId, options);
+    if (options.projectCode || options.projectName) {
+      const projectsId = await ensureChildFolder(driveClient, '_โปรเจค', companyId);
+      const projectFolderName = sanitizeDriveName(
+        [options.projectCode, options.projectName].filter(Boolean).join(' '),
+      );
+      const projectId = await ensureChildFolder(driveClient, projectFolderName, projectsId);
+      return {
+        projectFolderId: projectId,
+        projectFolderUrl: driveFolderUrl(projectId),
+        ...taxFolder,
+      };
+    }
+    return taxFolder;
+  }
 
   if (options.customerName || options.customerCode) {
     const customersId = await ensureChildFolder(driveClient, 'Customers', companyId);
@@ -346,6 +418,7 @@ async function resolveDriveDuplicate(
 
 export async function ensureProjectDriveFolder(input: {
   companyName: string;
+  companyTaxId?: string | null;
   projectCode: string;
   projectName: string;
   userRefreshToken?: string | null;
@@ -354,6 +427,7 @@ export async function ensureProjectDriveFolder(input: {
   const { auth, userDrive } = buildDriveAuth(input.userRefreshToken);
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
   const folder = await ensureProjectFolder(driveClient, input.companyName, {
+    companyTaxId: input.companyTaxId,
     projectCode: input.projectCode,
     projectName: input.projectName,
   });
@@ -374,12 +448,13 @@ export async function ensureProjectDriveFolder(input: {
 
 export async function ensureCompanyDriveFolder(input: {
   companyName: string;
+  companyTaxId?: string | null;
   userRefreshToken?: string | null;
   shareWithEmails?: string[];
 }): Promise<{ folderId: string; folderUrl: string; userDrive: boolean }> {
   const { auth, userDrive } = buildDriveAuth(input.userRefreshToken);
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
-  const folder = await ensureProjectFolder(driveClient, input.companyName);
+  const folder = await ensureProjectFolder(driveClient, input.companyName, { companyTaxId: input.companyTaxId });
   if (!userDrive) {
     await shareDriveFileWithEmails(driveClient, folder.targetFolderId, input.shareWithEmails, 'writer');
   }
@@ -408,8 +483,11 @@ export async function uploadToDrive(
   const driveClient = google.drive({ version: 'v3', auth: auth as never });
 
   const folder = await ensureProjectFolder(driveClient, companyName, options);
-  if (!userDrive && folder.projectFolderId) {
-    await shareDriveFileWithEmails(driveClient, folder.projectFolderId, options.shareWithEmails, 'writer');
+  if (!userDrive) {
+    if (folder.projectFolderId) {
+      await shareDriveFileWithEmails(driveClient, folder.projectFolderId, options.shareWithEmails, 'writer');
+    }
+    await shareDriveFileWithEmails(driveClient, folder.targetFolderId, options.shareWithEmails, 'writer');
   }
 
   const duplicateResolution = await resolveDriveDuplicate(

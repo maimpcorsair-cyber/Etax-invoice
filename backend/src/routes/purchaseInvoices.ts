@@ -22,7 +22,7 @@ import {
   PURCHASE_RECORD_DOCUMENT_TYPES,
   supportedDocumentMimeType,
 } from '../services/documentOcrService';
-import { syncDocumentIntakeToProjectDrive } from '../services/projectDriveSyncService';
+import { syncDocumentIntakeToProjectDrive, syncPurchaseInvoiceToDrive } from '../services/projectDriveSyncService';
 import { generateVoucherNumber } from '../services/expenseService';
 import { enqueueMasterSheetSync } from '../queues';
 import { linkRecentBenchmarksToIntake } from '../services/ocrBenchmarkService';
@@ -946,6 +946,9 @@ purchaseInvoicesRouter.post('/document-intakes/:id/confirm-purchase', requireRol
       language: 'th',
     });
 
+    void syncPurchaseInvoiceToDrive(created.id)
+      .then(() => enqueueMasterSheetSync(req.user!.companyId))
+      .catch((error) => logger.warn('Failed to sync purchase invoice to Drive', { error, purchaseInvoiceId: created.id }));
     void enqueueMasterSheetSync(req.user!.companyId);
     void linkRecentBenchmarksToIntake(req.user!.companyId, item.id, true);
     res.status(201).json({ data: updated, purchaseInvoice: created });
@@ -996,6 +999,9 @@ purchaseInvoicesRouter.post('/document-intakes/:id/attach-purchase', requireRole
       }),
     ]);
 
+    void syncPurchaseInvoiceToDrive(purchase.id)
+      .then(() => enqueueMasterSheetSync(req.user!.companyId))
+      .catch((error) => logger.warn('Failed to sync attached purchase invoice to Drive', { error, purchaseInvoiceId: purchase.id }));
     res.json({ data: updated });
   } catch (err) {
     if (err instanceof z.ZodError) {

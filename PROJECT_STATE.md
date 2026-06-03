@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-03 (Ledger Banner redesign deployed to production)
+Last updated: 2026-06-03 (Drive + master sheet audit P0)
 
 ## Latest work (2026-06-03)
+
+Drive folder architecture + master sheet audit P0:
+- **Backend:** Drive uploads can now target the audit-period spine `Billboy/<company> (taxId)/<ปีภาษี พ.ศ.>/<เดือน>/<tax class>` using the transaction date. Sales invoice PDF/XML sync now goes to `1_ภาษีขาย (Output VAT)` with PDF and XML paired in the same monthly folder. Project/intake Drive sync now supplies a tax class from OCR document type and uses OCR invoice date as the transaction-date bucket. Service-account uploads share both project and tax target folders with company/owner emails.
+- **Purchase evidence:** added `purchase_invoices.driveFileId/driveUrl` via migration `20260603_purchase_invoice_drive_mirror`. Confirming or attaching a purchase document now asynchronously mirrors the linked `DocumentIntake` file to Drive under `2_ภาษีซื้อ (Input VAT)` and backfills the purchase row's Drive URL before re-syncing the master sheet.
+- **Master Sheet:** company workspace export now uses Drive links for input VAT where available, wires expense evidence links from `ExpenseAttachment.driveUrl/url`, adds hidden-ish `docId` columns to transactional tabs, and adds new audit registers `WHT ภ.ง.ด.3-53` and `เงินเดือน ภ.ง.ด.1` from `WhtCertificate` and finalized/paid `Payslip` rows.
+- **Verification:** `cd backend && npx prisma generate`, `cd backend && npx tsc --noEmit`, `git diff --check`, and `cd backend && npm run test:unit` pass (`123/123`). Unit tests required an escalated rerun because the sandbox blocked the `tsx` IPC socket under `/var/folders` with `listen EPERM`. Google Drive/Sheets OAuth end-to-end was not exercised locally; production deployment should run Prisma migrate deploy and then trigger a master sheet sync for a connected Drive owner.
 
 Ledger Banner redesign production deploy:
 - **Production:** frontend redesign commit `fd087e3` (`feat(frontend): apply ledger banner redesign`) was pushed to `main` after the local Ledger Banner passes were still only uncommitted working-tree changes. GitHub Actions for the push are green: Typecheck run `26887086075`, Unit tests run `26887085876`, and Prod smoke test run `26887085700`.
