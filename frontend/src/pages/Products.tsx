@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Plus, Search, Edit2, X, Save, Loader2, Package, ChevronDown, Layers3, ReceiptText, BadgePercent, FileSpreadsheet, Users, Link2 } from 'lucide-react';
 import ProductChannelMappingModal from '../components/product/ProductChannelMappingModal';
 import SectionSubNav from '../components/SectionSubNav';
@@ -8,6 +9,7 @@ import { useAuthStore } from '../store/authStore';
 import type { Product } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isThaiText, thaiTextOnly } from '../lib/inputGuards';
+import { ToastStack, type FeedbackToast } from '../components/ui/AppFeedback';
 
 const VAT_OPTIONS = ['vat7', 'vatExempt', 'vatZero'] as const;
 const PRODUCT_TYPE_OPTIONS = [
@@ -66,12 +68,25 @@ export default function Products() {
   const [stockDelta, setStockDelta] = useState<string>('');
   const [stockNote, setStockNote] = useState('');
   const [stockSaving, setStockSaving] = useState(false);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
   const formValidation = {
     nameTh: form.nameTh.trim().length > 0 && !isThaiText(form.nameTh, true),
     nameEn: (form.nameEn ?? '').trim().length > 0 && !isEnglishText(form.nameEn ?? ''),
     descriptionTh: (form.descriptionTh ?? '').trim().length > 0 && !isThaiText(form.descriptionTh ?? ''),
     descriptionEn: (form.descriptionEn ?? '').trim().length > 0 && !isEnglishText(form.descriptionEn ?? ''),
   };
+
+  const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [...current.slice(-2), { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, toast.tone === 'error' ? 7000 : 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -115,7 +130,11 @@ export default function Products() {
     if (!stockAdjustProduct) return;
     const delta = parseFloat(stockDelta);
     if (!Number.isFinite(delta) || delta === 0) {
-      alert(isThai ? 'กรอกจำนวนที่จะปรับ (+ เพิ่ม / − ลด)' : 'Enter a non-zero delta (+ to add, − to subtract)');
+      showToast({
+        tone: 'warning',
+        title: isThai ? 'กรอกจำนวนที่จะปรับ' : 'Enter an adjustment amount',
+        description: isThai ? 'ใช้จำนวนบวกเพื่อเพิ่มสต๊อก หรือจำนวนลบเพื่อลดสต๊อก' : 'Use a positive number to add stock or a negative number to subtract stock.',
+      });
       return;
     }
     setStockSaving(true);
@@ -129,8 +148,13 @@ export default function Products() {
       if (!res.ok) throw new Error(json.error ?? 'Adjust failed');
       setStockAdjustProduct(null);
       await fetchProducts();
+      showToast({ tone: 'success', title: isThai ? 'ปรับสต๊อกแล้ว' : 'Stock adjusted' });
     } catch (e) {
-      alert((e as Error).message);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ปรับสต๊อกไม่สำเร็จ' : 'Stock adjustment failed',
+        description: (e as Error).message,
+      });
     } finally {
       setStockSaving(false);
     }
@@ -245,58 +269,161 @@ export default function Products() {
   const grossMargin = form.unitCost && form.unitPrice > 0
     ? Math.round(((form.unitPrice - form.unitCost) / form.unitPrice) * 100)
     : null;
+  const activeCount = products.filter((product) => product.isActive).length;
+  const inactiveCount = Math.max(products.length - activeCount, 0);
+  const stockTrackedCount = products.filter((product) => product.trackInventory).length;
+  const lowStockCount = products.filter((product) => {
+    if (!product.trackInventory || product.reorderPoint === null || product.reorderPoint === undefined) return false;
+    return (product.currentStock ?? 0) <= product.reorderPoint;
+  }).length;
+  const serviceCount = products.filter((product) => product.productType === 'service').length;
+  const vat7Count = products.filter((product) => product.vatType === 'vat7').length;
+  const catalogValue = products.reduce((sum, product) => sum + (product.isActive ? product.unitPrice : 0), 0);
+  const workItems = [
+    {
+      label: isThai ? 'ใช้งานอยู่' : 'Active items',
+      value: activeCount,
+      detail: isThai ? `${inactiveCount} ปิดใช้งาน` : `${inactiveCount} inactive`,
+      icon: Package,
+      tone: activeCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: isThai ? 'ติดตามสต๊อก' : 'Stock tracked',
+      value: stockTrackedCount,
+      detail: lowStockCount > 0 ? (isThai ? `${lowStockCount} ต่ำกว่าจุดสั่งซื้อ` : `${lowStockCount} below reorder`) : (isThai ? 'ไม่มีรายการต่ำ' : 'No low-stock items'),
+      icon: Layers3,
+      tone: lowStockCount > 0 ? 'needs' : stockTrackedCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: isThai ? 'บริการ' : 'Services',
+      value: serviceCount,
+      detail: isThai ? 'ใช้กับงานบริการ/ค่าจ้าง' : 'Service and labor lines',
+      icon: ReceiptText,
+      tone: serviceCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: isThai ? 'VAT 7%' : 'VAT 7%',
+      value: vat7Count,
+      detail: isThai ? 'รายการที่คิดภาษีขาย' : 'Taxable sales items',
+      icon: BadgePercent,
+      tone: vat7Count > 0 ? 'clear' : 'idle',
+    },
+  ];
+  const statusDotClass = (tone: string) => {
+    if (tone === 'needs') return 'bg-amber-500';
+    if (tone === 'clear') return 'bg-emerald-500';
+    return 'bg-slate-300';
+  };
 
   return (
-    <div className="space-y-4">
+    <>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <SectionSubNav
         items={[
           { key: 'customers', to: '/app/customers', label: isThai ? 'ลูกค้า' : 'Customers', icon: Users },
           { key: 'products', to: '/app/products', label: isThai ? 'สินค้า/บริการ' : 'Products & Services', icon: Package },
         ]}
       />
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            <span className="sm:hidden">{isThai ? 'สินค้า' : 'Products'}</span>
-            <span className="hidden sm:inline">{isThai ? 'สินค้าและบริการ' : 'Products / Services'}</span>
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {isThai ? 'ตั้งรายการที่ใช้บ่อยสำหรับเอกสารขาย พร้อมหมวดหมู่ ภาษี และต้นทุนเมื่อจำเป็น' : 'Manage reusable sales items with categories, tax, and optional cost settings.'}
-          </p>
+      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">{isThai ? 'Product Catalog Ledger' : 'Product Catalog Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+                <Package className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                  {isThai ? 'สินค้าและบริการ' : 'Products / Services'}
+                </h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                  {isThai ? 'ตั้งทะเบียนรายการขายให้พร้อมออกเอกสาร ภาษี สต๊อก และ Google Sheet' : 'Keep reusable sales items ready for documents, tax, stock, and Google Sheets.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+                {isThai ? 'มูลค่าราคาขายใน catalog' : 'Catalog price book value'}
+              </p>
+              <p className="mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none text-white tabular-nums">
+                {formatCurrency(catalogValue)}
+              </p>
+              <div className="mt-3 h-px w-40 bg-amber-200/80" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ใช้งานอยู่' : 'Active'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{activeCount}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ต่ำกว่าจุดสั่งซื้อ' : 'Low stock'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{lowStockCount}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Package className="h-4 w-4 text-amber-100" />
+              {isThai ? 'จัดการ catalog' : 'Catalog actions'}
+            </div>
+            {policy && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                <p className="text-xs font-semibold text-white/55">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
+                <p className="mt-1 text-sm font-bold text-white tabular-nums">
+                  {policy.usage.products}{policy.maxProducts ? ` / ${policy.maxProducts}` : ''} {isThai ? 'รายการ' : 'items'}
+                </p>
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <button
+                onClick={openCreate}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                disabled={!!policy && policy.maxProducts !== null && policy.usage.products >= policy.maxProducts}
+              >
+                <Plus className="h-4 w-4" />
+                {isThai ? 'เพิ่มรายการ' : 'Add item'}
+              </button>
+              <button
+                onClick={handleExportSheet}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                disabled={sheetExporting}
+                title={isThai ? 'ส่งออกทะเบียนสินค้าและบริการไป Google Sheet' : 'Export product catalog to Google Sheets'}
+              >
+                {sheetExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                {isThai ? 'Sync Sheet' : 'Sync Sheet'}
+              </button>
+              <Link to="/app/customers" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5">
+                <Users className="h-4 w-4" />
+                {isThai ? 'รายชื่อลูกค้า' : 'Customers'}
+              </Link>
+            </div>
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <button
-            onClick={handleExportSheet}
-            className="btn-secondary"
-            disabled={sheetExporting}
-            title={isThai ? 'ส่งออกทะเบียนสินค้าและบริการไป Google Sheet' : 'Export product catalog to Google Sheets'}
-          >
-            {sheetExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
-            <span className="hidden sm:inline">{isThai ? 'Sync Sheet' : 'Sync Sheet'}</span>
-          </button>
-          <button
-            onClick={openCreate}
-            className="btn-primary"
-            disabled={!!policy && policy.maxProducts !== null && policy.usage.products >= policy.maxProducts}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{isThai ? 'เพิ่มสินค้า/บริการ' : 'Add Product / Service'}</span>
-            <span className="sm:hidden">{isThai ? 'เพิ่ม' : 'Add'}</span>
-          </button>
-        </div>
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClass(item.tone)}`} />
+              </div>
+              <p className="mt-3 text-xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{item.label}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+            </div>
+          );
+        })}
       </div>
 
-      {policy && (
-        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900">
-          {isThai
-            ? `สินค้า/บริการในแพ็กเกจ ${policy.planLabel}: ${policy.usage.products}${policy.maxProducts ? ` / ${policy.maxProducts}` : ''}`
-            : `Products on ${policy.planLabel}: ${policy.usage.products}${policy.maxProducts ? ` / ${policy.maxProducts}` : ''}`}
-        </div>
-      )}
-
       {/* Search */}
-      <div className="card">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -322,10 +449,10 @@ export default function Products() {
           </div>
         ) : (
           products.map((p) => (
-            <div key={p.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-2">
+            <div key={p.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
               {/* Row 1: code + VAT badge */}
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
+                <span className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 font-mono text-xs font-semibold text-primary-700">
                   {p.code}
                 </span>
                 <span className={vatBadge(p.vatType)}>{vatLabel(p.vatType)}</span>
@@ -335,11 +462,11 @@ export default function Products() {
                 <p className="font-semibold text-gray-900">{p.nameTh}</p>
                 {p.nameEn && <p className="text-sm text-gray-500">{p.nameEn}</p>}
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                     {productTypeLabel(p.productType ?? 'product')}
                   </span>
                   {p.category && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                       {p.category}
                     </span>
                   )}
@@ -348,7 +475,7 @@ export default function Products() {
               {/* Row 3: unit + price */}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">{p.unit}</span>
-                <span className="font-bold text-gray-900">{formatCurrency(p.unitPrice)}</span>
+                <span className="font-bold text-gray-900 tabular-nums">{formatCurrency(p.unitPrice)}</span>
               </div>
               {/* Row 4: status + edit */}
               <div className="flex items-center justify-between pt-1">
@@ -358,7 +485,7 @@ export default function Products() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setChannelProduct(p)}
-                    className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-primary-700 hover:border-primary-200 hover:text-primary-900"
                     title={isThai ? 'SKU ช่องทางขาย' : 'Channel SKUs'}
                   >
                     <Link2 className="w-3.5 h-3.5" />
@@ -366,7 +493,7 @@ export default function Products() {
                   </button>
                   <button
                     onClick={() => openEdit(p)}
-                    className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-primary-700 hover:border-primary-200 hover:text-primary-900"
                     title={t('common.edit')}
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -380,10 +507,16 @@ export default function Products() {
       </div>
 
       {/* Desktop table */}
-      <div className="hidden sm:block card p-0 overflow-hidden">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="text-base font-bold text-slate-950">{isThai ? 'ทะเบียนสินค้าและบริการ' : 'Product catalog ledger'}</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            {isThai ? 'ตรวจรหัสสินค้า ราคา VAT สต๊อก และสถานะก่อนนำไปออกเอกสารขาย' : 'Review codes, prices, VAT, stock, and status before using items on sales documents.'}
+          </p>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full min-w-[980px]">
+            <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
                 <th className="table-header">{t('product.code')}</th>
                 <th className="table-header">{isThai ? 'ชื่อสินค้า/บริการ' : 'Name'}</th>
@@ -396,24 +529,24 @@ export default function Products() {
                 <th className="table-header">{t('common.actions')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12">
+                  <td colSpan={9} className="text-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-500" />
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-gray-500">
+                  <td colSpan={9} className="text-center py-12 text-gray-500">
                     <Package className="w-10 h-10 mx-auto mb-2 text-gray-300" />
                     {t('common.noData')}
                   </td>
                 </tr>
               ) : (
                 products.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="table-cell font-mono text-xs font-medium text-primary-700">{p.code}</td>
+                  <tr key={p.id} className="transition-colors hover:bg-slate-50">
+                    <td className="table-cell font-mono text-xs font-semibold text-primary-700">{p.code}</td>
                     <td className="table-cell">
                       <p className="font-medium">{isThai ? p.nameTh : (p.nameEn ?? p.nameTh)}</p>
                       {p.nameEn && isThai && <p className="text-xs text-gray-400">{p.nameEn}</p>}
@@ -426,7 +559,7 @@ export default function Products() {
                       </div>
                     </td>
                     <td className="table-cell text-gray-500">{p.unit}</td>
-                    <td className="table-cell text-right font-semibold">{formatCurrency(p.unitPrice)}</td>
+                    <td className="table-cell text-right font-semibold tabular-nums">{formatCurrency(p.unitPrice)}</td>
                     <td className="table-cell">
                       <span className={vatBadge(p.vatType)}>{vatLabel(p.vatType)}</span>
                     </td>
@@ -437,7 +570,7 @@ export default function Products() {
                           const reorder = p.reorderPoint;
                           const low = reorder !== null && reorder !== undefined && stock <= reorder;
                           return (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${low ? 'bg-rose-100 text-rose-700' : stock === 0 ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <span className={`inline-flex items-center gap-1 rounded-full border bg-white px-2 py-0.5 text-xs font-semibold ${low ? 'border-rose-200 text-rose-700' : stock === 0 ? 'border-slate-200 text-slate-500' : 'border-emerald-200 text-emerald-700'}`}>
                               <Package className="h-3.5 w-3.5" /> {stock}
                               {low && reorder !== null && reorder !== undefined && (
                                 <span className="text-rose-600">≤{reorder}</span>
@@ -504,7 +637,7 @@ export default function Products() {
 
             <div className="p-5 space-y-5">
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+                <div className="rounded-xl border border-rose-200 bg-white p-3 text-sm font-semibold text-rose-700">{error}</div>
               )}
 
               <section className="space-y-3">
@@ -820,6 +953,7 @@ export default function Products() {
           onClose={() => setChannelProduct(null)}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }

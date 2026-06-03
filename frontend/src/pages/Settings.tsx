@@ -323,12 +323,12 @@ function SettingsCard({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="card scroll-mt-24 space-y-5">
+    <section id={id} className="scroll-mt-24 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
           {icon}
         </div>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
         </div>
@@ -644,13 +644,15 @@ export default function Settings() {
   };
 
   const sections = [
-    ['company', isThai ? 'บริษัท' : 'Company'],
-    ['documents', isThai ? 'เอกสาร' : 'Documents'],
-    ['invoice-defaults', isThai ? 'ค่าเริ่มต้น' : 'Defaults'],
-    ['tax', isThai ? 'e-Tax/RD' : 'e-Tax/RD'],
-    ['integrations', isThai ? 'เชื่อมต่อ' : 'Integrations'],
-    ['expense', isThai ? 'เงินสดย่อย' : 'Petty cash'],
-    ['language', isThai ? 'ภาษา' : 'Language'],
+    { id: 'company', label: isThai ? 'บริษัท' : 'Company', icon: Building2 },
+    { id: 'documents', label: isThai ? 'เอกสาร' : 'Documents', icon: FileText },
+    { id: 'invoice-defaults', label: isThai ? 'ค่าเริ่มต้น' : 'Defaults', icon: ReceiptText },
+    { id: 'tax', label: isThai ? 'e-Tax/RD' : 'e-Tax/RD', icon: ShieldCheck },
+    { id: 'integrations', label: isThai ? 'เชื่อมต่อ' : 'Integrations', icon: Link2 },
+    { id: 'company-documents', label: isThai ? 'ไฟล์บริษัท' : 'Company files', icon: FileCheck2 },
+    { id: 'marketplace', label: isThai ? 'Marketplace' : 'Marketplace', icon: Cloud },
+    { id: 'expense', label: isThai ? 'เงินสดย่อย' : 'Petty cash', icon: Landmark },
+    { id: 'language', label: isThai ? 'ภาษา' : 'Language', icon: Languages },
   ];
 
   const subNavItems: SectionSubNavItem[] = [
@@ -665,6 +667,33 @@ export default function Settings() {
   const renderCompanyFieldError = (field: CompanyField) => (
     companyFieldErrors[field] ? <p className="mt-1 text-xs text-rose-700">{companyFieldErrors[field]}</p> : null
   );
+  const readyItems = [
+    {
+      label: isThai ? 'ข้อมูลบริษัท' : 'Company profile',
+      ok: Boolean(companyDraft.nameTh && companyDraft.taxId && companyDraft.addressTh),
+      value: companyDraft.taxId || '—',
+    },
+    {
+      label: isThai ? 'บัญชีรับชำระ' : 'Payment accounts',
+      ok: documentProfile.profile.bankAccounts.length > 0,
+      value: String(documentProfile.profile.bankAccounts.length),
+    },
+    {
+      label: isThai ? 'ลายเซ็น' : 'Signature',
+      ok: Boolean(signatureDraft.signatureImageUrl || signatureDraft.signerName),
+      value: signatureDraft.signerName || (isThai ? 'ยังไม่ตั้ง' : 'Not set'),
+    },
+    {
+      label: 'Google Drive',
+      ok: driveStatus?.driveUsable ?? driveStatus?.connected,
+      value: driveStatus?.mode ?? '—',
+    },
+    {
+      label: 'RD',
+      ok: rdStatus?.certStatus?.loaded && !rdStatus.certStatus.isExpired,
+      value: rdStatus?.environment ?? '—',
+    },
+  ];
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -676,10 +705,37 @@ export default function Settings() {
         mascot="spot"
       />
 
+      <nav className="lg:hidden" aria-label={isThai ? 'หมวดตั้งค่า' : 'Settings sections'}>
+        <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {sections.map(({ id, label, icon: Icon }) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-primary-50 hover:text-primary-700"
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
       <MascotHelperCard
         title={isThai ? 'ตั้งค่าครั้งเดียว ใช้ซ้ำทุกเอกสาร' : 'Set once, reuse everywhere'}
         description={isThai ? 'ข้อมูลผู้ขาย บัญชีรับชำระ ลายเซ็น และค่าเริ่มต้นในหน้านี้จะช่วยลดการกรอกซ้ำตอนออกใบกำกับภาษี' : 'Seller details, payment accounts, signatures, and defaults here reduce repeated typing during invoice issuance.'}
       />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {readyItems.map((item) => (
+          <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-bold uppercase text-slate-500">{item.label}</p>
+              <span className={`h-2 w-2 shrink-0 rounded-full ${item.ok ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            </div>
+            <p className="mt-2 truncate text-sm font-semibold text-slate-900">{item.value}</p>
+          </div>
+        ))}
+      </div>
 
       {(message || error || documentProfile.error) && (
         <div className={`rounded-xl border bg-white px-3 py-2 text-sm shadow-sm ${
@@ -699,9 +755,12 @@ export default function Settings() {
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-20 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-            {sections.map(([id, label]) => (
+            {sections.map(({ id, label, icon: Icon }) => (
               <a key={id} href={`#${id}`} className="block rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-                {label}
+                <span className="inline-flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </span>
               </a>
             ))}
           </div>

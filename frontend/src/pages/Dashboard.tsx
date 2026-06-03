@@ -5,12 +5,8 @@ import {
   Plus,
   ArrowRight,
   CheckCircle2,
-  XCircle,
-  Clock,
-  AlertTriangle,
   Bot,
   Table2,
-  HardDrive,
   UserCheck,
   Inbox,
   Send,
@@ -19,13 +15,12 @@ import {
   FileCheck2,
   Sparkles,
   ShieldCheck,
-  ExternalLink,
   FolderOpen,
   FileText,
   Link as LinkIcon,
   ChevronDown,
 } from 'lucide-react';
-import { EmptyState, MetricCard, PageHeader, MascotHelperCard } from '../components/ui/AppChrome';
+import { EmptyState, MascotHelperCard, mascotAssets } from '../components/ui/AppChrome';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import DashboardCharts from '../components/dashboard/DashboardCharts';
 import { useLanguage } from '../hooks/useLanguage';
@@ -146,15 +141,6 @@ interface DriveSummary {
   workspaceSheetSyncedAt: string | null;
   projects: DriveSummaryProject[];
   recentFiles: DriveSummaryFile[];
-}
-
-function SkeletonCard() {
-  return (
-    <div className="metric-card animate-pulse">
-      <div className="w-28 h-3 rounded bg-gray-200 mb-3" />
-      <div className="w-20 h-7 rounded bg-gray-200" />
-    </div>
-  );
 }
 
 function SkeletonRow() {
@@ -327,15 +313,6 @@ export default function Dashboard() {
     loadCompliance();
   }, [isThai, token]);
 
-  const statCards = stats
-    ? [
-        { key: 'totalInvoices',  value: stats.totalInvoices.toLocaleString() },
-        { key: 'totalRevenue',   value: formatCurrency(stats.totalRevenue) },
-        { key: 'pendingApproval', value: stats.pendingCount.toLocaleString() },
-        { key: 'submittedToRD',  value: stats.rdSuccessCount.toLocaleString() },
-      ]
-    : [];
-
   // Current month compliance (last item)
   const currentMonth = compliance[compliance.length - 1];
   const pendingRdCount = currentMonth ? currentMonth.failed + currentMonth.unsubmitted : stats?.rdPendingCount ?? 0;
@@ -359,7 +336,7 @@ export default function Dashboard() {
     integrations ? readyIntegrations < 4 : false,
   ].filter(Boolean).length;
 
-  const commandItems = [
+  const worklistItems = [
     {
       key: 'ai-inbox',
       icon: Inbox,
@@ -369,7 +346,8 @@ export default function Dashboard() {
       detail: isThai
         ? `รับเข้า ${documentStats?.totalLast30Days ?? 0} ไฟล์ใน 30 วันล่าสุด`
         : `${documentStats?.totalLast30Days ?? 0} files received in the last 30 days`,
-      tone: aiReviewCount > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      statusTone: aiReviewCount > 0 ? 'amber' : 'green',
+      status: aiReviewCount > 0 ? (isThai ? 'รอตรวจ' : 'Review') : (isThai ? 'โล่ง' : 'Clear'),
       action: isThai ? 'เปิด AI Inbox' : 'Open AI Inbox',
     },
     {
@@ -381,7 +359,8 @@ export default function Dashboard() {
       detail: currentMonth
         ? (isThai ? `${currentMonth.month} · เหลือ ${currentMonth.daysLeft} วัน` : `${currentMonth.month} · ${currentMonth.daysLeft} days left`)
         : (isThai ? 'ยังไม่มีรอบเดือนที่ต้องจัดการ' : 'No active filing month yet'),
-      tone: pendingRdCount > 0 ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      statusTone: pendingRdCount > 0 ? 'red' : 'green',
+      status: pendingRdCount > 0 ? (isThai ? 'ต้องส่ง' : 'Pending') : (isThai ? 'พร้อม' : 'Ready'),
       action: isThai ? 'ตรวจรายการส่ง' : 'Review queue',
     },
     {
@@ -393,7 +372,8 @@ export default function Dashboard() {
       detail: stats && stats.receivables.overdueOutstanding > 0
         ? (isThai ? 'ควรตามชำระหรือออกใบเสร็จเมื่อจ่ายแล้ว' : 'Needs collection follow-up or receipt after payment')
         : (isThai ? 'ไม่มีลูกหนี้เกินกำหนด' : 'No overdue balance'),
-      tone: stats && stats.receivables.overdueOutstanding > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-900',
+      statusTone: stats && stats.receivables.overdueOutstanding > 0 ? 'red' : 'green',
+      status: stats && stats.receivables.overdueOutstanding > 0 ? (isThai ? 'เกินกำหนด' : 'Overdue') : (isThai ? 'ปกติ' : 'Clear'),
       action: isThai ? 'ดูใบค้างชำระ' : 'View invoices',
     },
     {
@@ -403,7 +383,8 @@ export default function Dashboard() {
       value: currentMonth ? `${currentMonth.complianceRate}%` : '—',
       title: isThai ? 'ความพร้อมยื่น VAT' : 'VAT filing readiness',
       detail: isThai ? 'รวมขาย ซื้อ และสถานะ RD ไว้ในมุมมองเดียว' : 'Sales, purchase VAT, and RD readiness in one view',
-      tone: currentMonth && currentMonth.complianceRate < 100 ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+      statusTone: currentMonth && currentMonth.complianceRate < 100 ? 'amber' : 'green',
+      status: currentMonth && currentMonth.complianceRate < 100 ? (isThai ? 'เช็คต่อ' : 'Check') : (isThai ? 'พร้อม' : 'Ready'),
       action: isThai ? 'เปิดสรุป VAT' : 'Open VAT summary',
     },
     {
@@ -415,7 +396,8 @@ export default function Dashboard() {
       detail: stats?.customerReadiness?.vatEvidenceMissing
         ? (isThai ? `รอ ภ.พ.20 / VAT ${stats.customerReadiness.vatEvidenceMissing} ราย` : `${stats.customerReadiness.vatEvidenceMissing} VAT evidence items missing`)
         : (isThai ? 'เช็คลูกค้า/ซัพพลายเออร์ตามเคสก่อนเปิดเครดิต/สัญญา' : 'Review customer and supplier evidence by use case'),
-      tone: (stats?.customerReadiness?.actionNeeded ?? 0) > 0 ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-900',
+      statusTone: (stats?.customerReadiness?.actionNeeded ?? 0) > 0 ? 'amber' : 'green',
+      status: (stats?.customerReadiness?.actionNeeded ?? 0) > 0 ? (isThai ? 'ข้อมูลขาด' : 'Missing') : (isThai ? 'พร้อม' : 'Ready'),
       action: isThai ? 'เปิดคู่ค้า' : 'Open counterparties',
     },
   ];
@@ -487,6 +469,42 @@ export default function Dashboard() {
       action: isThai ? 'ดูยอดค้าง' : 'View status',
     },
   ];
+  const latestRevenue = stats?.monthlyRevenue?.length
+    ? stats.monthlyRevenue[stats.monthlyRevenue.length - 1].total
+    : stats?.totalRevenue ?? 0;
+  const netVat = monthEnd?.summary.vatPayable ?? 0;
+  const agingBuckets = stats
+    ? [
+        { key: 'current', label: isThai ? 'ยังไม่เกิน' : 'Current', value: stats.receivables.aging.current, color: 'bg-emerald-500' },
+        { key: '1-30', label: '1-30', value: stats.receivables.aging.days1To30, color: 'bg-lime-500' },
+        { key: '31-60', label: '31-60', value: stats.receivables.aging.days31To60, color: 'bg-amber-500' },
+        { key: '61-90', label: '61-90', value: stats.receivables.aging.days61To90, color: 'bg-orange-500' },
+        { key: '90+', label: isThai ? '90+ วัน' : '90+', value: stats.receivables.aging.days90Plus, color: 'bg-red-500' },
+      ]
+    : [];
+  const totalAging = agingBuckets.reduce((sum, bucket) => sum + bucket.value, 0);
+  const vatReadyLabel = currentMonth
+    ? `${currentMonth.complianceRate}%`
+    : monthEnd
+      ? formatCurrency(netVat)
+      : '—';
+  const driveModeLabel = driveSummary?.driveMode === 'company_owner'
+    ? (isThai ? 'Drive เจ้าของบริษัท' : 'Company owner Drive')
+    : driveSummary?.driveMode === 'current_user'
+      ? (isThai ? 'Drive ผู้ใช้นี้' : 'Current user Drive')
+      : driveSummary?.driveMode === 'service_account'
+        ? (isThai ? 'Drive กลางระบบ' : 'Service account Drive')
+        : (isThai ? 'ยังไม่ตั้งค่า Drive' : 'Drive not configured');
+  const statusDotClass: Record<string, string> = {
+    red: 'bg-red-500',
+    amber: 'bg-amber-500',
+    green: 'bg-emerald-500',
+  };
+  const statusPillClass: Record<string, string> = {
+    red: 'text-red-700 ring-red-200',
+    amber: 'text-amber-700 ring-amber-200',
+    green: 'text-emerald-700 ring-emerald-200',
+  };
 
   async function handleConnectDrive() {
     if (!token) return;
@@ -595,34 +613,64 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Command Center */}
-      <PageHeader
-        eyebrow={isThai ? 'Billboy Command Center' : 'Billboy Command Center'}
-        title={isThai ? `วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `${commandCount} finance actions need attention`}
-        description={isThai
-          ? `สวัสดี ${user?.name ?? ''} ระบบรวมงานเอกสารเข้า เอกสารขาย VAT ลูกหนี้ และไฟล์บริษัทไว้ในหน้าเดียว เพื่อให้ปิดงานรายวันได้เร็วขึ้น`
-          : `Hi ${user?.name ?? ''}. This workspace brings document intake, sales documents, VAT, receivables, and company files into one daily operating view.`}
-        icon={<Bot className="h-3.5 w-3.5" />}
-        mascot="hero"
-        actions={(
-          <>
-            <Link to="/app/purchase-invoices" className="btn-primary">
+      <section className="premium-hero premium-hero-dark">
+        <div className="relative z-10 min-w-0">
+          <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
+            <Bot className="h-3.5 w-3.5" />
+            {isThai ? 'ภาพรวมเงินที่ต้องจัดการวันนี้' : 'Billboy Ledger Banner'}
+          </div>
+          <p className="mt-5 text-sm font-semibold text-slate-200">
+            {isThai ? `สวัสดี ${user?.name ?? ''} · วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `Hi ${user?.name ?? ''} · ${commandCount} finance actions need attention`}
+          </p>
+          <h1 className="mt-2 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-tight text-white">
+            {isThai ? 'ยอดต้องตามเก็บทั้งหมด' : 'Total receivables to collect'}
+          </h1>
+          <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.9rem)]">
+            {loading ? '—' : formatCurrency(stats?.receivables.totalOutstanding ?? 0)}
+          </div>
+          <div className="mt-4 h-px w-full max-w-xl bg-[color-mix(in_oklch,var(--brand-gold)_78%,transparent)]" />
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-100">
+            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
+              <span className="text-slate-300">{isThai ? 'รายได้เดือนนี้' : 'This month revenue'}</span>
+              <span className="ml-2 font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(latestRevenue)}</span>
+            </div>
+            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
+              <span className="text-slate-300">{isThai ? 'ภาษีสุทธิ' : 'Net VAT'}</span>
+              <span className="ml-2 font-bold tabular-nums text-white">{monthEnd ? formatCurrency(netVat) : '—'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col gap-4 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
+          <div className="overflow-hidden rounded-2xl bg-white/15">
+            <img src={mascotAssets.hero} alt="" className="h-40 w-full object-cover object-center sm:h-48" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">
+              {isThai ? 'เริ่มจากงานที่กระทบเงินก่อน' : 'Start with money-impacting work first'}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-200">
+              {isThai ? 'เปิด AI Inbox หรือออกเอกสารขายใหม่ได้ทันทีโดยไม่ต้องไล่หาเมนู' : 'Open the AI Inbox or create a sales document without hunting through menus.'}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+            <Link to="/app/purchase-invoices" className="btn-primary justify-center bg-white text-primary-800 hover:bg-slate-100">
               <Inbox className="h-4 w-4" />
               {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
             </Link>
-            <Link to="/app/invoices/new" className="btn-secondary">
+            <Link to="/app/invoices/new" className="btn-secondary justify-center border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">
               <Plus className="h-4 w-4" />
               {isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
             </Link>
-          </>
-        )}
-      />
+          </div>
+        </div>
+      </section>
 
       {shouldShowFirstInvoicePath && (
-        <section className="rounded-2xl border border-blue-200 bg-blue-50/70 px-4 py-4 shadow-sm">
+        <section className="rounded-[20px] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
                 {isThai ? 'เส้นทางใบแรก' : 'First invoice path'}
               </p>
               <h2 className="mt-1 text-lg font-semibold text-slate-950">
@@ -644,7 +692,7 @@ export default function Dashboard() {
                   type="button"
                   onClick={handleSeedDemoData}
                   disabled={seedingDemo}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2 text-center sm:text-right"
+                  className="text-xs text-primary-700 hover:text-primary-900 underline underline-offset-2 text-center sm:text-right"
                 >
                   {seedingDemo
                     ? (isThai ? 'กำลังสร้าง…' : 'Creating…')
@@ -661,11 +709,11 @@ export default function Dashboard() {
                 <Link
                   key={step.key}
                   to={step.href}
-                  className="group flex min-h-[108px] flex-col justify-between rounded-xl border border-white/70 bg-white/85 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
+                  className="group flex min-h-[108px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-700 text-white">
                         <Icon className="h-4 w-4" />
                       </span>
                       <div>
@@ -681,7 +729,7 @@ export default function Dashboard() {
                       </span>
                     )}
                   </div>
-                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary-700">
                     {step.action}
                     <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                   </span>
@@ -692,36 +740,52 @@ export default function Dashboard() {
         </section>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {commandItems.map((item) => {
-          const Icon = item.icon;
-          const tone = item.key === 'rd' && pendingRdCount > 0
-            ? 'danger'
-            : item.key === 'ar' && (stats?.receivables.overdueOutstanding ?? 0) > 0
-              ? 'warning'
-              : item.key === 'customers' && (stats?.customerReadiness?.actionNeeded ?? 0) > 0
-                ? 'warning'
-              : item.key === 'tax'
-                ? 'success'
-                : 'primary';
-          return (
-            <Link key={item.key} to={item.href} className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
-              <MetricCard
-                label={item.title}
-                value={item.value}
-                detail={(
-                  <span className="inline-flex items-center gap-1">
-                    {item.detail}
+      {!shouldShowFirstInvoicePath && (
+        <section className="rounded-[20px] border border-slate-200 bg-white/90 p-3 shadow-sm">
+          <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
+                {isThai ? 'รายการงานประจำวัน' : 'Daily worklist'}
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-slate-950">
+                {isThai ? 'งานที่กระทบเงินและภาษี' : 'Money and tax actions'}
+              </h2>
+            </div>
+            <p className="text-xs font-semibold text-slate-600">
+              {isThai ? 'จัดเรียงตามสิ่งที่ควรเคลียร์ก่อน' : 'Prioritized by what should be cleared first'}
+            </p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {worklistItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.key}
+                  to={item.href}
+                  className="group rounded-2xl border border-slate-200 bg-white px-4 py-4 transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white shadow-sm">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className={`inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold ring-1 ${statusPillClass[item.statusTone]}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass[item.statusTone]}`} />
+                      {item.status}
+                    </span>
+                  </div>
+                  <div className="mt-4 text-2xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</div>
+                  <p className="mt-2 text-sm font-bold text-slate-900">{item.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{item.detail}</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-primary-700">
+                    {item.action}
                     <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                   </span>
-                )}
-                icon={<Icon className="h-5 w-5" />}
-                tone={tone}
-              />
-            </Link>
-          );
-        })}
-      </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -730,532 +794,369 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Money charts — revenue trend, AR aging, marketplace net */}
-      {stats && (
-        <DashboardCharts
-          isThai={isThai}
-          formatCurrency={formatCurrency}
-          monthlyRevenue={stats.monthlyRevenue ?? []}
-          aging={stats.receivables?.aging ?? { current: 0, days1To30: 0, days31To60: 0, days61To90: 0, days90Plus: 0 }}
-          marketplace={mpChannels}
-        />
-      )}
-
-      {/* Company month-end sheet preview */}
-      {monthEnd ? (
-        <MonthEndWorkspacePreview
-          workspace={monthEnd}
-          title={isThai ? 'ตารางสรุปรายเดือนของบริษัท' : 'Company Month-End Workspace'}
-          description={isThai
-            ? 'ตารางรวมภาษีซื้อ ภาษีขาย ค่าใช้จ่าย เอกสารที่ต้องตรวจ และสรุปทุกโปรเจค เหมือน preview ของ Google Sheet ก่อน export'
-            : 'Spreadsheet preview for company-wide input VAT, output VAT, expenses, missing documents, and project summary before export.'}
-          activeTab={monthEndTab}
-          onTabChange={setMonthEndTab}
-          formatCurrency={formatCurrency}
-          isThai={isThai}
-        />
-      ) : !loading && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-          <p className="font-bold">{isThai ? 'ตารางสรุปรายเดือนยังไม่แสดง' : 'Month-end workspace is not showing yet'}</p>
-          <p className="mt-1">
-            {isThai
-              ? 'ระบบโหลดข้อมูลหลักได้แล้ว แต่โหลดตารางสรุปรายเดือนไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง — ถ้ายังไม่ขึ้น อาจไม่มีสิทธิ์ดูข้อมูลส่วนนี้ ติดต่อผู้ดูแลของบริษัท'
-              : 'The main dashboard loaded but the month-end summary did not. Refresh this page — if it still does not show, you may not have permission to view this section; please contact your admin.'}
-          </p>
-          {monthEndError && (
-            <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-amber-900">
-              {monthEndError}
-            </p>
-          )}
-        </section>
-      )}
-
-      {/* Company Drive workspace */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                <HardDrive className="h-4 w-4" />
-              </span>
+      <div className="grid gap-5 xl:grid-cols-12">
+        <main className="min-w-0 space-y-5 xl:col-span-8">
+          <section className="card">
+            <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-base font-bold text-slate-950">
-                  {isThai ? 'คลัง Google Drive ของบริษัท' : 'Company Google Drive Workspace'}
-                </h2>
-                <p className="text-sm text-slate-500">
-                  {isThai
-                    ? 'เปิดโฟลเดอร์ Billboy ของบริษัท ดูไฟล์รวม ภาษีซื้อ ภาษีขาย ค่าใช้จ่าย และโฟลเดอร์โปรเจคย่อยจากหน้า Dashboard'
-                    : 'Open the company Billboy folder with all files, tax evidence, expenses, and nested project folders from the Dashboard.'}
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
+                  {isThai ? 'บัญชีลูกหนี้' : 'Receivables ledger'}
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-slate-950">{t('dashboard.recentInvoices')}</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {isThai ? 'รายการล่าสุดพร้อมอายุหนี้ เพื่อให้ตามเงินและออกใบเสร็จต่อได้เร็ว' : 'Recent documents with AR aging so collection and receipt work stays visible.'}
                 </p>
               </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {driveSummary?.driveConnected ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {isThai ? 'Drive user พร้อม' : 'User Drive ready'}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleConnectDrive}
-                disabled={driveConnecting || driveSummary?.oauthConfigured === false}
-                className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <UserCheck className="h-4 w-4" />
-                {driveConnecting ? (isThai ? 'กำลังเชื่อม...' : 'Connecting...') : (isThai ? 'เชื่อม Drive ของเจ้าของ' : 'Connect owner Drive')}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleOpenCompanyDrive}
-              disabled={driveOpening || driveSummary?.driveConfigured === false}
-              className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <FolderOpen className="h-4 w-4" />
-              {driveOpening ? (isThai ? 'กำลังเปิด...' : 'Opening...') : (isThai ? 'เปิด/สร้าง Drive บริษัท' : 'Open company Drive')}
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenMasterSheet}
-              disabled={sheetOpening || driveSummary?.driveConfigured === false}
-              className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Table2 className="h-4 w-4" />
-              {sheetOpening
-                ? (isThai ? 'กำลังเปิด...' : 'Opening...')
-                : driveSummary?.workspaceSheetUrl
-                  ? (isThai ? 'เปิด Master Sheet' : 'Open Master Sheet')
-                  : (isThai ? 'สร้าง Master Sheet' : 'Create Master Sheet')}
-            </button>
-          </div>
-        </div>
-
-        {driveSummaryError && (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <p className="font-bold">{isThai ? 'ยังโหลด/เปิด Drive workspace ไม่สำเร็จ' : 'Drive workspace is not ready yet'}</p>
-            <p className="mt-1 font-mono text-xs">{driveSummaryError}</p>
-          </div>
-        )}
-
-        <div className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {isThai ? 'โฟลเดอร์โปรเจคในบริษัท' : 'Project folders'}
-                </p>
-                <p className="text-sm text-slate-500">
-                  {driveSummary?.companyName ?? user?.company?.nameTh ?? user?.company?.nameEn ?? 'Billboy'}
-                  {driveSummary?.driveMode && (
-                    <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                      {driveSummary.driveMode === 'company_owner'
-                        ? (isThai ? 'ใช้ Drive เจ้าของบริษัท' : 'Company owner Drive')
-                        : driveSummary.driveMode === 'current_user'
-                          ? (isThai ? 'ใช้ Drive ผู้ใช้นี้' : 'Current user Drive')
-                          : driveSummary.driveMode === 'service_account'
-                            ? (isThai ? 'ใช้ Drive กลางระบบ' : 'Service account Drive')
-                            : (isThai ? 'ยังไม่ตั้งค่า Drive' : 'Drive not configured')}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <Link to="/app/projects" className="inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:text-primary-800">
-                {isThai ? 'ดูโปรเจคทั้งหมด' : 'All projects'}
+              <Link to="/app/invoices" className="inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:text-primary-900">
+                {t('dashboard.viewAll')}
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
 
-            {driveSummary?.projects?.length ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {driveSummary.projects.slice(0, 6).map((project) => (
-                  <div key={project.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-950">{project.code} · {project.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {isThai ? `${project.fileCount} ไฟล์ใน Drive` : `${project.fileCount} Drive files`} · {project.status}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
-                        {project.fileCount}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Link to={`/app/projects/${project.id}`} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
-                        {isThai ? 'เปิดในระบบ' : 'Open workspace'}
-                      </Link>
-                      {project.driveFolderUrl && (
-                        <a href={project.driveFolderUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
-                          Drive
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-                      {project.googleSheetUrl && (
-                        <a href={project.googleSheetUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-                          Sheet
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                {isThai ? 'ยังไม่มีโฟลเดอร์โปรเจคที่ sync เข้า Drive' : 'No project Drive folders have been synced yet.'}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {isThai ? 'ไฟล์ล่าสุดที่ sync แล้ว' : 'Recent synced files'}
-                </p>
-                <p className="text-sm text-slate-500">
-                  {isThai ? 'กดเปิดไฟล์จริงใน Drive หรือกลับไปดูโปรเจคต้นทาง' : 'Open the real Drive file or jump back to its project.'}
-                </p>
-              </div>
-            </div>
-
-            {driveSummary?.recentFiles?.length ? (
-              <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
-                {driveSummary.recentFiles.map((file) => (
-                  <div key={file.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                        <FileText className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">{file.fileName}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {file.projectCode ? `${file.projectCode} · ${file.projectName ?? ''}` : (isThai ? 'ไฟล์ระดับบริษัท' : 'Company file')}
-                          {file.driveSyncedAt ? ` · ${formatDate(file.driveSyncedAt)}` : ''}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {file.driveUrl && (
-                            <a href={file.driveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-primary-50 px-2 py-1 text-xs font-bold text-primary-700 hover:bg-primary-100">
-                              <LinkIcon className="h-3.5 w-3.5" />
-                              {isThai ? 'เปิดไฟล์' : 'Open file'}
-                            </a>
-                          )}
-                          {file.driveFolderUrl && (
-                            <a href={file.driveFolderUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100">
-                              <FolderOpen className="h-3.5 w-3.5" />
-                              {isThai ? 'โฟลเดอร์' : 'Folder'}
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                {isThai ? 'ยังไม่มีไฟล์ที่ sync เข้า Drive จาก LINE/เว็บ/โปรเจค' : 'No files have been synced from LINE, web upload, or projects yet.'}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Autopilot lanes */}
-      <section className="card">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
-              {isThai ? 'Workflow อัตโนมัติ' : 'Automation workflow'}
-            </p>
-            <h2 className="mt-1 text-lg font-bold text-gray-950">
-              {isThai ? 'จากเอกสารเข้า ไปจนถึงภาษีพร้อมยื่น' : 'From document intake to tax-ready filing'}
-            </h2>
-          </div>
-          <Link to="/app/admin" className="inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:text-primary-800">
-            {isThai ? 'ตั้งค่าการเชื่อมต่อ' : 'Configure integrations'}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <div className="mt-5 grid gap-3 lg:grid-cols-4">
-          {autopilotLanes.map((lane, index) => {
-            const Icon = lane.icon;
-            return (
-              <div key={lane.key} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary-700 ring-1 ring-slate-200">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="text-xs font-bold text-gray-500">0{index + 1}</span>
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">{isThai ? 'อายุลูกหนี้' : 'AR Aging'}</p>
+                  <p className="mt-1 text-2xl font-bold text-primary-800 tabular-nums">{loading ? '—' : formatCurrency(stats?.receivables.totalOutstanding ?? 0)}</p>
                 </div>
-                <p className="mt-3 text-xs font-bold uppercase tracking-wide text-gray-500">{lane.label}</p>
-                <p className="mt-1 text-sm font-bold text-gray-950">{lane.title}</p>
-                <p className="mt-3 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                  {lane.status}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {loading
-          ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
-          : statCards.map((stat, index) => (
-              <MetricCard
-                key={stat.key}
-                label={t(`dashboard.summary.${stat.key}`)}
-                value={stat.value}
-                tone={index === 3 ? 'success' : index === 2 ? 'warning' : 'primary'}
-              />
-            ))}
-      </div>
-
-      {!loading && stats && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-gray-900">
-                {isThai ? 'ภาพรวมลูกหนี้คงค้าง (AR)' : 'Accounts Receivable Overview'}
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {isThai ? 'สรุปยอดค้างชำระรวมและช่วงอายุหนี้ของทั้งบริษัท' : 'Company-wide outstanding balances and aging buckets.'}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-4">
-              <p className="text-sm font-medium text-rose-700">{isThai ? 'ยอดค้างรวม' : 'Total outstanding'}</p>
-              <p className="mt-2 text-2xl font-bold text-rose-900">{formatCurrency(stats.receivables.totalOutstanding)}</p>
-            </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-              <p className="text-sm font-medium text-amber-700">{isThai ? 'ยอดเกินกำหนด' : 'Overdue outstanding'}</p>
-              <p className="mt-2 text-2xl font-bold text-amber-900">{formatCurrency(stats.receivables.overdueOutstanding)}</p>
-            </div>
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-              <p className="text-sm font-medium text-emerald-700">{isThai ? 'ยอดยังไม่เกินกำหนด' : 'Current outstanding'}</p>
-              <p className="mt-2 text-2xl font-bold text-emerald-900">{formatCurrency(stats.receivables.currentOutstanding)}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <MascotHelperCard
-        title={isThai ? 'Billoy พร้อมช่วยปิดงานเอกสารวันนี้' : 'Billoy is ready to help close today’s paperwork'}
-        description={isThai ? 'เลือก workflow ที่ใช้บ่อยได้จากที่นี่ ระบบจะพาไปหน้าที่ถูกต้องโดยไม่ต้องจำเมนู' : 'Jump into the common workflows without remembering where each menu lives.'}
-      >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {[
-            { label: isThai ? 'เอกสารขาย' : 'Sales document', href: '/app/invoices/new' },
-            { label: isThai ? 'ใบเสร็จรับเงิน' : 'Receipt', href: '/app/invoices/new?type=receipt' },
-            { label: isThai ? 'ใบลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note' },
-            { label: isThai ? 'ภาพรวมการเงิน' : 'Finance overview', href: '/app/reports/finance-overview' },
-            { label: isThai ? 'ออเดอร์ช่องทางขาย' : 'Marketplace orders', href: '/app/marketplace-orders' },
-            { label: isThai ? 'รายการ/ส่งออก' : 'List / Export', href: '/app/invoices' },
-          ].map((action) => (
-            <Link
-              key={action.label}
-              to={action.href}
-              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-primary-200 hover:text-primary-800 hover:shadow-sm"
-            >
-              <span className="truncate">{action.label}</span>
-              <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
-            </Link>
-          ))}
-        </div>
-      </MascotHelperCard>
-
-      {/* RD Compliance Panel — collapsed by default to keep the dashboard light */}
-      <details className="card group">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-gray-900">
-              {isThai ? 'สถานะส่งเอกสารให้ RD เมื่อเปิดใช้ e-Tax' : 'RD submission status when e-Tax is enabled'}
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {isThai ? 'สำหรับบริษัทที่ตั้งค่า e-Tax/RD แล้ว · กำหนดส่งทุกวันที่ 15 ของเดือนถัดไป' : 'For companies with e-Tax/RD settings enabled · Deadline: 15th of following month'}
-            </p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-slate-500">
-            {compliance.length === 0
-              ? (isThai ? 'ยังไม่มีข้อมูล' : 'No data')
-              : (isThai ? `${compliance.length} เดือน` : `${compliance.length} mo`)}
-            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-          </span>
-        </summary>
-
-        <div className="mt-5">
-        {complianceLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="animate-pulse space-y-2">
-                <div className="h-4 w-24 bg-gray-200 rounded" />
-                <div className="h-2 bg-gray-200 rounded-full" />
-              </div>
-            ))}
-          </div>
-        ) : compliance.length === 0 ? (
-          <EmptyState
-            title={isThai ? 'ยังไม่มีข้อมูล RD' : 'No RD data yet'}
-            description={isThai ? 'เมื่อเริ่มออกเอกสารและส่ง RD ระบบจะแสดงสถานะรายเดือนที่นี่' : 'Monthly RD submission readiness will appear here after documents are issued.'}
-            variant="waiting"
-          />
-        ) : (
-          <div className="space-y-5">
-            {compliance.map((m) => (
-              <div key={m.month}>
-                {/* Month header */}
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-800">{m.month}</span>
-                    {m.isPast && m.complianceRate < 100 && (
-                      <span className="text-xs text-red-600 font-medium">
-                        {isThai ? '(เกินกำหนด)' : '(past deadline)'}
-                      </span>
-                    )}
-                    {!m.isPast && m.total > 0 && (
-                      <span className="text-xs text-gray-500">
-                        {isThai ? `เหลือ ${m.daysLeft} วัน` : `${m.daysLeft}d left`}
-                      </span>
-                    )}
-                  </div>
-                  {m.total === 0 ? (
-                    <span className="text-xs text-gray-500">{isThai ? 'ไม่มีเอกสาร' : 'No documents'}</span>
-                  ) : (
-                    <div className="flex items-center gap-3 text-xs text-gray-600">
-                      <span className="flex items-center gap-1 text-green-700">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {m.success}
-                      </span>
-                      {m.pending > 0 && (
-                        <span className="flex items-center gap-1 text-yellow-700">
-                          <Clock className="w-3.5 h-3.5" />
-                          {m.pending}
-                        </span>
-                      )}
-                      {m.failed > 0 && (
-                        <span className="flex items-center gap-1 text-red-700">
-                          <XCircle className="w-3.5 h-3.5" />
-                          {m.failed}
-                        </span>
-                      )}
-                      {m.unsubmitted > 0 && (
-                        <span className="flex items-center gap-1 text-gray-500">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          {m.unsubmitted}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />{isThai ? 'เกินกำหนด' : 'Overdue'} {stats ? formatCurrency(stats.receivables.overdueOutstanding) : '—'}</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />{isThai ? 'ยังไม่เกิน' : 'Current'} {stats ? formatCurrency(stats.receivables.currentOutstanding) : '—'}</span>
                 </div>
-
-                {m.total > 0 && <ComplianceBar rate={m.complianceRate} />}
-
-                {/* By document type */}
-                {m.byType.length > 0 && (
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-1.5">
-                    {m.byType.map((t) => (
-                      <div
-                        key={t.type}
-                        className="text-xs px-2 py-1.5 rounded-lg bg-gray-50 border border-gray-100"
-                      >
-                        <span className="font-mono font-semibold text-gray-700">{t.code}</span>
-                        <span className="text-gray-500 mx-1">·</span>
-                        <span className={t.failed > 0 ? 'text-red-600 font-medium' : t.success === t.total ? 'text-green-700' : 'text-gray-600'}>
-                          {t.success}/{t.total}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-            ))}
-
-            {/* Legend */}
-            <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-600" />{isThai ? 'ส่งสำเร็จ' : 'Submitted'}</span>
-              <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-yellow-600" />{isThai ? 'อยู่ระหว่างส่ง' : 'In progress'}</span>
-              <span className="flex items-center gap-1"><XCircle className="w-3.5 h-3.5 text-red-600" />{isThai ? 'ส่งไม่สำเร็จ' : 'Failed'}</span>
-              <span className="flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-gray-500" />{isThai ? 'ยังไม่ได้ส่ง' : 'Not submitted'}</span>
-            </div>
-          </div>
-        )}
-        </div>
-      </details>
-
-      {/* Recent Invoices */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">{t('dashboard.recentInvoices')}</h2>
-          <Link to="/app/invoices" className="text-sm text-primary-600 hover:underline flex items-center gap-1">
-            {t('dashboard.viewAll')}
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="table-header" scope="col">{isThai ? 'เลขที่' : 'Number'}</th>
-                <th className="table-header hidden sm:table-cell" scope="col">{t('customer.title')}</th>
-                <th className="table-header" scope="col">{t('common.date')}</th>
-                <th className="table-header text-right" scope="col">{t('common.amount')}</th>
-                <th className="table-header" scope="col">{t('common.status')}</th>
-                <th className="table-header" scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)
-              ) : recentInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="table-cell text-center py-10">
-                    <EmptyState
-                      title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
-                      description={isThai ? 'สร้างเอกสารใบแรกก่อน แล้วค่อยเปิด workflow e-Tax/RD เมื่อบริษัทลงทะเบียนและตั้งค่าพร้อม' : 'Create the first document now, then enable the e-Tax/RD workflow after registration and setup are ready.'}
-                      actionLabel={isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
-                      actionHref="/app/invoices/new"
-                    />
-                  </td>
-                </tr>
-              ) : (
-                recentInvoices.map((inv) => {
-                  const buyerName = isThai
-                    ? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'
-                    : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ??
-                      (inv.buyer as { nameTh?: string })?.nameTh ?? '—';
+              <div className="mt-4 grid gap-2 sm:grid-cols-5">
+                {loading ? (
+                  [1, 2, 3, 4, 5].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)
+                ) : agingBuckets.map((bucket) => {
+                  const width = totalAging > 0 ? Math.max((bucket.value / totalAging) * 100, bucket.value > 0 ? 8 : 0) : 0;
                   return (
-                    <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="table-cell font-mono text-xs">{inv.invoiceNumber}</td>
-                      <td className="table-cell hidden sm:table-cell">{buyerName}</td>
-                      <td className="table-cell text-gray-500">{formatDate(inv.invoiceDate)}</td>
-                      <td className="table-cell text-right font-medium">{formatCurrency(inv.total)}</td>
-                      <td className="table-cell">
-                        <span className={STATUS_COLORS[inv.status]}>
-                          {t(`invoice.status.${inv.status}`)}
-                        </span>
-                      </td>
-                      <td className="table-cell">
-                        <Link
-                          to={`/app/invoices/${inv.id}/edit`}
-                          className="text-xs text-primary-600 hover:underline"
-                        >
-                          {t('common.view')}
-                        </Link>
+                    <div key={bucket.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div className={`h-full rounded-full ${bucket.color}`} style={{ width: `${width}%` }} />
+                      </div>
+                      <p className="mt-2 text-xs font-bold text-slate-600">{bucket.label}</p>
+                      <p className="mt-1 text-sm font-bold text-slate-950 tabular-nums">{formatCurrency(bucket.value)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="table-header" scope="col">{isThai ? 'เลขที่' : 'Number'}</th>
+                    <th className="table-header hidden sm:table-cell" scope="col">{t('customer.title')}</th>
+                    <th className="table-header" scope="col">{t('common.date')}</th>
+                    <th className="table-header text-right" scope="col">{t('common.amount')}</th>
+                    <th className="table-header" scope="col">{t('common.status')}</th>
+                    <th className="table-header" scope="col" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    [1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)
+                  ) : recentInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="table-cell py-10 text-center">
+                        <EmptyState
+                          title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
+                          description={isThai ? 'สร้างเอกสารใบแรกก่อน แล้วค่อยเปิด workflow e-Tax/RD เมื่อบริษัทลงทะเบียนและตั้งค่าพร้อม' : 'Create the first document now, then enable the e-Tax/RD workflow after registration and setup are ready.'}
+                          actionLabel={isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
+                          actionHref="/app/invoices/new"
+                        />
                       </td>
                     </tr>
-                  );
-                })
+                  ) : (
+                    recentInvoices.map((inv) => {
+                      const buyerName = isThai
+                        ? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'
+                        : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ??
+                          (inv.buyer as { nameTh?: string })?.nameTh ?? '—';
+                      return (
+                        <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50">
+                          <td className="table-cell font-mono text-xs">{inv.invoiceNumber}</td>
+                          <td className="table-cell hidden sm:table-cell">{buyerName}</td>
+                          <td className="table-cell text-gray-600">{formatDate(inv.invoiceDate)}</td>
+                          <td className="table-cell text-right font-bold tabular-nums text-slate-950">{formatCurrency(inv.total)}</td>
+                          <td className="table-cell">
+                            <span className={STATUS_COLORS[inv.status]}>
+                              {t(`invoice.status.${inv.status}`)}
+                            </span>
+                          </td>
+                          <td className="table-cell">
+                            <Link to={`/app/invoices/${inv.id}/edit`} className="text-xs font-bold text-primary-700 hover:text-primary-900">
+                              {t('common.view')}
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {stats && (
+            <DashboardCharts
+              isThai={isThai}
+              formatCurrency={formatCurrency}
+              monthlyRevenue={stats.monthlyRevenue ?? []}
+              aging={stats.receivables?.aging ?? { current: 0, days1To30: 0, days31To60: 0, days61To90: 0, days90Plus: 0 }}
+              marketplace={mpChannels}
+            />
+          )}
+
+          {monthEnd ? (
+            <MonthEndWorkspacePreview
+              workspace={monthEnd}
+              title={isThai ? 'ตารางสรุปรายเดือนของบริษัท' : 'Company Month-End Workspace'}
+              description={isThai
+                ? 'ตารางรวมภาษีซื้อ ภาษีขาย ค่าใช้จ่าย เอกสารที่ต้องตรวจ และสรุปทุกโปรเจค เหมือน preview ของ Google Sheet ก่อน export'
+                : 'Spreadsheet preview for company-wide input VAT, output VAT, expenses, missing documents, and project summary before export.'}
+              activeTab={monthEndTab}
+              onTabChange={setMonthEndTab}
+              formatCurrency={formatCurrency}
+              isThai={isThai}
+            />
+          ) : !loading && (
+            <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+              <p className="font-bold">{isThai ? 'ตารางสรุปรายเดือนยังไม่แสดง' : 'Month-end workspace is not showing yet'}</p>
+              <p className="mt-1">
+                {isThai
+                  ? 'ระบบโหลดข้อมูลหลักได้แล้ว แต่โหลดตารางสรุปรายเดือนไม่ได้ ลองรีเฟรชหน้านี้อีกครั้ง'
+                  : 'The main dashboard loaded, but the month-end summary did not. Refresh this page and check permissions if it remains hidden.'}
+              </p>
+              {monthEndError && (
+                <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-amber-900">
+                  {monthEndError}
+                </p>
               )}
-            </tbody>
-          </table>
-        </div>
+            </section>
+          )}
+        </main>
+
+        <aside className="min-w-0 space-y-5 xl:col-span-4">
+          <section className="card">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
+                  {isThai ? 'Workflow อัตโนมัติ' : 'Automation workflow'}
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-gray-950">
+                  {isThai ? 'จากเอกสารเข้า ไปจนถึงภาษีพร้อมยื่น' : 'From document intake to tax-ready filing'}
+                </h2>
+              </div>
+              <Link to="/app/admin" className="inline-flex items-center gap-1 text-xs font-bold text-primary-700 hover:text-primary-900">
+                {isThai ? 'ตั้งค่า' : 'Configure'}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            <div className="mt-5 space-y-3">
+              {autopilotLanes.map((lane, index) => {
+                const Icon = lane.icon;
+                return (
+                  <div key={lane.key} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary-700 ring-1 ring-slate-200">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">{lane.label}</p>
+                          <span className="text-[11px] font-bold text-slate-500">0{index + 1}</span>
+                        </div>
+                        <p className="mt-0.5 text-sm font-bold text-gray-950">{lane.title}</p>
+                        <p className="mt-1 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                          {lane.status}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <MascotHelperCard
+            title={isThai ? 'Billoy พร้อมช่วยปิดงานเอกสารวันนี้' : 'Billoy is ready to help close today’s paperwork'}
+            description={isThai ? 'เลือก workflow ที่ใช้บ่อยได้จากที่นี่ ระบบจะพาไปหน้าที่ถูกต้องโดยไม่ต้องจำเมนู' : 'Jump into the common workflows without remembering where each menu lives.'}
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: isThai ? 'เอกสารขาย' : 'Sales document', href: '/app/invoices/new' },
+                { label: isThai ? 'ใบเสร็จ' : 'Receipt', href: '/app/invoices/new?type=receipt' },
+                { label: isThai ? 'ลดหนี้' : 'Credit Note', href: '/app/invoices/new?type=credit_note' },
+                { label: isThai ? 'การเงิน' : 'Finance', href: '/app/reports/finance-overview' },
+                { label: isThai ? 'Marketplace' : 'Marketplace', href: '/app/marketplace-orders' },
+                { label: isThai ? 'ส่งออก' : 'Export', href: '/app/invoices' },
+              ].map((action) => (
+                <Link
+                  key={action.label}
+                  to={action.href}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/90 p-2.5 text-xs font-bold text-slate-700 transition hover:border-primary-200 hover:text-primary-800"
+                >
+                  <span className="truncate">{action.label}</span>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                </Link>
+              ))}
+            </div>
+          </MascotHelperCard>
+
+          <section className="card">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">{isThai ? 'ความพร้อม VAT' : 'VAT Readiness'}</p>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-3xl font-bold text-slate-950 tabular-nums">{vatReadyLabel}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {monthEnd
+                    ? (netVat >= 0 ? (isThai ? 'ภาษีต้องชำระโดยประมาณ' : 'Estimated VAT payable') : (isThai ? 'ภาษีขอคืนโดยประมาณ' : 'Estimated VAT refund'))
+                    : (isThai ? 'รอข้อมูลรอบเดือน' : 'Waiting for period data')}
+                </p>
+              </div>
+              <Link to="/app/vat-summary" className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1.5 text-xs font-bold text-primary-700 ring-1 ring-primary-100 hover:bg-primary-100">
+                {isThai ? 'เปิด VAT' : 'Open VAT'}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </section>
+
+          <details className="card group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900">
+                  {isThai ? 'คลัง Google Drive ของบริษัท' : 'Company Google Drive Workspace'}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  {driveSummary?.projects?.length ?? 0} {isThai ? 'โปรเจค' : 'projects'} · {driveModeLabel}
+                </p>
+              </div>
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-4 space-y-4">
+              {driveSummaryError && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                  <p className="font-bold">{isThai ? 'ยังโหลด/เปิด Drive workspace ไม่สำเร็จ' : 'Drive workspace is not ready yet'}</p>
+                  <p className="mt-1 font-mono text-xs">{driveSummaryError}</p>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {driveSummary?.driveConnected ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {isThai ? 'Drive user พร้อม' : 'User Drive ready'}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleConnectDrive}
+                    disabled={driveConnecting || driveSummary?.oauthConfigured === false}
+                    className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {driveConnecting ? (isThai ? 'กำลังเชื่อม...' : 'Connecting...') : (isThai ? 'เชื่อม Drive' : 'Connect Drive')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOpenCompanyDrive}
+                  disabled={driveOpening || driveSummary?.driveConfigured === false}
+                  className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  {driveOpening ? (isThai ? 'กำลังเปิด...' : 'Opening...') : (isThai ? 'เปิด Drive บริษัท' : 'Open Drive')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenMasterSheet}
+                  disabled={sheetOpening || driveSummary?.driveConfigured === false}
+                  className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Table2 className="h-4 w-4" />
+                  {sheetOpening
+                    ? (isThai ? 'กำลังเปิด...' : 'Opening...')
+                    : driveSummary?.workspaceSheetUrl
+                      ? (isThai ? 'เปิด Master Sheet' : 'Open Master Sheet')
+                      : (isThai ? 'สร้าง Master Sheet' : 'Create Master Sheet')}
+                </button>
+              </div>
+              {driveSummary?.projects?.length ? (
+                <div className="space-y-2">
+                  {driveSummary.projects.slice(0, 4).map((project) => (
+                    <div key={project.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="truncate text-sm font-bold text-slate-950">{project.code} · {project.name}</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {isThai ? `${project.fileCount} ไฟล์ใน Drive` : `${project.fileCount} Drive files`} · {project.status}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">
+                  {isThai ? 'ยังไม่มีโฟลเดอร์โปรเจคที่ sync เข้า Drive' : 'No project Drive folders have been synced yet.'}
+                </div>
+              )}
+            </div>
+          </details>
+
+          <details className="card group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900">
+                  {isThai ? 'สถานะส่งเอกสารให้ RD เมื่อเปิดใช้ e-Tax' : 'RD submission status when e-Tax is enabled'}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  {compliance.length === 0
+                    ? (isThai ? 'ยังไม่มีข้อมูล' : 'No data')
+                    : (isThai ? `${compliance.length} เดือน` : `${compliance.length} mo`)}
+                </p>
+              </div>
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+            </summary>
+
+            <div className="mt-5">
+              {complianceLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="animate-pulse space-y-2">
+                      <div className="h-4 w-24 rounded bg-gray-200" />
+                      <div className="h-2 rounded-full bg-gray-200" />
+                    </div>
+                  ))}
+                </div>
+              ) : compliance.length === 0 ? (
+                <EmptyState
+                  title={isThai ? 'ยังไม่มีข้อมูล RD' : 'No RD data yet'}
+                  description={isThai ? 'เมื่อเริ่มออกเอกสารและส่ง RD ระบบจะแสดงสถานะรายเดือนที่นี่' : 'Monthly RD submission readiness will appear here after documents are issued.'}
+                  variant="waiting"
+                />
+              ) : (
+                <div className="space-y-5">
+                  {compliance.map((m) => (
+                    <div key={m.month}>
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-800">{m.month}</span>
+                          {m.isPast && m.complianceRate < 100 && (
+                            <span className="text-xs font-medium text-red-600">
+                              {isThai ? '(เกินกำหนด)' : '(past deadline)'}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs font-bold text-slate-600">{m.complianceRate}%</span>
+                      </div>
+                      {m.total > 0 && <ComplianceBar rate={m.complianceRate} />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+        </aside>
       </div>
+
     </div>
   );
 }

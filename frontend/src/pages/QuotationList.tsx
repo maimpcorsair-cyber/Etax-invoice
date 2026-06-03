@@ -31,6 +31,53 @@ export default function QuotationList() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<QuotationStatus | 'all'>('all');
 
+  const today = new Date();
+  const acceptedQuotes = quotations.filter((q) => q.status === 'accepted');
+  const sentQuotes = quotations.filter((q) => q.status === 'sent');
+  const draftQuotes = quotations.filter((q) => q.status === 'draft');
+  const convertedQuotes = quotations.filter((q) => q.status === 'converted');
+  const expiringQuotes = quotations.filter((q) => {
+    if (!q.validUntil || q.status === 'converted' || q.status === 'cancelled' || q.status === 'rejected') return false;
+    const validUntil = new Date(q.validUntil);
+    const diffDays = (validUntil.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 7;
+  });
+  const acceptedValue = acceptedQuotes.reduce((sum, q) => sum + Number(q.total ?? 0), 0);
+  const openValue = quotations
+    .filter((q) => q.status === 'sent' || q.status === 'accepted' || q.status === 'draft')
+    .reduce((sum, q) => sum + Number(q.total ?? 0), 0);
+  const latestQuote = quotations[0];
+  const workItems = [
+    {
+      label: isThai ? 'รอลูกค้าตอบรับ' : 'Awaiting customer',
+      value: sentQuotes.length,
+      status: sentQuotes.length > 0 ? (isThai ? 'Follow up' : 'Follow up') : (isThai ? 'Clear' : 'Clear'),
+      dot: sentQuotes.length > 0 ? 'bg-amber-500' : 'bg-emerald-500',
+      icon: Clock,
+    },
+    {
+      label: isThai ? 'ใกล้หมดอายุ' : 'Expiring soon',
+      value: expiringQuotes.length,
+      status: expiringQuotes.length > 0 ? (isThai ? 'Review' : 'Review') : (isThai ? 'Safe' : 'Safe'),
+      dot: expiringQuotes.length > 0 ? 'bg-rose-500' : 'bg-emerald-500',
+      icon: CalendarClock,
+    },
+    {
+      label: isThai ? 'แบบร่าง' : 'Draft quotes',
+      value: draftQuotes.length,
+      status: draftQuotes.length > 0 ? (isThai ? 'Finish' : 'Finish') : (isThai ? 'None' : 'None'),
+      dot: draftQuotes.length > 0 ? 'bg-amber-500' : 'bg-slate-300',
+      icon: FileText,
+    },
+    {
+      label: isThai ? 'แปลงเป็นใบกำกับแล้ว' : 'Converted',
+      value: convertedQuotes.length,
+      status: isThai ? 'Tax flow' : 'Tax flow',
+      dot: convertedQuotes.length > 0 ? 'bg-primary-500' : 'bg-slate-300',
+      icon: ArrowRight,
+    },
+  ];
+
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -93,7 +140,7 @@ export default function QuotationList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <SectionSubNav
         items={[
           { key: 'quotations', to: '/app/quotations', label: isThai ? 'ใบเสนอราคา' : 'Quotations', icon: FileText },
@@ -102,41 +149,112 @@ export default function QuotationList() {
           { key: 'invoices', to: '/app/invoices', label: isThai ? 'ใบกำกับภาษี/ใบเสร็จ' : 'Tax Invoices', icon: Receipt },
         ]}
       />
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary-600" />
-            {isThai ? 'ใบเสนอราคา' : 'Quotations'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {isThai
-              ? 'ออกใบเสนอราคา ส่งให้ลูกค้า แล้วแปลงเป็นใบกำกับภาษีตอนปิดดีล'
-              : 'Send price quotes to customers, then convert accepted quotes into tax invoices'}
-          </p>
-        </div>
-        <button onClick={() => navigate('/app/quotations/new')} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          {isThai ? 'สร้างใบเสนอราคา' : 'New quotation'}
-        </button>
-      </header>
 
-      {/* Filters */}
-      <div className="card">
+      <section className="premium-hero premium-hero-dark overflow-hidden p-4 sm:p-6 lg:p-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-end">
+          <div className="min-w-0">
+            <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
+              {isThai ? 'Quote Pipeline Ledger' : 'Quote Pipeline Ledger'}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3 sm:mt-4">
+              <div className="hidden h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 sm:flex">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white sm:text-3xl">
+                  {isThai ? 'ใบเสนอราคา' : 'Quotations'}
+                </h1>
+                <p className="mt-1 max-w-2xl text-sm text-white/70">
+                  {isThai
+                    ? 'ดูมูลค่าดีลที่ลูกค้ารับแล้ว งานที่ต้องตาม และแปลงเป็นใบกำกับภาษีเมื่อปิดดีล'
+                    : 'Track accepted quote value, follow-up work, and the path into tax invoices.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 sm:mt-6">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
+                {isThai ? 'มูลค่าใบเสนอราคาที่ตอบรับแล้ว' : 'Accepted quote value'}
+              </p>
+              <div className="mt-2 max-w-2xl border-b border-[rgba(201,168,76,0.7)] pb-2 sm:pb-3">
+                <p className="font-sarabun text-[2rem] font-bold leading-none text-white tabular-nums sm:text-[clamp(2rem,4vw,2.5rem)]">
+                  {formatCurrency(acceptedValue)}
+                </p>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/75 sm:mt-4 sm:gap-3">
+                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
+                  {isThai ? 'มูลค่าเปิดอยู่' : 'Open value'} <strong className="text-white tabular-nums">{formatCurrency(openValue)}</strong>
+                </span>
+                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
+                  {isThai ? 'ทั้งหมด' : 'Total'} <strong className="text-white tabular-nums">{quotations.length}</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white/10 p-3 text-white ring-1 ring-white/15 backdrop-blur-sm sm:p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
+              {isThai ? 'Next action' : 'Next action'}
+            </p>
+            <p className="mt-1.5 text-base font-semibold sm:mt-2 sm:text-lg">
+              {latestQuote
+                ? latestQuote.buyer?.nameTh ?? latestQuote.quotationNumber
+                : isThai ? 'เริ่มจากใบเสนอราคาแรก' : 'Start with the first quote'}
+            </p>
+            <p className="mt-1 text-sm text-white/65">
+              {latestQuote
+                ? `${latestQuote.quotationNumber} · ${formatCurrency(latestQuote.total)}`
+                : isThai ? 'สร้าง ส่งลิงก์ให้ลูกค้า แล้วแปลงเป็นเอกสารขายเมื่อยอมรับ' : 'Create, share, then convert once accepted.'}
+            </p>
+            <button onClick={() => navigate('/app/quotations/new')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-800 shadow-sm hover:bg-primary-50 sm:mt-4">
+              <Plus className="h-4 w-4" />
+              {isThai ? 'สร้างใบเสนอราคา' : 'New quotation'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-2xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</p>
+                    <p className="mt-1 truncate text-sm font-medium text-slate-600">{item.label}</p>
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+                  <span className={`h-2 w-2 rounded-full ${item.dot}`} />
+                  {item.status}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap gap-3">
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={isThai ? 'ค้นหาเลขที่ / ชื่อลูกค้า...' : 'Search number or customer...'}
-              className="input-field pl-9 w-full"
+              className="input-field w-full pl-9"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as QuotationStatus | 'all')}
-            className="input-field w-auto"
+            className="input-field min-w-[180px]"
           >
             <option value="all">{isThai ? 'ทุกสถานะ' : 'All statuses'}</option>
             {(Object.keys(STATUS_LABELS) as QuotationStatus[]).map((s) => (
@@ -144,14 +262,13 @@ export default function QuotationList() {
             ))}
           </select>
         </div>
-      </div>
+      </section>
 
-      {/* Table */}
       {listMsg && (
-        <div className={`border px-4 py-3 text-sm ${
+        <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${
           listMsg.type === 'ok'
-            ? 'border-primary-100 bg-primary-50 text-primary-800'
-            : 'border-rose-200 bg-rose-50 text-rose-800'
+            ? 'border-primary-100 bg-white text-primary-800'
+            : 'border-rose-200 bg-white text-rose-800'
         }`}>
           {listMsg.text}
         </div>
@@ -174,8 +291,18 @@ export default function QuotationList() {
           </button>
         </div>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-950">{isThai ? 'รายการใบเสนอราคา' : 'Quotation ledger'}</p>
+              <p className="text-xs text-slate-500">{isThai ? 'คลิกแถวเพื่อดูรายละเอียดหรือแก้ไข' : 'Click a row to view details or edit'}</p>
+            </div>
+            <Link to="/app/invoices" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+              {isThai ? 'ดูใบกำกับภาษีที่ออกแล้ว' : 'View issued tax invoices'}
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+          <table className="min-w-[920px] w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header">{isThai ? 'เลขที่' : 'Number'}</th>
@@ -199,9 +326,9 @@ export default function QuotationList() {
                   >
                     <td className="table-cell">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-primary-700">{q.quotationNumber}</span>
+                        <span className="text-sm font-semibold text-primary-700 tabular-nums">{q.quotationNumber}</span>
                         {(q.revisionNo ?? 0) > 0 && (
-                          <span className="border border-primary-100 bg-primary-50 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700">
+                          <span className="rounded-full border border-primary-100 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-primary-700">
                             R{q.revisionNo}
                           </span>
                         )}
@@ -216,9 +343,9 @@ export default function QuotationList() {
                       <div className="font-medium text-gray-900">{q.buyer?.nameTh ?? '-'}</div>
                       <div className="text-xs text-gray-500">{q.buyer?.taxId ?? ''}</div>
                     </td>
-                    <td className="table-cell text-sm text-gray-700">{q.quotationDate.slice(0, 10)}</td>
-                    <td className="table-cell text-sm text-gray-500">{q.validUntil ? q.validUntil.slice(0, 10) : '—'}</td>
-                    <td className="table-cell text-right font-medium">{formatCurrency(q.total)}</td>
+                    <td className="table-cell text-sm text-gray-700 tabular-nums">{q.quotationDate.slice(0, 10)}</td>
+                    <td className="table-cell text-sm text-gray-500 tabular-nums">{q.validUntil ? q.validUntil.slice(0, 10) : '—'}</td>
+                    <td className="table-cell text-right font-semibold tabular-nums">{formatCurrency(q.total)}</td>
                     <td className="table-cell text-center">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${meta.tone}`}>
                         <Icon className="w-3 h-3" />
@@ -260,14 +387,9 @@ export default function QuotationList() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
-
-      <div className="text-xs text-gray-400 mt-2">
-        <Link to="/app/invoices" className="text-primary-600 hover:underline">
-          {isThai ? '→ ดูใบกำกับภาษีที่ออกแล้ว' : '→ View issued tax invoices'}
-        </Link>
-      </div>
     </div>
   );
 }

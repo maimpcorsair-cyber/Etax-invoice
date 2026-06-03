@@ -15,9 +15,10 @@ import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { useDriveStatus } from '../hooks/useDriveStatus';
 import type { ExpenseVoucher, ExpenseVoucherStatus, AttachmentFileType, EvidenceType, PettyCash, ApprovalLog } from '../types';
-import { EmptyState, MetricCard, PageHeader } from '../components/ui/AppChrome';
+import { EmptyState } from '../components/ui/AppChrome';
 import SectionSubNav from '../components/SectionSubNav';
 import { ShoppingCart } from 'lucide-react';
+import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 
 const CATEGORY_KEYS = [
   'transportation', 'office_supplies', 'meals', 'postage',
@@ -114,9 +115,23 @@ export default function Expenses() {
 
   const [driveUploading, setDriveUploading] = useState(false);
   const [sheetsExporting, setSheetsExporting] = useState(false);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const isFreePlan = policy?.plan === 'free';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [...current.slice(-2), { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, toast.tone === 'error' ? 7000 : 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   const fetchVouchers = useCallback(async () => {
     setLoading(true);
@@ -158,6 +173,50 @@ export default function Expenses() {
   const draftCount = vouchers.filter((v) => v.status === 'draft').length;
   const submittedCount = vouchers.filter((v) => v.status === 'submitted').length;
   const approvedCount = vouchers.filter((v) => v.status === 'approved').length;
+  const rejectedCount = vouchers.filter((v) => v.status === 'rejected').length;
+  const pendingAmount = vouchers
+    .filter((v) => v.status === 'draft' || v.status === 'submitted')
+    .reduce((s, v) => s + Number(v.totalAmount), 0);
+  const approvedAmount = vouchers
+    .filter((v) => v.status === 'approved')
+    .reduce((s, v) => s + Number(v.totalAmount), 0);
+  const pettyCashBalance = pettyCash?.balance ?? 0;
+  const workItems = [
+    {
+      label: t('expenses.status.draft'),
+      value: draftCount,
+      detail: isThai ? 'ยังไม่ส่งอนุมัติ' : 'Not submitted',
+      icon: Clock,
+      tone: draftCount > 0 ? 'idle' : 'clear',
+    },
+    {
+      label: t('expenses.status.submitted'),
+      value: submittedCount,
+      detail: isThai ? 'รอผู้อนุมัติ' : 'Awaiting approval',
+      icon: Send,
+      tone: submittedCount > 0 ? 'needs' : 'clear',
+    },
+    {
+      label: t('expenses.status.approved'),
+      value: approvedCount,
+      detail: formatCurrency(approvedAmount),
+      icon: ThumbsUp,
+      tone: approvedCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: t('expenses.status.rejected'),
+      value: rejectedCount,
+      detail: isThai ? 'ต้องแก้ไข' : 'Needs correction',
+      icon: ThumbsDown,
+      tone: rejectedCount > 0 ? 'overdue' : 'clear',
+    },
+  ];
+  const statusDotClass = (tone: string) => {
+    if (tone === 'overdue') return 'bg-rose-500';
+    if (tone === 'needs') return 'bg-amber-500';
+    if (tone === 'clear') return 'bg-emerald-500';
+    return 'bg-slate-300';
+  };
 
   function statusBadgeClass(status: ExpenseVoucherStatus) {
     if (status === 'draft') return 'badge-info';
@@ -340,11 +399,26 @@ export default function Expenses() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm(t('common.confirm') + '?')) return;
+    setConfirmDialog({
+      tone: 'error',
+      title: isThai ? 'ลบใบเบิก/ค่าใช้จ่ายนี้?' : 'Delete this expense voucher?',
+      description: isThai ? 'รายการนี้จะถูกเอาออกจากรายงานค่าใช้จ่ายและหลักฐานที่แนบไว้' : 'This removes the voucher from expense reporting and its attached evidence list.',
+      confirmLabel: isThai ? 'ลบรายการ' : 'Delete',
+      cancelLabel: t('common.cancel'),
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void deleteConfirmed(id);
+      },
+    });
+  }
+
+  async function deleteConfirmed(id: string) {
     await fetch(`/api/expenses/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
+    showToast({ tone: 'success', title: isThai ? 'ลบรายการแล้ว' : 'Expense voucher deleted' });
     fetchVouchers();
   }
 
@@ -377,12 +451,26 @@ export default function Expenses() {
         const json = await res.json();
         if (res.status === 409 && json.code === 'PROJECT_OVER_BUDGET' && json.budgetGuard && !forceOverBudget) {
           const guard = json.budgetGuard as NonNullable<ExpenseVoucher['budgetGuard']>;
-          const ok = confirm(
-            isThai
-              ? `โปรเจค ${guard.project.code} เกินงบ ${formatCurrency(guard.overBudgetAmount)} หลังอนุมัติ\n\nงบ: ${formatCurrency(guard.budgetAmount)}\nต้นทุนผูกพัน: ${formatCurrency(guard.committedAmount)}\n\nยืนยันอนุมัติต่อหรือไม่?`
-              : `Project ${guard.project.code} is over budget by ${formatCurrency(guard.overBudgetAmount)} after approval.\n\nBudget: ${formatCurrency(guard.budgetAmount)}\nCommitted: ${formatCurrency(guard.committedAmount)}\n\nApprove anyway?`,
-          );
-          if (ok) return handleApprove(id, true);
+          setConfirmDialog({
+            tone: 'warning',
+            title: isThai ? `โปรเจค ${guard.project.code} เกินงบ` : `Project ${guard.project.code} is over budget`,
+            description: isThai
+              ? `หลังอนุมัติจะเกินงบ ${formatCurrency(guard.overBudgetAmount)}`
+              : `Approving this voucher will exceed budget by ${formatCurrency(guard.overBudgetAmount)}.`,
+            detail: (
+              <div className="space-y-1">
+                <div className="flex justify-between gap-3"><span>{isThai ? 'งบ' : 'Budget'}</span><strong>{formatCurrency(guard.budgetAmount)}</strong></div>
+                <div className="flex justify-between gap-3"><span>{isThai ? 'ต้นทุนผูกพัน' : 'Committed'}</span><strong>{formatCurrency(guard.committedAmount)}</strong></div>
+              </div>
+            ),
+            confirmLabel: isThai ? 'อนุมัติต่อ' : 'Approve anyway',
+            cancelLabel: t('common.cancel'),
+            onCancel: () => setConfirmDialog(null),
+            onConfirm: () => {
+              setConfirmDialog(null);
+              void handleApprove(id, true);
+            },
+          });
           return;
         }
         throw new Error(json.error ?? 'Approve failed');
@@ -495,57 +583,114 @@ export default function Expenses() {
   }
 
   return (
-    <div className="space-y-5">
+    <>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ConfirmDialog dialog={confirmDialog} />
+      <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <SectionSubNav
         items={[
           { key: 'bills', to: '/app/purchase-invoices', label: isThai ? 'บันทึกซื้อ' : 'Bills', icon: ShoppingCart },
           { key: 'pettyCash', to: '/app/expenses', label: isThai ? 'เงินสดย่อย' : 'Petty Cash', icon: Wallet },
         ]}
       />
-      {/* Header */}
-      <PageHeader
-        eyebrow={isThai ? 'Approval workflow' : 'Approval workflow'}
-        title={t('expenses.title')}
-        description={expenseLimit !== null
-          ? `${t('expenses.expenseLimit')}: ${formatCurrency(expenseLimit)}`
-          : t('expenses.noLimit')}
-        icon={<Wallet className="h-3.5 w-3.5" />}
-        mascot="spot"
-        tone="teal"
-        actions={(
-          <>
-          {/* Petty cash balance chip */}
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
-            <Wallet className="w-4 h-4 text-emerald-600" />
-            <span className="font-semibold text-emerald-800">{formatCurrency(pettyCash?.balance ?? 0)}</span>
-            {isAdmin && (
-              <button
-                onClick={() => { setTopUpAmount(''); setShowTopUpModal(true); }}
-                className="ml-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 underline"
-              >
-                {t('expenses.topUp', 'Top Up')}
-              </button>
-            )}
+      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">{isThai ? 'Expense Approval Ledger' : 'Expense Approval Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+                <Wallet className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                  {t('expenses.title')}
+                </h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                  {expenseLimit !== null
+                    ? `${t('expenses.expenseLimit')}: ${formatCurrency(expenseLimit)}`
+                    : t('expenses.noLimit')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+                {isThai ? 'ยอด voucher ในช่วงที่เลือก' : 'Voucher value in selected range'}
+              </p>
+              <p className="mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none text-white tabular-nums">
+                {formatCurrency(totalAmount)}
+              </p>
+              <div className="mt-3 h-px w-40 bg-amber-200/80" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'รอจ่าย/รออนุมัติ' : 'Pending'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(pendingAmount)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'เงินสดย่อยคงเหลือ' : 'Petty cash'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(pettyCashBalance)}</p>
+              </div>
+            </div>
           </div>
-        <button
-          onClick={handleSheetsExport}
-          disabled={sheetsExporting || vouchers.length === 0}
-          className="btn-secondary hidden sm:inline-flex"
-          title={t('expenses.exportSheets', 'Export to Google Sheets')}
-        >
-          {sheetsExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sheet className="w-4 h-4 text-green-600" />}
-          {t('expenses.exportSheets', 'Export')}
-        </button>
-        <button onClick={openCreate} className="btn-primary" disabled={isFreePlan}>
-          <Plus className="w-4 h-4" />
-          {t('expenses.newVoucher')}
-        </button>
-          </>
-        )}
-      />
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Wallet className="h-4 w-4 text-amber-100" />
+              {isThai ? 'จัดการ voucher' : 'Voucher actions'}
+            </div>
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+              <p className="text-xs font-semibold text-white/55">{isThai ? 'งวดที่กำลังดู' : 'Current period'}</p>
+              <p className="mt-1 text-sm font-bold text-white">{formatDate(from)} - {formatDate(to)}</p>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 disabled:opacity-60 sm:px-4 sm:py-2.5" disabled={isFreePlan}>
+                <Plus className="h-4 w-4" />
+                {t('expenses.newVoucher')}
+              </button>
+              <button
+                onClick={handleSheetsExport}
+                disabled={sheetsExporting || vouchers.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                title={t('expenses.exportSheets', 'Export to Google Sheets')}
+              >
+                {sheetsExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sheet className="h-4 w-4" />}
+                {t('expenses.exportSheets', 'Export')}
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { setTopUpAmount(''); setShowTopUpModal(true); }}
+                  className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5"
+                >
+                  <Wallet className="h-4 w-4" />
+                  {t('expenses.topUp', 'Top Up')}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClass(item.tone)}`} />
+              </div>
+              <p className="mt-3 text-xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{item.label}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+            </div>
+          );
+        })}
+      </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+        <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-700 shadow-sm">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
           <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
@@ -553,7 +698,7 @@ export default function Expenses() {
       )}
 
       {driveError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2">
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {driveError}
         </div>
@@ -561,16 +706,16 @@ export default function Expenses() {
 
       {/* Google Drive connect banner */}
       {driveStatus?.oauthConfigured && !driveStatus.connected && (
-        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-          <HardDrive className="w-5 h-5 text-blue-600 shrink-0" />
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <HardDrive className="w-5 h-5 text-primary-700 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-blue-800">{t('expenses.driveConnectTitle', 'Connect your Google Drive')}</p>
-            <p className="text-xs text-blue-600 mt-0.5">{t('expenses.driveConnectDesc', 'Upload attachments directly to your Drive — files stay in your account')}</p>
+            <p className="text-sm font-semibold text-slate-900">{t('expenses.driveConnectTitle', 'Connect your Google Drive')}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{t('expenses.driveConnectDesc', 'Upload attachments directly to your Drive — files stay in your account')}</p>
           </div>
           <button
             onClick={() => void connectDrive()}
             disabled={driveConnecting}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary-800"
           >
             {driveConnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HardDrive className="w-3.5 h-3.5" />}
             {t('expenses.driveConnect', 'Connect')}
@@ -579,31 +724,19 @@ export default function Expenses() {
       )}
 
       {driveStatus?.connected && (
-        <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-          <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-          <p className="text-sm text-green-800 flex-1">
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <p className="text-sm text-slate-700 flex-1">
             <span className="font-semibold">{t('expenses.driveConnected', 'Google Drive connected')}</span>
             {driveStatus.linkedAt && (
-              <span className="text-xs text-green-600 ml-2">— {formatDate(driveStatus.linkedAt)}</span>
+              <span className="text-xs text-slate-500 ml-2">— {formatDate(driveStatus.linkedAt)}</span>
             )}
           </p>
-          <button onClick={disconnectDrive} className="text-xs text-green-700 hover:text-green-900 underline shrink-0">
+          <button onClick={disconnectDrive} className="text-xs text-primary-700 hover:text-primary-900 underline shrink-0">
             {t('expenses.driveDisconnect', 'Disconnect')}
           </button>
         </div>
       )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: t('common.total'), value: vouchers.length, amount: formatCurrency(totalAmount), tone: 'primary' as const },
-          { label: t('expenses.status.draft'), value: draftCount, tone: 'neutral' as const },
-          { label: t('expenses.status.submitted'), value: submittedCount, tone: 'warning' as const },
-          { label: t('expenses.status.approved'), value: approvedCount, tone: 'success' as const },
-        ].map((stat) => (
-          <MetricCard key={stat.label} label={stat.label} value={stat.value} detail={stat.amount} tone={stat.tone} />
-        ))}
-      </div>
 
       {/* Filters */}
       <div className="card">
@@ -669,7 +802,7 @@ export default function Expenses() {
           />
         ) : (
           vouchers.map((v) => (
-            <div key={v.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-2">
+            <div key={v.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold text-gray-900 font-mono text-sm">{v.voucherNumber}</p>
@@ -683,10 +816,10 @@ export default function Expenses() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-400">{t('expenses.total')}</span>
-                <span className="font-bold text-primary-700">{formatCurrency(v.totalAmount)}</span>
+                <span className="font-bold text-primary-700 tabular-nums">{formatCurrency(v.totalAmount)}</span>
               </div>
               {v.rejectionNote && (
-                <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{v.rejectionNote}</p>
+                <p className="rounded-lg border border-rose-100 bg-white px-2 py-1 text-xs font-semibold text-rose-600">{v.rejectionNote}</p>
               )}
               {v.project && (
                 <p className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
@@ -695,15 +828,15 @@ export default function Expenses() {
                 </p>
               )}
               <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <button onClick={() => openDetail(v)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100">
+                <button onClick={() => openDetail(v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
                   <Eye className="w-3.5 h-3.5" /> {t('common.view', 'View')}
                 </button>
                 {v.status === 'draft' && (
                   <>
-                    <button onClick={() => openEdit(v)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100">
+                    <button onClick={() => openEdit(v)} className="inline-flex items-center gap-1 rounded-lg border border-primary-100 bg-white px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50">
                       <Edit2 className="w-3.5 h-3.5" /> {t('common.edit')}
                     </button>
-                    <button onClick={() => handleSubmit(v.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100">
+                    <button onClick={() => handleSubmit(v.id)} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50">
                       <Send className="w-3.5 h-3.5" /> {t('expenses.submit')}
                     </button>
                     <DeleteButton onClick={() => handleDelete(v.id)} label={t('common.delete')} size="sm" className="ml-auto" />
@@ -711,10 +844,10 @@ export default function Expenses() {
                 )}
                 {canApproveVoucher(v) && (
                   <>
-                    <button onClick={() => handleApprove(v.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100">
+                    <button onClick={() => handleApprove(v.id)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
                       <ThumbsUp className="w-3.5 h-3.5" /> {t('expenses.approve')}
                     </button>
-                    <button onClick={() => openReject(v.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100">
+                    <button onClick={() => openReject(v.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50">
                       <ThumbsDown className="w-3.5 h-3.5" /> {t('expenses.reject')}
                     </button>
                   </>
@@ -726,9 +859,13 @@ export default function Expenses() {
       </div>
 
       {/* Desktop table */}
-      <div className="card p-0 overflow-hidden hidden sm:block">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="text-base font-bold text-slate-950">{isThai ? 'รายการเงินสดย่อย' : 'Petty cash vouchers'}</h2>
+          <p className="mt-1 text-xs text-slate-500">{isThai ? 'ตรวจสถานะ อนุมัติ และหลักฐานของ voucher ในช่วงที่เลือก' : 'Review voucher status, approvals, and evidence in the selected range.'}</p>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[980px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header">{t('expenses.voucherNumber')}</th>
@@ -768,8 +905,8 @@ export default function Expenses() {
                         <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="table-cell text-center">{v.itemCount ?? 0}</td>
-                    <td className="table-cell text-right font-semibold">{formatCurrency(v.totalAmount)}</td>
+                    <td className="table-cell text-center tabular-nums">{v.itemCount ?? 0}</td>
+                    <td className="table-cell text-right font-semibold tabular-nums">{formatCurrency(v.totalAmount)}</td>
                     <td className="table-cell">
                       <span className={statusBadgeClass(v.status)}>{t(`expenses.status.${v.status}`)}</span>
                       {v.rejectionNote && (
@@ -812,7 +949,7 @@ export default function Expenses() {
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                 <tr>
                   <td colSpan={5} className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{t('expenses.total')}</td>
-                  <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">{formatCurrency(totalAmount)}</td>
+                  <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(totalAmount)}</td>
                   <td colSpan={2} />
                 </tr>
               </tfoot>
@@ -1334,6 +1471,7 @@ export default function Expenses() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

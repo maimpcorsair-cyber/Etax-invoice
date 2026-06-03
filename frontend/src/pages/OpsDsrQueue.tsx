@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { ConfirmDialog, type ConfirmDialogState } from '../components/ui/AppFeedback';
 
 interface DsrRow {
   id: string;
@@ -22,6 +23,7 @@ export default function OpsDsrQueue() {
   const [rows, setRows] = useState<DsrRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -42,7 +44,7 @@ export default function OpsDsrQueue() {
 
   async function cancel(companyId: string) {
     if (!token || busyId) return;
-    if (!window.confirm('Cancel this deletion request and reactivate the requester?')) return;
+    setConfirmDialog(null);
     setBusyId(companyId);
     try {
       const res = await fetch(`/api/account/owner/dsr-queue/${companyId}/cancel`, {
@@ -58,8 +60,27 @@ export default function OpsDsrQueue() {
     }
   }
 
+  function requestCancel(row: DsrRow) {
+    setConfirmDialog({
+      tone: 'warning',
+      title: 'Cancel deletion request?',
+      description: 'This reactivates the tenant request and stops the scheduled PDPA erasure workflow for this company.',
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep scheduled',
+      detail: (
+        <div>
+          <p className="font-semibold text-slate-900">{row.nameTh}</p>
+          <p className="mt-1 text-xs text-slate-500">{row.taxId} · {row.email ?? 'No email'}</p>
+        </div>
+      ),
+      onConfirm: () => void cancel(row.id),
+      onCancel: () => setConfirmDialog(null),
+    });
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <ConfirmDialog dialog={confirmDialog} />
       <header>
         <h1 className="text-xl font-semibold text-slate-900">Data Subject Requests — Deletion Queue</h1>
         <p className="mt-1 text-sm text-slate-600">Pending PDPA Section 33 erasure requests across all tenants. Tax invoices are retained 5 years per Revenue Code; full purge runs automatically when scheduled.</p>
@@ -114,7 +135,7 @@ export default function OpsDsrQueue() {
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
-                        onClick={() => cancel(row.id)}
+                        onClick={() => requestCancel(row)}
                         disabled={busyId === row.id}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                       >

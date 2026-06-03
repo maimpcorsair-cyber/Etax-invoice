@@ -92,25 +92,125 @@ export default function MarketplaceOrders() {
     return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${map[s] ?? 'bg-slate-100 text-slate-500'}`}>{s}</span>;
   }
 
+  const totalOrders = summary?.totalOrders ?? orders.length;
+  const unmappedOrders = summary?.ordersWithUnmapped ?? 0;
+  const lowStockCount = summary?.lowStock.length ?? 0;
+  const channelCount = summary?.channels.length || settlementSummary?.channels.length || 0;
+  const payoutLines = settlementSummary?.total.count ?? 0;
+  const netPayout = settlementSummary?.total.net ?? 0;
+  const grossPayout = settlementSummary?.total.gross ?? 0;
+  const totalFees = settlementSummary?.total.fee ?? 0;
+  const workItems = [
+    {
+      label: isThai ? 'ออเดอร์นำเข้า' : 'Imported orders',
+      value: String(totalOrders),
+      icon: Store,
+      dot: totalOrders > 0 ? 'bg-emerald-500' : 'bg-slate-300',
+      status: isThai ? 'พร้อมตรวจ' : 'Ready',
+    },
+    {
+      label: isThai ? 'SKU ยังไม่ผูก' : 'Unmapped SKU orders',
+      value: String(unmappedOrders),
+      icon: AlertTriangle,
+      dot: unmappedOrders > 0 ? 'bg-amber-500' : 'bg-emerald-500',
+      status: unmappedOrders > 0 ? (isThai ? 'ต้องผูกสินค้า' : 'Map products') : (isThai ? 'ปกติ' : 'Clear'),
+    },
+    {
+      label: isThai ? 'สินค้าใกล้หมด' : 'Low stock items',
+      value: String(lowStockCount),
+      icon: PackageX,
+      dot: lowStockCount > 0 ? 'bg-rose-500' : 'bg-emerald-500',
+      status: lowStockCount > 0 ? (isThai ? 'ต้องเติม' : 'Restock') : (isThai ? 'ปกติ' : 'Clear'),
+    },
+    {
+      label: isThai ? 'ช่องทางที่มีข้อมูล' : 'Channels with data',
+      value: String(channelCount),
+      icon: ReceiptText,
+      dot: channelCount > 0 ? 'bg-primary-500' : 'bg-slate-300',
+      status: payoutLines > 0 ? `${payoutLines} ${isThai ? 'บรรทัดเงินเข้า' : 'payout lines'}` : (isThai ? 'รอนำเข้า' : 'Awaiting import'),
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{isThai ? 'ออเดอร์จากช่องทางขาย' : 'Marketplace orders'}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {isThai ? 'ออเดอร์ สต็อก และเงินรับจริงจาก Shopee/Lazada/TikTok/Facebook/Instagram ในหน้าเดียว' : 'Orders, stock, and real payout reconciliation across every sales channel.'}
-          </p>
+    <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="premium-hero premium-hero-dark overflow-hidden">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">{isThai ? 'Marketplace Payout Ledger' : 'Marketplace Payout Ledger'}</p>
+            <h1 className="mt-3 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
+              {isThai ? 'ออเดอร์จากช่องทางขาย' : 'Marketplace orders'}
+            </h1>
+            <p className="mt-3 hidden max-w-3xl text-sm leading-6 text-primary-50/80 sm:block">
+              {isThai
+                ? 'ตรวจออเดอร์ สต็อก SKU และเงินรับจริงจาก Shopee/Lazada/TikTok/Facebook/Instagram ในหน้าเดียว'
+                : 'Reconcile imported orders, SKU stock impact, and real payouts across every sales channel.'}
+            </p>
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'เงินเข้าจริงสุทธิ' : 'Net payout received'}</p>
+              <p className="mt-2 font-sarabun text-[clamp(2rem,5vw,3.6rem)] font-bold leading-none tabular-nums text-white">
+                {loading ? '—' : formatCurrency(netPayout)}
+              </p>
+              <div className="mt-4 h-1 w-44 rounded-full bg-gradient-to-r from-thai-gold via-thai-gold/70 to-transparent" />
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-primary-50/80">
+                <div>
+                  <span className="block text-xs font-bold uppercase text-primary-100/60">Gross</span>
+                  <span className="mt-1 block font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(grossPayout)}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold uppercase text-primary-100/60">Fees</span>
+                  <span className="mt-1 block font-bold tabular-nums text-rose-100">{loading ? '—' : `- ${formatCurrency(totalFees)}`}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'ช่องทางในมุมมองนี้' : 'Channels in view'}</p>
+                <p className="mt-2 text-3xl font-bold tabular-nums text-white">{loading ? '—' : channelCount}</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-thai-gold">
+                <Banknote className="h-6 w-6" />
+              </div>
+            </div>
+            <p className="mt-4 hidden text-sm leading-6 text-primary-50/75 sm:block">
+              {isThai
+                ? 'นำเข้าไฟล์ออเดอร์เพื่อตัดสต็อก และนำเข้าไฟล์เงินเข้าเพื่อเห็นยอดสุทธิหลังค่าธรรมเนียม'
+                : 'Import order CSVs for stock impact, then payout CSVs to see net deposits after marketplace fees.'}
+            </p>
+            <div className="mt-4 grid gap-2 sm:mt-5">
+              <button onClick={() => setShowSettlementImport(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-primary-900 shadow-sm hover:bg-primary-50 sm:py-2.5">
+                <Banknote className="h-4 w-4" />
+                {isThai ? 'นำเข้าเงินเข้า (CSV)' : 'Import payout'}
+              </button>
+              <button onClick={() => setShowImport(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/15 sm:py-2.5">
+                <Upload className="h-4 w-4" />
+                {isThai ? 'นำเข้าออเดอร์ (CSV)' : 'Import orders'}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button onClick={() => setShowSettlementImport(true)} className="btn-secondary inline-flex shrink-0 items-center gap-2">
-            <Banknote className="h-4 w-4" />
-            {isThai ? 'นำเข้าเงินเข้า (CSV)' : 'Import payout'}
-          </button>
-          <button onClick={() => setShowImport(true)} className="btn-primary inline-flex shrink-0 items-center gap-2">
-            <Upload className="h-4 w-4" />
-            {isThai ? 'นำเข้าออเดอร์ (CSV)' : 'Import orders'}
-          </button>
-        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 sm:h-10 sm:w-10">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.dot}`} />
+              </div>
+              <p className="mt-3 text-xl font-bold leading-none tabular-nums text-slate-950 sm:mt-4 sm:text-2xl">{item.value}</p>
+              <div className="mt-2 min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-700">{item.label}</p>
+                <p className="mt-1 truncate text-xs font-medium text-slate-500">{item.status}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {loading ? (
@@ -119,8 +219,8 @@ export default function MarketplaceOrders() {
         <>
           {/* Payout reconciliation */}
           {settlementSummary && settlementSummary.total.count > 0 && (
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_1fr]">
-              <div className="card">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_1fr]">
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <Banknote className="h-4 w-4 text-emerald-600" />
@@ -134,15 +234,15 @@ export default function MarketplaceOrders() {
                   <Metric label={isThai ? 'Refund' : 'Refund'} value={`- ${formatCurrency(settlementSummary.total.refund)}`} tone="text-rose-700" />
                   <Metric label="Net" value={formatCurrency(settlementSummary.total.net)} tone="text-emerald-700" />
                 </div>
-              </div>
-              <div className="card">
+              </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <ReceiptText className="h-4 w-4 text-primary-600" />
                   {isThai ? 'แยกตามช่องทาง' : 'By channel'}
                 </div>
                 <div className="space-y-2">
                   {settlementSummary.channels.map((c) => (
-                    <div key={c.channel} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    <div key={c.channel} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-100 py-2 text-sm first:border-t-0">
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-900">{CHANNEL_LABEL[c.channel] ?? c.channel}</div>
                         <div className="text-xs text-slate-500">{c.count} {isThai ? 'รายการ' : 'lines'} · fee {(c.takeRate * 100).toFixed(1)}%</div>
@@ -154,24 +254,27 @@ export default function MarketplaceOrders() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             </div>
           )}
 
           {/* Per-channel summary */}
           {summary && summary.channels.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Store className="h-4 w-4 text-primary-600" />
+                {isThai ? 'ออเดอร์แยกตามช่องทาง' : 'Orders by channel'}
+              </div>
+              <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-xl border border-slate-200 sm:grid-cols-3 lg:grid-cols-4">
               {summary.channels.map((c) => (
-                <div key={c.channel} className="card">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Store className="h-4 w-4 text-primary-600" />
-                    {CHANNEL_LABEL[c.channel] ?? c.channel}
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-slate-900">{c.orders}</div>
-                  <div className="text-xs text-slate-500">{isThai ? 'ออเดอร์' : 'orders'} · {c.stockApplied} {isThai ? 'ตัดสต็อก' : 'stock-applied'}</div>
+                <div key={c.channel} className="min-w-0 border-b border-r border-slate-200 px-3 py-3 last:border-r-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{CHANNEL_LABEL[c.channel] ?? c.channel}</p>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{c.orders}</p>
+                  <p className="mt-1 text-xs text-slate-500">{c.stockApplied} {isThai ? 'ตัดสต็อก' : 'stock-applied'}</p>
                 </div>
               ))}
-            </div>
+              </div>
+            </section>
           )}
 
           {/* Unmapped warning */}
@@ -188,24 +291,27 @@ export default function MarketplaceOrders() {
 
           {/* Low stock */}
           {summary && summary.lowStock.length > 0 && (
-            <div className="card">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <PackageX className="h-4 w-4 text-rose-600" />
                 {isThai ? 'สต็อกต่ำกว่าจุดสั่งซื้อ' : 'Low stock'}
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {summary.lowStock.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-rose-100 bg-rose-50/50 px-3 py-2 text-sm">
+                  <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
                     <span className="min-w-0 truncate"><span className="font-mono text-xs text-slate-400">{p.code}</span> {isThai ? p.nameTh : (p.nameEn ?? p.nameTh)}</span>
                     <span className="shrink-0 font-semibold text-rose-700">{p.currentStock} / {p.reorderPoint}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Orders table */}
-          <div className="card p-0 overflow-hidden">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-4 py-3">
+              <h2 className="text-sm font-semibold text-slate-900">{isThai ? 'ออเดอร์ล่าสุด' : 'Recent imported orders'}</h2>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -247,11 +353,11 @@ export default function MarketplaceOrders() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
 
           {/* Settlement table */}
           {settlements.length > 0 && (
-            <div className="card p-0 overflow-hidden">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 px-4 py-3">
                 <h2 className="text-sm font-semibold text-slate-900">{isThai ? 'รายการเงินรับ / ค่าธรรมเนียมล่าสุด' : 'Recent settlement lines'}</h2>
               </div>
@@ -283,7 +389,7 @@ export default function MarketplaceOrders() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
           )}
         </>
       )}

@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import type { Customer, CustomerDocument, CustomerDocumentType, CustomerKind, CustomerPartyRole, CustomerReadinessSummary, CustomerUseCase } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { digitsOnly, englishTextOnly, guardedInputClass, inputGuide, isEnglishText, isFiveDigitBranchCode, isThaiText, isThirteenDigitId, thaiTextOnly } from '../lib/inputGuards';
+import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 
 type CustomerForm = Omit<Customer, 'id' | 'companyId' | 'isActive' | 'createdAt'> & {
   creditLimit?: string | number | null;
@@ -156,8 +157,22 @@ export default function Customers() {
   const [dbdLoading, setDbdLoading] = useState(false);
   const [dbdNotice, setDbdNotice] = useState('');
   const [appliedDbdSuggestion, setAppliedDbdSuggestion] = useState<DbdLocalSuggestion | null>(null);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const isIndividual = customerKind === 'individual';
   const currentUseCase = (form.useCase ?? 'general') as CustomerUseCase;
+
+  const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [...current.slice(-2), { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, toast.tone === 'error' ? 7000 : 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }, []);
   const currentPartyRole = (form.partyRole ?? 'customer') as CustomerPartyRole;
   const isSupplierRole = currentPartyRole === 'supplier' || currentPartyRole === 'both' || currentUseCase === 'vendor_payee';
   const primaryPartyRole: 'customer' | 'supplier' =
@@ -495,11 +510,28 @@ export default function Customers() {
   }
 
   async function handleDeactivate(id: string) {
-    if (!confirm(isThai ? 'ยืนยันการปิดใช้งานลูกค้านี้?' : 'Deactivate this customer?')) return;
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'ปิดใช้งานรายชื่อนี้?' : 'Deactivate this contact?',
+      description: isThai
+        ? 'รายชื่อนี้จะไม่แสดงเป็นตัวเลือกหลัก แต่ประวัติเอกสารเดิมยังอยู่เพื่อ audit'
+        : 'This contact will be hidden from primary choices, while existing document history remains available for audit.',
+      confirmLabel: isThai ? 'ปิดใช้งาน' : 'Deactivate',
+      cancelLabel: t('common.cancel'),
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void deactivateConfirmed(id);
+      },
+    });
+  }
+
+  async function deactivateConfirmed(id: string) {
     await fetch(`/api/customers/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
+    showToast({ tone: 'success', title: isThai ? 'ปิดใช้งานรายชื่อแล้ว' : 'Contact deactivated' });
     fetchCustomers();
   }
 
@@ -508,13 +540,30 @@ export default function Customers() {
   // the buyer doesn't have to remember /portal + retype their email.
   async function handleSendPortalLink(customer: Customer) {
     if (!customer.email) {
-      alert(isThai ? 'ลูกค้ายังไม่มีอีเมล — เพิ่มก่อนค่อยส่งลิงก์' : 'Customer has no email yet — add one first');
+      showToast({
+        tone: 'warning',
+        title: isThai ? 'ยังไม่มีอีเมลลูกค้า' : 'Customer email is missing',
+        description: isThai ? 'เพิ่มอีเมลก่อน แล้วค่อยส่งลิงก์ Customer Portal' : 'Add an email address before sending a Customer Portal link.',
+      });
       return;
     }
-    const ok = confirm(isThai
-      ? `ส่งลิงก์ Customer Portal ไปที่ ${customer.email}?\n\nลูกค้าจะคลิกแล้วเห็นใบกำกับ/ใบเสนอราคา/ใบส่งของ ของตัวเอง (ลิงก์อายุ 14 วัน)`
-      : `Send Customer Portal link to ${customer.email}?\n\nThey'll see only the invoices/quotations/delivery notes you've issued to them (link expires in 14 days).`);
-    if (!ok) return;
+    setConfirmDialog({
+      tone: 'info',
+      title: isThai ? 'ส่งลิงก์ Customer Portal?' : 'Send Customer Portal link?',
+      description: isThai
+        ? `ระบบจะส่งลิงก์ไปที่ ${customer.email} ลูกค้าจะเห็นเฉพาะเอกสารของตัวเอง และลิงก์มีอายุ 14 วัน`
+        : `Billboy will email ${customer.email}. They will only see their own documents, and the link expires in 14 days.`,
+      confirmLabel: isThai ? 'ส่งลิงก์' : 'Send link',
+      cancelLabel: t('common.cancel'),
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void sendPortalLinkConfirmed(customer);
+      },
+    });
+  }
+
+  async function sendPortalLinkConfirmed(customer: Customer) {
     try {
       const res = await fetch(`/api/customers/${customer.id}/portal-link`, {
         method: 'POST',
@@ -522,9 +571,17 @@ export default function Customers() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Failed');
-      alert(isThai ? `ส่งลิงก์ไปที่ ${customer.email} แล้ว` : `Sent link to ${customer.email}`);
+      showToast({
+        tone: 'success',
+        title: isThai ? 'ส่งลิงก์แล้ว' : 'Portal link sent',
+        description: customer.email ?? undefined,
+      });
     } catch (e) {
-      alert(isThai ? `ส่งไม่สำเร็จ: ${(e as Error).message}` : `Send failed: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ส่งลิงก์ไม่สำเร็จ' : 'Portal link could not be sent',
+        description: (e as Error).message,
+      });
     }
   }
 
@@ -604,9 +661,9 @@ export default function Customers() {
   }
 
   function partyRoleBadgeClass(role?: string | null) {
-    if (role === 'supplier') return 'bg-amber-50 text-amber-700 ring-amber-100';
-    if (role === 'both') return 'bg-violet-50 text-violet-700 ring-violet-100';
-    return 'bg-blue-50 text-blue-700 ring-blue-100';
+    if (role === 'supplier') return 'border border-amber-200 bg-white text-amber-700';
+    if (role === 'both') return 'border border-primary-200 bg-white text-primary-700';
+    return 'border border-slate-200 bg-white text-slate-700';
   }
 
   function creditTermsText(customer: Customer) {
@@ -780,49 +837,171 @@ export default function Customers() {
   }
 
   function readinessStatusClass(status: CustomerReadinessSummary['status']) {
-    if (status === 'complete') return 'bg-emerald-50 text-emerald-700 ring-emerald-100';
-    if (status === 'not_required') return 'bg-slate-100 text-slate-600 ring-slate-200';
-    return 'bg-amber-50 text-amber-700 ring-amber-100';
+    if (status === 'complete') return 'border border-emerald-200 bg-white text-emerald-700';
+    if (status === 'not_required') return 'border border-slate-200 bg-white text-slate-600';
+    return 'border border-amber-200 bg-white text-amber-700';
   }
 
+  const activeCount = customers.filter((customer) => customer.isActive).length;
+  const inactiveCount = customers.length - activeCount;
+  const supplierCount = customers.filter((customer) => customer.partyRole === 'supplier' || customer.partyRole === 'both' || customer.useCase === 'vendor_payee').length;
+  const customerCount = customers.filter((customer) => customer.partyRole !== 'supplier').length;
+  const creditCustomerCount = customers.filter((customer) => customer.creditDays != null || customer.creditLimit != null || customer.useCase === 'credit').length;
+  const evidenceReviewCount = customers.filter((customer) => {
+    const readiness = customer.readiness;
+    if (!readiness) return customer.vatEvidenceStatus === 'missing' || customer.verificationStatus === 'missing' || customer.verificationStatus === 'partial';
+    return readiness.status === 'missing' || readiness.status === 'partial' || readiness.missingRequiredCount > 0;
+  }).length;
+  const totalCreditLimit = customers.reduce((sum, customer) => {
+    const amount = optionalCreditLimit(customer.creditLimit);
+    return amount !== null && !Number.isNaN(amount) ? sum + amount : sum;
+  }, 0);
+  const workItems = [
+    {
+      label: isThai ? 'ลูกค้าใช้งาน' : 'Active customers',
+      value: activeCount,
+      detail: isThai ? `${inactiveCount} ปิดใช้งาน` : `${inactiveCount} inactive`,
+      icon: Users,
+      tone: activeCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: isThai ? 'ผู้ขาย/ผู้รับเงิน' : 'Vendors/payees',
+      value: supplierCount,
+      detail: isThai ? `${customerCount} ฝั่งขาย` : `${customerCount} sales-side`,
+      icon: Truck,
+      tone: supplierCount > 0 ? 'needs' : 'idle',
+    },
+    {
+      label: isThai ? 'เครดิต' : 'Credit terms',
+      value: creditCustomerCount,
+      detail: totalCreditLimit > 0 ? formatMoney(totalCreditLimit, isThai ? 'th-TH' : 'en-US') : (isThai ? 'ยังไม่มีวงเงิน' : 'No credit limit'),
+      icon: Handshake,
+      tone: creditCustomerCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: isThai ? 'ต้องตรวจเอกสาร' : 'Evidence review',
+      value: evidenceReviewCount,
+      detail: isThai ? 'ภ.พ.20 / สัญญา / KYC' : 'VAT / contract / KYC',
+      icon: ShieldCheck,
+      tone: evidenceReviewCount > 0 ? 'needs' : 'clear',
+    },
+  ];
+  const statusDotClass = (tone: string) => {
+    if (tone === 'overdue') return 'bg-rose-500';
+    if (tone === 'needs') return 'bg-amber-500';
+    if (tone === 'clear') return 'bg-emerald-500';
+    return 'bg-slate-300';
+  };
+
   return (
-    <div className="space-y-4">
+    <>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ConfirmDialog dialog={confirmDialog} />
+      <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <SectionSubNav
         items={[
           { key: 'customers', to: '/app/customers', label: isThai ? 'ลูกค้า' : 'Customers', icon: Users },
           { key: 'products', to: '/app/products', label: isThai ? 'สินค้า/บริการ' : 'Products & Services', icon: Package },
         ]}
       />
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{isThai ? 'รายชื่อลูกค้าและผู้ขาย' : 'Customer & Vendor Directory'}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {isThai ? 'เก็บข้อมูลลูกค้า ผู้ขาย และบริษัทที่ใช้ในเอกสาร' : 'Manage customers, vendors, and company names used in documents.'}
-          </p>
+      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">{isThai ? 'Customer Master Ledger' : 'Customer Master Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+                <Database className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                  {isThai ? 'รายชื่อลูกค้าและผู้ขาย' : 'Customer & Vendor Directory'}
+                </h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                  {isThai ? 'เก็บ master data สำหรับออกเอกสารขาย ซื้อ โปรเจค และ Customer Portal' : 'Keep master data ready for sales, purchases, projects, and Customer Portal.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+                {isThai ? 'รายชื่อในมุมมองนี้' : 'Directory entries in this view'}
+              </p>
+              <p className="mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none text-white tabular-nums">
+                {customers.length}
+              </p>
+              <div className="mt-3 h-px w-40 bg-amber-200/80" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ใช้งานอยู่' : 'Active'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{activeCount}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ต้องตรวจเอกสาร' : 'Evidence review'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{evidenceReviewCount}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Users className="h-4 w-4 text-amber-100" />
+              {isThai ? 'จัดการรายชื่อ' : 'Directory actions'}
+            </div>
+            {policy && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                <p className="text-xs font-semibold text-white/55">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
+                <p className="mt-1 text-sm font-bold text-white tabular-nums">
+                  {policy.usage.customers}{policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''} {isThai ? 'รายชื่อ' : 'entries'}
+                </p>
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <button
+                onClick={() => openCreate('customer')}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
+              >
+                <Plus className="h-4 w-4" />
+                {isThai ? 'เพิ่มลูกค้า' : 'Add customer'}
+              </button>
+              <button
+                onClick={() => openCreate('supplier')}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
+              >
+                <Truck className="h-4 w-4" />
+                {isThai ? 'เพิ่มผู้ขาย' : 'Add vendor'}
+              </button>
+              <Link to="/app/products" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5">
+                <Package className="h-4 w-4" />
+                {isThai ? 'สินค้า/บริการ' : 'Products'}
+              </Link>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => openCreate('customer')}
-            className="btn-primary"
-            disabled={!!policy && policy.maxCustomers !== null && policy.usage.customers >= policy.maxCustomers}
-          >
-            <Plus className="w-4 h-4" />
-            {isThai ? 'เพิ่มรายชื่อ' : 'Add name'}
-          </button>
-        </div>
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClass(item.tone)}`} />
+              </div>
+              <p className="mt-3 text-xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{item.label}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+            </div>
+          );
+        })}
       </div>
 
-      {policy && (
-        <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900">
-          {isThai
-            ? `รายชื่อในแพ็กเกจ ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`
-            : `Directory entries on ${policy.planLabel}: ${policy.usage.customers}${policy.maxCustomers ? ` / ${policy.maxCustomers}` : ''}`}
-        </div>
-      )}
-
       {/* Search */}
-      <div className="card">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {(['all', 'customer', 'supplier'] as const).map((role) => (
@@ -867,7 +1046,7 @@ export default function Customers() {
           </div>
         ) : (
           customers.map((c) => (
-            <div key={c.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-1">
+            <div key={c.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               {/* Row 1: name + status badge */}
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-gray-900 leading-snug">
@@ -884,7 +1063,7 @@ export default function Customers() {
                 {!isThai && c.nameTh && (
                   <p className="text-sm text-gray-500">{c.nameTh}</p>
                 )}
-                <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${partyRoleBadgeClass(c.partyRole)}`}>
+                <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${partyRoleBadgeClass(c.partyRole)}`}>
                   {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
                   {partyRoleLabel(c.partyRole)}
                 </span>
@@ -901,14 +1080,14 @@ export default function Customers() {
               <div className="flex items-center gap-2 pt-2">
                 <Link
                   to={`/app/customers/${c.id}/statement`}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   {isThai ? 'เอกสาร' : 'Invoices'}
                 </Link>
                 <button
                   onClick={() => openEdit(c)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100"
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary-100 bg-white px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                   {t('common.edit')}
@@ -916,7 +1095,7 @@ export default function Customers() {
                 {c.isActive && (
                   <button
                     onClick={() => handleDeactivate(c.id)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
                   >
                     <UserX className="w-3.5 h-3.5" />
                     {isThai ? 'ปิดใช้งาน' : 'Deactivate'}
@@ -929,9 +1108,13 @@ export default function Customers() {
       </div>
 
       {/* Table */}
-      <div className="card p-0 overflow-hidden hidden sm:block">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="text-base font-bold text-slate-950">{isThai ? 'Customer master ledger' : 'Customer master ledger'}</h2>
+          <p className="mt-1 text-xs text-slate-500">{isThai ? 'ตรวจข้อมูลลูกค้า ผู้ขาย เลขภาษี ช่องทางติดต่อ และ statement' : 'Review customers, vendors, tax IDs, contact channels, and statements.'}</p>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[920px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header">{isThai ? 'ชื่อ' : 'Name'}</th>
@@ -963,7 +1146,7 @@ export default function Customers() {
                         <p className="font-medium">{isThai ? c.nameTh : (c.nameEn ?? c.nameTh)}</p>
                         {c.nameEn && isThai && <p className="text-xs text-gray-400">{c.nameEn}</p>}
                         {!isThai && <p className="text-xs text-gray-400">{c.nameTh}</p>}
-                        <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${partyRoleBadgeClass(c.partyRole)}`}>
+                        <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${partyRoleBadgeClass(c.partyRole)}`}>
                           {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
                           {partyRoleLabel(c.partyRole)}
                         </span>
@@ -1040,7 +1223,7 @@ export default function Customers() {
 
             <div className="p-5 space-y-4">
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+                  <div className="rounded-xl border border-rose-200 bg-white p-3 text-sm font-semibold text-rose-700">{error}</div>
                 )}
 
                 <div>
@@ -1578,6 +1761,7 @@ export default function Customers() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

@@ -5,12 +5,14 @@ import {
   Plus, Search, Download, FileText, FileSpreadsheet,
   ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle, Mail,
   BriefcaseBusiness, CalendarClock, Truck, MessageCircle,
+  Wallet,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus, InvoiceType, Payment } from '../types';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
-import { EmptyState, MetricCard, PageHeader } from '../components/ui/AppChrome';
+import { EmptyState } from '../components/ui/AppChrome';
+import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 import SectionSubNav from '../components/SectionSubNav';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
@@ -24,11 +26,11 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
 };
 
 const TYPE_LABELS: Record<InvoiceType, { th: string; en: string; color: string }> = {
-  tax_invoice:         { th: 'ใบกำกับภาษี',              en: 'Tax Invoice',          color: 'bg-blue-100 text-blue-700' },
-  tax_invoice_receipt: { th: 'ใบกำกับภาษี/ใบเสร็จ',      en: 'Tax Inv/Receipt',      color: 'bg-purple-100 text-purple-700' },
-  receipt:             { th: 'ใบเสร็จรับเงิน',            en: 'Receipt',              color: 'bg-green-100 text-green-700' },
-  credit_note:         { th: 'ใบลดหนี้',                  en: 'Credit Note',          color: 'bg-orange-100 text-orange-700' },
-  debit_note:          { th: 'ใบเพิ่มหนี้',               en: 'Debit Note',           color: 'bg-red-100 text-red-700' },
+  tax_invoice:         { th: 'ใบกำกับภาษี',              en: 'Tax Invoice',          color: 'border border-slate-200 bg-white text-slate-700' },
+  tax_invoice_receipt: { th: 'ใบกำกับภาษี/ใบเสร็จ',      en: 'Tax Inv/Receipt',      color: 'border border-primary-100 bg-white text-primary-700' },
+  receipt:             { th: 'ใบเสร็จรับเงิน',            en: 'Receipt',              color: 'border border-emerald-200 bg-white text-emerald-700' },
+  credit_note:         { th: 'ใบลดหนี้',                  en: 'Credit Note',          color: 'border border-amber-200 bg-white text-amber-700' },
+  debit_note:          { th: 'ใบเพิ่มหนี้',               en: 'Debit Note',           color: 'border border-rose-200 bg-white text-rose-700' },
 };
 
 const PAYMENT_METHODS: Record<string, string> = {
@@ -142,6 +144,20 @@ export default function InvoiceList() {
     endDate: '',
   });
   const [creatingRecurring, setCreatingRecurring] = useState(false);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+
+  const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [...current.slice(-2), { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, toast.tone === 'error' ? 7000 : 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   const fetchInvoices = useCallback(async (page = 1) => {
     setLoading(true);
@@ -189,7 +205,11 @@ export default function InvoiceList() {
   /* ── Export ── */
   async function handleExcelExport() {
     if (!policy?.canExportExcel) {
-      alert(isThai ? 'แพ็กเกจนี้ยังไม่รองรับการส่งออกข้อมูล' : 'This plan does not support data export');
+      showToast({
+        tone: 'warning',
+        title: isThai ? 'แพ็กเกจนี้ยังไม่รองรับการส่งออกข้อมูล' : 'Data export is not included in this plan',
+        description: isThai ? 'อัปเกรดแพ็กเกจเพื่อดาวน์โหลดรายการเอกสารเป็น Excel' : 'Upgrade the plan to download invoice data as Excel.',
+      });
       return;
     }
     setExporting('excel'); setExportOpen(false);
@@ -205,13 +225,19 @@ export default function InvoiceList() {
       const a = document.createElement('a'); a.href = url;
       a.download = `invoices-${new Date().toISOString().split('T')[0]}.xlsx`; a.click();
       URL.revokeObjectURL(url);
-    } catch { alert(isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed'); }
+    } catch {
+      showToast({ tone: 'error', title: isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed' });
+    }
     finally { setExporting(null); }
   }
 
   async function handleSheetsExport() {
     if (!policy?.canExportGoogleSheets) {
-      alert(isThai ? 'อัปเกรดเป็น Business เพื่อส่งออก Google Sheets' : 'Upgrade to Business to export to Google Sheets');
+      showToast({
+        tone: 'warning',
+        title: isThai ? 'อัปเกรดเป็น Business เพื่อส่งออก Google Sheets' : 'Upgrade to Business to export to Google Sheets',
+        description: isThai ? 'การส่งออกเข้า Google Sheets เป็น workflow สำหรับทีมที่ทำงานร่วมกัน' : 'Google Sheets export is available for collaborative finance teams.',
+      });
       return;
     }
     setExporting('sheets'); setExportOpen(false);
@@ -224,7 +250,9 @@ export default function InvoiceList() {
       if (!res.ok) throw new Error();
       const { url } = await res.json() as { url: string };
       window.location.assign(url);
-    } catch { alert(isThai ? 'ส่งออก Google Sheets ไม่สำเร็จ' : 'Google Sheets export failed'); }
+    } catch {
+      showToast({ tone: 'error', title: isThai ? 'ส่งออก Google Sheets ไม่สำเร็จ' : 'Google Sheets export failed' });
+    }
     finally { setExporting(null); }
   }
 
@@ -273,7 +301,11 @@ export default function InvoiceList() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(isThai ? `ดาวน์โหลดไม่สำเร็จ: ${(e as Error).message}` : `Download failed: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ดาวน์โหลด PDF ไม่สำเร็จ' : 'PDF download failed',
+        description: (e as Error).message,
+      });
     } finally {
       setPdfLoading(false);
     }
@@ -298,7 +330,11 @@ export default function InvoiceList() {
       fetchInvoices(pagination.page);
       openPreview({ id: receipt.id, invoiceNumber: receipt.invoiceNumber });
     } catch (e) {
-      alert(isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ออกใบเสร็จไม่สำเร็จ' : 'Receipt could not be issued',
+        description: (e as Error).message,
+      });
     } finally { setIssuingReceipt(false); }
   }
 
@@ -326,7 +362,11 @@ export default function InvoiceList() {
       setPaymentModal(null);
       fetchInvoices(pagination.page);
     } catch (e) {
-      alert(isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'บันทึกรับเงินไม่สำเร็จ' : 'Payment could not be recorded',
+        description: (e as Error).message,
+      });
     } finally { setSavingPayment(false); }
   }
 
@@ -399,7 +439,11 @@ export default function InvoiceList() {
       setRecurringModal(null);
       navigate(`/app/recurring-invoices/${json.data.id}`);
     } catch (e) {
-      alert(isThai ? `สร้าง recurring ไม่สำเร็จ: ${(e as Error).message}` : `Failed to create recurring schedule: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'สร้างรายการวางบิลซ้ำไม่สำเร็จ' : 'Recurring schedule could not be created',
+        description: (e as Error).message,
+      });
     } finally {
       setCreatingRecurring(false);
     }
@@ -408,14 +452,26 @@ export default function InvoiceList() {
   // Email the invoice PDF to the buyer. Backend already validates plan
    // access + buyer email presence; the UI just disables the button when
    // we can predict the 400 (no email on buyer) so the user gets a clear
-   // affordance instead of a thrown alert.
+  // affordance instead of a thrown alert.
   async function handleSendEmail(inv: Invoice) {
     if (!inv.buyer?.email) return;
-    const msg = isThai
-      ? `ส่งใบกำกับ ${inv.invoiceNumber} ทางอีเมลไปยัง ${inv.buyer.email}?`
-      : `Email invoice ${inv.invoiceNumber} to ${inv.buyer.email}?`;
-    if (!window.confirm(msg)) return;
+    setConfirmDialog({
+      tone: 'info',
+      title: isThai ? 'ส่งเอกสารทางอีเมล?' : 'Send this document by email?',
+      description: isThai
+        ? `ระบบจะส่ง ${inv.invoiceNumber} ไปยัง ${inv.buyer.email}`
+        : `Billboy will email ${inv.invoiceNumber} to ${inv.buyer.email}.`,
+      confirmLabel: isThai ? 'ส่งอีเมล' : 'Send email',
+      cancelLabel: t('common.cancel'),
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void sendEmailConfirmed(inv);
+      },
+    });
+  }
 
+  async function sendEmailConfirmed(inv: Invoice) {
     setSendingEmail(inv.id);
     try {
       const res = await fetch(`/api/invoices/${inv.id}/send-email`, {
@@ -435,7 +491,11 @@ export default function InvoiceList() {
         return next;
       }), 4000);
     } catch (e) {
-      alert(isThai ? `ส่งอีเมลไม่สำเร็จ: ${(e as Error).message}` : `Failed to send email: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ส่งอีเมลไม่สำเร็จ' : 'Email could not be sent',
+        description: (e as Error).message,
+      });
     } finally {
       setSendingEmail(null);
     }
@@ -458,7 +518,11 @@ export default function InvoiceList() {
       if (!res.ok || !body.url) throw new Error(body.error ?? 'Failed');
       setShareModal({ invoiceNumber: inv.invoiceNumber, url: body.url });
     } catch (e) {
-      alert(isThai ? `สร้างลิงก์ไม่สำเร็จ: ${(e as Error).message}` : `Failed: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'สร้างลิงก์ลูกค้าไม่สำเร็จ' : 'Customer link could not be created',
+        description: (e as Error).message,
+      });
     } finally {
       setSharingLine(null);
     }
@@ -488,11 +552,23 @@ export default function InvoiceList() {
   }
 
   async function handleSubmitRD(inv: Invoice) {
-    const msg = isThai
-      ? `ยืนยันส่งใบกำกับ ${inv.invoiceNumber} ให้กรมสรรพากร?`
-      : `Submit invoice ${inv.invoiceNumber} to Revenue Department?`;
-    if (!window.confirm(msg)) return;
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'ส่งเอกสารให้กรมสรรพากร?' : 'Submit this document to Revenue Department?',
+      description: isThai
+        ? `${inv.invoiceNumber} จะถูกส่งเข้าคิว RD หลังยืนยัน ตรวจเลขผู้เสียภาษี ยอดเงิน และประเภทเอกสารให้ถูกต้องก่อน`
+        : `${inv.invoiceNumber} will be queued for RD submission. Check tax ID, amount, and document type before continuing.`,
+      confirmLabel: isThai ? 'ยืนยันส่ง RD' : 'Submit to RD',
+      cancelLabel: t('common.cancel'),
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void submitRDConfirmed(inv);
+      },
+    });
+  }
 
+  async function submitRDConfirmed(inv: Invoice) {
     setSubmittingRD(inv.id);
     try {
       const res = await fetch(`/api/invoices/${inv.id}/submit-rd`, {
@@ -505,7 +581,11 @@ export default function InvoiceList() {
       }
       fetchInvoices(pagination.page);
     } catch (e) {
-      alert(isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ส่ง RD ไม่สำเร็จ' : 'RD submission failed',
+        description: (e as Error).message,
+      });
     } finally {
       setSubmittingRD(null);
     }
@@ -527,18 +607,72 @@ export default function InvoiceList() {
       setCancelReason('');
       fetchInvoices(pagination.page);
 
-      // Show toast-style success message
-      const rdWarning = json.rdError ? `\n\n${isThai ? 'หมายเหตุ: ' : 'Note: '}${json.rdError}` : '';
-      alert(`${json.message ?? (isThai ? 'ยกเลิกสำเร็จ' : 'Cancelled successfully')}${rdWarning}`);
+      showToast({
+        tone: json.rdError ? 'warning' : 'success',
+        title: json.message ?? (isThai ? 'ยกเลิกสำเร็จ' : 'Cancelled successfully'),
+        description: json.rdError ? `${isThai ? 'หมายเหตุ: ' : 'Note: '}${json.rdError}` : undefined,
+      });
     } catch (e) {
-      alert(isThai ? `เกิดข้อผิดพลาด: ${(e as Error).message}` : `Error: ${(e as Error).message}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'ยกเลิกเอกสารไม่สำเร็จ' : 'Document could not be cancelled',
+        description: (e as Error).message,
+      });
     } finally {
       setCancelling(false);
     }
   }
 
+  const totalValue = invoices.reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);
+  const unpaidValue = invoices
+    .filter((inv) => !inv.isPaid && inv.status !== 'cancelled')
+    .reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);
+  const paidCount = invoices.filter((inv) => inv.isPaid).length;
+  const rdAcceptedCount = invoices.filter((inv) => inv.rdSubmissionStatus === 'success').length;
+  const rdPendingCount = invoices.filter((inv) => canSubmitRD(inv) || inv.rdSubmissionStatus === 'pending' || inv.rdSubmissionStatus === 'failed').length;
+  const cancelledCount = invoices.filter((inv) => inv.status === 'cancelled' || inv.status === 'rejected').length;
+  const workItems = [
+    {
+      label: isThai ? 'ยังไม่รับชำระ' : 'Unpaid',
+      value: formatCurrency(unpaidValue),
+      detail: isThai ? `${invoices.filter((inv) => !inv.isPaid && inv.status !== 'cancelled').length} เอกสาร` : `${invoices.filter((inv) => !inv.isPaid && inv.status !== 'cancelled').length} documents`,
+      icon: Clock,
+      tone: unpaidValue > 0 ? 'needs' : 'clear',
+    },
+    {
+      label: isThai ? 'รับชำระแล้ว' : 'Paid',
+      value: paidCount,
+      detail: isThai ? 'พร้อมออกใบเสร็จ/ปิดงาน' : 'Receipt-ready',
+      icon: CheckCircle,
+      tone: paidCount > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: isThai ? 'งานส่ง RD' : 'RD work',
+      value: rdPendingCount,
+      detail: isThai ? `${rdAcceptedCount} ส่งสำเร็จ` : `${rdAcceptedCount} accepted`,
+      icon: Send,
+      tone: rdPendingCount > 0 ? 'needs' : 'clear',
+    },
+    {
+      label: isThai ? 'ยกเลิก/ถูกปฏิเสธ' : 'Cancelled/rejected',
+      value: cancelledCount,
+      detail: isThai ? 'ต้องตามเหตุผล' : 'Needs audit trail',
+      icon: XCircle,
+      tone: cancelledCount > 0 ? 'overdue' : 'clear',
+    },
+  ];
+  const statusDotClass = (tone: string) => {
+    if (tone === 'overdue') return 'bg-rose-500';
+    if (tone === 'needs') return 'bg-amber-500';
+    if (tone === 'clear') return 'bg-emerald-500';
+    return 'bg-slate-300';
+  };
+
   return (
-    <div className="space-y-5">
+    <>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ConfirmDialog dialog={confirmDialog} />
+      <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <SectionSubNav
         items={[
           { key: 'quotations', to: '/app/quotations', label: isThai ? 'ใบเสนอราคา' : 'Quotations', icon: FileText },
@@ -547,33 +681,96 @@ export default function InvoiceList() {
           { key: 'invoices', to: '/app/invoices', label: isThai ? 'ใบกำกับภาษี/ใบเสร็จ' : 'Tax Invoices', icon: Receipt },
         ]}
       />
-      {/* Header */}
-      <PageHeader
-        eyebrow={isThai ? 'Revenue document workspace' : 'Revenue document workspace'}
-        title={t('invoice.list')}
-        description={isThai ? 'ออกเอกสาร T01-T05, ตรวจสถานะชำระเงิน และส่ง RD จากมุมมองเดียวที่อ่านง่าย' : 'Issue T01-T05 documents, track payment state, and submit to RD from one readable workspace.'}
-        icon={<FileText className="h-3.5 w-3.5" />}
-        mascot="spot"
-        actions={(
-          <Link to="/app/invoices/new" className={`btn-primary shrink-0 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('invoice.create')}</span>
-            <span className="sm:hidden">{isThai ? 'สร้าง' : 'New'}</span>
-          </Link>
-        )}
-      />
+      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">{isThai ? 'Sales Tax Ledger' : 'Sales Tax Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+                <Receipt className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                  {t('invoice.list')}
+                </h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                  {isThai ? 'ออกเอกสาร T01-T05, ตรวจรับเงิน และส่ง RD จาก ledger เดียว' : 'Issue T01-T05 documents, track payment, and submit to RD from one ledger.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+                {isThai ? 'มูลค่าเอกสารในมุมมองนี้' : 'Document value in this view'}
+              </p>
+              <p className="mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none text-white tabular-nums">
+                {formatCurrency(totalValue)}
+              </p>
+              <div className="mt-3 h-px w-40 bg-amber-200/80" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ยังไม่รับชำระ' : 'Unpaid'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(unpaidValue)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'จำนวนในหน้านี้' : 'Loaded docs'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{invoices.length} / {pagination.total}</p>
+              </div>
+            </div>
+          </div>
 
-      {policy && (
-        <MetricCard
-          label={isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}
-          value={`${policy.usage.documentsThisMonth}${policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''}`}
-          detail={isThai ? 'เอกสารที่ใช้ในเดือนนี้' : 'Documents used this month'}
-          tone="primary"
-        />
-      )}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Wallet className="h-4 w-4 text-amber-100" />
+              {isThai ? 'งานขายถัดไป' : 'Next sales action'}
+            </div>
+            {policy && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
+                <p className="text-xs font-semibold text-white/55">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
+                <p className="mt-1 text-sm font-bold text-white tabular-nums">
+                  {policy.usage.documentsThisMonth}{policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''} {isThai ? 'เอกสารเดือนนี้' : 'docs this month'}
+                </p>
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <Link to="/app/invoices/new" className={`inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 sm:px-4 sm:py-2.5 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
+                <Plus className="h-4 w-4" />
+                <span>{t('invoice.create')}</span>
+              </Link>
+              <button onClick={handleExcelExport} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5" disabled={exporting !== null || !policy?.canExportExcel}>
+                {exporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Excel
+              </button>
+              <Link to="/app/quotations" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5">
+                <FileText className="h-4 w-4" />
+                {isThai ? 'ดูใบเสนอราคา' : 'Quotations'}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClass(item.tone)}`} />
+              </div>
+              <p className="mt-3 text-xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{item.label}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+            </div>
+          );
+        })}
+      </div>
 
       {/* Filters */}
-      <div className="card">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="relative flex-1 w-full sm:min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -660,7 +857,7 @@ export default function InvoiceList() {
                   if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
                   navigate(`/app/invoices/${inv.id}/edit`);
                 }}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-primary-200 hover:bg-primary-50/20"
               >
                 {/* Row 1: type badge + invoice number + status */}
                 <div className="flex items-center gap-2 mb-1">
@@ -681,7 +878,7 @@ export default function InvoiceList() {
                 {/* Row 3: date + amount */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-gray-400 text-xs">{formatDate(inv.invoiceDate)}</span>
-                  <span className="font-bold text-primary-700 text-sm">{formatCurrency(inv.total)}</span>
+                  <span className="font-bold text-primary-700 text-sm tabular-nums">{formatCurrency(inv.total)}</span>
                 </div>
                 {inv.project && (
                   <p className="mb-2 inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
@@ -723,7 +920,7 @@ export default function InvoiceList() {
                     <button
                       onClick={() => handleShareLine(inv)}
                       disabled={sharingLine === inv.id}
-                      className="inline-flex items-center gap-1.5 text-xs border border-green-200 text-green-700 hover:bg-green-50 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                     >
                       {sharingLine === inv.id
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -773,9 +970,13 @@ export default function InvoiceList() {
       </div>
 
       {/* Table — hidden on mobile */}
-      <div className="hidden sm:block card p-0 overflow-hidden">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="text-base font-bold text-slate-950">{isThai ? 'Sales tax document ledger' : 'Sales tax document ledger'}</h2>
+          <p className="mt-1 text-xs text-slate-500">{isThai ? 'ติดตามประเภทเอกสาร ลูกค้า ยอดเงิน การรับชำระ และสถานะส่ง RD' : 'Track document type, buyer, value, payment, and RD submission status.'}</p>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[1180px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="table-header" scope="col">{isThai ? 'เลขที่' : 'Number'}</th>
@@ -843,10 +1044,10 @@ export default function InvoiceList() {
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="table-cell text-right font-semibold">{formatCurrency(inv.total)}</td>
+                      <td className="table-cell text-right font-semibold tabular-nums">{formatCurrency(inv.total)}</td>
                       <td className="table-cell hidden sm:table-cell">
                         {inv.isPaid ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
                             <CheckCircle className="w-3.5 h-3.5" />
                             {isThai ? 'ชำระแล้ว' : 'Paid'}
                           </span>
@@ -1010,7 +1211,7 @@ export default function InvoiceList() {
         </div>
 
         {/* Pagination */}
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
           <span className="text-sm text-gray-500">
             {t('pagination.showing')} {invoices.length} {t('pagination.of')} {pagination.total} {t('pagination.entries')}
           </span>
@@ -1520,6 +1721,7 @@ export default function InvoiceList() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

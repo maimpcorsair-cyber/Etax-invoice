@@ -220,57 +220,125 @@ export default function Projects() {
     }
   }
 
-  const summaryCards = [
-    { label: isThai ? 'งบรวม' : 'Total budget', value: formatCurrency(totals.budget), icon: WalletCards },
-    { label: isThai ? 'ใช้/จองงบแล้ว' : 'Committed', value: formatCurrency(totals.committed), icon: BriefcaseBusiness },
-    { label: isThai ? 'จ่าย/อนุมัติแล้ว' : 'Paid / approved', value: formatCurrency(totals.paid), icon: CheckCircle2 },
-    { label: isThai ? 'โปรเจคเกินงบ' : 'Over budget', value: String(totals.overBudget), icon: AlertTriangle },
+  const activeProjects = projects.filter((project) => project.status === 'active').length;
+  const intakeDocs = projects.reduce((sum, project) => sum + (project.summary.documentIntakeCount || 0), 0);
+  const averageBudgetUsed = totals.budget > 0 ? Math.round((totals.committed / totals.budget) * 100) : 0;
+  const workItems = [
+    {
+      label: isThai ? 'โปรเจคที่กำลังทำ' : 'Active projects',
+      value: String(activeProjects),
+      icon: BriefcaseBusiness,
+      tone: activeProjects > 0 ? 'bg-emerald-500' : 'bg-slate-300',
+      status: isThai ? 'พร้อมติดตาม' : 'Trackable',
+    },
+    {
+      label: isThai ? 'เอกสารเข้าโปรเจค' : 'Project inbox docs',
+      value: String(intakeDocs),
+      icon: WalletCards,
+      tone: intakeDocs > 0 ? 'bg-amber-500' : 'bg-slate-300',
+      status: isThai ? 'รอจัดหมวด' : 'To classify',
+    },
+    {
+      label: isThai ? 'ใช้/จองงบเฉลี่ย' : 'Budget committed',
+      value: `${averageBudgetUsed}%`,
+      icon: CheckCircle2,
+      tone: averageBudgetUsed > 90 ? 'bg-rose-500' : averageBudgetUsed > 70 ? 'bg-amber-500' : 'bg-emerald-500',
+      status: isThai ? 'เทียบงบรวม' : 'Of total budget',
+    },
+    {
+      label: isThai ? 'โปรเจคเกินงบ' : 'Over budget',
+      value: String(totals.overBudget),
+      icon: AlertTriangle,
+      tone: totals.overBudget > 0 ? 'bg-rose-500' : 'bg-emerald-500',
+      status: totals.overBudget > 0 ? (isThai ? 'ต้องดูทันที' : 'Needs review') : (isThai ? 'ปกติ' : 'Clear'),
+    },
   ];
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-primary-700">
-            {isThai ? 'Project Cost Control' : 'Project Cost Control'}
-          </p>
-          <h1 className="text-2xl font-bold text-slate-950">
-            {isThai ? 'โปรเจค / งบงาน' : 'Projects / Cost Centers'}
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            {isThai
-              ? 'แยกเอกสารซื้อ สลิป เงินสดย่อย และ LINE inbox ตามโปรเจค เพื่อดูงบที่จอง ใช้ไป และคงเหลือ'
-              : 'Split purchases, slips, petty cash, and LINE documents by project so budget owners can see committed, paid, and remaining amounts.'}
-          </p>
-        </div>
-        {canManage && (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700"
-          >
-            <Plus className="h-4 w-4" />
-            {isThai ? 'สร้างโปรเจค' : 'New project'}
-          </button>
-        )}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div key={card.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
-                <Icon className="h-4 w-4 text-primary-500" />
+    <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="premium-hero premium-hero-dark overflow-hidden">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">
+              {isThai ? 'Project Cost Ledger' : 'Project Cost Ledger'}
+            </p>
+            <h1 className="mt-3 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
+              {isThai ? 'โปรเจค / งบงาน' : 'Projects / Cost Centers'}
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-primary-50/80">
+              {isThai
+                ? 'ดูงบที่เหลือ เอกสารเข้า และงานที่เริ่มเสี่ยงเกินงบ ก่อนเปิด Workspace รายโปรเจค'
+                : 'See remaining budget, incoming documents, and cost-risk projects before opening each workspace.'}
+            </p>
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'งบคงเหลือรวม' : 'Total remaining budget'}</p>
+              <p className={clsx('mt-2 font-sarabun text-[clamp(2rem,5vw,3.6rem)] font-bold leading-none tabular-nums', totals.remaining < 0 ? 'text-rose-100' : 'text-white')}>
+                {loading ? '—' : formatCurrency(totals.remaining)}
+              </p>
+              <div className="mt-4 h-1 w-44 rounded-full bg-gradient-to-r from-thai-gold via-thai-gold/70 to-transparent" />
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-primary-50/80">
+                <div>
+                  <span className="block text-xs font-bold uppercase text-primary-100/60">{isThai ? 'งบตั้งต้น' : 'Total budget'}</span>
+                  <span className="mt-1 block font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(totals.budget)}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold uppercase text-primary-100/60">{isThai ? 'ใช้/จองแล้ว' : 'Committed'}</span>
+                  <span className="mt-1 block font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(totals.committed)}</span>
+                </div>
               </div>
-              <p className="mt-2 text-xl font-bold text-slate-950">{card.value}</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'โปรเจคในมุมมองนี้' : 'Projects in view'}</p>
+                <p className="mt-2 text-3xl font-bold tabular-nums text-white">{loading ? '—' : projects.length}</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-thai-gold">
+                <BriefcaseBusiness className="h-6 w-6" />
+              </div>
+            </div>
+            <p className="mt-4 hidden text-sm leading-6 text-primary-50/75 sm:block">
+              {isThai
+                ? 'ใช้หน้านี้เป็นบัญชีรวมของงานทั้งหมด แล้วค่อยเข้า Workspace เพื่อดูเอกสาร ซื้อ จ่าย และภาษีของแต่ละงาน'
+                : 'Use this as the consolidated project ledger, then open a workspace for documents, purchases, payments, and tax evidence.'}
+            </p>
+            {canManage && (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-900 shadow-sm hover:bg-primary-50 sm:mt-5 sm:py-3"
+              >
+                <Plus className="h-4 w-4" />
+                {isThai ? 'สร้างโปรเจค' : 'New project'}
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {workItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 sm:h-10 sm:w-10">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <span className={clsx('mt-1 h-2.5 w-2.5 shrink-0 rounded-full', item.tone)} />
+              </div>
+              <p className="mt-3 text-xl font-bold leading-none tabular-nums text-slate-950 sm:mt-4 sm:text-2xl">{item.value}</p>
+              <div className="mt-2 min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-700">{item.label}</p>
+                <p className="mt-1 truncate text-xs font-medium text-slate-500">{item.status}</p>
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
@@ -325,7 +393,7 @@ export default function Projects() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') navigate(`/app/projects/${project.id}`);
                 }}
-                className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-primary-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-100"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-primary-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-100"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -348,7 +416,7 @@ export default function Projects() {
                   <div className="flex items-start justify-between gap-3 sm:block sm:text-right">
                     <div>
                       <p className="text-xs text-slate-500">{isThai ? 'งบคงเหลือ' : 'Remaining'}</p>
-                      <p className={clsx('text-lg font-bold', project.summary.remainingAmount < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                      <p className={clsx('text-xl font-bold tabular-nums', project.summary.remainingAmount < 0 ? 'text-rose-600' : 'text-emerald-700')}>
                         {formatCurrency(project.summary.remainingAmount)}
                       </p>
                     </div>
@@ -369,9 +437,9 @@ export default function Projects() {
                 </div>
 
                 <div className="mt-4">
-                  <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                  <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-500">
                     <span>{isThai ? 'ใช้/จองงบ' : 'Committed'} {formatCurrency(project.summary.committedAmount)}</span>
-                    <span>{project.summary.budgetUsedPercent}%</span>
+                    <span className="tabular-nums">{project.summary.budgetUsedPercent}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
@@ -381,18 +449,18 @@ export default function Projects() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500">{isThai ? 'งบตั้งต้น' : 'Budget'}</p>
-                    <p className="font-semibold text-slate-900">{formatCurrency(project.budgetAmount)}</p>
+                <div className="mt-5 grid gap-0 overflow-hidden rounded-xl border border-slate-200 text-sm sm:grid-cols-3">
+                  <div className="border-b border-slate-200 px-3 py-3 sm:border-b-0 sm:border-r">
+                    <p className="text-xs font-medium text-slate-500">{isThai ? 'งบตั้งต้น' : 'Budget'}</p>
+                    <p className="mt-1 font-bold tabular-nums text-slate-900">{formatCurrency(project.budgetAmount)}</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500">{isThai ? 'จ่าย/อนุมัติ' : 'Paid / approved'}</p>
-                    <p className="font-semibold text-slate-900">{formatCurrency(project.summary.paidAmount)}</p>
+                  <div className="border-b border-slate-200 px-3 py-3 sm:border-b-0 sm:border-r">
+                    <p className="text-xs font-medium text-slate-500">{isThai ? 'จ่าย/อนุมัติ' : 'Paid / approved'}</p>
+                    <p className="mt-1 font-bold tabular-nums text-slate-900">{formatCurrency(project.summary.paidAmount)}</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs text-slate-500">{isThai ? 'เอกสารเข้า' : 'Inbox docs'}</p>
-                    <p className="font-semibold text-slate-900">{project.summary.documentIntakeCount}</p>
+                  <div className="px-3 py-3">
+                    <p className="text-xs font-medium text-slate-500">{isThai ? 'เอกสารเข้า' : 'Inbox docs'}</p>
+                    <p className="mt-1 font-bold tabular-nums text-slate-900">{project.summary.documentIntakeCount}</p>
                   </div>
                 </div>
 

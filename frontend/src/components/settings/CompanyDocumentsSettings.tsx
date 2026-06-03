@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Upload, Trash2, Loader2, FileText, Download } from 'lucide-react';
 import type { CompanyDocument, CompanyDocumentType } from '../../types';
+import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../ui/AppFeedback';
 
 // Company library documents (ภ.พ.20, certificate, bank book, profile, catalog).
 // Uploaded once here, then attached to quotation customer links by reference.
@@ -38,7 +39,17 @@ export default function CompanyDocumentsSettings({ token, isThai, canManage }: P
   const [error, setError] = useState<string | null>(null);
   const [docType, setDocType] = useState<CompanyDocumentType>('por_por_20');
   const [label, setLabel] = useState('');
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const pushToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 4800);
+  }, []);
 
   const fetchDocs = useCallback(async () => {
     if (!token) return;
@@ -74,16 +85,26 @@ export default function CompanyDocumentsSettings({ token, isThai, canManage }: P
       if (!res.ok || !json.data) throw new Error(json.error ?? 'Upload failed');
       setDocs((prev) => [json.data!, ...prev]);
       setLabel('');
+      pushToast({
+        tone: 'success',
+        title: isThai ? 'อัปโหลดเอกสารแล้ว' : 'Document uploaded',
+        description: json.data.label || json.data.fileName,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
+      pushToast({
+        tone: 'error',
+        title: isThai ? 'อัปโหลดไม่สำเร็จ' : 'Upload failed',
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setUploading(false);
     }
   }
 
-  async function handleDelete(id: string) {
+  async function deleteDocument(id: string) {
     if (!token) return;
-    if (!confirm(isThai ? 'ลบเอกสารนี้?' : 'Delete this document?')) return;
+    setConfirmDialog(null);
     setDeletingId(id);
     try {
       const res = await fetch(`/api/company-documents/${id}`, {
@@ -95,15 +116,46 @@ export default function CompanyDocumentsSettings({ token, isThai, canManage }: P
         throw new Error((json as { error?: string }).error ?? 'Delete failed');
       }
       setDocs((prev) => prev.filter((d) => d.id !== id));
+      pushToast({
+        tone: 'success',
+        title: isThai ? 'ลบเอกสารแล้ว' : 'Document deleted',
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
+      pushToast({
+        tone: 'error',
+        title: isThai ? 'ลบเอกสารไม่สำเร็จ' : 'Delete failed',
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setDeletingId(null);
     }
   }
 
+  function requestDelete(doc: CompanyDocument) {
+    setConfirmDialog({
+      tone: 'error',
+      title: isThai ? 'ลบเอกสารบริษัทนี้?' : 'Delete this company document?',
+      description: isThai
+        ? 'เอกสารนี้จะถูกนำออกจากคลังไฟล์บริษัท และลิงก์แนบกับใบเสนอราคาจะเปิดไม่ได้'
+        : 'This removes the file from the company library and quotation attachments will no longer open.',
+      confirmLabel: isThai ? 'ลบเอกสาร' : 'Delete document',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      detail: (
+        <div>
+          <p className="font-semibold text-slate-900">{doc.label || doc.fileName}</p>
+          <p className="mt-1 text-xs text-slate-500">{typeLabel(doc.docType, isThai)} · {formatSize(doc.fileSize)}</p>
+        </div>
+      ),
+      onConfirm: () => void deleteDocument(doc.id),
+      onCancel: () => setConfirmDialog(null),
+    });
+  }
+
   return (
     <div className="space-y-4">
+      <ToastStack toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />
+      <ConfirmDialog dialog={confirmDialog} />
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
@@ -177,7 +229,7 @@ export default function CompanyDocumentsSettings({ token, isThai, canManage }: P
               {canManage && (
                 <button
                   type="button"
-                  onClick={() => void handleDelete(doc.id)}
+                  onClick={() => requestDelete(doc)}
                   disabled={deletingId === doc.id}
                   className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                   title={isThai ? 'ลบ' : 'Delete'}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle, FlaskConical, Loader2, Save, Sparkles, XCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { ConfirmDialog, type ConfirmDialogState } from '../../components/ui/AppFeedback';
 
 const templatePreviewSamples = {
   th: {
@@ -247,6 +248,7 @@ export default function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: st
   const [editingId, setEditingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [form, setForm] = useState(emptyTemplateForm);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const previewLanguage = form.language === 'en' ? 'en' : 'th';
   const previewHtml = compileTemplatePreview(
     previewLanguage === 'en' ? form.htmlEn : form.htmlTh,
@@ -376,7 +378,7 @@ export default function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: st
   }
 
   async function deleteTemplate(id: string) {
-    if (!confirm(isThai ? 'ลบแม่แบบนี้ใช่ไหม' : 'Delete this template?')) return;
+    setConfirmDialog(null);
     try {
       const res = await fetch(`/api/admin/templates/${id}`, {
         method: 'DELETE',
@@ -387,6 +389,26 @@ export default function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: st
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
     }
+  }
+
+  function requestDeleteTemplate(template: typeof templates[number]) {
+    setConfirmDialog({
+      tone: 'error',
+      title: isThai ? 'ลบแม่แบบนี้?' : 'Delete this template?',
+      description: isThai
+        ? 'แม่แบบนี้จะถูกนำออกจากรายการอีเมล/เอกสารที่เลือกใช้ได้'
+        : 'This template will be removed from the available email/document templates.',
+      confirmLabel: isThai ? 'ลบแม่แบบ' : 'Delete template',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      detail: (
+        <div>
+          <p className="font-semibold text-slate-900">{template.name}</p>
+          <p className="mt-1 text-xs text-slate-500">{template.type} · {template.language}</p>
+        </div>
+      ),
+      onConfirm: () => void deleteTemplate(template.id),
+      onCancel: () => setConfirmDialog(null),
+    });
   }
 
   function exportTemplate(template: typeof templates[number]) {
@@ -510,6 +532,7 @@ export default function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: st
 
   return (
     <div className="space-y-5">
+      <ConfirmDialog dialog={confirmDialog} />
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="font-semibold text-lg text-gray-900">{t('admin.templates')}</h2>
@@ -723,7 +746,7 @@ export default function TemplatesTab({ isThai, t }: { isThai: boolean; t: (k: st
             <button className="mt-2 text-xs text-sky-700 hover:underline" onClick={() => exportTemplate(tpl)}>
               {isThai ? 'ส่งออก JSON' : 'Export JSON'}
             </button>
-            <button className="mt-2 text-xs text-red-600 hover:underline" onClick={() => deleteTemplate(tpl.id)}>
+            <button className="mt-2 text-xs text-red-600 hover:underline" onClick={() => requestDeleteTemplate(tpl)}>
               {t('common.delete')}
             </button>
           </div>

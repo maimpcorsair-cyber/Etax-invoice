@@ -12,6 +12,7 @@ import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { Customer, DocumentIntake, Invoice, PurchaseInvoice } from '../types';
 import { EmptyState } from '../components/ui/AppChrome';
+import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 import SectionSubNav from '../components/SectionSubNav';
 
 type VatType = 'vat7' | 'vatExempt' | 'vatZero';
@@ -218,8 +219,27 @@ export default function PurchaseInvoices() {
   const [previewMimeType, setPreviewMimeType] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [storageUsage, setStorageUsage] = useState<{ usedBytes: number; quotaBytes: number; usedPercent: number } | null>(null);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [duplicateDialog, setDuplicateDialog] = useState<{
+    fileName: string;
+    detail: string;
+  } | null>(null);
+  const duplicateResolveRef = useRef<((policy: 'rename' | 'replace' | 'skip' | null) => void) | null>(null);
 
   const isFreePlan = policy?.plan === 'free';
+
+  const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [...current.slice(-2), { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, toast.tone === 'error' ? 7000 : 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   function formatBytes(b: number) {
     if (b < 1024) return `${b} B`;
@@ -621,7 +641,23 @@ export default function PurchaseInvoices() {
   }
 
   async function rejectDocument(doc: DocumentIntake) {
-    if (!confirm(isThai ? 'ย้ายเอกสารนี้ไปสถานะไม่ใช้?' : 'Reject this document?')) return;
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'ย้ายเอกสารนี้ไปสถานะไม่ใช้?' : 'Reject this document?',
+      description: isThai
+        ? 'เอกสารจะออกจากคิวตรวจ AI แต่ยังคงอยู่ในประวัติเพื่อ audit ได้'
+        : 'The document will leave the AI review queue but stay in history for audit.',
+      confirmLabel: isThai ? 'ย้ายไปไม่ใช้' : 'Reject document',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void rejectDocumentConfirmed(doc);
+      },
+    });
+  }
+
+  async function rejectDocumentConfirmed(doc: DocumentIntake) {
     setDocumentActionId(doc.id);
     await runDocumentAction(
       `/api/purchase-invoices/document-intakes/${doc.id}/reject`,
@@ -630,19 +666,26 @@ export default function PurchaseInvoices() {
     setDocumentActionId(null);
   }
 
-  function askDuplicatePolicy(payload: DuplicateUploadPayload): 'rename' | 'replace' | 'skip' | null {
+  function askDuplicatePolicy(payload: DuplicateUploadPayload): Promise<'rename' | 'replace' | 'skip' | null> {
     const duplicate = payload?.duplicates?.[0];
     const sizeText = duplicate
       ? duplicate.sameSize
         ? (isThai ? 'ขนาดไฟล์เท่ากัน' : 'same file size')
         : (isThai ? `ขนาดไฟล์ต่างกัน: เดิม ${duplicate.fileSize} bytes` : `different size: existing ${duplicate.fileSize} bytes`)
       : '';
-    const message = isThai
-      ? `พบไฟล์ชื่อซ้ำในโปรเจคนี้\n${duplicate?.fileName ?? ''}\n${sizeText}\n\nพิมพ์ rename = เก็บเป็นชื่อใหม่อัตโนมัติ\nพิมพ์ replace = เขียนทับไฟล์ชื่อเดิมใน Google Drive\nพิมพ์ skip = ไม่อัปโหลดซ้ำ`
-      : `A file with the same name already exists in this project.\n${duplicate?.fileName ?? ''}\n${sizeText}\n\nType rename = keep both with an auto name\nType replace = overwrite the same Google Drive file\nType skip = do not upload`;
-    const answer = window.prompt(message, 'rename')?.trim().toLowerCase();
-    if (answer === 'replace' || answer === 'skip' || answer === 'rename') return answer;
-    return null;
+    return new Promise((resolve) => {
+      duplicateResolveRef.current = resolve;
+      setDuplicateDialog({
+        fileName: duplicate?.fileName ?? (isThai ? 'ไฟล์ไม่ทราบชื่อ' : 'Unnamed file'),
+        detail: sizeText,
+      });
+    });
+  }
+
+  function resolveDuplicatePolicy(policy: 'rename' | 'replace' | 'skip' | null) {
+    duplicateResolveRef.current?.(policy);
+    duplicateResolveRef.current = null;
+    setDuplicateDialog(null);
   }
 
   async function uploadDocument(file: File) {
@@ -673,7 +716,7 @@ export default function PurchaseInvoices() {
       if (res.status === 409) {
         const duplicate = await res.json().catch(() => ({}));
         if (duplicate.code === 'DUPLICATE_PROJECT_DOCUMENT') {
-          const duplicatePolicy = askDuplicatePolicy(duplicate);
+          const duplicatePolicy = await askDuplicatePolicy(duplicate);
           if (!duplicatePolicy) return;
           res = await fetch('/api/purchase-invoices/document-intakes/upload', {
             method: 'POST',
@@ -689,12 +732,26 @@ export default function PurchaseInvoices() {
       const json = await res.json().catch(() => ({}));
       await fetchItems();
       if (json.skipped) {
-        setError(isThai ? 'ข้ามการอัปโหลด เพราะมีไฟล์ชื่อนี้อยู่แล้ว' : 'Skipped upload because this file already exists');
+        showToast({
+          tone: 'info',
+          title: isThai ? 'ข้ามการอัปโหลดแล้ว' : 'Upload skipped',
+          description: isThai ? 'มีไฟล์ชื่อนี้อยู่แล้วในโปรเจค' : 'A file with this name already exists in the project.',
+        });
         return;
       }
       const status = json.data?.status as string | undefined;
       if (status === 'failed' || status === 'needs_review') {
-        setError(isThai ? 'อัปโหลดแล้ว แต่ระบบต้องให้ตรวจเอกสารนี้เอง' : 'Uploaded, but this document needs manual review');
+        showToast({
+          tone: 'warning',
+          title: isThai ? 'อัปโหลดแล้ว แต่ต้องตรวจเอง' : 'Uploaded, manual review needed',
+          description: isThai ? 'AI ยังไม่มั่นใจพอ ให้เปิดเอกสารแล้วเติมช่องที่ขาด' : 'AI is not confident enough. Open the document and fill missing fields.',
+        });
+      } else {
+        showToast({
+          tone: 'success',
+          title: isThai ? 'อัปโหลดเข้า AI แล้ว' : 'Uploaded to AI Inbox',
+          description: isThai ? 'ระบบจะอ่านเอกสารและจัดเข้าคิวตรวจให้' : 'Billboy will extract the document and place it in the review queue.',
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -781,11 +838,26 @@ export default function PurchaseInvoices() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm(isThai ? 'ยืนยันการลบรายการนี้?' : 'Delete this purchase invoice?')) return;
+    setConfirmDialog({
+      tone: 'error',
+      title: isThai ? 'ลบรายการซื้อนี้?' : 'Delete this purchase invoice?',
+      description: isThai ? 'การลบรายการซื้อจะเอาออกจากสรุปภาษีซื้อของรอบนี้' : 'Deleting this bill removes it from the input VAT summary for this period.',
+      confirmLabel: isThai ? 'ลบรายการ' : 'Delete',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      onCancel: () => setConfirmDialog(null),
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void deletePurchaseInvoiceConfirmed(id);
+      },
+    });
+  }
+
+  async function deletePurchaseInvoiceConfirmed(id: string) {
     await fetch(`/api/purchase-invoices/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
+    showToast({ tone: 'success', title: isThai ? 'ลบรายการแล้ว' : 'Purchase invoice deleted' });
     fetchItems();
   }
 
@@ -862,7 +934,47 @@ export default function PurchaseInvoices() {
   const previewIsPdf = previewDisplayMimeType === 'application/pdf';
 
   return (
-    <div className="space-y-4">
+    <>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ConfirmDialog dialog={confirmDialog} />
+      {duplicateDialog && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20" role="dialog" aria-modal="true">
+            <div className="flex items-start gap-4">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-slate-950">
+                  {isThai ? 'พบไฟล์ชื่อซ้ำในโปรเจคนี้' : 'A file with this name already exists'}
+                </h2>
+                <p className="mt-2 break-words text-sm font-semibold text-slate-800">{duplicateDialog.fileName}</p>
+                {duplicateDialog.detail && <p className="mt-1 text-sm text-slate-600">{duplicateDialog.detail}</p>}
+              </div>
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              <button type="button" className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3 text-left text-sm font-bold text-primary-800 transition hover:bg-primary-100" onClick={() => resolveDuplicatePolicy('rename')}>
+                {isThai ? 'เก็บเป็นชื่อใหม่' : 'Keep both'}
+                <span className="mt-1 block text-xs font-semibold text-primary-700/75">{isThai ? 'ระบบเติมชื่อให้อัตโนมัติ' : 'Auto-renames the new file'}</span>
+              </button>
+              <button type="button" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm font-bold text-amber-800 transition hover:bg-amber-100" onClick={() => resolveDuplicatePolicy('replace')}>
+                {isThai ? 'เขียนทับไฟล์เดิม' : 'Replace'}
+                <span className="mt-1 block text-xs font-semibold text-amber-800/75">{isThai ? 'อัปเดตไฟล์ใน Drive' : 'Updates the Drive file'}</span>
+              </button>
+              <button type="button" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-slate-50" onClick={() => resolveDuplicatePolicy('skip')}>
+                {isThai ? 'ไม่อัปโหลดซ้ำ' : 'Skip'}
+                <span className="mt-1 block text-xs font-semibold text-slate-500">{isThai ? 'ใช้ไฟล์เดิมต่อ' : 'Keep the existing file'}</span>
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button type="button" className="btn-secondary" onClick={() => resolveDuplicatePolicy(null)}>
+                {isThai ? 'ยกเลิก' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="space-y-4">
       <SectionSubNav
         items={[
           { key: 'bills', to: '/app/purchase-invoices', label: isThai ? 'บันทึกซื้อ' : 'Bills', icon: ShoppingCart },
@@ -875,7 +987,7 @@ export default function PurchaseInvoices() {
           <div className="p-5 sm:p-6 lg:p-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
               <Inbox className="h-3.5 w-3.5" />
-              {isThai ? 'AI Document Inbox' : 'AI Document Inbox'}
+              {isThai ? 'กล่องเอกสารเข้า AI' : 'AI Document Inbox'}
             </div>
             <h1 className="mt-4 max-w-2xl text-2xl font-bold leading-tight text-white sm:text-3xl">
               {isThai ? 'โยนเอกสารเข้า แล้วให้ AI เตรียมภาษีซื้อให้' : 'Drop documents in. Let AI prepare input VAT.'}
@@ -1820,6 +1932,7 @@ export default function PurchaseInvoices() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

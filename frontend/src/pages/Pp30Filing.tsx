@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Printer, Loader2, FileText, Calendar, Calculator, TrendingUp, Link2 } from 'lucide-react';
+import { Download, Printer, Loader2, FileText, Calendar, Calculator, TrendingUp, Link2, Landmark, Wallet, AlertTriangle, CheckCircle2, Receipt } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Pp30Data, WhtSummaryData } from '../types';
-import { Receipt } from 'lucide-react';
 import SectionSubNav from '../components/SectionSubNav';
+import { ToastStack, type FeedbackToast } from '../components/ui/AppFeedback';
 
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -32,6 +32,15 @@ export default function Pp30Filing() {
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'vat' | 'wht'>('vat');
   const [whtData, setWhtData] = useState<WhtSummaryData | null>(null);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+
+  const pushToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((prev) => [...prev, { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 4800);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -80,7 +89,11 @@ export default function Pp30Filing() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert(isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed');
+      pushToast({
+        tone: 'error',
+        title: isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed',
+        description: isThai ? 'ลองใหม่อีกครั้ง หรือพิมพ์รายงานแทนชั่วคราว' : 'Try again, or print the report for now.',
+      });
     } finally {
       setExporting(false);
     }
@@ -99,9 +112,49 @@ export default function Pp30Filing() {
 
   const vatPayable = data?.vatPayable ?? 0;
   const mustPay = vatPayable > 0;
+  const outputVat = data?.sales.outputVat ?? 0;
+  const inputVat = data?.purchases.inputVat ?? 0;
+  const whtTotal = whtData?.totalWithheld ?? 0;
+  const filingWorkItems = [
+    {
+      label: isThai ? 'ภาษีขาย' : 'Output VAT',
+      value: formatCurrency(outputVat),
+      detail: isThai ? 'จากยอดขายในงวด' : 'Sales in period',
+      icon: TrendingUp,
+      tone: outputVat > 0 ? 'needs' : 'clear',
+    },
+    {
+      label: isThai ? 'ภาษีซื้อ' : 'Input VAT',
+      value: formatCurrency(inputVat),
+      detail: isThai ? 'จากเอกสารซื้อที่บันทึก' : 'Recorded purchase docs',
+      icon: Wallet,
+      tone: inputVat > 0 ? 'clear' : 'idle',
+    },
+    {
+      label: mustPay ? (isThai ? 'ต้องชำระ' : 'Payable') : (isThai ? 'ขอคืน' : 'Refundable'),
+      value: formatCurrency(Math.abs(vatPayable)),
+      detail: isThai ? 'ยอดสุทธิ ภ.พ.30' : 'Net PP.30 position',
+      icon: mustPay ? AlertTriangle : CheckCircle2,
+      tone: mustPay ? 'overdue' : 'clear',
+    },
+    {
+      label: isThai ? 'หัก ณ ที่จ่าย' : 'WHT',
+      value: formatCurrency(whtTotal),
+      detail: isThai ? `${whtData?.totalCertificates ?? 0} ใบรับรอง` : `${whtData?.totalCertificates ?? 0} certificates`,
+      icon: Receipt,
+      tone: whtTotal > 0 ? 'needs' : 'idle',
+    },
+  ];
+  const statusDotClass = (tone: string) => {
+    if (tone === 'overdue') return 'bg-rose-500';
+    if (tone === 'needs') return 'bg-amber-500';
+    if (tone === 'clear') return 'bg-emerald-500';
+    return 'bg-slate-300';
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <ToastStack toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />
       <SectionSubNav
         items={[
           { key: 'financials', to: '/app/reports/financials', label: isThai ? 'งบการเงิน' : 'Financials', icon: TrendingUp },
@@ -121,55 +174,89 @@ export default function Pp30Filing() {
         }
       `}</style>
 
-      {/* Header (no print) */}
-      <div className="no-print flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary-600" />
-            {isThai ? 'รายงาน ภ.พ.30' : 'PP.30 Report'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {isThai
-              ? 'สรุปการยื่นภาษีมูลค่าเพิ่มรายเดือนตามแบบ ภ.พ.30 ของกรมสรรพากร'
-              : 'Monthly VAT filing summary as per Revenue Department PP.30 form'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExport} disabled={exporting} className="btn-secondary">
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {isThai ? 'ดาวน์โหลด CSV' : 'Download CSV'}
-          </button>
-          <button onClick={handlePrint} className="btn-primary">
-            <Printer className="w-4 h-4" />
-            {isThai ? 'พิมพ์รายงาน' : 'Print'}
-          </button>
-          <button
-            onClick={() => setActiveTab('wht')}
-            className={`btn-secondary ${activeTab === 'wht' ? 'ring-2 ring-red-400' : ''}`}
-          >
-            <Receipt className="w-4 h-4" />
-            {isThai ? 'ภาษีหัก ณ ที่จ่าย' : 'WHT Summary'}
-          </button>
-        </div>
-      </div>
+      <section className="premium-hero premium-hero-dark no-print overflow-hidden p-3.5 sm:p-6 lg:p-7">
+        <div className="grid gap-3 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.75fr)] lg:items-stretch">
+          <div className="min-w-0">
+            <p className="premium-eyebrow">{isThai ? 'PP.30 Filing Ledger' : 'PP.30 Filing Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 text-white/80 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+                <Landmark className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                  {isThai ? 'รายงาน ภ.พ.30' : 'PP.30 Report'}
+                </h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                  {isThai
+                    ? 'สรุปภาษีขาย ภาษีซื้อ และภาษีหัก ณ ที่จ่ายของงวดนี้ให้พร้อมพิมพ์หรือส่งออก'
+                    : 'Review output VAT, input VAT, and withholding tax for the filing period.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+                {mustPay ? (isThai ? 'ภาษีที่ต้องชำระ' : 'VAT payable') : (isThai ? 'ภาษีที่ขอคืน' : 'VAT refundable')}
+              </p>
+              <p className={`mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none tabular-nums ${mustPay ? 'text-rose-100' : 'text-emerald-100'}`}>
+                {formatCurrency(Math.abs(vatPayable))}
+              </p>
+              <div className={`mt-3 h-px w-40 ${mustPay ? 'bg-rose-200/80' : 'bg-amber-200/80'}`} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ภาษีขาย' : 'Output VAT'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(outputVat)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+                <p className="text-xs font-semibold text-white/55">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
+                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(inputVat)}</p>
+              </div>
+            </div>
+          </div>
 
-      {/* Period selector (no print) */}
-      <div className="no-print card">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Calendar className="w-5 h-5 text-gray-400" />
-          <span className="text-sm font-medium text-gray-700">{isThai ? 'งวด' : 'Period'}:</span>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input-field w-auto">
-            {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
-              <option key={i} value={i + 1}>{m}</option>
-            ))}
-          </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input-field w-auto">
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{isThai ? y + 543 : y}</option>
-            ))}
-          </select>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Calendar className="h-4 w-4 text-amber-100" />
+              {periodLabel}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4">
+              <label className="min-w-0 text-xs font-semibold text-white/70">
+                {isThai ? 'เดือน' : 'Month'}
+                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-amber-200">
+                  {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
+                    <option key={i} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0 text-xs font-semibold text-white/70">
+                {isThai ? 'ปี' : 'Year'}
+                <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-amber-200">
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>{isThai ? y + 543 : y}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-3 lg:grid-cols-1">
+              <button onClick={handlePrint} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 sm:px-4 sm:py-2.5">
+                <Printer className="h-4 w-4" />
+                {isThai ? 'พิมพ์รายงาน' : 'Print'}
+              </button>
+              <button onClick={handleExport} disabled={exporting} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5">
+                {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {isThai ? 'ดาวน์โหลด CSV' : 'Download CSV'}
+              </button>
+              <button
+                onClick={() => setActiveTab(activeTab === 'wht' ? 'vat' : 'wht')}
+                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5"
+              >
+                <Receipt className="h-4 w-4" />
+                {activeTab === 'wht' ? (isThai ? 'กลับไป VAT' : 'VAT Summary') : (isThai ? 'ดูหัก ณ ที่จ่าย' : 'WHT Summary')}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -177,8 +264,27 @@ export default function Pp30Filing() {
         </div>
       ) : (
         <>
+          <div className="no-print grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {filingWorkItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${statusDotClass(item.tone)}`} />
+                  </div>
+                  <p className="mt-3 text-xl font-bold leading-none text-slate-950 tabular-nums">{item.value}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">{item.label}</p>
+                  <p className="mt-1 text-xs text-slate-500">{item.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+
           {/* Header card */}
-          <div className="card pp30-card">
+          <div className="card pp30-card border-slate-200 bg-white shadow-sm">
             <div className="flex items-start justify-between flex-wrap gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
@@ -207,13 +313,15 @@ export default function Pp30Filing() {
           </div>
 
           {/* Sales section (Output VAT) */}
-          <div className="card pp30-card p-0 overflow-hidden">
-            <div className="px-5 py-3 bg-green-50 border-b border-green-100">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm pp30-card">
+            <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="font-bold text-gray-900">
                 {isThai ? '1. ภาษีขาย (Output VAT)' : '1. Output VAT (Sales)'}
               </h2>
+              <p className="mt-1 text-xs text-slate-500">{isThai ? 'ยอดขายแยกตามประเภทภาษีมูลค่าเพิ่ม' : 'Sales grouped by VAT treatment'}</p>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="table-header">{isThai ? 'ประเภท' : 'VAT Type'}</th>
@@ -224,38 +332,41 @@ export default function Pp30Filing() {
               <tbody className="divide-y divide-gray-100">
                 <tr>
                   <td className="table-cell font-medium">{isThai ? 'อัตรา 7%' : 'VAT 7%'}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.sales.byVatType.vat7.totalExclVat ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.sales.byVatType.vat7.totalExclVat ?? 0)}</td>
                   <td className="table-cell text-right font-semibold text-green-700">{formatCurrency(data?.sales.byVatType.vat7.vatAmount ?? 0)}</td>
                 </tr>
                 <tr>
                   <td className="table-cell font-medium">{isThai ? 'อัตรา 0%' : 'Zero-rated'}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.sales.byVatType.vatZero.totalExclVat ?? 0)}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.sales.byVatType.vatZero.vatAmount ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.sales.byVatType.vatZero.totalExclVat ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.sales.byVatType.vatZero.vatAmount ?? 0)}</td>
                 </tr>
                 <tr>
                   <td className="table-cell font-medium">{isThai ? 'ยกเว้น VAT' : 'VAT Exempt'}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.sales.byVatType.vatExempt.totalExclVat ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.sales.byVatType.vatExempt.totalExclVat ?? 0)}</td>
                   <td className="table-cell text-right text-gray-400">—</td>
                 </tr>
               </tbody>
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                 <tr>
                   <td className="px-4 py-3 font-semibold text-gray-900">{isThai ? 'รวมยอดขาย' : 'Total Sales'}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatCurrency(data?.sales.totalExclVat ?? 0)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-green-700">{formatCurrency(data?.sales.outputVat ?? 0)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{formatCurrency(data?.sales.totalExclVat ?? 0)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-green-700 tabular-nums">{formatCurrency(data?.sales.outputVat ?? 0)}</td>
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
 
           {/* Purchases section (Input VAT) */}
-          <div className="card pp30-card p-0 overflow-hidden">
-            <div className="px-5 py-3 bg-blue-50 border-b border-blue-100">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm pp30-card">
+            <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="font-bold text-gray-900">
                 {isThai ? '2. ภาษีซื้อ (Input VAT)' : '2. Input VAT (Purchases)'}
               </h2>
+              <p className="mt-1 text-xs text-slate-500">{isThai ? 'เอกสารซื้อที่บันทึกแล้วสำหรับงวดนี้' : 'Recorded purchase documents for this period'}</p>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="table-header">{isThai ? 'ประเภท' : 'VAT Type'}</th>
@@ -266,32 +377,33 @@ export default function Pp30Filing() {
               <tbody className="divide-y divide-gray-100">
                 <tr>
                   <td className="table-cell font-medium">{isThai ? 'อัตรา 7%' : 'VAT 7%'}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.purchases.byVatType.vat7.totalExclVat ?? 0)}</td>
-                  <td className="table-cell text-right font-semibold text-blue-700">{formatCurrency(data?.purchases.byVatType.vat7.vatAmount ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.purchases.byVatType.vat7.totalExclVat ?? 0)}</td>
+                  <td className="table-cell text-right font-semibold text-blue-700 tabular-nums">{formatCurrency(data?.purchases.byVatType.vat7.vatAmount ?? 0)}</td>
                 </tr>
                 <tr>
                   <td className="table-cell font-medium">{isThai ? 'อัตรา 0%' : 'Zero-rated'}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.purchases.byVatType.vatZero.totalExclVat ?? 0)}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.purchases.byVatType.vatZero.vatAmount ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.purchases.byVatType.vatZero.totalExclVat ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.purchases.byVatType.vatZero.vatAmount ?? 0)}</td>
                 </tr>
                 <tr>
                   <td className="table-cell font-medium">{isThai ? 'ยกเว้น VAT' : 'VAT Exempt'}</td>
-                  <td className="table-cell text-right">{formatCurrency(data?.purchases.byVatType.vatExempt.totalExclVat ?? 0)}</td>
+                  <td className="table-cell text-right tabular-nums">{formatCurrency(data?.purchases.byVatType.vatExempt.totalExclVat ?? 0)}</td>
                   <td className="table-cell text-right text-gray-400">—</td>
                 </tr>
               </tbody>
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                 <tr>
                   <td className="px-4 py-3 font-semibold text-gray-900">{isThai ? 'รวมยอดซื้อ' : 'Total Purchases'}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatCurrency(data?.purchases.totalExclVat ?? 0)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-blue-700">{formatCurrency(data?.purchases.inputVat ?? 0)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{formatCurrency(data?.purchases.totalExclVat ?? 0)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-blue-700 tabular-nums">{formatCurrency(data?.purchases.inputVat ?? 0)}</td>
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
 
           {/* Summary card */}
-          <div className={`card pp30-card border-2 ${mustPay ? 'border-red-200 bg-red-50/30' : 'border-emerald-200 bg-emerald-50/30'}`}>
+          <div className={`card pp30-card border-2 bg-white shadow-sm ${mustPay ? 'border-rose-200' : 'border-emerald-200'}`}>
             <h2 className="font-bold text-gray-900 mb-4">
               {isThai ? '3. สรุปยอดภาษี' : '3. Summary'}
             </h2>
@@ -308,13 +420,13 @@ export default function Pp30Filing() {
                 <span className="text-gray-700">{isThai ? 'ภาษีซื้อ (Input VAT)' : 'Input VAT'}</span>
                 <span className="font-medium text-blue-700">− {formatCurrency(data?.purchases.inputVat ?? 0)}</span>
               </div>
-              <div className={`flex justify-between items-center py-3 mt-2 px-4 rounded-lg ${mustPay ? 'bg-red-100' : 'bg-emerald-100'}`}>
+              <div className={`flex justify-between items-center py-3 mt-2 px-4 rounded-lg border ${mustPay ? 'border-rose-200 bg-white' : 'border-emerald-200 bg-white'}`}>
                 <span className={`text-base font-bold ${mustPay ? 'text-red-900' : 'text-emerald-900'}`}>
                   {mustPay
                     ? (isThai ? 'ภาษีที่ต้องชำระ' : 'VAT Payable')
                     : (isThai ? 'ภาษีที่ขอคืน' : 'VAT Refundable')}
                 </span>
-                <span className={`text-2xl font-bold ${mustPay ? 'text-red-700' : 'text-emerald-700'}`}>
+                <span className={`text-2xl font-bold tabular-nums ${mustPay ? 'text-red-700' : 'text-emerald-700'}`}>
                   {formatCurrency(Math.abs(vatPayable))}
                 </span>
               </div>
@@ -329,7 +441,7 @@ export default function Pp30Filing() {
           {/* WHT Section (shown when WHT tab is active) */}
           {activeTab === 'wht' && (
             <div className="space-y-4">
-              <div className="card pp30-card border-red-200 bg-red-50/30">
+              <div className="card pp30-card border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                   <Receipt className="w-5 h-5 text-red-600" />
                   <h2 className="font-bold text-gray-900">
@@ -338,24 +450,24 @@ export default function Pp30Filing() {
                 </div>
                 {whtData ? (
                   <>
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div className="bg-white rounded-lg p-4 text-center border border-red-100">
+                    <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
                         <p className="text-xs text-gray-500 mb-1">{isThai ? 'จำนวนใบรับรอง' : 'Total Certificates'}</p>
                         <p className="text-2xl font-bold text-gray-900">{whtData.totalCertificates}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-4 text-center border border-red-100">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
                         <p className="text-xs text-gray-500 mb-1">{isThai ? 'ภาษีหักรวม' : 'Total Withheld'}</p>
                         <p className="text-2xl font-bold text-red-600">{formatCurrency(whtData.totalWithheld)}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-4 text-center border border-red-100">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
                         <p className="text-xs text-gray-500 mb-1">{isThai ? 'ยอดเงินได้รวม' : 'Total Income'}</p>
                         <p className="text-2xl font-bold text-gray-700">{formatCurrency(whtData.totalAmount)}</p>
                       </div>
                     </div>
                     {/* By-rate breakdown */}
-                    <div className="overflow-hidden rounded-lg border border-red-100">
-                      <table className="w-full">
-                        <thead className="bg-red-50">
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full min-w-[760px]">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="table-header">{isThai ? 'อัตราภาษี' : 'Rate'}</th>
                             <th className="table-header">{isThai ? 'ประเภทเงินได้' : 'Income Type'}</th>
@@ -364,14 +476,14 @@ export default function Pp30Filing() {
                             <th className="table-header text-right">{isThai ? 'ภาษีหัก' : 'Withheld'}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-red-100">
+                        <tbody className="divide-y divide-slate-100">
                           {whtData.byRate.filter(r => r.count > 0).map((rate) => (
                             <tr key={rate.rate}>
                               <td className="table-cell font-semibold text-red-700">{rate.rate}%</td>
                               <td className="table-cell text-sm text-gray-600">{rate.label}</td>
-                              <td className="table-cell text-right">{rate.count}</td>
-                              <td className="table-cell text-right">{formatCurrency(rate.totalAmount)}</td>
-                              <td className="table-cell text-right font-semibold text-red-600">{formatCurrency(rate.totalWithheld)}</td>
+                              <td className="table-cell text-right tabular-nums">{rate.count}</td>
+                              <td className="table-cell text-right tabular-nums">{formatCurrency(rate.totalAmount)}</td>
+                              <td className="table-cell text-right font-semibold text-red-600 tabular-nums">{formatCurrency(rate.totalWithheld)}</td>
                             </tr>
                           ))}
                           {whtData.byRate.filter(r => r.count > 0).length === 0 && (

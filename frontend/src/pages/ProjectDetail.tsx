@@ -158,6 +158,15 @@ interface DuplicateUploadPayload {
   }>;
 }
 
+interface ProjectUploadPayload {
+  fileName: string;
+  mimeType: string;
+  fileBase64: string;
+  projectId: string;
+}
+
+type DuplicatePolicy = 'rename' | 'replace' | 'skip';
+
 interface DocumentComment {
   id: string;
   authorType: string;
@@ -433,6 +442,16 @@ export default function ProjectDetail() {
   const [lineRefreshingId, setLineRefreshingId] = useState<string | null>(null);
   const [lineRoleUpdatingId, setLineRoleUpdatingId] = useState<string | null>(null);
   const [lineLinkCode, setLineLinkCode] = useState<{ otp: string; command: string; expiresInSeconds: number } | null>(null);
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{ payload: ProjectUploadPayload; duplicate: DuplicateUploadPayload } | null>(null);
+  const [commentDoc, setCommentDoc] = useState<DocumentIntake | null>(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({
+    amount: '',
+    reason: '',
+    category: 'Cash Advance',
+    paidToName: '',
+  });
   const [error, setError] = useState('');
 
   const fetchWorkspace = useCallback(async () => {
@@ -518,53 +537,21 @@ export default function ProjectDetail() {
     });
   }
 
-  function askDuplicatePolicy(payload: DuplicateUploadPayload): 'rename' | 'replace' | 'skip' | null {
-    const duplicate = payload?.duplicates?.[0];
-    const sizeText = duplicate
-      ? duplicate.sameSize
-        ? (isThai ? 'ขนาดไฟล์เท่ากัน' : 'same file size')
-        : (isThai ? `ขนาดไฟล์ต่างกัน: เดิม ${duplicate.fileSize} bytes / ใหม่ไฟล์นี้ ${duplicate.fileName ?? ''}` : `different size: existing ${duplicate.fileSize} bytes`)
-      : '';
-    const message = isThai
-      ? `พบไฟล์ชื่อซ้ำในโปรเจคนี้\n${duplicate?.fileName ?? ''}\n${sizeText}\n\nพิมพ์ rename = เก็บเป็นชื่อใหม่อัตโนมัติ\nพิมพ์ replace = เขียนทับไฟล์ชื่อเดิมใน Google Drive\nพิมพ์ skip = ไม่อัปโหลดซ้ำ`
-      : `A file with the same name already exists in this project.\n${duplicate?.fileName ?? ''}\n${sizeText}\n\nType rename = keep both with an auto name\nType replace = overwrite the same Google Drive file\nType skip = do not upload`;
-    const answer = window.prompt(message, 'rename')?.trim().toLowerCase();
-    if (answer === 'replace' || answer === 'skip' || answer === 'rename') return answer;
-    return null;
-  }
-
-  async function handleUpload(file?: File | null) {
-    if (!token || !workspace || !file) return;
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      setError(isThai ? 'รองรับเฉพาะ PDF, JPG, PNG, WebP' : 'Only PDF, JPG, PNG, and WebP are supported');
-      return;
-    }
+  async function submitProjectUpload(payload: ProjectUploadPayload, duplicatePolicy?: DuplicatePolicy) {
+    if (!token) return;
     setUploading(true);
     setError('');
     try {
-      const fileBase64 = await fileToBase64(file);
-      const payload = {
-          fileName: file.name,
-          mimeType: file.type,
-          fileBase64,
-          projectId: workspace.project.id,
-      };
-      let res = await fetch('/api/purchase-invoices/document-intakes/upload', {
+      const res = await fetch('/api/purchase-invoices/document-intakes/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(duplicatePolicy ? { ...payload, duplicatePolicy } : payload),
       });
       if (res.status === 409) {
         const duplicate = await res.json().catch(() => ({}));
         if (duplicate.code === 'DUPLICATE_PROJECT_DOCUMENT') {
-          const duplicatePolicy = askDuplicatePolicy(duplicate);
-          if (!duplicatePolicy) return;
-          res = await fetch('/api/purchase-invoices/document-intakes/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ ...payload, duplicatePolicy }),
-          });
+          setDuplicatePrompt({ payload, duplicate });
+          return;
         }
       }
       if (!res.ok) {
@@ -576,12 +563,29 @@ export default function ProjectDetail() {
         setError(isThai ? 'ข้ามการอัปโหลด เพราะมีไฟล์ชื่อนี้อยู่แล้ว' : 'Skipped upload because this file already exists');
       }
       setActiveTab('files');
+      setDuplicatePrompt(null);
       await fetchWorkspace();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleUpload(file?: File | null) {
+    if (!workspace || !file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setError(isThai ? 'รองรับเฉพาะ PDF, JPG, PNG, WebP' : 'Only PDF, JPG, PNG, and WebP are supported');
+      return;
+    }
+    const fileBase64 = await fileToBase64(file);
+    await submitProjectUpload({
+      fileName: file.name,
+      mimeType: file.type,
+      fileBase64,
+      projectId: workspace.project.id,
+    });
   }
 
   async function openDocument(doc: DocumentIntake) {
@@ -833,21 +837,26 @@ export default function ProjectDetail() {
     }
   }
 
-  async function requestDocumentComment(doc: DocumentIntake) {
-    if (!token || !workspace) return;
-    const message = window.prompt(isThai ? 'พิมพ์คำขอหรือคอมเมนต์สำหรับไฟล์นี้' : 'Write a request or comment for this file');
-    if (!message?.trim()) return;
+  function requestDocumentComment(doc: DocumentIntake) {
+    setCommentDoc(doc);
+    setCommentDraft('');
+  }
 
-    setCommentingId(doc.id);
+  async function submitDocumentComment() {
+    if (!token || !workspace || !commentDoc || !commentDraft.trim()) return;
+
+    setCommentingId(commentDoc.id);
     setError('');
     try {
-      const res = await fetch(`/api/projects/${workspace.project.id}/documents/${doc.id}/comments`, {
+      const res = await fetch(`/api/projects/${workspace.project.id}/documents/${commentDoc.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ kind: 'request', message: message.trim() }),
+        body: JSON.stringify({ kind: 'request', message: commentDraft.trim() }),
       });
       const json = await res.json() as { error?: string };
       if (!res.ok) throw new Error(json.error || 'Failed to create document request');
+      setCommentDoc(null);
+      setCommentDraft('');
       await fetchWorkspace();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create document request');
@@ -876,15 +885,30 @@ export default function ProjectDetail() {
     }
   }
 
-  async function createCashAdvanceRequest() {
+  function openCashAdvanceRequest() {
+    setAdvanceDialogOpen(true);
+    setAdvanceForm({
+      amount: '',
+      reason: '',
+      category: 'Cash Advance',
+      paidToName: '',
+    });
+  }
+
+  async function submitCashAdvanceRequest() {
     if (!token || !workspace) return;
-    const amountText = window.prompt(isThai ? 'ยอดขอเบิกเงินหน้างาน (บาท)' : 'Cash advance amount (THB)');
-    const amount = Number(amountText?.replace(/,/g, '').trim());
-    if (!amountText || !Number.isFinite(amount) || amount <= 0) return;
-    const reason = window.prompt(isThai ? 'ใช้ทำอะไร/ซื้ออะไร' : 'Purpose / what will this pay for');
-    if (!reason?.trim()) return;
-    const category = window.prompt(isThai ? 'หมวดงบ เช่น Material, Labor, Travel' : 'Cost code/category, e.g. Material, Labor, Travel')?.trim() || 'Cash Advance';
-    const paidToName = window.prompt(isThai ? 'โอนให้ใคร/ผู้รับเงิน' : 'Pay to / recipient name')?.trim() || undefined;
+    const amount = Number(advanceForm.amount.replace(/,/g, '').trim());
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError(isThai ? 'กรุณาระบุยอดเงินทดรองให้ถูกต้อง' : 'Enter a valid cash advance amount');
+      return;
+    }
+    if (!advanceForm.reason.trim()) {
+      setError(isThai ? 'กรุณาระบุเหตุผลการเบิกเงินหน้างาน' : 'Enter the cash advance purpose');
+      return;
+    }
+    const reason = advanceForm.reason.trim();
+    const category = advanceForm.category.trim() || 'Cash Advance';
+    const paidToName = advanceForm.paidToName.trim() || undefined;
     const today = new Date().toISOString().slice(0, 10);
 
     setAdvanceCreating(true);
@@ -897,14 +921,14 @@ export default function ProjectDetail() {
           projectId: workspace.project.id,
           workflowType: 'cash_advance',
           voucherDate: today,
-          description: `${isThai ? 'ขอเบิกเงินหน้างาน' : 'Cash advance'}: ${reason.trim()}`,
+          description: `${isThai ? 'ขอเบิกเงินหน้างาน' : 'Cash advance'}: ${reason}`,
           notes: isThai
             ? 'สร้างจากหน้าโปรเจคเพื่อรออนุมัติและเคลียร์ด้วยใบเสร็จ/สลิปภายหลัง'
             : 'Created from project workspace; clear later with receipts/payment proof.',
           requestedByName: paidToName,
           paidToName,
           items: [{
-            description: reason.trim(),
+            description: reason,
             category,
             amount,
             date: today,
@@ -925,6 +949,7 @@ export default function ProjectDetail() {
       }
       await fetchWorkspace();
       setActiveTab('expenses');
+      setAdvanceDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create cash advance');
     } finally {
@@ -1009,155 +1034,392 @@ export default function ProjectDetail() {
     .filter((item) => item.status === 'approved')
     .reduce((sum, item) => sum + item.totalAmount, 0);
 
-  const statCards = [
-    { label: isThai ? 'งบตั้งต้น' : 'Budget', value: formatCurrency(project.budgetAmount), icon: WalletCards },
-    { label: isThai ? 'ใช้/จองงบ' : 'Committed', value: formatCurrency(project.summary.committedAmount), icon: Receipt },
-    { label: isThai ? 'รายรับออกบิล' : 'Sales invoiced', value: formatCurrency(workspaceSummary.revenueTotal), icon: Send },
-    { label: isThai ? 'กำไรประมาณการ' : 'Estimated margin', value: formatCurrency(workspaceSummary.estimatedMargin), icon: CheckCircle2 },
-  ];
+  const budgetTone = project.summary.isOverBudget ? 'danger' : project.summary.remainingAmount <= project.budgetAmount * 0.15 ? 'warning' : 'success';
+  const projectWorkItems = [
+    {
+      label: isThai ? 'เอกสารต้องจัดการ' : 'Action documents',
+      value: String(workspaceSummary.actionNeededCount),
+      icon: AlertTriangle,
+      tone: workspaceSummary.actionNeededCount > 0 ? 'danger' : 'success',
+      status: workspaceSummary.actionNeededCount > 0 ? (isThai ? 'ต้องตรวจ' : 'Review') : (isThai ? 'เรียบร้อย' : 'Clear'),
+    },
+    {
+      label: isThai ? 'ไฟล์ในโปรเจค' : 'Project files',
+      value: String(workspaceSummary.filesCount),
+      icon: FileText,
+      tone: workspaceSummary.filesCount > 0 ? 'info' : 'neutral',
+      status: isThai ? 'คลังเอกสาร' : 'Archive',
+    },
+    {
+      label: isThai ? 'รอจับคู่' : 'Pending matches',
+      value: String(workspaceSummary.smartMatchCount ?? 0),
+      icon: Link2,
+      tone: (workspaceSummary.smartMatchCount ?? 0) > 0 ? 'warning' : 'success',
+      status: (workspaceSummary.smartMatchCount ?? 0) > 0 ? (isThai ? 'จับคู่' : 'Match') : (isThai ? 'ไม่มีค้าง' : 'Clear'),
+    },
+    {
+      label: isThai ? 'VAT ซื้อที่เคลมได้' : 'Claimable input VAT',
+      value: formatCurrency(workspaceSummary.claimableVat ?? workspaceSummary.purchaseVat),
+      icon: ShieldCheck,
+      tone: (workspaceSummary.taxSafetyRiskCount ?? 0) > 0 ? 'warning' : 'success',
+      status: (workspaceSummary.taxSafetyRiskCount ?? 0) > 0 ? (isThai ? 'มีความเสี่ยง' : 'Risk') : (isThai ? 'Tax-safe' : 'Tax-safe'),
+    },
+    {
+      label: isThai ? 'เงินทดรองรอเคลียร์' : 'Advances pending',
+      value: formatCurrency(pendingAdvanceTotal),
+      icon: WalletCards,
+      tone: pendingAdvanceTotal > 0 ? 'warning' : 'neutral',
+      status: pendingAdvanceTotal > 0 ? (isThai ? 'รออนุมัติ' : 'Pending') : (isThai ? 'ไม่มีค้าง' : 'Clear'),
+    },
+  ] as const;
+
+  const workToneClass = {
+    danger: 'bg-rose-500',
+    warning: 'bg-amber-500',
+    success: 'bg-emerald-500',
+    info: 'bg-blue-500',
+    neutral: 'bg-slate-300',
+  };
 
   return (
     <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <Link to="/app/projects" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-700">
-            <ArrowLeft className="h-4 w-4" />
-            {isThai ? 'โปรเจคทั้งหมด' : 'All projects'}
-          </Link>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{project.code}</span>
-            <span className={clsx('rounded-full border px-2 py-0.5 text-[11px] font-semibold', STATUS_CLASSES[project.status])}>
-              {statusLabel(project.status)}
-            </span>
-            {project.summary.isOverBudget && (
-              <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
-                {isThai ? 'เกินงบ' : 'Over budget'}
+      {duplicatePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20" role="dialog" aria-modal="true" aria-labelledby="duplicate-upload-title">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <AlertTriangle className="h-5 w-5" />
               </span>
-            )}
-          </div>
-          <h1 className="mt-2 text-2xl font-bold text-slate-950">{project.name}</h1>
-          <p className="mt-1 max-w-4xl text-sm text-slate-500">
-            {project.customerName || project.description || (isThai ? 'Workspace นี้รวมเอกสาร รูป สลิป ใบซื้อ ใบขาย และเบิกจ่ายของโปรเจคเดียวกัน' : 'This workspace collects files, slips, purchases, sales invoices, and expenses for this project.')}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void fetchWorkspace()}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {isThai ? 'รีเฟรช' : 'Refresh'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void downloadProjectExport()}
-            disabled={exporting}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {isThai ? 'Export Excel' : 'Export Excel'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void syncProjectSheet()}
-            disabled={sheetSyncing}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
-          >
-            {sheetSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-            {workspace.googleSheet?.url || project.googleSheetUrl ? (isThai ? 'เปิด/Sync ตาราง' : 'Open/Sync Sheet') : (isThai ? 'สร้างตารางโปรเจค' : 'Create project sheet')}
-          </button>
-          <button
-            type="button"
-            onClick={() => void openProjectDriveFolder()}
-            disabled={driveOpening}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            {driveOpening ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
-            {isThai ? 'Drive' : 'Drive'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void generateLineGroupLinkCode()}
-            disabled={lineLinking}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
-          >
-            {lineLinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-            {isThai ? 'ผูก LINE กลุ่ม' : 'Link LINE group'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void downloadAttachmentZip()}
-            disabled={zipDownloading}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            {zipDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
-            ZIP
-          </button>
-          <Link
-            to={`/app/invoices/new?projectId=${project.id}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <Send className="h-4 w-4" />
-            {isThai ? 'ออกใบขาย' : 'New sales invoice'}
-          </Link>
-          <Link
-            to={`/app/expenses?projectId=${project.id}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <Inbox className="h-4 w-4" />
-            {isThai ? 'ทำใบเบิก' : 'New voucher'}
-          </Link>
-          <button
-            type="button"
-            onClick={() => void createCashAdvanceRequest()}
-            disabled={advanceCreating}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-          >
-            {advanceCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
-            {isThai ? 'ขอเบิกหน้างาน' : 'Cash advance'}
-          </button>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700">
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {isThai ? 'อัปโหลดเข้าโปรเจค' : 'Upload to project'}
-            <input
-              type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
+              <div className="min-w-0">
+                <h2 id="duplicate-upload-title" className="text-lg font-bold text-slate-950">
+                  {isThai ? 'พบไฟล์ชื่อซ้ำในโปรเจค' : 'Duplicate file in this project'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {isThai ? 'เลือกว่าจะจัดการไฟล์นี้อย่างไร ก่อนส่งเข้า Google Drive และคิวเอกสาร' : 'Choose how to handle this file before sending it to Google Drive and the document queue.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              <p className="font-semibold text-slate-900">{duplicatePrompt.duplicate.duplicates?.[0]?.fileName ?? duplicatePrompt.payload.fileName}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {duplicatePrompt.duplicate.duplicates?.[0]?.sameSize
+                  ? (isThai ? 'ขนาดไฟล์เท่ากัน' : 'Same file size')
+                  : (isThai ? 'ชื่อไฟล์ซ้ำ แต่อาจเป็นคนละเวอร์ชัน' : 'Same file name, possibly a different version')}
+              </p>
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => void submitProjectUpload(duplicatePrompt.payload, 'rename')}
+                disabled={uploading}
+              >
+                {isThai ? 'เก็บทั้งคู่' : 'Keep both'}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
+                onClick={() => void submitProjectUpload(duplicatePrompt.payload, 'replace')}
+                disabled={uploading}
+              >
+                {isThai ? 'เขียนทับ' : 'Replace'}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
+                onClick={() => void submitProjectUpload(duplicatePrompt.payload, 'skip')}
+                disabled={uploading}
+              >
+                {isThai ? 'ข้ามไฟล์นี้' : 'Skip'}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="mt-3 w-full rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-50"
+              onClick={() => setDuplicatePrompt(null)}
               disabled={uploading}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                void handleUpload(file);
-              }}
-              className="hidden"
-            />
-          </label>
+            >
+              {isThai ? 'ยกเลิก' : 'Cancel'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {commentDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20" role="dialog" aria-modal="true" aria-labelledby="document-comment-title">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                <MessageCircle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 id="document-comment-title" className="text-lg font-bold text-slate-950">
+                  {isThai ? 'ขอข้อมูลเพิ่มจากไฟล์นี้' : 'Request details for this file'}
+                </h2>
+                <p className="mt-1 truncate text-sm text-slate-500">{commentDoc.fileName ?? 'Untitled file'}</p>
+              </div>
+            </div>
+            <textarea
+              value={commentDraft}
+              onChange={(event) => setCommentDraft(event.target.value)}
+              className="mt-4 min-h-32 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              placeholder={isThai ? 'พิมพ์คำขอหรือคอมเมนต์สำหรับไฟล์นี้' : 'Write a request or comment for this file'}
+              autoFocus
+            />
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => {
+                  setCommentDoc(null);
+                  setCommentDraft('');
+                }}
+                disabled={commentingId === commentDoc.id}
+              >
+                {isThai ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-700 px-5 py-2 text-sm font-bold text-white transition hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void submitDocumentComment()}
+                disabled={!commentDraft.trim() || commentingId === commentDoc.id}
+              >
+                {commentingId === commentDoc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                {isThai ? 'ส่งคำขอ' : 'Send request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {advanceDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20" role="dialog" aria-modal="true" aria-labelledby="cash-advance-title">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <WalletCards className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 id="cash-advance-title" className="text-lg font-bold text-slate-950">
+                  {isThai ? 'สร้างคำขอเบิกเงินหน้างาน' : 'Create cash advance request'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {isThai ? 'ระบบจะสร้าง voucher เพื่อรออนุมัติ แล้วเคลียร์ด้วยใบเสร็จหรือสลิปภายหลัง' : 'This creates a voucher for approval, to be cleared later with receipts or payment proof.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-600">{isThai ? 'ยอดขอเบิก (บาท)' : 'Amount (THB)'}</span>
+                <input
+                  value={advanceForm.amount}
+                  onChange={(event) => setAdvanceForm((prev) => ({ ...prev, amount: event.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-600">{isThai ? 'หมวดงบ' : 'Cost code/category'}</span>
+                <input
+                  value={advanceForm.category}
+                  onChange={(event) => setAdvanceForm((prev) => ({ ...prev, category: event.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                  placeholder="Material, Labor, Travel"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-xs font-semibold text-slate-600">{isThai ? 'ใช้ทำอะไร/ซื้ออะไร' : 'Purpose / what will this pay for'}</span>
+                <textarea
+                  value={advanceForm.reason}
+                  onChange={(event) => setAdvanceForm((prev) => ({ ...prev, reason: event.target.value }))}
+                  className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                  placeholder={isThai ? 'เช่น ซื้อวัสดุหน้างาน รอบติดตั้ง' : 'e.g. Site materials for installation round'}
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-xs font-semibold text-slate-600">{isThai ? 'โอนให้ใคร/ผู้รับเงิน' : 'Pay to / recipient name'}</span>
+                <input
+                  value={advanceForm.paidToName}
+                  onChange={(event) => setAdvanceForm((prev) => ({ ...prev, paidToName: event.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                  placeholder={isThai ? 'ไม่บังคับ' : 'Optional'}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setAdvanceDialogOpen(false)}
+                disabled={advanceCreating}
+              >
+                {isThai ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void submitCashAdvanceRequest()}
+                disabled={advanceCreating}
+              >
+                {advanceCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+                {isThai ? 'สร้างคำขอ' : 'Create request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="premium-hero premium-hero-dark overflow-hidden">
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-stretch">
+          <div className="min-w-0">
+            <Link to="/app/projects" className="inline-flex items-center gap-2 text-sm font-semibold text-white/85 transition hover:text-white">
+              <ArrowLeft className="h-4 w-4" />
+              {isThai ? 'โปรเจคทั้งหมด' : 'All projects'}
+            </Link>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-white/12 px-2 py-1 text-xs font-bold text-white ring-1 ring-white/15">{project.code}</span>
+              <span className={clsx('rounded-full border px-2 py-0.5 text-[11px] font-semibold', STATUS_CLASSES[project.status])}>
+                {statusLabel(project.status)}
+              </span>
+              {project.summary.isOverBudget && (
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                  {isThai ? 'เกินงบ' : 'Over budget'}
+                </span>
+              )}
+            </div>
+            <h1 className="mt-3 max-w-4xl text-2xl font-bold leading-tight text-white sm:text-3xl">{project.name}</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
+              {project.customerName || project.description || (isThai ? 'Workspace นี้รวมเอกสาร รูป สลิป ใบซื้อ ใบขาย และเบิกจ่ายของโปรเจคเดียวกัน' : 'This workspace collects files, slips, purchases, sales invoices, and expenses for this project.')}
+            </p>
+
+            <div className="mt-5 sm:mt-7">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
+                {isThai ? 'งบคงเหลือของโปรเจค' : 'Project budget remaining'}
+              </p>
+              <p className={clsx('mt-2 font-sarabun text-[clamp(2rem,5vw,2.75rem)] font-bold leading-none tabular-nums', budgetTone === 'danger' ? 'text-rose-100' : budgetTone === 'warning' ? 'text-amber-100' : 'text-white')}>
+                {formatCurrency(project.summary.remainingAmount)}
+              </p>
+              <div className="mt-4 h-1 w-40 rounded-full bg-gradient-to-r from-thai-gold via-thai-gold/70 to-transparent" />
+              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-sm text-white/75">
+                <span>
+                  <span className="font-semibold text-white">{formatCurrency(project.summary.committedAmount)}</span>
+                  {' '}
+                  {isThai ? 'ใช้/จองงบ' : 'committed'}
+                </span>
+                <span>
+                  <span className="font-semibold text-white">{formatCurrency(workspaceSummary.revenueTotal)}</span>
+                  {' '}
+                  {isThai ? 'ออกบิลขายแล้ว' : 'sales invoiced'}
+                </span>
+                <span>
+                  <span className={clsx('font-semibold', workspaceSummary.estimatedMargin < 0 ? 'text-rose-100' : 'text-emerald-100')}>
+                    {formatCurrency(workspaceSummary.estimatedMargin)}
+                  </span>
+                  {' '}
+                  {isThai ? 'กำไรประมาณการ' : 'estimated margin'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/15 bg-white/10 p-3 shadow-2xl shadow-slate-950/15 backdrop-blur sm:p-4">
+            <div className="hidden items-start justify-between gap-3 sm:flex">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/60">{isThai ? 'งานถัดไป' : 'Next actions'}</p>
+                <p className="mt-1 text-sm text-white/75">{isThai ? 'ทางลัดหลักของ workspace นี้' : 'Primary paths for this workspace'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void fetchWorkspace()}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+                aria-label={isThai ? 'รีเฟรช' : 'Refresh'}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:mt-4 xl:grid-cols-1">
+              <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-2 py-2 text-xs font-bold text-primary-800 shadow-sm transition hover:bg-primary-50 sm:px-4 sm:text-sm">
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {isThai ? 'อัปโหลดเข้าโปรเจค' : 'Upload to project'}
+                <input
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  disabled={uploading}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    void handleUpload(file);
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <Link
+                to={`/app/invoices/new?projectId=${project.id}`}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/12 px-2 py-2 text-xs font-bold text-white ring-1 ring-white/15 transition hover:bg-white/18 sm:px-4 sm:text-sm"
+              >
+                <Send className="h-4 w-4" />
+                {isThai ? 'ออกใบขาย' : 'New sales invoice'}
+              </Link>
+              <button
+                type="button"
+                onClick={() => openCashAdvanceRequest()}
+                disabled={advanceCreating}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-100 px-2 py-2 text-xs font-bold text-amber-900 transition hover:bg-amber-200 disabled:opacity-60 sm:px-4 sm:text-sm"
+              >
+                {advanceCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+                {isThai ? 'ขอเบิกหน้างาน' : 'Cash advance'}
+              </button>
+              <Link
+                to={`/app/expenses?projectId=${project.id}`}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white/12 px-2 py-2 text-xs font-bold text-white ring-1 ring-white/15 transition hover:bg-white/18 sm:px-4 sm:text-sm"
+              >
+                <Inbox className="h-4 w-4" />
+                {isThai ? 'ทำใบเบิก' : 'New voucher'}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {error ? (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((card) => {
-          const Icon = card.icon;
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        {projectWorkItems.map((item) => {
+          const Icon = item.icon;
           return (
-            <div key={card.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase text-slate-500">{card.label}</p>
-                <Icon className="h-4 w-4 text-primary-500" />
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => {
+                if (item.icon === AlertTriangle) setActiveTab('action');
+                else if (item.icon === FileText) setActiveTab('files');
+                else if (item.icon === Link2) setActiveTab('matching');
+                else if (item.icon === ShieldCheck) setActiveTab('purchases');
+                else setActiveTab('expenses');
+              }}
+              className="group min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-200"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                  <span className={clsx('h-1.5 w-1.5 rounded-full', workToneClass[item.tone])} />
+                  {item.status}
+                </span>
               </div>
-              <p className={clsx('mt-2 text-xl font-bold', card.label.includes('กำไร') || card.label.includes('margin') ? (workspaceSummary.estimatedMargin < 0 ? 'text-rose-600' : 'text-emerald-700') : 'text-slate-950')}>
-                {card.value}
-              </p>
-            </div>
+              <p className="mt-3 truncate text-xs font-bold uppercase text-slate-500">{item.label}</p>
+              <p className="mt-1 truncate text-xl font-bold text-slate-950 tabular-nums">{item.value}</p>
+            </button>
           );
         })}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between text-xs text-slate-500">
               <span>{isThai ? 'ใช้งบไปแล้ว' : 'Budget used'}</span>
@@ -1176,6 +1438,51 @@ export default function ProjectDetail() {
               <Bot className="h-3.5 w-3.5" />
               LINE {workspaceSummary.lineGroupCount}
             </span>
+            <button
+              type="button"
+              onClick={() => void downloadProjectExport()}
+              disabled={exporting}
+              className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => void syncProjectSheet()}
+              disabled={sheetSyncing}
+              className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {sheetSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+              Sheet
+            </button>
+            <button
+              type="button"
+              onClick={() => void openProjectDriveFolder()}
+              disabled={driveOpening}
+              className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {driveOpening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
+              Drive
+            </button>
+            <button
+              type="button"
+              onClick={() => void generateLineGroupLinkCode()}
+              disabled={lineLinking}
+              className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {lineLinking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+              LINE
+            </button>
+            <button
+              type="button"
+              onClick={() => void downloadAttachmentZip()}
+              disabled={zipDownloading}
+              className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {zipDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileArchive className="h-3.5 w-3.5" />}
+              ZIP
+            </button>
           </div>
         </div>
       </div>
@@ -1476,7 +1783,7 @@ export default function ProjectDetail() {
             </div>
             <button
               type="button"
-              onClick={() => void createCashAdvanceRequest()}
+              onClick={() => openCashAdvanceRequest()}
               disabled={advanceCreating}
               className="inline-flex min-h-[76px] items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
             >

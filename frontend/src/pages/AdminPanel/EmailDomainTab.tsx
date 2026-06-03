@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Check, CheckCircle, Copy, Loader2, Trash2, XCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { ConfirmDialog, type ConfirmDialogState } from '../../components/ui/AppFeedback';
 
 export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
   const { token } = useAuthStore();
@@ -21,6 +22,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
   const [disconnecting, setDisconnecting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok'|'err'|'info'; text: string } | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -83,7 +85,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
   }
 
   async function handleDisconnect() {
-    if (!window.confirm(isThai ? 'ยกเลิก custom domain? อีเมลจะกลับไปส่งจาก domain ของ Billboy' : 'Disconnect custom domain? Emails will revert to the Billboy default.')) return;
+    setConfirmDialog(null);
     setDisconnecting(true); setMsg(null);
     try {
       const res = await fetch('/api/admin/email-domain', {
@@ -96,6 +98,21 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
     finally { setDisconnecting(false); }
   }
 
+  function requestDisconnect() {
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'ยกเลิก custom domain?' : 'Disconnect custom domain?',
+      description: isThai
+        ? 'อีเมลใบกำกับจะกลับไปส่งจากโดเมน default ของ Billboy จนกว่าจะตั้งค่าใหม่'
+        : 'Invoice emails will return to the Billboy default domain until this is configured again.',
+      confirmLabel: isThai ? 'ยกเลิก domain' : 'Disconnect domain',
+      cancelLabel: isThai ? 'กลับไปตั้งค่า' : 'Keep domain',
+      detail: state?.domain ? <p className="font-mono text-sm font-semibold text-slate-900">noreply@{state.domain}</p> : undefined,
+      onConfirm: () => void handleDisconnect(),
+      onCancel: () => setConfirmDialog(null),
+    });
+  }
+
   const copyValue = async (text: string, idx: number) => {
     await navigator.clipboard.writeText(text);
     setCopied(idx);
@@ -104,6 +121,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
 
   return (
     <div className="space-y-5">
+      <ConfirmDialog dialog={confirmDialog} />
       <div>
         <h2 className="font-semibold text-lg text-gray-900">
           {isThai ? 'ส่งอีเมลจาก domain ของคุณ' : 'Send email from your domain'}
@@ -173,7 +191,7 @@ export default function EmailDomainTab({ isThai }: { isThai: boolean }) {
                   {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : (isThai ? 'ตรวจสอบ DNS' : 'Verify')}
                 </button>
               )}
-              <button className="btn-secondary text-red-600" onClick={() => void handleDisconnect()} disabled={disconnecting}>
+              <button className="btn-secondary text-red-600" onClick={() => requestDisconnect()} disabled={disconnecting}>
                 {disconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               </button>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useCompanyAccessPolicy } from '../../hooks/useCompanyAccessPolicy';
+import { ConfirmDialog, type ConfirmDialogState } from '../../components/ui/AppFeedback';
 
 export default function BillingTab({ isThai }: { isThai: boolean }) {
   const { token } = useAuthStore();
@@ -41,6 +42,7 @@ export default function BillingTab({ isThai }: { isThai: boolean }) {
     } | null;
   }>(null);
   const [error, setError] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -92,7 +94,7 @@ export default function BillingTab({ isThai }: { isThai: boolean }) {
   }
 
   async function chargeOverage() {
-    if (!window.confirm(isThai ? 'ยืนยันสร้างรายการเก็บเงินเอกสารเกินแพ็กเกจ?' : 'Confirm charging this month’s document overage?')) return;
+    setConfirmDialog(null);
     setOverageCharging(true);
     setError('');
     try {
@@ -116,12 +118,39 @@ export default function BillingTab({ isThai }: { isThai: boolean }) {
     }
   }
 
+  function requestChargeOverage() {
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'สร้างรายการเก็บเงินเอกสารเกินแพ็กเกจ?' : 'Charge document overage?',
+      description: isThai
+        ? 'ระบบจะสร้างรายการเก็บเงินสำหรับจำนวนเอกสารที่เกินแพ็กเกจในรอบนี้'
+        : 'This creates a billing charge for documents above the package limit in this period.',
+      confirmLabel: isThai ? 'ยืนยันเก็บเงิน' : 'Confirm charge',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      detail: overage ? (
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <p className="text-slate-500">{isThai ? 'เอกสารเกิน' : 'Overage documents'}</p>
+            <p className="mt-1 font-bold text-slate-900">{overage.overageDocuments.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-slate-500">{isThai ? 'ยอดประมาณการ' : 'Estimated charge'}</p>
+            <p className="mt-1 font-bold text-slate-900">฿{overage.estimatedOverageThb.toLocaleString()}</p>
+          </div>
+        </div>
+      ) : undefined,
+      onConfirm: () => void chargeOverage(),
+      onCancel: () => setConfirmDialog(null),
+    });
+  }
+
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
   }
 
   return (
     <div className="space-y-5">
+      <ConfirmDialog dialog={confirmDialog} />
       <div>
         <h2 className="font-semibold text-lg text-gray-900">{isThai ? 'แพ็กเกจและการชำระเงิน' : 'Billing & Plan'}</h2>
         <p className="text-sm text-gray-500 mt-1">
@@ -197,7 +226,7 @@ export default function BillingTab({ isThai }: { isThai: boolean }) {
             </div>
             <button
               className="btn-primary"
-              onClick={chargeOverage}
+              onClick={requestChargeOverage}
               disabled={!overage.billable || overageCharging || !!overage.existingCharge}
             >
               {overageCharging ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}

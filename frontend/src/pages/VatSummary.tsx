@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator, TrendingUp, TrendingDown, FileSpreadsheet, Loader2,
-  ArrowRight, Calendar, FolderOpen, FileText, Receipt, Link2,
+  ArrowRight, FolderOpen, FileText, Receipt, Link2,
 } from 'lucide-react';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import SectionSubNav from '../components/SectionSubNav';
@@ -10,6 +10,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import type { VatSummaryData } from '../types';
+import { ToastStack, type FeedbackToast } from '../components/ui/AppFeedback';
 
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -43,6 +44,19 @@ export default function VatSummary() {
   const [exporting, setExporting] = useState<'sales' | 'purchases' | null>(null);
   const [auditExporting, setAuditExporting] = useState(false);
   const [auditUrl, setAuditUrl] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<FeedbackToast[]>([]);
+
+  const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((current) => [...current.slice(-2), { ...toast, id }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== id));
+    }, toast.tone === 'error' ? 7000 : 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -80,7 +94,11 @@ export default function VatSummary() {
 
   async function handleExport(kind: 'sales' | 'purchases') {
     if (!policy?.canExportExcel) {
-      alert(isThai ? 'แพ็กเกจนี้ยังไม่รองรับการส่งออก' : 'This plan does not support export');
+      showToast({
+        tone: 'warning',
+        title: isThai ? 'แพ็กเกจนี้ยังไม่รองรับการส่งออก' : 'This plan does not support export',
+        description: isThai ? 'อัปเกรดแพ็กเกจเพื่อดาวน์โหลดรายละเอียด VAT เป็นไฟล์' : 'Upgrade the plan to download VAT detail files.',
+      });
       return;
     }
     setExporting(kind);
@@ -99,7 +117,7 @@ export default function VatSummary() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert(isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed');
+      showToast({ tone: 'error', title: isThai ? 'ส่งออกไม่สำเร็จ' : 'Export failed' });
     } finally {
       setExporting(null);
     }
@@ -118,9 +136,11 @@ export default function VatSummary() {
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setAuditUrl(json.data?.url ?? null);
     } catch (err) {
-      alert(isThai
-        ? `สร้าง Audit Package ไม่สำเร็จ: ${err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'}`
-        : `Audit export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showToast({
+        tone: 'error',
+        title: isThai ? 'สร้าง Audit Package ไม่สำเร็จ' : 'Audit export failed',
+        description: err instanceof Error ? err.message : (isThai ? 'ไม่ทราบสาเหตุ' : 'Unknown error'),
+      });
     } finally {
       setAuditExporting(false);
     }
@@ -139,7 +159,9 @@ export default function VatSummary() {
   const mustPay = vatPayable > 0;
 
   return (
-    <div className="space-y-4">
+    <>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <div className="space-y-4">
       <SectionSubNav
         items={[
           { key: 'financials', to: '/app/reports/financials', label: isThai ? 'งบการเงิน' : 'Financials', icon: TrendingUp },
@@ -149,47 +171,62 @@ export default function VatSummary() {
           { key: 'reconciliation', to: '/app/reports/reconciliation', label: isThai ? 'กระทบยอดธนาคาร' : 'Bank Reconciliation', icon: Link2 },
         ]}
       />
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Calculator className="w-6 h-6 text-primary-600" />
-          {isThai ? 'สรุปภาษี / VAT Summary' : 'VAT Summary'}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {isThai
-            ? 'สรุปภาษีขาย (Output VAT) และภาษีซื้อ (Input VAT) ตามรอบเดือน'
-            : 'Monthly summary of Output VAT (sales) and Input VAT (purchases)'}
-        </p>
-      </div>
-
-      {/* Period selector */}
-      <div className="card">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Calendar className="w-5 h-5 text-gray-400" />
-          <span className="text-sm font-medium text-gray-700">
-            {isThai ? 'งวด' : 'Period'}:
-          </span>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="input-field w-auto"
-          >
-            {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
-              <option key={i} value={i + 1}>{m}</option>
-            ))}
-          </select>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="input-field w-auto"
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{isThai ? y + 543 : y}</option>
-            ))}
-          </select>
-          <span className="text-sm text-gray-500 ml-auto">{periodLabel}</span>
+      <section className="premium-hero premium-hero-dark">
+        <div className="relative z-10 min-w-0">
+          <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
+            <Calculator className="h-3.5 w-3.5" />
+            {isThai ? 'ความพร้อมยื่น VAT' : 'VAT Filing Readiness'}
+          </div>
+          <p className="mt-5 text-sm font-semibold text-slate-200">{periodLabel}</p>
+          <h1 className="mt-2 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-tight text-white">
+            {mustPay ? (isThai ? 'ภาษีที่ต้องชำระโดยประมาณ' : 'Estimated VAT payable') : (isThai ? 'ภาษีขอคืนโดยประมาณ' : 'Estimated VAT refundable')}
+          </h1>
+          <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.75rem)]">
+            {loading ? '—' : formatCurrency(Math.abs(vatPayable))}
+          </div>
+          <div className="mt-4 h-px w-full max-w-xl bg-[color-mix(in_oklch,var(--brand-gold)_78%,transparent)]" />
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-100">
+            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
+              <span className="text-slate-300">{isThai ? 'ภาษีขาย' : 'Output VAT'}</span>
+              <span className="ml-2 font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(outputVat)}</span>
+            </div>
+            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
+              <span className="text-slate-300">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</span>
+              <span className="ml-2 font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(inputVat)}</span>
+            </div>
+          </div>
         </div>
-      </div>
+        <div className="relative z-10 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-200">{isThai ? 'เลือกงวดภาษี' : 'Filing period'}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="input-field border-white/15 bg-white/95"
+            >
+              {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
+                <option key={i} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="input-field border-white/15 bg-white/95"
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{isThai ? y + 543 : y}</option>
+              ))}
+            </select>
+          </div>
+          <Link
+            to={`/app/pp30?year=${year}&month=${month}`}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-800 transition hover:bg-slate-100"
+          >
+            {isThai ? 'เปิดรายงาน ภ.พ.30' : 'Open PP.30 report'}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -197,95 +234,50 @@ export default function VatSummary() {
         </div>
       ) : (
         <>
-          {/* Top row: 3 main cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Output VAT */}
-            <div className="card">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                </div>
-                <h3 className="font-semibold text-gray-900">
-                  {isThai ? 'ภาษีขาย (Output VAT)' : 'Output VAT (Sales)'}
-                </h3>
+          <div className="rounded-[20px] border border-slate-200 bg-white/90 p-3 shadow-sm">
+            <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">{isThai ? 'รายการตรวจรอบภาษี' : 'Filing worklist'}</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{isThai ? 'ตัวเลขที่ต้องเช็คก่อนยื่น' : 'Numbers to verify before filing'}</h2>
               </div>
-              <p className="text-2xl font-bold text-green-700">{formatCurrency(outputVat)}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {data?.sales.count ?? 0} {isThai ? 'ใบกำกับ' : 'invoices'} ·
-                {' '}{formatCurrency(data?.sales.totalExclVat ?? 0)} {isThai ? '(ก่อน VAT)' : 'excl. VAT'}
-              </p>
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                <Link to="/app/invoices" className="text-xs font-medium text-primary-600 hover:underline">
-                  {isThai ? 'ดูรายละเอียด' : 'View details'}
-                </Link>
-                <button
-                  onClick={() => handleExport('sales')}
-                  disabled={exporting === 'sales' || !policy?.canExportExcel}
-                  className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
-                >
-                  {exporting === 'sales' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                  {isThai ? 'Excel' : 'Excel'}
-                </button>
-              </div>
+              <p className="text-xs font-semibold text-slate-600">Output VAT - Input VAT</p>
             </div>
-
-            {/* Input VAT */}
-            <div className="card">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <TrendingDown className="w-5 h-5 text-blue-600" />
-                </div>
-                <h3 className="font-semibold text-gray-900">
-                  {isThai ? 'ภาษีซื้อ (Input VAT)' : 'Input VAT (Purchases)'}
-                </h3>
-              </div>
-              <p className="text-2xl font-bold text-blue-700">{formatCurrency(inputVat)}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {data?.purchases.count ?? 0} {isThai ? 'ใบกำกับ' : 'invoices'} ·
-                {' '}{formatCurrency(data?.purchases.totalExclVat ?? 0)} {isThai ? '(ก่อน VAT)' : 'excl. VAT'}
-              </p>
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                <Link to="/app/purchase-invoices" className="text-xs font-medium text-primary-600 hover:underline">
-                  {isThai ? 'ดูรายละเอียด' : 'View details'}
-                </Link>
-                <button
-                  onClick={() => handleExport('purchases')}
-                  disabled={exporting === 'purchases' || !policy?.canExportExcel}
-                  className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
-                >
-                  {exporting === 'purchases' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                  Excel
-                </button>
-              </div>
-            </div>
-
-            {/* VAT Payable */}
-            <div className={`card ${mustPay ? 'bg-red-50/30' : 'bg-emerald-50/30'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${mustPay ? 'bg-red-100' : 'bg-emerald-100'}`}>
-                  <Calculator className={`w-5 h-5 ${mustPay ? 'text-red-600' : 'text-emerald-600'}`} />
-                </div>
-                <h3 className="font-semibold text-gray-900">
-                  {mustPay
-                    ? (isThai ? 'ภาษีที่ต้องชำระ' : 'VAT Payable')
-                    : (isThai ? 'ภาษีที่ขอคืน' : 'VAT Refundable')}
-                </h3>
-              </div>
-              <p className={`text-2xl font-bold ${mustPay ? 'text-red-700' : 'text-emerald-700'}`}>
-                {mustPay
-                  ? (isThai ? `ต้องชำระ ${formatCurrency(vatPayable)}` : formatCurrency(vatPayable))
-                  : (isThai ? `ขอคืน ${formatCurrency(Math.abs(vatPayable))}` : formatCurrency(Math.abs(vatPayable)))}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {isThai ? 'Output VAT − Input VAT' : 'Output VAT − Input VAT'}
-              </p>
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <Link
-                  to={`/app/pp30?year=${year}&month=${month}`}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline"
-                >
-                  {isThai ? 'ดูรายงาน ภ.พ.30' : 'View PP.30 report'}
-                  <ArrowRight className="w-3.5 h-3.5" />
+            <div className="grid gap-2 md:grid-cols-3">
+              <VatWorkItem
+                icon={<TrendingUp className="h-4 w-4" />}
+                label={isThai ? 'ภาษีขาย' : 'Output VAT'}
+                value={formatCurrency(outputVat)}
+                detail={`${data?.sales.count ?? 0} ${isThai ? 'ใบกำกับ' : 'invoices'} · ${formatCurrency(data?.sales.totalExclVat ?? 0)}`}
+                actionLabel={isThai ? 'ดูขาย' : 'Sales detail'}
+                actionHref="/app/invoices"
+                onExport={() => handleExport('sales')}
+                exporting={exporting === 'sales'}
+                canExport={Boolean(policy?.canExportExcel)}
+              />
+              <VatWorkItem
+                icon={<TrendingDown className="h-4 w-4" />}
+                label={isThai ? 'ภาษีซื้อ' : 'Input VAT'}
+                value={formatCurrency(inputVat)}
+                detail={`${data?.purchases.count ?? 0} ${isThai ? 'ใบกำกับ' : 'invoices'} · ${formatCurrency(data?.purchases.totalExclVat ?? 0)}`}
+                actionLabel={isThai ? 'ดูซื้อ' : 'Purchase detail'}
+                actionHref="/app/purchase-invoices"
+                onExport={() => handleExport('purchases')}
+                exporting={exporting === 'purchases'}
+                canExport={Boolean(policy?.canExportExcel)}
+              />
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white shadow-sm">
+                  <Calculator className="h-4 w-4" />
+                </span>
+                <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                  {mustPay ? (isThai ? 'ต้องชำระ' : 'Payable') : (isThai ? 'ขอคืน' : 'Refundable')}
+                </p>
+                <p className={`mt-1 text-2xl font-bold tabular-nums ${mustPay ? 'text-red-700' : 'text-emerald-700'}`}>
+                  {formatCurrency(Math.abs(vatPayable))}
+                </p>
+                <Link to={`/app/pp30?year=${year}&month=${month}`} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-primary-700 hover:text-primary-900">
+                  {isThai ? 'เปิด ภ.พ.30' : 'Open PP.30'}
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             </div>
@@ -432,6 +424,50 @@ export default function VatSummary() {
           </div>
         </>
       )}
+      </div>
+    </>
+  );
+}
+
+function VatWorkItem({
+  icon,
+  label,
+  value,
+  detail,
+  actionLabel,
+  actionHref,
+  onExport,
+  exporting,
+  canExport,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  actionLabel: string;
+  actionHref: string;
+  onExport: () => void;
+  exporting: boolean;
+  canExport: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white shadow-sm">{icon}</span>
+      <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-slate-950 tabular-nums">{value}</p>
+      <p className="mt-1 text-xs leading-5 text-slate-600">{detail}</p>
+      <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+        <Link to={actionHref} className="text-xs font-bold text-primary-700 hover:text-primary-900">{actionLabel}</Link>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={exporting || !canExport}
+          className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900 disabled:opacity-50"
+        >
+          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+          Excel
+        </button>
+      </div>
     </div>
   );
 }

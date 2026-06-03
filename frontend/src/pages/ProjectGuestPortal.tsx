@@ -97,6 +97,8 @@ export default function ProjectGuestPortal() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [replyFileId, setReplyFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -161,23 +163,24 @@ export default function ProjectGuestPortal() {
     }
   }
 
-  async function handleReply(fileId: string) {
+  async function submitReply() {
     if (!token) return;
-    const message = window.prompt('พิมพ์คำตอบหรือรายละเอียดเพิ่มเติมสำหรับเอกสารนี้');
-    if (!message?.trim()) return;
+    if (!replyFileId || !replyDraft.trim()) return;
 
-    setReplyingId(fileId);
+    setReplyingId(replyFileId);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/project-portal/${token}/documents/${fileId}/comments`, {
+      const res = await fetch(`/api/project-portal/${token}/documents/${replyFileId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message.trim() }),
+        body: JSON.stringify({ message: replyDraft.trim() }),
       });
       const json = await res.json() as { error?: string };
       if (!res.ok) throw new Error(json.error ?? 'ส่งข้อความไม่สำเร็จ');
       setNotice('ส่งข้อความกลับเข้าโปรเจคแล้ว');
+      setReplyFileId(null);
+      setReplyDraft('');
       await loadPortal();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ส่งข้อความไม่สำเร็จ');
@@ -220,6 +223,50 @@ export default function ProjectGuestPortal() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {replyFileId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20" role="dialog" aria-modal="true" aria-labelledby="project-reply-title">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                <MessageCircle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 id="project-reply-title" className="text-lg font-bold text-slate-950">ตอบกลับเอกสาร</h2>
+                <p className="mt-1 text-sm text-slate-500">ข้อความนี้จะเข้าโปรเจคให้ทีมบัญชีเห็นต่อจากคอมเมนต์เดิม</p>
+              </div>
+            </div>
+            <textarea
+              value={replyDraft}
+              onChange={(event) => setReplyDraft(event.target.value)}
+              className="mt-4 min-h-32 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              placeholder="พิมพ์คำตอบหรือรายละเอียดเพิ่มเติมสำหรับเอกสารนี้"
+              autoFocus
+            />
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => {
+                  setReplyFileId(null);
+                  setReplyDraft('');
+                }}
+                disabled={replyingId === replyFileId}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-700 px-5 py-2 text-sm font-bold text-white transition hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void submitReply()}
+                disabled={!replyDraft.trim() || replyingId === replyFileId}
+              >
+                {replyingId === replyFileId ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                ส่งข้อความ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -311,7 +358,10 @@ export default function ProjectGuestPortal() {
                       {file.comments && file.comments.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => void handleReply(file.id)}
+                          onClick={() => {
+                            setReplyFileId(file.id);
+                            setReplyDraft('');
+                          }}
                           disabled={replyingId === file.id}
                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                         >

@@ -47,6 +47,19 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  useEffect(() => {
+    setSheetOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobile || !sheetOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobile, sheetOpen]);
+
   if (!isMobile) return null;
 
   const moreItems = [
@@ -70,7 +83,11 @@ export default function MobileBottomNav() {
   return (
     <>
       {/* Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex lg:hidden pb-safe">
+      <nav
+        aria-label={t('nav.mobile', { defaultValue: 'Mobile navigation' })}
+        className="fixed inset-x-3 bottom-3 z-50 flex overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl shadow-slate-900/10 backdrop-blur-xl lg:hidden"
+        style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         {primaryTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = tab.activePrefixes.some((p) => location.pathname.startsWith(p));
@@ -78,17 +95,21 @@ export default function MobileBottomNav() {
             <Link
               key={tab.key}
               to={tab.href}
-              className="flex-1 flex flex-col items-center justify-center h-14 gap-0.5"
+              className={clsx(
+                'relative flex h-16 flex-1 flex-col items-center justify-center gap-1 text-center transition-colors',
+                isActive ? 'text-primary-700' : 'text-slate-500 hover:text-slate-900',
+              )}
               onClick={() => setSheetOpen(false)}
             >
+              {isActive && <span className="absolute left-1/2 top-1 h-1 w-7 -translate-x-1/2 rounded-full bg-primary-600" />}
               <Icon
-                className={clsx('w-6 h-6', isActive ? 'text-primary-600' : 'text-gray-400')}
+                className={clsx('h-5 w-5', isActive ? 'text-primary-600' : 'text-slate-400')}
                 strokeWidth={isActive ? 2.5 : 1.8}
               />
               <span
                 className={clsx(
-                  'text-[11px] font-medium leading-none',
-                  isActive ? 'text-primary-600' : 'text-gray-400',
+                  'max-w-[4.25rem] truncate text-[11px] font-bold leading-none',
+                  isActive ? 'text-primary-700' : 'text-slate-500',
                 )}
               >
                 {t(tab.labelKey)}
@@ -99,19 +120,24 @@ export default function MobileBottomNav() {
 
         {/* More tab */}
         <button
-          className="flex-1 flex flex-col items-center justify-center h-14 gap-0.5"
+          type="button"
+          className={clsx(
+            'relative flex h-16 flex-1 flex-col items-center justify-center gap-1 text-center transition-colors',
+            isMoreActive || sheetOpen ? 'text-primary-700' : 'text-slate-500 hover:text-slate-900',
+          )}
           onClick={() => setSheetOpen((prev) => !prev)}
           aria-label="More options"
           aria-expanded={sheetOpen}
         >
+          {(isMoreActive || sheetOpen) && <span className="absolute left-1/2 top-1 h-1 w-7 -translate-x-1/2 rounded-full bg-primary-600" />}
           <MoreHorizontal
-            className={clsx('w-6 h-6', isMoreActive || sheetOpen ? 'text-primary-600' : 'text-gray-400')}
+            className={clsx('h-5 w-5', isMoreActive || sheetOpen ? 'text-primary-600' : 'text-slate-400')}
             strokeWidth={isMoreActive || sheetOpen ? 2.5 : 1.8}
           />
           <span
             className={clsx(
-              'text-[11px] font-medium leading-none',
-              isMoreActive || sheetOpen ? 'text-primary-600' : 'text-gray-400',
+              'text-[11px] font-bold leading-none',
+              isMoreActive || sheetOpen ? 'text-primary-700' : 'text-slate-500',
             )}
           >
             {t('nav.more', 'More')}
@@ -121,56 +147,71 @@ export default function MobileBottomNav() {
 
       {/* Backdrop */}
       {sheetOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
-          onClick={() => setSheetOpen(false)}
-        />
-      )}
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[2px] lg:hidden"
+            onClick={() => setSheetOpen(false)}
+          />
 
-      {/* Slide-up sheet */}
-      <div
-        className={clsx(
-          'fixed left-0 right-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-xl border-t border-gray-200 lg:hidden',
-          'transition-transform duration-300 ease-out',
-          sheetOpen ? 'translate-y-0' : 'translate-y-full',
-        )}
-        style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}
-      >
-        {/* Sheet handle */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <div className="w-10 h-1 rounded-full bg-gray-300 mx-auto" />
-        </div>
-        <button
-          className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100"
-          onClick={() => setSheetOpen(false)}
-          aria-label="Close"
-        >
-          <X className="w-5 h-5 text-gray-500" />
-        </button>
-
-        <div className="px-4 pb-4 pt-2 space-y-1">
-          {moreItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.key}
-                to={item.href}
+          <div
+            className="fixed inset-x-3 bottom-3 z-50 max-h-[min(78vh,34rem)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 lg:hidden"
+            style={{ paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('nav.more', 'More')}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 pb-3 pt-4">
+              <div>
+                <div className="h-1 w-10 rounded-full bg-slate-300" />
+                <p className="mt-4 text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
+                  {t('nav.more', 'More')}
+                </p>
+                <h2 className="mt-1 text-base font-bold text-slate-950">
+                  {t('nav.workspaceMenu', { defaultValue: 'เมนูงานบริษัท' })}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-100 hover:text-slate-900"
                 onClick={() => setSheetOpen(false)}
-                className={clsx(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-100',
-                )}
+                aria-label="Close"
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {'raw' in item && item.raw ? item.labelKey : t(item.labelKey as string)}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(min(78vh,34rem)-8rem)] space-y-1 overflow-y-auto px-4 py-3">
+              {moreItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.key}
+                    to={item.href}
+                    onClick={() => setSheetOpen(false)}
+                    className={clsx(
+                      'flex min-h-12 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition-colors',
+                      isActive
+                        ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-100'
+                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950',
+                    )}
+                  >
+                    <span className={clsx(
+                      'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1',
+                      isActive ? 'bg-white text-primary-700 ring-primary-100' : 'bg-slate-50 text-slate-500 ring-slate-100',
+                    )}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 truncate">
+                      {'raw' in item && item.raw ? item.labelKey : t(item.labelKey as string)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Bell, BriefcaseBusiness, Check, CheckCircle, Copy, Link2, Loader2, Lock, Save, Unlink2, Users, XCircle, Zap } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import type { CompanyAccessPolicy } from '../../types';
+import { ConfirmDialog, type ConfirmDialogState } from '../../components/ui/AppFeedback';
 
 export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolicy | null; isThai: boolean }) {
   const { token } = useAuthStore();
@@ -42,6 +43,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
   const [localReminderDays, setLocalReminderDays] = useState(3);
   const [copied, setCopied] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [liveStatus, setLiveStatus] = useState<{
     checkedAt: string;
@@ -245,7 +247,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
   }
 
   async function handleUserUnlink(user: LineManagedUser) {
-    if (!confirm(isThai ? `ยืนยันถอด LINE จาก ${user.name}?` : `Unlink LINE from ${user.name}?`)) return;
+    setConfirmDialog(null);
     setMsg(null);
     try {
       const res = await fetch(`/api/line/admin/users/${user.id}/unlink`, {
@@ -281,7 +283,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
   }
 
   async function handleGroupUnlink(group: LineManagedGroup) {
-    if (!confirm(isThai ? `ยืนยันถอด LINE group ${group.groupName ?? group.lineGroupIdMasked ?? ''}?` : `Unlink LINE group ${group.groupName ?? group.lineGroupIdMasked ?? ''}?`)) return;
+    setConfirmDialog(null);
     setMsg(null);
     try {
       const res = await fetch(`/api/line/admin/groups/${group.id}`, {
@@ -295,6 +297,38 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
     } catch (e) {
       setMsg({ type: 'err', text: (e as Error).message });
     }
+  }
+
+  function requestUserUnlink(user: LineManagedUser) {
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'ถอด LINE จากผู้ใช้นี้?' : 'Unlink this LINE user?',
+      description: isThai ? 'ผู้ใช้นี้จะไม่ได้รับแจ้งเตือนผ่าน LINE จนกว่าจะเชื่อมต่อใหม่' : 'This user will stop receiving LINE notifications until they reconnect.',
+      confirmLabel: isThai ? 'ถอด LINE' : 'Unlink LINE',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      detail: (
+        <div>
+          <p className="font-semibold text-slate-900">{user.name}</p>
+          <p className="mt-1 text-xs text-slate-500">{user.email}</p>
+        </div>
+      ),
+      onConfirm: () => void handleUserUnlink(user),
+      onCancel: () => setConfirmDialog(null),
+    });
+  }
+
+  function requestGroupUnlink(group: LineManagedGroup) {
+    const groupName = group.groupName ?? group.lineGroupIdMasked ?? 'LINE Group';
+    setConfirmDialog({
+      tone: 'warning',
+      title: isThai ? 'ถอด LINE group นี้?' : 'Unlink this LINE group?',
+      description: isThai ? 'กลุ่มนี้จะหยุดส่งเอกสารเข้าโปรเจคจนกว่าจะเชื่อมใหม่' : 'This group will stop routing documents into projects until it is linked again.',
+      confirmLabel: isThai ? 'ถอดกลุ่ม' : 'Unlink group',
+      cancelLabel: isThai ? 'ยกเลิก' : 'Cancel',
+      detail: <p className="font-semibold text-slate-900">{groupName}</p>,
+      onConfirm: () => void handleGroupUnlink(group),
+      onCancel: () => setConfirmDialog(null),
+    });
   }
 
   async function handleGroupProjectChange(group: LineManagedGroup, projectId: string) {
@@ -440,6 +474,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog dialog={confirmDialog} />
       <h2 className="font-semibold text-lg text-gray-900">
         {isThai ? 'LINE Billboy' : 'LINE AI Assistant (Billboy)'}
       </h2>
@@ -582,7 +617,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                     {managedUser.line.linked ? (isThai ? 'เชื่อมใหม่' : 'Relink') : (isThai ? 'สร้างรหัส' : 'Generate code')}
                   </button>
                   {managedUser.line.linked && (
-                    <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => void handleUserUnlink(managedUser)}>
+                    <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => requestUserUnlink(managedUser)}>
                       <Unlink2 className="w-3.5 h-3.5" />
                       {isThai ? 'ถอด' : 'Unlink'}
                     </button>
@@ -691,7 +726,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                       {isThai ? 'ลิงก์ดูโปรเจค' : 'Portal link'}
                     </button>
                   )}
-                  <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => void handleGroupUnlink(group)}>
+                  <button className="btn-secondary text-xs text-red-600 hover:text-red-700" onClick={() => requestGroupUnlink(group)}>
                     <Unlink2 className="w-3.5 h-3.5" />
                     {isThai ? 'ถอด' : 'Unlink'}
                   </button>

@@ -30,7 +30,7 @@ function thisMonthRange() {
 
 export default function FinanceOverview() {
   const { token } = useAuthStore();
-  const { isThai, formatCurrency } = useLanguage();
+  const { isThai, formatCurrency, formatDate } = useLanguage();
   const [range, setRange] = useState(thisMonthRange());
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,34 +71,68 @@ export default function FinanceOverview() {
           { key: 'reconciliation', to: '/app/reports/reconciliation', label: isThai ? 'กระทบยอดธนาคาร' : 'Bank Reconciliation', icon: Link2 },
         ]}
       />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{isThai ? 'ภาพรวมการเงิน' : 'Finance overview'}</h1>
-          <p className="mt-1 text-sm text-gray-500">{isThai ? 'กระแสเงินสด กำไร ลูกหนี้/เจ้าหนี้ และภาษี ในที่เดียว' : 'Cashflow, profit, receivables/payables, and tax in one view.'}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="input-field text-sm" />
-          <span className="text-slate-400">–</span>
-          <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="input-field text-sm" />
-        </div>
-      </div>
-
       {loading || !data ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-gray-300" /></div>
       ) : (
         <>
-          {/* Top KPIs */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={<ArrowDownLeft className="h-4 w-4 text-emerald-600" />} label={isThai ? 'เงินเข้า' : 'Cash in'} value={formatCurrency(data.cashflow.in)} tone="text-emerald-700" />
-            <Kpi icon={<ArrowUpRight className="h-4 w-4 text-rose-600" />} label={isThai ? 'เงินออก' : 'Cash out'} value={formatCurrency(data.cashflow.out)} tone="text-rose-700" />
-            <Kpi icon={<Wallet className="h-4 w-4 text-primary-600" />} label={isThai ? 'กระแสเงินสดสุทธิ' : 'Net cashflow'} value={formatCurrency(data.cashflow.net)} tone={data.cashflow.net >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
-            <Kpi
-              icon={data.pnl.operatingProfit >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-rose-600" />}
-              label={isThai ? 'กำไรจากดำเนินงาน' : 'Operating profit'}
-              value={formatCurrency(data.pnl.operatingProfit)}
-              tone={data.pnl.operatingProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
-              detail={`${(data.pnl.margin * 100).toFixed(1)}% ${isThai ? 'margin' : 'margin'}`}
-            />
+          <section className="premium-hero premium-hero-dark">
+            <div className="relative z-10 min-w-0">
+              <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
+                <Wallet className="h-3.5 w-3.5" />
+                {isThai ? 'ภาพรวมเงินบริษัท' : 'Company Money Overview'}
+              </div>
+              <p className="mt-5 text-sm font-semibold text-slate-200">{formatDate(range.from)} - {formatDate(range.to)}</p>
+              <h1 className="mt-2 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-tight text-white">
+                {isThai ? 'กระแสเงินสดสุทธิช่วงนี้' : 'Net cashflow this period'}
+              </h1>
+              <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.75rem)]">
+                {formatCurrency(data.cashflow.net)}
+              </div>
+              <div className="mt-4 h-px w-full max-w-xl bg-[color-mix(in_oklch,var(--brand-gold)_78%,transparent)]" />
+              <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-100">
+                <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
+                  <span className="text-slate-300">{isThai ? 'กำไรดำเนินงาน' : 'Operating profit'}</span>
+                  <span className="ml-2 font-bold tabular-nums text-white">{formatCurrency(data.pnl.operatingProfit)}</span>
+                </div>
+                <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
+                  <span className="text-slate-300">{isThai ? 'VAT โดยประมาณ' : 'VAT estimate'}</span>
+                  <span className="ml-2 font-bold tabular-nums text-white">{formatCurrency(data.vat.payable)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="relative z-10 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-200">{isThai ? 'ช่วงเวลาที่ดู' : 'Date range'}</p>
+              <div className="mt-3 grid gap-2">
+                <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="input-field border-white/15 bg-white/95 text-sm" />
+                <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="input-field border-white/15 bg-white/95 text-sm" />
+              </div>
+              <Link to="/app/reports/reconciliation" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-800 transition hover:bg-slate-100">
+                {isThai ? 'กระทบยอดธนาคาร' : 'Bank reconciliation'}
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
+          </section>
+
+          <div className="rounded-[20px] border border-slate-200 bg-white/90 p-3 shadow-sm">
+            <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">{isThai ? 'บัญชีงานการเงิน' : 'Finance ledger strip'}</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{isThai ? 'เงินเข้า เงินออก กำไร และ VAT' : 'Cash in, cash out, profit, and VAT'}</h2>
+              </div>
+              <p className="text-xs font-semibold text-slate-600">{isThai ? 'อ่านเร็วสำหรับเจ้าของและทีมบัญชี' : 'Fast scan for owners and accountants'}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <Kpi icon={<ArrowDownLeft className="h-4 w-4" />} label={isThai ? 'เงินเข้า' : 'Cash in'} value={formatCurrency(data.cashflow.in)} tone="text-emerald-700" />
+              <Kpi icon={<ArrowUpRight className="h-4 w-4" />} label={isThai ? 'เงินออก' : 'Cash out'} value={formatCurrency(data.cashflow.out)} tone="text-rose-700" />
+              <Kpi icon={<Wallet className="h-4 w-4" />} label={isThai ? 'กระแสเงินสดสุทธิ' : 'Net cashflow'} value={formatCurrency(data.cashflow.net)} tone={data.cashflow.net >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
+              <Kpi
+                icon={data.pnl.operatingProfit >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                label={isThai ? 'กำไรจากดำเนินงาน' : 'Operating profit'}
+                value={formatCurrency(data.pnl.operatingProfit)}
+                tone={data.pnl.operatingProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+                detail={`${(data.pnl.margin * 100).toFixed(1)}% ${isThai ? 'margin' : 'margin'}`}
+              />
+            </div>
           </div>
 
           {/* P&L + cashflow breakdown */}
@@ -198,10 +232,13 @@ export default function FinanceOverview() {
 
 function Kpi({ icon, label, value, tone, detail }: { icon: React.ReactNode; label: string; value: string; tone?: string; detail?: string }) {
   return (
-    <div className="card">
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">{icon}{label}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary-700 text-white shadow-sm">{icon}</span>
+        {label}
+      </div>
       <div className={`mt-2 text-xl font-bold ${tone ?? 'text-slate-900'}`}>{value}</div>
-      {detail && <div className="text-xs text-slate-400">{detail}</div>}
+      {detail && <div className="text-xs font-semibold text-slate-500">{detail}</div>}
     </div>
   );
 }

@@ -32,7 +32,7 @@ export default function SectionSubNav({ items, className }: SectionSubNavProps) 
     <nav
       role="tablist"
       className={clsx(
-        'flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur',
+        'flex w-full min-w-0 max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur',
         className,
       )}
     >
