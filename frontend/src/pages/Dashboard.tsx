@@ -1037,7 +1037,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <details className="card group">
+          <details id="drive-tax-register" className="card group scroll-mt-24" open>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-gray-900">
