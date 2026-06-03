@@ -104,7 +104,17 @@ app.get('/api/health/workers', async (_req, res) => {
   try {
     const { lineOcrQueue } = await import('./queues/lineOcrQueue');
     const { masterSheetQueue } = await import('./queues/masterSheetQueue');
-    const [waiting, active, delayed, failed, masterWaiting, masterActive, masterDelayed, masterFailed] = await Promise.all([
+    const [
+      waiting,
+      active,
+      delayed,
+      failed,
+      masterWaiting,
+      masterActive,
+      masterDelayed,
+      masterFailed,
+      masterFailedJobs,
+    ] = await Promise.all([
       lineOcrQueue.getWaitingCount(),
       lineOcrQueue.getActiveCount(),
       lineOcrQueue.getDelayedCount(),
@@ -113,6 +123,7 @@ app.get('/api/health/workers', async (_req, res) => {
       masterSheetQueue.getActiveCount(),
       masterSheetQueue.getDelayedCount(),
       masterSheetQueue.getFailedCount(),
+      masterSheetQueue.getFailed(0, 0),
     ]);
     // BullMQ tracks the most recent completed job — use it as a freshness
     // signal. If nothing has completed in 5 min but there ARE waiting jobs,
@@ -130,6 +141,7 @@ app.get('/api/health/workers', async (_req, res) => {
           active: masterActive,
           delayed: masterDelayed,
           failed: masterFailed,
+          lastFailedReason: masterFailedJobs[0]?.failedReason?.slice(0, 240) ?? null,
         },
       },
       timestamp: new Date().toISOString(),
