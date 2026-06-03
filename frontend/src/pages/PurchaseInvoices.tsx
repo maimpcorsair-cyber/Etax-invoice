@@ -1216,8 +1216,10 @@ export default function PurchaseInvoices() {
                       <div className="min-w-0 flex flex-1 items-start gap-3">
                         <button type="button" onClick={() => void openPreview(doc)} className="group relative cursor-pointer" title={isThai ? 'ดูตัวอย่าง' : 'Preview'}>
                           <DocumentThumbnail docId={doc.id} mimeType={doc.mimeType} token={token ?? ''} />
-                          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 group-hover:bg-black/30 transition-colors">
-                            <Eye className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/20 transition-colors group-hover:bg-black/35">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-sm ring-1 ring-white/70">
+                              <Eye className="w-4 h-4" />
+                            </span>
                           </span>
                         </button>
                         <div className="min-w-0">

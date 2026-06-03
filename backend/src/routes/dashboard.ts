@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import prisma from '../config/database';
-import { tenantRlsContext, withRlsContext } from '../config/rls';
+import { tenantRlsContext, withRlsContext, withSystemRlsContext } from '../config/rls';
 import { logger } from '../config/logger';
 import { rdComplianceQueue } from '../queues/rdComplianceQueue';
 import { enqueueMasterSheetSync, masterSheetQueue } from '../queues/masterSheetQueue';
@@ -793,9 +793,10 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
     const companyDriveOwner = company?.googleDriveOwnerUserId
       ? await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.user.findFirst({
         where: { id: company.googleDriveOwnerUserId!, companyId },
-        select: { id: true, email: true, name: true, googleDriveLinkedAt: true },
+        select: { id: true, email: true, name: true, googleDriveLinkedAt: true, googleRefreshToken: true },
       }))
       : null;
+    const companyDriveOwnerConnected = !!companyDriveOwner?.googleRefreshToken;
 
     res.json({
       data: {
@@ -812,9 +813,10 @@ dashboardRouter.get('/drive-summary', async (req, res) => {
               email: companyDriveOwner.email,
               name: companyDriveOwner.name,
               linkedAt: companyDriveOwner.googleDriveLinkedAt,
+              connected: companyDriveOwnerConnected,
             }
           : null,
-        driveMode: companyDriveOwner
+        driveMode: companyDriveOwnerConnected
           ? 'company_owner'
           : (driveConnected
               ? 'current_user'
@@ -904,15 +906,42 @@ dashboardRouter.post('/drive/folder', async (req, res) => {
 dashboardRouter.post('/workspace-sheet/sync', async (req, res) => {
   try {
     const companyId = req.user!.companyId;
-    const company = await prisma.company.findUnique({
+    const company = await withSystemRlsContext(prisma, (tx) => tx.company.findUnique({
       where: { id: companyId },
       select: { googleWorkspaceSheetUrl: true, googleDriveOwnerUserId: true },
-    });
+    }));
+    const [companyOwner, currentUser] = await Promise.all([
+      company?.googleDriveOwnerUserId
+        ? withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+          where: { id: company.googleDriveOwnerUserId!, companyId },
+          select: { googleRefreshToken: true },
+        }))
+        : Promise.resolve(null),
+      withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+        where: { id: req.user!.userId, companyId },
+        select: { googleRefreshToken: true },
+      })),
+    ]);
 
-    if (!isDriveServiceAccountConfigured() && !company?.googleDriveOwnerUserId) {
+    if (!isDriveServiceAccountConfigured() && !companyOwner?.googleRefreshToken) {
+      if (currentUser?.googleRefreshToken) {
+        await withSystemRlsContext(prisma, (tx) => tx.company.update({
+          where: { id: companyId },
+          data: { googleDriveOwnerUserId: req.user!.userId, googleDriveOwnerLinkedAt: new Date() },
+        }));
+      } else {
+        res.status(409).json({
+          error: 'Connect a company Google Drive owner before creating the master tax register sheet.',
+          data: { status: 'needs_drive_owner' },
+        });
+        return;
+      }
+    }
+
+    if (!isDriveServiceAccountConfigured() && !isUserDriveOAuthConfigured()) {
       res.status(409).json({
-        error: 'Connect a company Google Drive owner before creating the master tax register sheet.',
-        data: { status: 'needs_drive_owner' },
+        error: 'Google Drive OAuth is not configured for this environment.',
+        data: { status: 'not_configured' },
       });
       return;
     }

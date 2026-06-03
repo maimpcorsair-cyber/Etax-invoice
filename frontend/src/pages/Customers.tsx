@@ -1649,12 +1649,14 @@ export default function Customers() {
                     onClick={() => setShowEvidenceDetails((value) => !value)}
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
-                    {isThai ? 'ดูเอกสารที่แนบแล้ว' : 'View attached documents'}
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showEvidenceDetails ? 'rotate-180' : ''}`} />
+                    {showEvidenceDetails || summaryReviewCount > 0
+                      ? (isThai ? 'ซ่อนรายการเอกสาร' : 'Hide document checklist')
+                      : (isThai ? 'ดูเอกสารที่แนบแล้ว' : 'View attached documents')}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showEvidenceDetails || summaryReviewCount > 0 ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
 
-                {showEvidenceDetails && (
+                {(showEvidenceDetails || summaryReviewCount > 0) && (
                   <div className="mt-3 space-y-4">
                     {[
                       {

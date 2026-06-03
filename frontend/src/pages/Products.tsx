@@ -813,15 +813,15 @@ export default function Products() {
 
               {/* Inventory tracking — opt-in per product. Service-business
                   tenants leave this off and never see the stock UI. */}
-              <details className="rounded-2xl border border-gray-200 bg-gray-50/60 px-1 sm:px-2">
+              <details className="rounded-2xl border border-gray-200 bg-gray-50/60 px-1 sm:px-2" open={form.productType === 'product' || !!form.trackInventory}>
                 <summary className="cursor-pointer select-none rounded-2xl px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100">
                   <span className="inline-flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     {isThai ? 'ติดตามสต๊อก (Inventory)' : 'Inventory tracking'}
                   </span>
-                  {form.trackInventory && (
-                    <span className="ml-2 text-xs font-normal text-emerald-600">• {isThai ? 'เปิดอยู่' : 'On'}</span>
-                  )}
+                  <span className={`ml-2 text-xs font-normal ${form.trackInventory ? 'text-emerald-600' : 'text-slate-500'}`}>
+                    • {form.trackInventory ? (isThai ? 'เปิดอยู่' : 'On') : (isThai ? 'ปิดอยู่' : 'Off')}
+                  </span>
                 </summary>
                 <div className="space-y-3 border-t border-gray-200 bg-white px-4 py-4">
                   <label className="flex items-center gap-3">

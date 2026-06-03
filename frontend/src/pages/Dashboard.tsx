@@ -137,6 +137,7 @@ interface DriveSummary {
     email: string;
     name: string;
     linkedAt: string | null;
+    connected: boolean;
   } | null;
   driveMode: 'company_owner' | 'current_user' | 'service_account' | 'oauth_ready' | 'not_configured';
   workspaceSheetUrl: string | null;

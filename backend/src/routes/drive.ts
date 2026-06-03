@@ -182,10 +182,22 @@ driveRouter.get('/callback', async (req, res) => {
         where: { id: pending.userId },
         data: { googleRefreshToken: encryptGoogleRefreshToken(refreshToken), googleDriveLinkedAt: now },
       });
-      await tx.company.updateMany({
-        where: { id: pending.companyId, googleDriveOwnerUserId: null },
-        data: { googleDriveOwnerUserId: pending.userId, googleDriveOwnerLinkedAt: now },
+      const company = await tx.company.findUnique({
+        where: { id: pending.companyId },
+        select: { googleDriveOwnerUserId: true },
       });
+      const existingOwner = company?.googleDriveOwnerUserId
+        ? await tx.user.findFirst({
+          where: { id: company.googleDriveOwnerUserId, companyId: pending.companyId },
+          select: { googleRefreshToken: true },
+        })
+        : null;
+      if (!company?.googleDriveOwnerUserId || company.googleDriveOwnerUserId === pending.userId || !existingOwner?.googleRefreshToken) {
+        await tx.company.update({
+          where: { id: pending.companyId },
+          data: { googleDriveOwnerUserId: pending.userId, googleDriveOwnerLinkedAt: now },
+        });
+      }
       return tx.user.findUnique({ where: { id: pending.userId }, select: { companyId: true, role: true } });
     });
 
