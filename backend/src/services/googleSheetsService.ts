@@ -515,14 +515,22 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
     // Billboy folder so users can find it next to project files. Without
     // this the spreadsheet sits at root and the only way to reach it is
     // via direct URL (i.e., our "Open Master Sheet" button).
+    // Read the actual current parents instead of assuming the alias "root":
+    // a fresh sheet's real parent id isn't always the literal "root" token,
+    // and removing a non-existent parent makes the whole move fail (leaving
+    // the sheet at root). This mirrors the backfill path below.
     if (data.companyFolderId) {
       try {
-        await drive.files.update({
-          fileId: spreadsheetId,
-          addParents: data.companyFolderId,
-          removeParents: 'root',
-          fields: 'id, parents',
-        });
+        const meta = await drive.files.get({ fileId: spreadsheetId!, fields: 'parents' });
+        const parents = meta.data.parents ?? [];
+        if (!parents.includes(data.companyFolderId)) {
+          await drive.files.update({
+            fileId: spreadsheetId!,
+            addParents: data.companyFolderId,
+            removeParents: parents.join(','),
+            fields: 'id, parents',
+          });
+        }
       } catch (err) {
         logger.warn('Failed to move workspace sheet into company folder', { error: err, spreadsheetId, companyFolderId: data.companyFolderId });
       }

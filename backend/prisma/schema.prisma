@@ -1874,3 +1874,22 @@ model Payslip {
   @@index([employeeId])
   @@map("payslips")
 }
+
+// Caches the resolved Google Drive folder id for a logical (company, parent,
+// name) slot so folder resolution follows a stable id instead of re-finding
+// by name on every upload. Following the id means a user renaming/moving the
+// canonical Thai folders no longer causes Billboy to create duplicates; a
+// genuinely deleted folder fails the existence check and is re-created.
+// scopeKey = company taxId; parentKey = parent Drive folder id or "ROOT".
+model DriveFolderCache {
+  id            String   @id @default(cuid())
+  scopeKey      String   @map("scope_key")
+  parentKey     String   @map("parent_key")
+  name          String
+  driveFolderId String   @map("drive_folder_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([scopeKey, parentKey, name])
+  @@map("drive_folder_cache")
+}
