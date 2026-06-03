@@ -1,10 +1,17 @@
 # Project State Handoff
 
-Last updated: 2026-06-04 (WHT Drive mirror + audit-correctness fixes)
+Last updated: 2026-06-04 (Master Sheet sync diagnosis + manual-edit guard)
 
 ## Latest work (2026-06-04)
 
-Drive audit-correctness fixes (repo-local — not deployed, batched with the WHT work below):
+Master Sheet sync — production diagnosis + manual-edit guard:
+- **Diagnosis (verified on prod via `/api/health/workers`):** `master-sheet-sync` shows `failed: 3, lastFailedReason: "The caller does not have permission"`. Root cause: a company with NO connected Drive owner falls back to `driveMode: service_account`, and a Google service account cannot create Drive files in its own (quota-less) Drive → 403. The master sheet only materializes when a real Drive owner is connected (sheet then lands in that user's My Drive under `Billboy/<company> (taxId)/`; service-account creation would need a Shared Drive, not yet configured). The Siam Technology demo company has `driveConnected: false`, so its sheet never gets created — this is why "the sheet can't be found".
+- **Action for real tenants:** connect a personal Google Drive owner on the target company (Dashboard → connect Drive) before expecting the master sheet; confirm `drive-summary` returns `driveConnected: true`.
+- **Manual-edit guard (shipped this pass):** `exportCompanyWorkspaceToSheets` now adds a `warningOnly` protected range to every tab on first creation. Billboy clear-and-rewrites tabs each sync, so hand-typed edits are lost; the warning prompts humans before editing without blocking the API sync. Added only on `isNew` so re-syncs don't stack duplicates.
+- **Robustness summary (from code):** moving/renaming the sheet is safe (fileId is stable; sync even re-homes it into the company folder); deleting it self-heals (recreated next sync, manual formatting lost); evidence-file links stay valid when moved (stored driveUrl). **Still fragile:** renaming/moving the canonical Thai folders makes name-based `ensureChildFolder` create duplicates — folder-by-stored-ID resolution is the next P1 (needs a folder-id cache table).
+- **Verification:** backend `npm run typecheck` + `npm run test:unit` (126/126) pass.
+
+Drive audit-correctness fixes (deployed in PR #8 / commit on main):
 - **Sales XML retry (M1):** `syncInvoiceToDrive` previously short-circuited on `driveFileId` alone, so if the PDF filed but the XML wasn't yet in storage the legally-binding XML (ขมธอ.3-2560) could be lost forever. It now skips only when BOTH `driveFileId` and `driveXmlFileId` are set and uploads each artifact independently, so a later re-run still backfills a missing XML.
 - **Cancelled invoices in register (M2):** `masterSheetWorker` output-VAT query now includes `cancelled` (alongside approved/submitted/pending). A cancelled tax invoice still consumed a number; dropping it left a sequence gap auditors read as hidden sales. The row carries its `cancelled` status. Draft/rejected stay excluded (never issued).
 - **Project folder shortcut (M3):** tax-period project uploads put the file in the audit spine (`YYYY/เดือน/tax-class`) and now also drop a Drive **shortcut** into `Projects/<proj>` via `ensureDriveShortcut`, so browsing the project folder shows the file without duplicating bytes. Best-effort + idempotent (skips if a same-named item exists).
