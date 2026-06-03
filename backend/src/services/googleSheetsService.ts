@@ -438,8 +438,16 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
 
   if (data.existingSheetId) {
     spreadsheetId = data.existingSheetId;
-    // Verify the sheet still exists; fall through to create if not
+    // Verify the sheet still exists AND is not trashed; fall through to create
+    // a fresh one otherwise. The Sheets API still reads a trashed file (trash
+    // is not delete), so without this trashed-check a user who deletes the
+    // master sheet keeps getting writes into the trashed copy and the "Open"
+    // button reopens the trash. Drive's `trashed` flag is the source of truth.
     try {
+      const trashState = await drive.files.get({ fileId: spreadsheetId, fields: 'trashed' });
+      if (trashState.data.trashed) {
+        throw new Error('workspace sheet is in trash');
+      }
       const existing = await sheets.spreadsheets.get({ spreadsheetId, fields: 'spreadsheetId,sheets.properties' });
       const existingTitles = new Set((existing.data.sheets ?? []).map((s) => s.properties?.title));
 
