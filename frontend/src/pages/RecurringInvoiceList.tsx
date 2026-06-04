@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CalendarClock, CheckCircle, FileText, Loader2, PauseCircle, PlayCircle, Plus, Receipt, Search, Truck, XCircle } from 'lucide-react';
+import { CalendarClock, CheckCircle, FileText, Loader2, PauseCircle, Pencil, PlayCircle, Plus, Receipt, Search, Truck, X, XCircle } from 'lucide-react';
 import SectionSubNav from '../components/SectionSubNav';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
@@ -39,6 +39,7 @@ export default function RecurringInvoiceList() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RecurringInvoiceStatus | 'all'>('all');
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [selectedRow, setSelectedRow] = useState<RecurringInvoice | null>(null);
 
   const activeRows = rows.filter((row) => row.status === 'active');
   const pausedRows = rows.filter((row) => row.status === 'paused');
@@ -117,6 +118,7 @@ export default function RecurringInvoiceList() {
       if (!res.ok) throw new Error(json.error ?? 'Generate failed');
       setMsg({ type: 'ok', text: isThai ? `สร้าง draft invoice ${json.data.invoice.invoiceNumber} แล้ว` : `Draft invoice ${json.data.invoice.invoiceNumber} created` });
       await load();
+      setSelectedRow(null);
     } catch (err) {
       setMsg({ type: 'err', text: err instanceof Error ? err.message : 'Generate failed' });
     } finally {
@@ -137,11 +139,16 @@ export default function RecurringInvoiceList() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Update failed');
       await load();
+      setSelectedRow((current) => current?.id === row.id ? { ...current, status } : current);
     } catch (err) {
       setMsg({ type: 'err', text: err instanceof Error ? err.message : 'Update failed' });
     } finally {
       setActingId(null);
     }
+  }
+
+  function closeDetail() {
+    setSelectedRow(null);
   }
 
   return (
@@ -315,12 +322,12 @@ export default function RecurringInvoiceList() {
                     key={row.id}
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
-                      navigate(`/app/recurring-invoices/${row.id}`);
+                      setSelectedRow(row);
                     }}
                     className="cursor-pointer hover:bg-gray-50"
                   >
                     <td className="table-cell">
-                      <button onClick={() => navigate(`/app/recurring-invoices/${row.id}`)} className="text-left font-semibold text-primary-700 hover:underline">
+                      <button onClick={() => setSelectedRow(row)} className="text-left font-semibold text-primary-700 hover:underline">
                         {row.name}
                       </button>
                       <div className="text-xs text-gray-500">{row.runCount} {isThai ? 'ครั้งที่สร้างแล้ว' : 'drafts generated'}</div>
@@ -359,6 +366,172 @@ export default function RecurringInvoiceList() {
             </tbody>
           </table>
           </div>
+        </div>
+      )}
+
+      {selectedRow && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-950/55 backdrop-blur-sm"
+          role="presentation"
+          onClick={closeDetail}
+        >
+          <section
+            className="ml-auto flex h-[100dvh] w-full flex-col bg-white shadow-2xl shadow-slate-950/25 sm:max-w-2xl sm:border-l sm:border-slate-200"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recurring-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-700">
+                  {isThai ? 'Recurring schedule' : 'Recurring schedule'}
+                </p>
+                <h2 id="recurring-detail-title" className="mt-1 truncate text-lg font-bold text-slate-950">
+                  {selectedRow.name}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedRow.customer?.nameTh ?? selectedRow.customer?.nameEn ?? '—'} · {formatCurrency(estimateTotal(selectedRow))}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDetail}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label={isThai ? 'ปิดรายละเอียดรอบวางบิล' : 'Close schedule detail'}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                    {isThai ? 'รอบถัดไป' : 'Next run'}
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-slate-950 tabular-nums">
+                    {selectedRow.nextRunDate.slice(0, 10)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {selectedRow.interval > 1 ? `${selectedRow.interval}x ` : ''}
+                    {isThai ? FREQ_LABELS[selectedRow.frequency].th : FREQ_LABELS[selectedRow.frequency].en}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                    {isThai ? 'สถานะและจำนวนครั้ง' : 'Status and runs'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {(() => {
+                      const meta = STATUS_LABELS[selectedRow.status];
+                      const Icon = meta.icon;
+                      return (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${meta.tone}`}>
+                          <Icon className="h-3.5 w-3.5" />
+                          {isThai ? meta.th : meta.en}
+                        </span>
+                      );
+                    })()}
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      {selectedRow.runCount} {isThai ? 'ครั้ง' : 'runs'}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-500">
+                    {selectedRow.maxRuns
+                      ? `${isThai ? 'สูงสุด' : 'Max'} ${selectedRow.maxRuns}`
+                      : isThai ? 'ไม่มีจำนวนครั้งสูงสุด' : 'No maximum run count'}
+                    {selectedRow.endDate ? ` · ${isThai ? 'จบ' : 'Ends'} ${selectedRow.endDate.slice(0, 10)}` : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">{isThai ? 'รายการที่จะสร้างซ้ำ' : 'Repeating items'}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {isThai ? 'ใช้สำหรับสร้าง draft invoice ตามรอบ' : 'Used when generating each draft invoice.'}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-primary-700 tabular-nums">{formatCurrency(estimateTotal(selectedRow))}</p>
+                </div>
+                <div className="mt-4 divide-y divide-slate-100">
+                  {selectedRow.items.map((item, index) => (
+                    <div key={`${item.productId ?? item.nameTh}-${index}`} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {isThai ? item.nameTh : item.nameEn ?? item.nameTh}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-semibold text-slate-800 tabular-nums">
+                        {formatCurrency(item.quantity * item.unitPrice)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selectedRow.runs && selectedRow.runs.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-sm font-bold text-slate-950">{isThai ? 'ประวัติการสร้างล่าสุด' : 'Recent generated drafts'}</p>
+                  <div className="mt-3 divide-y divide-slate-100">
+                    {selectedRow.runs.slice(0, 5).map((run) => (
+                      <div key={run.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{run.invoice?.invoiceNumber ?? run.status}</p>
+                          <p className="text-xs text-slate-500">{run.scheduledFor.slice(0, 10)}</p>
+                        </div>
+                        {run.invoice && (
+                          <Link to={`/app/invoices/${run.invoice.id}/edit`} className="text-xs font-semibold text-primary-700 hover:text-primary-800">
+                            {isThai ? 'เปิดใบ' : 'Open'}
+                          </Link>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-white p-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] sm:flex-row sm:items-center sm:justify-end sm:p-4">
+              <Link to={`/app/recurring-invoices/${selectedRow.id}`} className="btn-secondary justify-center">
+                <Pencil className="h-4 w-4" />
+                {isThai ? 'แก้ไขรอบ' : 'Edit schedule'}
+              </Link>
+              {selectedRow.status === 'active' ? (
+                <button
+                  type="button"
+                  disabled={actingId === selectedRow.id}
+                  onClick={() => void setStatus(selectedRow, 'paused')}
+                  className="btn-secondary justify-center disabled:opacity-50"
+                >
+                  {isThai ? 'พักรอบ' : 'Pause'}
+                </button>
+              ) : selectedRow.status === 'paused' ? (
+                <button
+                  type="button"
+                  disabled={actingId === selectedRow.id}
+                  onClick={() => void setStatus(selectedRow, 'active')}
+                  className="btn-secondary justify-center disabled:opacity-50"
+                >
+                  {isThai ? 'เปิดต่อ' : 'Resume'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={actingId === selectedRow.id || selectedRow.status !== 'active'}
+                onClick={() => void generate(selectedRow)}
+                className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actingId === selectedRow.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isThai ? 'สร้าง draft invoice' : 'Generate draft'}
+              </button>
+            </footer>
+          </section>
         </div>
       )}
     </div>
