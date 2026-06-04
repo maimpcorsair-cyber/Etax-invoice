@@ -743,3 +743,71 @@ export async function syncPayrollRunToDrive(payrollRunId: string): Promise<void>
     }
   }
 }
+
+/**
+ * Render a filed ภ.พ.30 to PDF and mirror it into the audit-period
+ * "9_แบบที่ยื่นแล้ว (ภ.พ.30)" folder, bucketed by the TAX PERIOD month (not the
+ * filing date — the form belongs to the month its VAT relates to). Uses the
+ * figures snapshotted at filing time so the document never drifts.
+ */
+export async function syncVatFilingToDrive(vatFilingId: string): Promise<void> {
+  if (!isDriveConfigured()) return;
+
+  const filing = await withSystemRlsContext(prisma, (tx) => tx.vatFiling.findFirst({
+    where: { id: vatFilingId },
+    include: {
+      company: { select: { nameTh: true, nameEn: true, taxId: true, email: true, googleDriveOwnerUserId: true } },
+    },
+  }));
+
+  if (!filing || !filing.snapshot) return;
+  if (filing.driveFileId) return;
+
+  const company = filing.company;
+  let userRefreshToken: string | null = null;
+  let ownerEmail: string | null = null;
+  if (company.googleDriveOwnerUserId) {
+    const owner = await withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+      where: { id: company.googleDriveOwnerUserId!, companyId: filing.companyId },
+      select: { email: true, googleRefreshToken: true },
+    }));
+    userRefreshToken = owner?.googleRefreshToken ?? null;
+    ownerEmail = owner?.email ?? null;
+  }
+
+  // Bucket by the tax-period month (period = "YYYY-MM"), first day of that month.
+  const [y, m] = filing.period.split('-').map((part) => Number(part));
+  const periodDate = Number.isFinite(y) && Number.isFinite(m) ? new Date(Date.UTC(y, m - 1, 1)) : filing.filedAt;
+
+  const { generatePp30Pdf } = await import('./pp30Pdf');
+  const snapshot = filing.snapshot as unknown as Parameters<typeof generatePp30Pdf>[0];
+  const pdfBuffer = await generatePp30Pdf({ ...snapshot, filedAt: filing.filedAt, rdReference: filing.rdReference });
+
+  const companyName = company.nameTh || company.nameEn || 'Company';
+  const result = await uploadToDrive(
+    pdfBuffer,
+    `PP30-${filing.period}.pdf`,
+    'application/pdf',
+    companyName,
+    userRefreshToken,
+    {
+      taxFolder: 'filed_forms',
+      transactionDate: periodDate,
+      companyTaxId: company.taxId,
+      shareWithEmails: [company.email, ownerEmail].filter(Boolean) as string[],
+      duplicatePolicy: 'replace',
+    },
+  );
+
+  await withSystemRlsContext(prisma, (tx) => tx.vatFiling.update({
+    where: { id: filing.id },
+    data: {
+      driveFileId: result.fileId,
+      driveUrl: result.url,
+      driveFolderId: result.folderId,
+      driveFolderUrl: result.folderUrl,
+    },
+  }));
+
+  logger.info('[syncVatFilingToDrive] PP.30 filing synced to Drive', { vatFilingId, period: filing.period, fileId: result.fileId });
+}

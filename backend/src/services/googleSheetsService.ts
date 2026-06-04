@@ -360,6 +360,21 @@ export async function exportCompanyWorkspaceToSheets(data: CompanyWorkspaceSheet
       ]),
     },
     {
+      title: 'ภ.พ.30 ที่ยื่นแล้ว',
+      rows: rowsFromObjects(data.tabs.vatFilings ?? [], [
+        { key: 'period', label: 'งวด' },
+        { key: 'filedAt', label: 'วันที่ยื่น' },
+        { key: 'rdReference', label: 'เลขที่รับ' },
+        { key: 'outputVat', label: 'ภาษีขาย' },
+        { key: 'inputVat', label: 'ภาษีซื้อ' },
+        { key: 'payable', label: 'ต้องชำระ' },
+        { key: 'refundable', label: 'ขอคืน' },
+        { key: 'attachmentLink', label: 'ไฟล์' },
+        { key: 'folderLink', label: 'โฟลเดอร์' },
+        { key: 'docId', label: 'docId' },
+      ]),
+    },
+    {
       title: 'ลูกค้า Customers',
       rows: rowsFromObjects(data.tabs.customers ?? [], [
         { key: 'name', label: 'ชื่อ' },

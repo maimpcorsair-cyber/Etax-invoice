@@ -48,6 +48,7 @@ async function buildWorkspaceData(companyId: string) {
     purchaseEvidenceIntakes,
     whtCertificates,
     payslips,
+    vatFilings,
   ] = await Promise.all([
     withSystemRlsContext(prisma, (tx) => tx.company.findFirst({
       where: { id: companyId },
@@ -163,6 +164,11 @@ async function buildWorkspaceData(companyId: string) {
       orderBy: [{ payrollRun: { year: 'desc' } }, { payrollRun: { month: 'desc' } }, { employeeName: 'asc' }],
       take: 10000,
     })),
+    withSystemRlsContext(prisma, (tx) => tx.vatFiling.findMany({
+      where: { companyId },
+      orderBy: { period: 'desc' },
+      take: 200,
+    })),
   ]);
 
   if (!company) return null;
@@ -276,6 +282,19 @@ async function buildWorkspaceData(companyId: string) {
     docId: payslip.id,
   }));
 
+  const vatFilingTab = vatFilings.map((filing) => ({
+    period: filing.period,
+    filedAt: formatDate(filing.filedAt),
+    rdReference: filing.rdReference ?? '',
+    outputVat: filing.outputVat,
+    inputVat: filing.inputVat,
+    payable: filing.vatPayable,
+    refundable: filing.vatRefundable,
+    attachmentLink: linkCell(filing.driveUrl),
+    folderLink: linkCell(filing.driveFolderUrl),
+    docId: filing.id,
+  }));
+
   // Split customers vs vendors so each tab is scoped to its mental model.
   // One row per uploaded document keeps the register complete for auditors.
   const customersTab = buildPartyDirectoryRows(customers, 'customer').map((row) => ({
@@ -320,6 +339,7 @@ async function buildWorkspaceData(companyId: string) {
       expenses: expensesTab,
       wht: whtTab,
       payroll: payrollTab,
+      vatFilings: vatFilingTab,
       customers: customersTab,
       vendors: vendorsTab,
       missingDocs: aiInboxTab,

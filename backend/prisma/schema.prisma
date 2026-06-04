@@ -243,6 +243,7 @@ model Company {
   marketplaceConnections MarketplaceConnection[]
   marketplaceOrders      MarketplaceOrder[]
   marketplaceSettlements MarketplaceSettlement[]
+  vatFilings             VatFiling[]
 
   @@map("companies")
 }
@@ -1879,6 +1880,36 @@ model Payslip {
   @@index([payrollRunId])
   @@index([employeeId])
   @@map("payslips")
+}
+
+// A filed ภ.พ.30 (monthly VAT return) for one tax period. Snapshots the
+// figures as filed so the audit folder "9_แบบที่ยื่นแล้ว" and the master sheet
+// reflect what was actually submitted — not a live recompute that drifts as
+// later edits land. One row per (company, period).
+model VatFiling {
+  id                String   @id @default(cuid())
+  companyId         String   @map("company_id")
+  period            String // "YYYY-MM" (tax period the VAT relates to)
+  filedAt           DateTime @map("filed_at")
+  rdReference       String?  @map("rd_reference") // RD receipt / ใบนำส่ง number, if any
+  outputVat         Float    @map("output_vat")
+  inputVat          Float    @map("input_vat")
+  vatPayable        Float    @map("vat_payable")
+  vatRefundable     Float    @map("vat_refundable")
+  totalSalesExclVat Float    @map("total_sales_excl_vat")
+  snapshot          Json? // full computed PP.30 payload at filing time
+  driveFileId       String?  @map("drive_file_id")
+  driveUrl          String?  @map("drive_url")
+  driveFolderId     String?  @map("drive_folder_id")
+  driveFolderUrl    String?  @map("drive_folder_url")
+  filedBy           String   @map("filed_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, period])
+  @@map("vat_filings")
 }
 
 // Caches the resolved Google Drive folder id for a logical (company, parent,
