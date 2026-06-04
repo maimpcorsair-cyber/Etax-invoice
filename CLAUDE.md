@@ -155,7 +155,7 @@ pkill -f "tsx watch"; cd backend && npx tsx watch src/index.ts &
 
 ## Design Context (frontend/UI)
 
-Canonical source: [`DESIGN.md`](DESIGN.md) (design system / tokens) + [`PRODUCT.md`](PRODUCT.md) (product/audience). Read before any UI work. Essence:
+Canonical source: [`DESIGN.md`](DESIGN.md) (design system / tokens) + [`PRODUCT.md`](PRODUCT.md) (product/audience). For active UI redesign work, also read [`TASK.md`](TASK.md) before touching code so scope, non-goals, and page order stay aligned. Essence:
 
 - **Users**: Thai SME owners (occasional, mobile, want simplicity + confidence), accountants (daily power users, want density + efficiency), LINE-first operators (capture from phone). Formal Thai business context — documents go to กรมสรรพากร; errors cost money.
 - **North Star**: "The Trusted Companion (ผู้ช่วยคู่ใจ)" — a reassuring sidekick for tax-stressed SME owners. Friendly-professional, calm and in control, warm not corporate-cold.
