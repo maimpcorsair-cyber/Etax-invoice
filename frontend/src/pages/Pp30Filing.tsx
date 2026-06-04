@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Printer, Loader2, FileText, Calendar, Calculator, TrendingUp, Link2, Landmark, Wallet, AlertTriangle, CheckCircle2, Receipt } from 'lucide-react';
+import { Download, Printer, Loader2, FileText, Calendar, Calculator, TrendingUp, Link2, Landmark, Wallet, AlertTriangle, CheckCircle2, Receipt, Save } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Pp30Data, WhtSummaryData } from '../types';
@@ -15,6 +15,19 @@ const EN_MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+interface VatFilingRecord {
+  id: string;
+  period: string;
+  filedAt: string;
+  rdReference?: string | null;
+  outputVat: number;
+  inputVat: number;
+  vatPayable: number;
+  vatRefundable: number;
+  driveUrl?: string | null;
+  driveFolderUrl?: string | null;
+}
 
 export default function Pp30Filing() {
   const { isThai, formatCurrency } = useLanguage();
@@ -32,6 +45,9 @@ export default function Pp30Filing() {
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'vat' | 'wht'>('vat');
   const [whtData, setWhtData] = useState<WhtSummaryData | null>(null);
+  const [filings, setFilings] = useState<VatFilingRecord[]>([]);
+  const [filing, setFiling] = useState(false);
+  const [rdReference, setRdReference] = useState('');
   const [toasts, setToasts] = useState<FeedbackToast[]>([]);
 
   const pushToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
@@ -45,21 +61,26 @@ export default function Pp30Filing() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/pp30?year=${year}&month=${month}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await fetch(`/api/pp30?year=${year}&month=${month}`, { headers });
       const json = await res.json();
       setData(json.data ?? null);
 
       // Also fetch WHT summary
       try {
-        const whtRes = await fetch(`/api/pp30/wht?year=${year}&month=${month}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const whtRes = await fetch(`/api/pp30/wht?year=${year}&month=${month}`, { headers });
         const whtJson = await whtRes.json();
         setWhtData(whtJson.data ?? null);
       } catch {
         setWhtData(null);
+      }
+
+      try {
+        const filingsRes = await fetch('/api/pp30/filings', { headers });
+        const filingsJson = await filingsRes.json();
+        setFilings(filingsJson.data ?? []);
+      } catch {
+        setFilings([]);
       }
     } catch {
       setData(null);
@@ -99,6 +120,40 @@ export default function Pp30Filing() {
     }
   }
 
+  async function handleFilePeriod() {
+    setFiling(true);
+    try {
+      const res = await fetch('/api/pp30/file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          year,
+          month,
+          rdReference: rdReference.trim() || undefined,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? 'Failed to file PP.30');
+      pushToast({
+        tone: 'success',
+        title: isThai ? 'บันทึกแบบที่ยื่นแล้ว' : 'PP.30 filing recorded',
+        description: isThai
+          ? 'ระบบจะสร้าง PDF เข้า Drive และซิงก์สมุดทะเบียนภาษีให้อัตโนมัติ'
+          : 'Billboy will mirror the PDF to Drive and refresh the tax register.',
+      });
+      setRdReference('');
+      await fetchData();
+    } catch (err) {
+      pushToast({
+        tone: 'error',
+        title: isThai ? 'บันทึกแบบที่ยื่นไม่สำเร็จ' : 'Could not record filing',
+        description: (err as Error).message,
+      });
+    } finally {
+      setFiling(false);
+    }
+  }
+
   function handlePrint() {
     window.print();
   }
@@ -109,6 +164,8 @@ export default function Pp30Filing() {
   const periodLabel = isThai
     ? `ภ.พ.30 ประจำเดือน ${TH_MONTHS[month - 1]} ${year + 543}`
     : `PP.30 Monthly Filing — ${EN_MONTHS[month - 1]} ${year}`;
+  const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+  const currentFiling = filings.find((item) => item.period === periodKey) ?? null;
 
   const vatPayable = data?.vatPayable ?? 0;
   const mustPay = vatPayable > 0;
@@ -254,6 +311,55 @@ export default function Pp30Filing() {
                 {activeTab === 'wht' ? (isThai ? 'กลับไป VAT' : 'VAT Summary') : (isThai ? 'ดูหัก ณ ที่จ่าย' : 'WHT Summary')}
               </button>
             </div>
+
+            <div className="mt-4 rounded-2xl border border-white/12 bg-slate-950/20 p-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className={`mt-0.5 h-4 w-4 ${currentFiling ? 'text-emerald-200' : 'text-amber-100'}`} />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">
+                    {currentFiling
+                      ? isThai ? 'งวดนี้บันทึกว่ายื่นแล้ว' : 'This period is recorded as filed'
+                      : isThai ? 'บันทึกแบบที่ยื่นแล้ว' : 'Record filed return'}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-white/65">
+                    {currentFiling
+                      ? `${isThai ? 'วันที่ยื่น' : 'Filed'} ${new Date(currentFiling.filedAt).toISOString().slice(0, 10)}${currentFiling.rdReference ? ` · ${currentFiling.rdReference}` : ''}`
+                      : isThai ? 'หลังยื่นในระบบ RD แล้ว ให้บันทึกที่นี่เพื่อ snapshot และเก็บ PDF เข้า Drive' : 'After filing with RD, record it here to snapshot and mirror the PDF to Drive.'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-col gap-2">
+                <input
+                  value={rdReference}
+                  onChange={(event) => setRdReference(event.target.value)}
+                  placeholder={isThai ? 'เลขอ้างอิง/เลขรับจาก RD (ถ้ามี)' : 'RD reference / receipt no. (optional)'}
+                  className="w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-200"
+                />
+                <button
+                  type="button"
+                  onClick={handleFilePeriod}
+                  disabled={filing || loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {currentFiling
+                    ? isThai ? 'บันทึกซ้ำ/แก้ไข snapshot' : 'Re-file / update snapshot'
+                    : isThai ? 'บันทึกว่ายื่นแล้ว' : 'Record as filed'}
+                </button>
+              </div>
+              {currentFiling?.driveUrl && (
+                <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                  <a href={currentFiling.driveUrl} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-3 py-1.5 text-white ring-1 ring-white/15 hover:bg-white/15">
+                    {isThai ? 'เปิด PDF ที่ยื่นแล้ว' : 'Open filed PDF'}
+                  </a>
+                  {currentFiling.driveFolderUrl && (
+                    <a href={currentFiling.driveFolderUrl} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-3 py-1.5 text-white ring-1 ring-white/15 hover:bg-white/15">
+                      {isThai ? 'เปิดโฟลเดอร์ Drive' : 'Open Drive folder'}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -310,6 +416,72 @@ export default function Pp30Filing() {
                 <p className="text-lg font-bold text-primary-700">{periodLabel}</p>
               </div>
             </div>
+          </div>
+
+          <div className="no-print rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="font-bold text-slate-950">{isThai ? 'แบบ ภ.พ.30 ที่บันทึกว่ายื่นแล้ว' : 'Filed PP.30 records'}</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isThai ? 'ใช้ตรวจหลักฐานที่ส่ง RD แล้ว และลิงก์ PDF/Drive ที่ระบบเก็บไว้' : 'Audit trail for RD filings and the PDF/Drive evidence Billboy keeps.'}
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                {filings.length} {isThai ? 'งวด' : 'periods'}
+              </span>
+            </div>
+            {filings.length === 0 ? (
+              <div className="px-5 py-6 text-sm text-slate-500">
+                {isThai ? 'ยังไม่มีงวดที่บันทึกว่ายื่นแล้ว' : 'No filed periods recorded yet.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px]">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="table-header">{isThai ? 'งวด' : 'Period'}</th>
+                      <th className="table-header">{isThai ? 'วันที่ยื่น' : 'Filed at'}</th>
+                      <th className="table-header">{isThai ? 'เลขอ้างอิง' : 'Reference'}</th>
+                      <th className="table-header text-right">{isThai ? 'ภาษีขาย' : 'Output VAT'}</th>
+                      <th className="table-header text-right">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</th>
+                      <th className="table-header text-right">{isThai ? 'สุทธิ' : 'Net'}</th>
+                      <th className="table-header text-right">{isThai ? 'หลักฐาน' : 'Evidence'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filings.slice(0, 8).map((filingRow) => {
+                      const net = filingRow.vatPayable > 0 ? filingRow.vatPayable : -filingRow.vatRefundable;
+                      return (
+                        <tr key={filingRow.id} className={filingRow.period === periodKey ? 'bg-primary-50/35' : undefined}>
+                          <td className="table-cell font-semibold text-primary-700 tabular-nums">{filingRow.period}</td>
+                          <td className="table-cell text-sm text-slate-700 tabular-nums">{new Date(filingRow.filedAt).toISOString().slice(0, 10)}</td>
+                          <td className="table-cell text-sm text-slate-600">{filingRow.rdReference || '—'}</td>
+                          <td className="table-cell text-right tabular-nums">{formatCurrency(filingRow.outputVat)}</td>
+                          <td className="table-cell text-right tabular-nums">{formatCurrency(filingRow.inputVat)}</td>
+                          <td className={`table-cell text-right font-bold tabular-nums ${net >= 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatCurrency(Math.abs(net))}</td>
+                          <td className="table-cell text-right">
+                            <div className="flex justify-end gap-2">
+                              {filingRow.driveUrl ? (
+                                <a href={filingRow.driveUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary-700 hover:text-primary-900">
+                                  PDF
+                                </a>
+                              ) : (
+                                <span className="text-xs text-amber-600">{isThai ? 'กำลังซิงก์' : 'Syncing'}</span>
+                              )}
+                              {filingRow.driveFolderUrl && (
+                                <a href={filingRow.driveFolderUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                                  Drive
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Sales section (Output VAT) */}
