@@ -643,3 +643,103 @@ export async function syncWhtCertificateToDrive(whtCertificateId: string): Promi
     folderId: result.folderId,
   });
 }
+
+/**
+ * Generate a สลิปเงินเดือน (payslip) PDF and mirror it into the audit-period
+ * "5_เงินเดือน (ภ.ง.ด.1 / สปส.)" Drive folder, bucketed by the run's pay date.
+ * Payroll has no stored PDF otherwise, so this both renders and files it.
+ */
+export async function syncPayslipToDrive(payslipId: string): Promise<void> {
+  if (!isDriveConfigured()) return;
+
+  const payslip = await withSystemRlsContext(prisma, (tx) => tx.payslip.findFirst({
+    where: { id: payslipId },
+    include: {
+      payrollRun: {
+        select: {
+          year: true,
+          month: true,
+          payDate: true,
+          companyId: true,
+          company: {
+            select: { nameTh: true, nameEn: true, taxId: true, addressTh: true, email: true, googleDriveOwnerUserId: true },
+          },
+        },
+      },
+    },
+  }));
+
+  if (!payslip) return;
+  if (payslip.driveFileId) return;
+
+  const company = payslip.payrollRun.company;
+  let userRefreshToken: string | null = null;
+  let ownerEmail: string | null = null;
+  if (company.googleDriveOwnerUserId) {
+    const owner = await withSystemRlsContext(prisma, (tx) => tx.user.findFirst({
+      where: { id: company.googleDriveOwnerUserId!, companyId: payslip.payrollRun.companyId },
+      select: { email: true, googleRefreshToken: true },
+    }));
+    userRefreshToken = owner?.googleRefreshToken ?? null;
+    ownerEmail = owner?.email ?? null;
+  }
+
+  const { generatePayslipPdf } = await import('./payslipPdf');
+  const pdfBuffer = await generatePayslipPdf({
+    ...payslip,
+    payrollRun: { year: payslip.payrollRun.year, month: payslip.payrollRun.month, payDate: payslip.payrollRun.payDate },
+    company: { nameTh: company.nameTh, nameEn: company.nameEn, taxId: company.taxId, addressTh: company.addressTh },
+  });
+
+  const companyName = company.nameTh || company.nameEn || 'Company';
+  const period = `${payslip.payrollRun.year}-${String(payslip.payrollRun.month).padStart(2, '0')}`;
+  const fileName = `payslip-${period}-${payslip.employeeCode || payslip.employeeName}.pdf`;
+  const result = await uploadToDrive(
+    pdfBuffer,
+    fileName,
+    'application/pdf',
+    companyName,
+    userRefreshToken,
+    {
+      taxFolder: 'payroll',
+      transactionDate: payslip.payrollRun.payDate,
+      companyTaxId: company.taxId,
+      shareWithEmails: [company.email, ownerEmail].filter(Boolean) as string[],
+      duplicatePolicy: 'replace',
+    },
+  );
+
+  await withSystemRlsContext(prisma, (tx) => tx.payslip.update({
+    where: { id: payslip.id },
+    data: {
+      driveFileId: result.fileId,
+      driveUrl: result.url,
+      driveFolderId: result.folderId,
+      driveFolderUrl: result.folderUrl,
+    },
+  }));
+
+  logger.info('[syncPayslipToDrive] Payslip synced to Drive', { payslipId, fileId: result.fileId });
+}
+
+/**
+ * Mirror every payslip in a finalized/paid payroll run to Drive. Sequential —
+ * each payslip renders its own Chromium PDF, so we avoid spawning many at once.
+ * Best-effort per payslip: one failure doesn't abort the rest.
+ */
+export async function syncPayrollRunToDrive(payrollRunId: string): Promise<void> {
+  if (!isDriveConfigured()) return;
+
+  const payslips = await withSystemRlsContext(prisma, (tx) => tx.payslip.findMany({
+    where: { payrollRunId, driveFileId: null },
+    select: { id: true },
+  }));
+
+  for (const { id } of payslips) {
+    try {
+      await syncPayslipToDrive(id);
+    } catch (err) {
+      logger.warn('[syncPayrollRunToDrive] payslip sync failed', { payrollRunId, payslipId: id, error: err });
+    }
+  }
+}

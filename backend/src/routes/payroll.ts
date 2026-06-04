@@ -5,6 +5,8 @@ import { logger } from '../config/logger';
 import { requireRole } from '../middleware/auth';
 import { runPayroll, type EmployeeAdjustmentMap } from '../services/payroll/payrollRunner';
 import { buildPnd1Csv, buildSso110Csv, UTF8_BOM, type PayslipRow } from '../services/payroll/csvExports';
+import { syncPayrollRunToDrive } from '../services/projectDriveSyncService';
+import { enqueueMasterSheetSync } from '../queues';
 
 // Phase 3 payroll routes — Employee CRUD, monthly run, payslip
 // retrieval, and the two government exports (ภงด.1 + สปส.1-10) as
@@ -213,6 +215,14 @@ payrollRouter.post('/runs/:id/finalize', editRole, async (req, res) => {
       where: { id: run.id },
       data: { status: 'finalized', finalizedAt: new Date() },
     });
+
+    // Finalized payslips become audit evidence: render each to PDF and file it
+    // under 5_เงินเดือน in Drive, then refresh the master tax register.
+    void syncPayrollRunToDrive(run.id)
+      .then(() => enqueueMasterSheetSync(req.user!.companyId))
+      .catch((error) => logger.warn('Failed to sync payroll run to Drive', { error, payrollRunId: run.id }));
+    void enqueueMasterSheetSync(req.user!.companyId);
+
     res.json({ data: updated });
   } catch (err) {
     logger.error('finalize run failed', { err: err instanceof Error ? err.message : String(err) });

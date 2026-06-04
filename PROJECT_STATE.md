@@ -1,8 +1,17 @@
 # Project State Handoff
 
-Last updated: 2026-06-04 (purchase slip matching workflow)
+Last updated: 2026-06-05 (payslip Drive mirror)
 
-## Latest work (2026-06-04)
+## Latest work (2026-06-05)
+
+Payslip → Drive (completes the payroll half of the audit tree):
+- **New PDF:** `payslipPdf.ts` renders a Thai สลิปเงินเดือน (HTML→PDF via the same Puppeteer `launchBrowser` pipeline as the WHT 50ทวิ). Payroll never produced a stored document before.
+- **Sync:** `syncPayslipToDrive(payslipId)` generates the PDF and files it under `5_เงินเดือน (ภ.ง.ด.1 / สปส.)` bucketed by the run's pay date, then persists `drive*` on the payslip (fields already existed from `20260604_wht_payslip_drive_mirror`). `syncPayrollRunToDrive(runId)` loops a run's payslips sequentially (one Chromium each), best-effort per payslip.
+- **Trigger:** `POST /payroll/runs/:id/finalize` now fires `syncPayrollRunToDrive` + a master-sheet re-sync. The master sheet payroll tab already prefers the Drive link + has a folder column.
+- **Verification:** `npm run typecheck`, `npm run test:unit` (126/126) pass. No migration. Live check after deploy: finalize a payroll run with a connected Drive owner → PDFs land in `5_เงินเดือน` + master sheet payroll tab links resolve.
+- **Still deferred:** PP30 filed → `9_แบบที่ยื่นแล้ว` (needs a persisted VAT-filing model + route).
+
+## Earlier work (2026-06-04)
 
 Drive folder-id cache (B1 — stops duplicate Thai tax folders on rename):
 - **Schema:** migration `20260604_drive_folder_cache` adds `drive_folder_cache` (`scope_key`=company taxId, `parent_key`=parent Drive id or `ROOT`, `name`, `drive_folder_id`; unique on the triple).
