@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileText, Loader2, ArrowRight, CalendarClock, CheckCircle, XCircle, Clock, Receipt, Truck, Download, Share2 } from 'lucide-react';
+import { Plus, Search, FileText, Loader2, ArrowRight, CalendarClock, CheckCircle, XCircle, Clock, Receipt, Truck, Download, Share2, Eye } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
 import type { Quotation, QuotationStatus } from '../types';
+import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
 
 // ใบเสนอราคา — list page. Mirrors InvoiceList layout but simpler since
 // quotations have no e-Tax submission flow.
@@ -28,6 +29,9 @@ export default function QuotationList() {
   const [downloadId, setDownloadId] = useState<string | null>(null);
   const [shareId, setShareId] = useState<string | null>(null);
   const [listMsg, setListMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [previewQuotation, setPreviewQuotation] = useState<Quotation | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<QuotationStatus | 'all'>('all');
 
@@ -117,6 +121,28 @@ export default function QuotationList() {
     } finally {
       setDownloadId(null);
     }
+  }
+
+  async function openPreview(quotation: Quotation) {
+    if (!token) return;
+    setPreviewQuotation(quotation);
+    setPreviewHtml(null);
+    setPreviewError(null);
+    try {
+      const res = await fetch(`/api/quotations/${quotation.id}/preview?format=html`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      setPreviewHtml(await res.text());
+    } catch (err) {
+      setPreviewError((err as Error).message);
+    }
+  }
+
+  function closePreview() {
+    setPreviewQuotation(null);
+    setPreviewHtml(null);
+    setPreviewError(null);
   }
 
   async function shareQuotation(quotation: Quotation) {
@@ -321,7 +347,7 @@ export default function QuotationList() {
                 return (
                   <tr
                     key={q.id}
-                    onClick={() => navigate(`/app/quotations/${q.id}`)}
+                    onClick={() => void openPreview(q)}
                     className="hover:bg-gray-50 cursor-pointer"
                   >
                     <td className="table-cell">
@@ -354,6 +380,17 @@ export default function QuotationList() {
                     </td>
                     <td className="table-cell text-right">
                       <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void openPreview(q);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          {isThai ? 'ดู' : 'View'}
+                        </button>
                         {q.status !== 'draft' && q.status !== 'cancelled' && q.status !== 'converted' && (
                           <button
                             type="button"
@@ -390,6 +427,22 @@ export default function QuotationList() {
           </div>
         </div>
       )}
+
+      <DocumentPreviewSheet
+        open={Boolean(previewQuotation)}
+        title={isThai ? 'ใบเสนอราคา' : 'Quotation'}
+        description={previewQuotation?.buyer?.nameTh ?? previewQuotation?.buyer?.nameEn ?? undefined}
+        documentNumber={previewQuotation?.quotationNumber ?? ''}
+        previewHtml={previewHtml}
+        loading={Boolean(previewQuotation) && !previewHtml && !previewError}
+        error={previewError}
+        downloading={previewQuotation ? downloadId === previewQuotation.id : false}
+        editHref={previewQuotation ? `/app/quotations/${previewQuotation.id}` : undefined}
+        onDownload={() => {
+          if (previewQuotation) void downloadPdf(previewQuotation);
+        }}
+        onClose={closePreview}
+      />
     </div>
   );
 }

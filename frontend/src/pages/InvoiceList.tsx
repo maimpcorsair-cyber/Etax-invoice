@@ -14,6 +14,7 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { EmptyState } from '../components/ui/AppChrome';
 import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 import SectionSubNav from '../components/SectionSubNav';
+import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -104,8 +105,8 @@ export default function InvoiceList() {
   const [issuingReceipt, setIssuingReceipt] = useState(false);
 
   // Preview modal
-  const [previewModal, setPreviewModal] = useState<{ id: string; invoiceNumber: string } | null>(null);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewModal, setPreviewModal] = useState<{ id: string; invoiceNumber: string; buyerName?: string } | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Payment modal
@@ -259,25 +260,29 @@ export default function InvoiceList() {
   /* ── Preview ── */
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  async function openPreview(inv: { id: string; invoiceNumber: string }) {
-    setPreviewModal(inv);
-    setPreviewBlobUrl(null);
+  async function openPreview(inv: Invoice | { id: string; invoiceNumber: string; buyerName?: string }) {
+    const buyerName = 'buyer' in inv
+      ? isThai
+        ? (inv.buyer as { nameTh?: string; nameEn?: string })?.nameTh ?? (inv.buyer as { nameEn?: string })?.nameEn
+        : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ?? (inv.buyer as { nameTh?: string })?.nameTh
+      : inv.buyerName;
+
+    setPreviewModal({ id: inv.id, invoiceNumber: inv.invoiceNumber, buyerName });
+    setPreviewHtml(null);
     setPreviewError(null);
     try {
       const res = await fetch(`/api/invoices/${inv.id}/preview`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const blob = await res.blob();
-      setPreviewBlobUrl(URL.createObjectURL(blob));
+      setPreviewHtml(await res.text());
     } catch (e) {
       setPreviewError((e as Error).message);
     }
   }
 
   function closePreview() {
-    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
-    setPreviewBlobUrl(null);
+    setPreviewHtml(null);
     setPreviewModal(null);
     setPreviewError(null);
   }
@@ -855,7 +860,7 @@ export default function InvoiceList() {
                 key={inv.id}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
-                  navigate(`/app/invoices/${inv.id}/edit`);
+                  void openPreview(inv);
                 }}
                 className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-primary-200 hover:bg-primary-50/20"
               >
@@ -1013,7 +1018,7 @@ export default function InvoiceList() {
                       key={inv.id}
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest('a,button,input,select,label,[role="button"]')) return;
-                        navigate(`/app/invoices/${inv.id}/edit`);
+                        void openPreview(inv);
                       }}
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
                     >
@@ -1523,63 +1528,19 @@ export default function InvoiceList() {
         </div>
       )}
 
-      {/* ── Preview Popup ── */}
-      {previewModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={closePreview}>
-          <div
-            className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-            style={{ width: '860px', maxWidth: '95vw', height: '90vh' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary-600" />
-                <span className="font-semibold text-gray-900 text-sm">{previewModal.invoiceNumber}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDownloadPdf}
-                  disabled={pdfLoading}
-                  className="btn-secondary text-xs py-1.5 inline-flex items-center gap-1.5"
-                >
-                  {pdfLoading
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Download className="w-3.5 h-3.5" />}
-                  {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
-                </button>
-                <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 bg-gray-50 overflow-hidden">
-              {previewError ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-red-600">
-                  <span className="text-sm font-medium">โหลด preview ไม่สำเร็จ: {previewError}</span>
-                  <button onClick={() => openPreview(previewModal)} className="btn-secondary text-xs">
-                    ลองใหม่
-                  </button>
-                </div>
-              ) : previewBlobUrl ? (
-                <iframe
-                  src={previewBlobUrl}
-                  className="w-full h-full border-0"
-                  title={previewModal.invoiceNumber}
-                  sandbox="allow-same-origin allow-scripts"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
-                  <Loader2 className="w-8 h-8 animate-spin" />
-                  <span className="text-xs">{isThai ? 'กำลังโหลดเอกสาร...' : 'Loading document...'}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <DocumentPreviewSheet
+        open={Boolean(previewModal)}
+        title={isThai ? 'เอกสารขาย' : 'Sales document'}
+        description={previewModal?.buyerName}
+        documentNumber={previewModal?.invoiceNumber ?? ''}
+        previewHtml={previewHtml}
+        loading={Boolean(previewModal) && !previewHtml && !previewError}
+        error={previewError}
+        downloading={pdfLoading}
+        editHref={previewModal ? `/app/invoices/${previewModal.id}/edit` : undefined}
+        onDownload={handleDownloadPdf}
+        onClose={closePreview}
+      />
 
       {/* ── Record Payment Modal ── */}
       {paymentModal && (
