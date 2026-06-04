@@ -43,6 +43,10 @@ Drive vault canonical folder link follow-up:
 - **Backend:** Dashboard `POST /api/dashboard/drive/folder` now resolves the company evidence vault with `company.nameTh` first and passes `company.taxId` into `ensureCompanyDriveFolder`, so the "เปิดคลังหลักฐาน" button opens the canonical `Billboy/<ชื่อไทย> (<เลขผู้เสียภาษี>)` folder instead of an older English-name folder such as `Billboy/Dom`.
 - **Production:** commit `dc9305d` pushed to `main`; GitHub Typecheck `26918944150`, Unit tests `26918944147`, and Prod smoke `26918944118` passed. Render deploy workflow `26919005542` applied migrations, deployed backend, and passed backend health smoke. Authenticated production `POST /api/dashboard/drive/folder` returned `200` with a Drive folder URL from the canonical resolver. Manual browser check: click Dashboard → "เปิดคลังหลักฐาน" and confirm it opens the tax-id folder, e.g. `Billboy/ดม (1111111111111)`.
 
+Master sheet queue cleanup follow-up:
+- **Backend:** added super-admin-only `POST /api/system/queues/master-sheet/failed/clean` to remove old BullMQ failed jobs from `master-sheet-sync` without touching waiting/active/delayed work. This is ops cleanup for stale failed counts after Drive was reconnected, not part of normal tenant workflow.
+- **Verification:** local `cd backend && npm run typecheck` passes. After deploy, call the endpoint with a super-admin token and confirm `/api/health/workers` reports `master-sheet-sync.failed: 0`.
+
 Drive register audit-ready P0:
 - **Backend:** Drive filing now uses a single `Projects` folder name for project workspace creation from both normal project uploads and tax-period uploads; the old tax-folder path no longer creates a separate `_โปรเจค` sibling.
 - **Master Sheet:** added `driveAuditRegister` helpers so register rows prefer Drive links first with S3/app URLs only as fallback. Customer/Vendor tabs now emit one row per uploaded document instead of only the newest/first document. Project summary now includes Drive folder links and synced-file counts. AI Inbox rows now include both file and folder links, preferring `DocumentIntake.driveUrl` over `fileUrl`.

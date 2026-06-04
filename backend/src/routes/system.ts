@@ -3,10 +3,33 @@ import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import { withSystemRlsContext } from '../config/rls';
 import { requireRole } from '../middleware/auth';
+import { masterSheetQueue } from '../queues/masterSheetQueue';
 
 export const systemRouter = Router();
 
 systemRouter.use(requireRole('super_admin'));
+
+systemRouter.post('/queues/master-sheet/failed/clean', async (_req, res) => {
+  try {
+    const before = await masterSheetQueue.getFailedCount();
+    const removedJobIds = before > 0
+      ? await masterSheetQueue.clean(0, Math.min(before, 1000), 'failed')
+      : [];
+    const after = await masterSheetQueue.getFailedCount();
+
+    res.json({
+      data: {
+        queue: 'master-sheet-sync',
+        before,
+        after,
+        removed: removedJobIds.length,
+        removedJobIds,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to clean master sheet failed jobs' });
+  }
+});
 
 function issueTenantToken(user: { id: string; companyId: string; role: string; email: string }) {
   return jwt.sign(
