@@ -535,317 +535,238 @@ export default function Landing() {
     <div className="app-shell">
       <ProductDoodleField />
       {/* Header */}
-      <header className="fixed top-0 z-50 w-full border-b border-slate-200/70 bg-white/88 shadow-sm backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-lg bg-primary-700 flex items-center justify-center shadow-sm group-hover:bg-primary-800 transition-colors">
-              <FileText className="w-5 h-5 text-white" strokeWidth={2.5} />
-            </div>
-            <span className="font-bold text-lg text-gray-900 group-hover:text-primary-600 transition-colors">{t('app.shortName')}</span>
+      <header className="fixed inset-x-0 top-4 z-50 px-4">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between rounded-[22px] border border-white/10 bg-[#151719]/96 px-4 text-white shadow-[0_22px_70px_rgba(0,0,0,0.32)] backdrop-blur-sm sm:px-5">
+          <Link to="/" className="group flex items-center gap-3 text-white hover:text-white">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary-800 shadow-[0_10px_28px_rgba(255,255,255,0.12)]">
+              <FileText className="h-5 w-5" strokeWidth={2.6} />
+            </span>
+            <span className="text-lg font-bold">{t('app.shortName')}</span>
           </Link>
-          <div className="flex items-center gap-3">
+          <nav className="hidden items-center gap-8 text-sm font-semibold text-white/60 md:flex">
+            <a href="#features" className="text-white/60 hover:text-white">{isThai ? 'ระบบ' : 'Product'}</a>
+            <a href="#workflow" className="text-white/60 hover:text-white">{isThai ? 'Workflow' : 'Workflow'}</a>
+            <a href="#pricing-checkout" className="text-white/60 hover:text-white">{isThai ? 'ราคา' : 'Pricing'}</a>
+            <Link to="/contact" className="text-white/60 hover:text-white">{isThai ? 'ติดต่อ' : 'Contact'}</Link>
+          </nav>
+          <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher variant="toggle" />
-            <a href={getPlanePath('/login', 'app')} className="btn-secondary sm">
+            <a href={getPlanePath('/login', 'app')} className="hidden rounded-2xl px-3 py-2 text-sm font-semibold text-white/70 hover:bg-white/[0.08] hover:text-white sm:inline-flex">
               {t('auth.login')}
             </a>
-            <button type="button" onClick={() => openCheckout('free')} className="btn-primary sm hidden sm:flex">
-              {t('landing.hero.cta')}
+            <button
+              type="button"
+              onClick={() => openCheckout('free')}
+              className="inline-flex items-center justify-center rounded-2xl bg-[#f15b3a] px-4 py-2.5 text-sm font-bold text-white shadow-[0_16px_34px_rgba(241,91,58,0.32)] transition hover:-translate-y-0.5 hover:bg-[#ff6b47] sm:px-5"
+            >
+              {isThai ? 'เริ่มใช้ฟรี' : 'Start free'}
             </button>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#f5f8fd] pt-28 lg:pt-32">
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(245,248,253,0.98)_0%,rgba(245,248,253,0.92)_42%,rgba(245,248,253,0.35)_72%,rgba(245,248,253,0.12)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-slate-200" />
+      <section className="relative isolate min-h-[820px] overflow-hidden bg-[#07090b] pt-24 text-white sm:min-h-[860px] lg:min-h-[900px]">
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(115deg,rgba(45,212,191,0.13)_0%,transparent_28%),linear-gradient(245deg,rgba(201,168,76,0.12)_0%,transparent_26%),linear-gradient(180deg,#090b0d_0%,#060708_72%,#111827_100%)]" />
+        <div className="absolute inset-x-0 top-0 -z-10 h-80 bg-[linear-gradient(180deg,rgba(30,58,138,0.12),transparent)]" />
+        <div className="absolute left-1/2 top-[17rem] -z-10 h-[30rem] w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.28),transparent)]" />
 
-        <div className="max-w-6xl mx-auto px-4 pb-16 lg:pb-20">
-          <div className="grid gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-            <div className="max-w-2xl py-8 lg:py-14">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-primary-700 shadow-sm">
-                <ShieldCheck className="h-4 w-4" />
-                {isThai ? 'ETDA-ready e-Tax workflow' : 'ETDA-ready e-Tax workflow'}
+        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+          <div className="relative mx-auto max-w-5xl pt-16 text-center sm:pt-20">
+            <h1 className="mx-auto max-w-5xl text-balance text-5xl font-semibold leading-[0.98] text-white sm:text-6xl lg:text-7xl xl:text-[5.8rem]">
+              {isThai ? 'เอกสารเข้า LINE วันนี้ ภาษีพร้อมส่งพรุ่งนี้' : 'Documents in today. Tax-ready tomorrow.'}
+            </h1>
+            <p className="mx-auto mt-7 max-w-3xl text-pretty text-base leading-8 text-white/70 sm:text-lg">
+              {isThai
+                ? 'AI อ่านบิล สลิป และใบกำกับภาษี แล้วจัดเข้าคลัง Drive + สมุดทะเบียนภาษีให้ทีมบัญชีตรวจต่อได้ทันที'
+                : 'AI reads bills, slips, and tax invoices, then organizes Drive evidence and tax registers for the accounting team.'}
+            </p>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => openCheckout('free')}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#f15b3a] px-6 py-3 text-base font-bold text-white shadow-[0_18px_46px_rgba(241,91,58,0.34)] transition hover:-translate-y-1 hover:bg-[#ff6b47]"
+              >
+                {isThai ? 'เริ่มทดลองใช้ฟรี' : 'Start free trial'}
+                <ArrowRight className="h-5 w-5" />
+              </button>
+              <a
+                href="#workflow"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.08] px-6 py-3 text-base font-bold text-white shadow-[0_16px_42px_rgba(0,0,0,0.22)] backdrop-blur transition hover:-translate-y-1 hover:bg-white/[0.12]"
+              >
+                {isThai ? 'ดูตัวอย่าง workflow' : 'See workflow'}
+                <Smartphone className="h-5 w-5" />
+              </a>
+            </div>
+          </div>
+
+          <div className="pointer-events-none relative mx-auto mt-10 min-h-[440px] max-w-6xl sm:min-h-[500px] lg:mt-12">
+            <div className="absolute left-0 top-8 hidden w-[17rem] rounded-[24px] border border-white/12 bg-[#1b1d20]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
+              <div className="flex items-center justify-between text-xs font-semibold text-white/60">
+                <span>{isThai ? 'AI Inbox' : 'AI Inbox'}</span>
+                <span className="rounded-full bg-[#f15b3a] px-2 py-1 text-white">89</span>
               </div>
-
-              <h1 className="animate-slide-in-left max-w-4xl text-4xl font-semibold leading-[1.08] tracking-tight text-slate-950 sm:text-5xl lg:text-[3.9rem]" style={{animationDelay:'0.15s'}}>
-                {t('landing.hero.title')}
-              </h1>
-
-              <p className="animate-slide-in-left mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg" style={{animationDelay:'0.3s'}}>
-                {t('landing.hero.subtitle')}
-              </p>
-
-              <div className="animate-slide-in-left mt-9 flex flex-col gap-3 sm:flex-row" style={{animationDelay:'0.45s'}}>
-                <button type="button" onClick={() => openCheckout('free')} className="btn-primary lg">
-                  {t('landing.hero.cta')}
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-                <a href="#pricing-checkout" className="btn-secondary lg">
-                  {isThai ? 'ดูแพ็กเกจและวิธีชำระเงิน' : 'View plans and payment options'}
-                  <Smartphone className="w-5 h-5" />
-                </a>
+              <div className="mt-5 space-y-3">
+                {[
+                  { label: isThai ? 'ใบซื้อรอตรวจ' : 'Purchases to review', value: '34', color: 'bg-amber-300' },
+                  { label: isThai ? 'สลิปรอจับคู่' : 'Slips to match', value: '12', color: 'bg-teal-300' },
+                  { label: isThai ? 'พร้อมบันทึก' : 'Ready to post', value: '43', color: 'bg-emerald-400' },
+                ].map((item) => (
+                  <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-3">
+                    <div>
+                      <div className="text-xs text-white/60">{item.label}</div>
+                      <div className="mt-2 h-2 rounded-full bg-white/[0.08]">
+                        <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${36 + Number(item.value)}%` }} />
+                      </div>
+                    </div>
+                    <span className="text-xl font-bold text-white">{item.value}</span>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              <p className="animate-fade-in mt-5 text-sm font-medium text-slate-500" style={{animationDelay:'0.55s'}}>{t('landing.hero.trustText')}</p>
+            <div className="absolute right-0 top-10 hidden w-[18rem] rounded-[24px] border border-white/12 bg-[#17191c]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white/60">{isThai ? 'VAT Ready' : 'VAT Ready'}</span>
+                <ShieldCheck className="h-5 w-5 text-emerald-300" />
+              </div>
+              <div className="mt-5 grid grid-cols-4 items-end gap-2">
+                {[42, 58, 48, 82].map((height, index) => (
+                  <div key={index} className="flex flex-col items-center gap-2">
+                    <div className="w-full rounded-xl bg-white/[0.08] p-1">
+                      <div className={`rounded-lg ${index === 3 ? 'bg-emerald-300' : 'bg-white/[0.18]'}`} style={{ height }} />
+                    </div>
+                    <span className="text-[10px] text-white/40">{['ขาย','ซื้อ','WHT','PP30'][index]}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 rounded-2xl bg-emerald-300 px-4 py-3 text-sm font-bold text-emerald-950">
+                {isThai ? 'พร้อมยื่น ภ.พ.30' : 'PP.30 ready'}
+              </div>
+            </div>
 
-              <div className="animate-slide-up mt-10 grid gap-3 sm:grid-cols-3" style={{animationDelay:'0.6s'}}>
-                <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'เหมาะกับ' : 'Best for'}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'ทีมบัญชีและธุรกิจ SME' : 'Accounting teams and SME operators'}</div>
+            <div className="absolute left-1/2 top-0 w-[min(92vw,760px)] -translate-x-1/2 rotate-[-3deg] rounded-[30px] border border-white/12 bg-[#151719] p-3 shadow-[0_40px_120px_rgba(0,0,0,0.55)] sm:top-3 sm:p-4">
+              <div className="rounded-[22px] border border-white/10 bg-[#0d0f12] p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary-800">
+                      <FileText className="h-5 w-5" />
+                    </span>
+                    <div className="text-left">
+                      <div className="text-sm font-bold text-white">Billboy Tax Cockpit</div>
+                      <div className="text-xs text-white/40">{isThai ? 'ดม จำกัด · มิ.ย. 2569' : 'Demo Co. · Jun 2026'}</div>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white/[0.08] px-3 py-1.5 text-xs font-semibold text-white/70">{isThai ? 'ซิงก์ Drive แล้ว' : 'Drive synced'}</span>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'รองรับ' : 'Supports'}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'RD submit, PDF, XML, audit logs' : 'RD submit, PDF, XML, and audit logs'}</div>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'ชำระเงิน' : 'Payments'}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{isThai ? 'บัตรเครดิต, Stripe PromptPay, QR' : 'Card, Stripe PromptPay, and QR'}</div>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                  <div className="space-y-3">
+                    {[
+                      { name: isThai ? 'SYSTEM STANDARD' : 'SYSTEM STANDARD', meta: isThai ? 'ใบกำกับภาษีซื้อ · ฿1,070.00' : 'Purchase invoice · ฿1,070.00', status: isThai ? 'รอยืนยัน' : 'Review' },
+                      { name: isThai ? 'SCB มณี SHOP' : 'SCB Manee SHOP', meta: isThai ? 'สลิปโอนเงิน · ฿176.00' : 'Bank slip · ฿176.00', status: isThai ? 'จับคู่สลิป' : 'Match slip' },
+                      { name: isThai ? 'ขายสินค้าออนไลน์' : 'Online sale', meta: isThai ? 'e-Tax XML + PDF · พร้อมส่ง RD' : 'e-Tax XML + PDF · RD ready', status: isThai ? 'พร้อมส่ง' : 'Ready' },
+                    ].map((row) => (
+                      <div key={row.name} className="grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3 text-left">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white">
+                          <FileCheck className="h-5 w-5" />
+                        </span>
+                        <span>
+                          <span className="block text-sm font-bold text-white">{row.name}</span>
+                          <span className="block text-xs text-white/50">{row.meta}</span>
+                        </span>
+                        <span className="rounded-full bg-[#f3c84b] px-3 py-1 text-xs font-bold text-[#2d2410]">{row.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 text-left">
+                    <div className="text-xs font-semibold text-white/60">{isThai ? 'สมุดทะเบียนภาษี' : 'Tax register'}</div>
+                    <div className="mt-3 text-3xl font-bold text-white">฿28,420</div>
+                    <p className="mt-1 text-xs text-white/50">{isThai ? 'ภาษีซื้อรอตรวจ 9 รายการ' : '9 input-VAT items need review'}</p>
+                    <div className="mt-5 space-y-2">
+                      {['1_ภาษีขาย','2_ภาษีซื้อ','9_แบบที่ยื่นแล้ว'].map((label, index) => (
+                        <div key={label} className="flex items-center justify-between rounded-xl bg-white/[0.07] px-3 py-2 text-xs">
+                          <span className="text-white/70">{label}</span>
+                          <span className={index === 2 ? 'text-emerald-300' : 'text-white/50'}>{index === 2 ? 'Ready' : 'Synced'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <aside className="relative min-h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.12)] lg:min-h-[560px]">
-              <img
-                src="/brand/billoy-hero-mascot.jpg"
-                alt={isThai ? 'Billoy ผู้ช่วยเอกสาร e-Tax' : 'Billoy e-Tax document assistant'}
-                className="absolute inset-0 h-full w-full object-cover object-[64%_50%]"
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0)_48%,rgba(15,23,42,0.72)_100%)]" />
-              <div className="absolute bottom-0 left-0 right-0 p-5 text-white sm:p-6">
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-primary-800 shadow-sm">
-                  <FileCheck className="h-4 w-4" />
-                  Billoy Mascot
-                </div>
-                <h2 className="mt-4 max-w-sm text-2xl font-semibold leading-tight">
-                  {isThai ? 'ผู้ช่วยเอกสารที่ดูเป็นมิตร แต่ทำงานแบบทีมบัญชีจริง' : 'A friendly document assistant with accounting-grade discipline'}
-                </h2>
-                <div className="mt-5 grid grid-cols-3 gap-2 text-xs font-semibold text-white/90">
-                  <span className="rounded-md bg-white/14 px-3 py-2 backdrop-blur">{isThai ? 'XML' : 'XML'}</span>
-                  <span className="rounded-md bg-white/14 px-3 py-2 backdrop-blur">{isThai ? 'Sign' : 'Sign'}</span>
-                  <span className="rounded-md bg-white/14 px-3 py-2 backdrop-blur">{isThai ? 'RD' : 'RD'}</span>
+            <div className="absolute bottom-4 left-[8%] hidden rounded-full bg-[#f15b3a] px-7 py-6 text-center shadow-[0_24px_70px_rgba(241,91,58,0.34)] md:block">
+              <div className="text-4xl font-bold">3m</div>
+              <div className="mt-1 text-xs font-semibold text-white/80">{isThai ? 'จากรูปถึง draft' : 'photo to draft'}</div>
+            </div>
+            <div className="absolute bottom-16 right-[10%] hidden h-36 w-36 items-center justify-center rounded-full bg-[#3578ff] text-center shadow-[0_28px_80px_rgba(53,120,255,0.35)] md:flex">
+              <div>
+                <div className="text-4xl font-bold">+30%</div>
+                <div className="mt-1 text-xs font-semibold text-white/80">{isThai ? 'ปิดงวดไวขึ้น' : 'faster close'}</div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-1/2 w-[min(78vw,430px)] -translate-x-1/2 rounded-[28px] border border-white/12 bg-white p-4 text-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.48)] sm:bottom-[-1rem]">
+              <div className="grid grid-cols-[72px_1fr] items-center gap-4">
+                <img src="/brand/billoy-hero-mascot.jpg" alt="" className="h-16 w-16 rounded-2xl object-cover object-[55%_42%]" />
+                <div className="text-left">
+                  <div className="text-sm font-bold">{isThai ? 'Billoy ช่วยจัดเอกสารแล้ว' : 'Billoy organized the evidence'}</div>
+                  <div className="mt-1 text-xs leading-5 text-slate-500">{isThai ? 'LINE, Drive, Sheets และ ภ.พ.30 อยู่ใน flow เดียว' : 'LINE, Drive, Sheets, and PP.30 in one flow.'}</div>
                 </div>
               </div>
-            </aside>
+            </div>
+          </div>
 
-            <aside className="hidden animate-slide-in-right animate-float rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl" style={{animationDelay:'0.2s'}}>
-              {/* Billy mascot — faithful SVG of the 3D receipt character */}
-              <div className="flex justify-center mb-2">
-                <svg viewBox="0 0 200 280" width="160" height="224" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* ── Ground shadow ── */}
-                  <ellipse cx="100" cy="272" rx="52" ry="7" fill="#bbf7d0" opacity="0.7"/>
-
-                  {/* ── Legs ── */}
-                  <rect x="62" y="216" width="22" height="38" rx="10" fill="#f1f5f9"/>
-                  <rect x="116" y="216" width="22" height="38" rx="10" fill="#f1f5f9"/>
-                  {/* Leg shading */}
-                  <rect x="62" y="216" width="6" height="38" rx="10" fill="#e2e8f0"/>
-                  <rect x="116" y="216" width="6" height="38" rx="10" fill="#e2e8f0"/>
-
-                  {/* ── Green sneakers ── */}
-                  {/* Left shoe */}
-                  <ellipse cx="73" cy="254" rx="20" ry="11" fill="#16a34a"/>
-                  <ellipse cx="70" cy="252" rx="14" ry="7" fill="#15803d"/>
-                  {/* Sole white stripe */}
-                  <ellipse cx="73" cy="258" rx="19" ry="5" fill="white" opacity="0.3"/>
-                  {/* Lace dots */}
-                  <circle cx="68" cy="250" r="1.5" fill="white" opacity="0.8"/>
-                  <circle cx="73" cy="248" r="1.5" fill="white" opacity="0.8"/>
-                  <circle cx="78" cy="250" r="1.5" fill="white" opacity="0.8"/>
-                  {/* Right shoe */}
-                  <ellipse cx="127" cy="254" rx="20" ry="11" fill="#16a34a"/>
-                  <ellipse cx="124" cy="252" rx="14" ry="7" fill="#15803d"/>
-                  <ellipse cx="127" cy="258" rx="19" ry="5" fill="white" opacity="0.3"/>
-                  <circle cx="122" cy="250" r="1.5" fill="white" opacity="0.8"/>
-                  <circle cx="127" cy="248" r="1.5" fill="white" opacity="0.8"/>
-                  <circle cx="132" cy="250" r="1.5" fill="white" opacity="0.8"/>
-
-                  {/* ── Left arm (holding phone) ── */}
-                  <path d="M42 140 C24 148 20 168 26 180 C30 188 38 190 44 186" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1"/>
-                  <ellipse cx="34" cy="170" rx="14" ry="22" fill="#f1f5f9" transform="rotate(-20 34 170)"/>
-                  {/* Round hand */}
-                  <circle cx="30" cy="182" r="12" fill="#f1f5f9"/>
-                  <circle cx="30" cy="182" r="10" fill="white"/>
-
-                  {/* ── Phone in left hand ── */}
-                  <rect x="10" y="148" width="36" height="58" rx="6" fill="#1e293b"/>
-                  <rect x="13" y="152" width="30" height="50" rx="4" fill="#334155"/>
-                  {/* Camera bump */}
-                  <circle cx="16" cy="156" r="3" fill="#0f172a"/>
-                  <circle cx="16" cy="156" r="2" fill="#1e293b"/>
-                  {/* Screen glow */}
-                  <rect x="14" y="153" width="28" height="48" rx="3" fill="#4ade80" opacity="0.15"/>
-                  {/* B on phone */}
-                  <text x="28" y="181" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="14" fontWeight="900" fill="white" opacity="0.9">B</text>
-
-                  {/* ── Right arm ── */}
-                  <ellipse cx="166" cy="160" rx="14" ry="22" fill="#f1f5f9" transform="rotate(15 166 160)"/>
-                  <circle cx="170" cy="176" r="12" fill="#f1f5f9"/>
-                  <circle cx="170" cy="176" r="10" fill="white"/>
-
-                  {/* ── Receipt body — main white body ── */}
-                  {/* Shadow/depth layer */}
-                  <rect x="36" y="50" width="130" height="178" rx="14" fill="#e2e8f0"/>
-                  {/* Main body */}
-                  <rect x="32" y="46" width="130" height="178" rx="14" fill="#f8fafc"/>
-                  {/* White inner */}
-                  <rect x="36" y="50" width="122" height="170" rx="12" fill="white"/>
-
-                  {/* ── Crown / spike top edge ── */}
-                  <path d="M32,46 L44,22 L56,44 L68,16 L80,44 L92,16 L104,44 L116,16 L128,44 L140,22 L154,42 L162,46"
-                    fill="white" stroke="#e2e8f0" strokeWidth="1.5" strokeLinejoin="round"/>
-                  {/* Fill spikes white */}
-                  <path d="M32,46 L44,22 L56,44 L68,16 L80,44 L92,16 L104,44 L116,16 L128,44 L140,22 L154,42 L162,46 L162,60 L32,60 Z"
-                    fill="white"/>
-
-                  {/* ── Eyebrows — thin arch above eyes ── */}
-                  <path d="M66 82 Q76 74 86 80" stroke="#1e293b" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-                  <path d="M110 80 Q120 74 130 82" stroke="#1e293b" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-
-                  {/* ── Eyes — big round black with white shine ── */}
-                  <circle cx="76" cy="96" r="17" fill="#1e293b"/>
-                  <circle cx="120" cy="96" r="17" fill="#1e293b"/>
-                  {/* Iris highlight */}
-                  <circle cx="83" cy="89" r="6" fill="white"/>
-                  <circle cx="127" cy="89" r="6" fill="white"/>
-                  <circle cx="86" cy="87" r="2.5" fill="white" opacity="0.6"/>
-                  <circle cx="130" cy="87" r="2.5" fill="white" opacity="0.6"/>
-
-                  {/* ── Cheeks ── */}
-                  <ellipse cx="54" cy="112" rx="12" ry="8" fill="#fda4af" opacity="0.5"/>
-                  <ellipse cx="142" cy="112" rx="12" ry="8" fill="#fda4af" opacity="0.5"/>
-
-                  {/* ── Open smiling mouth ── */}
-                  {/* Mouth path — open happy */}
-                  <path d="M72 120 Q98 144 124 120" fill="#ef4444" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round"/>
-                  {/* Teeth */}
-                  <path d="M76 121 Q98 138 120 121" fill="white" stroke="none"/>
-                  {/* Tongue hint */}
-                  <ellipse cx="98" cy="134" rx="10" ry="5" fill="#f87171" opacity="0.6"/>
-
-                  {/* ── Receipt lines on body ── */}
-                  <line x1="52" y1="155" x2="144" y2="155" stroke="#e5e7eb" strokeWidth="2"/>
-                  <line x1="52" y1="166" x2="120" y2="166" stroke="#e5e7eb" strokeWidth="2"/>
-                  <line x1="52" y1="177" x2="130" y2="177" stroke="#e5e7eb" strokeWidth="2"/>
-                  <line x1="52" y1="188" x2="108" y2="188" stroke="#e5e7eb" strokeWidth="2"/>
-
-                  {/* ── Green scarf / cape ── */}
-                  {/* Cape back */}
-                  <path d="M120 138 C150 140 172 155 168 195 C162 210 145 215 132 210 L128 192 C138 196 148 192 150 180 C153 162 138 148 118 148 Z" fill="#15803d"/>
-                  {/* Scarf front band */}
-                  <path d="M55 138 Q98 152 142 138 L145 154 Q98 168 52 154 Z" fill="#16a34a"/>
-                  {/* Scarf fold */}
-                  <path d="M68 138 Q98 148 128 138 L126 148 Q98 158 70 148 Z" fill="#15803d"/>
-                  {/* Knot at center */}
-                  <ellipse cx="98" cy="148" rx="14" ry="10" fill="#4ade80"/>
-                  <ellipse cx="98" cy="148" rx="9" ry="7" fill="#16a34a"/>
-                  <ellipse cx="98" cy="148" rx="5" ry="4" fill="#22c55e"/>
-
-                  {/* ── Green B badge ── */}
-                  <circle cx="98" cy="175" r="14" fill="#16a34a"/>
-                  <circle cx="98" cy="175" r="12" fill="#15803d"/>
-                  <text x="98" y="180" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="15" fontWeight="900" fill="white">B</text>
-
-                  {/* ── Sparkle decorations ── */}
-                  <path d="M168 60 L170 53 L172 60 L179 62 L172 64 L170 71 L168 64 L161 62 Z" fill="#4ade80" opacity="0.9"/>
-                  <path d="M20 100 L21.5 95 L23 100 L28 101.5 L23 103 L21.5 108 L20 103 L15 101.5 Z" fill="#86efac" opacity="0.8"/>
-                  <path d="M170 110 L171 106 L172 110 L176 111 L172 112 L171 116 L170 112 L166 111 Z" fill="#4ade80" opacity="0.7"/>
-                </svg>
+          <div id="workflow" className="relative z-10 mx-auto mt-16 grid max-w-5xl gap-3 text-left sm:grid-cols-4">
+            {[
+              { title: isThai ? 'ส่งเข้า LINE' : 'Send to LINE', desc: isThai ? 'ถ่ายบิล/สลิปจากมือถือ' : 'Capture bills and slips' },
+              { title: isThai ? 'AI อ่านให้' : 'AI reads', desc: isThai ? 'แยกประเภทและเช็ค VAT' : 'Classifies and checks VAT' },
+              { title: isThai ? 'บัญชีกดยืนยัน' : 'Accountant reviews', desc: isThai ? 'แก้เฉพาะรายการเสี่ยง' : 'Only risky items need edits' },
+              { title: isThai ? 'พร้อมยื่นภาษี' : 'Tax-ready', desc: isThai ? 'Drive + master sheet ครบ' : 'Drive and sheets complete' },
+            ].map((step, index) => (
+              <div key={step.title} className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur">
+                <div className="text-xs font-bold text-[#f3c84b]">0{index + 1}</div>
+                <div className="mt-3 text-sm font-bold text-white">{step.title}</div>
+                <div className="mt-1 text-xs leading-5 text-white/50">{step.desc}</div>
               </div>
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Operational Snapshot' : 'Operational Snapshot'}</p>
-                  <h2 className="mt-1 text-xl font-semibold text-slate-900">{isThai ? 'ระบบที่พร้อมใช้งานจริง' : 'Built for real operations'}</h2>
-                </div>
-                <div className="rounded-2xl bg-slate-900 p-3 text-white">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Business Dashboard' : 'Business Dashboard'}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {isThai
-                      ? 'ดูรายได้ ลูกหนี้ สถานะใบกำกับ และสต๊อกสินค้าได้จากหน้าเดียว'
-                      : 'See revenue, receivables, invoice status, and stock from a single dashboard.'}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Data Security' : 'Data Security'}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {isThai
-                      ? 'ข้อมูลแต่ละบริษัทถูกแยกอย่างเข้มงวด เข้ารหัส และสำรองข้อมูลทุกวัน'
-                      : 'Per-company data isolation with encryption and daily automated backups.'}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-slate-500">{isThai ? 'Workflow' : 'Workflow'}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {isThai
-                      ? 'สร้างเอกสาร, sign XML, timestamp, ส่ง RD, และติดตามสถานะแบบครบ flow'
-                      : 'Create documents, sign XML, timestamp, submit to RD, and track status end-to-end.'}
-                  </p>
-                </div>
-              </div>
-            </aside>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="feature-grid-bg relative overflow-hidden py-24">
+      <section id="features" className="relative overflow-hidden bg-[#111827] py-24 text-white">
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(45,212,191,0.12)_0%,transparent_34%),linear-gradient(250deg,rgba(241,91,58,0.11)_0%,transparent_32%)]" />
         <div className="relative z-10 mx-auto max-w-6xl px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              {t('landing.features.title')}
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              {isThai ? 'ระบบที่สมบูรณ์สำหรับการออกใบกำกับภาษีอิเล็กทรอนิกส์' : 'Everything you need for seamless e-Invoice management'}
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+            <div>
+              <h2 className="max-w-3xl text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl">
+                {isThai ? 'ไม่ใช่หน้าออกใบกำกับอีกหน้า แต่เป็นห้องควบคุมภาษีของทั้งบริษัท' : 'Not another invoice screen. A tax cockpit for the whole company.'}
+              </h2>
+            </div>
+            <p className="max-w-2xl text-base leading-8 text-white/60">
+              {isThai
+                ? 'เจ้าของส่งเอกสารจากมือถือ ทีมบัญชีตรวจจาก ledger และระบบเก็บหลักฐานไว้ให้ auditor ตามรอบภาษีเดียวกัน'
+                : 'Owners send documents from mobile, accountants review from ledgers, and evidence is filed for audit by tax period.'}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {features.map(({ icon: Icon, key }, i) => {
-              const iconStyles = [
-                'bg-primary-700',
-                'bg-emerald-700',
-                'bg-slate-800',
-                'bg-amber-600',
-              ];
-              const iconBg = iconStyles[i % iconStyles.length];
+              const accents = ['text-[#f15b3a]', 'text-teal-300', 'text-[#f3c84b]', 'text-emerald-300'];
               return (
                 <div
                   key={key}
-                  className="animate-slide-up flip-card group"
-                  style={{animationDelay: `${0.1 + i * 0.1}s`}}
+                  className="group rounded-[24px] border border-white/10 bg-white/[0.055] p-6 shadow-[0_22px_70px_rgba(0,0,0,0.22)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white/[0.08]"
                 >
-                  {/* Inside page — revealed when the cover swings open (always shown on touch) */}
-                  <div className="flex h-full flex-col rounded-2xl border border-primary-100 bg-gradient-to-br from-white to-primary-50/50 p-6 shadow-card">
-                    <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${iconBg} shadow-sm`}>
-                      <Icon className="w-6 h-6 text-white" strokeWidth={2} />
-                    </div>
-                    <h3 className="mb-2 text-base font-bold text-gray-900">
-                      {t(`landing.features.${key}.title`)}
-                    </h3>
-                    <p className="text-sm leading-relaxed text-gray-500">
-                      {t(`landing.features.${key}.desc`)}
-                    </p>
+                  <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.09] ${accents[i % accents.length]}`}>
+                    <Icon className="h-6 w-6" strokeWidth={2.2} />
                   </div>
-
-                  {/* Cover — the front of the "book", swings open on hover */}
-                  <div className="flip-card-cover rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-                    <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${iconBg} shadow-sm`}>
-                      <Icon className="w-7 h-7 text-white" strokeWidth={2} />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900">
-                      {t(`landing.features.${key}.title`)}
-                    </h3>
-                    <span className="flip-card-hint mt-auto flex items-center gap-1.5 pt-4 text-xs font-semibold text-primary-600">
-                      {isThai ? 'ดูรายละเอียด' : 'Read more'}
-                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300" strokeWidth={2.5} />
-                    </span>
-                  </div>
+                  <h3 className="text-base font-bold text-white">
+                    {t(`landing.features.${key}.title`)}
+                  </h3>
+                  <p className="mt-3 text-sm leading-7 text-white/60">
+                    {t(`landing.features.${key}.desc`)}
+                  </p>
                 </div>
               );
             })}
@@ -854,14 +775,11 @@ export default function Landing() {
       </section>
 
       {/* Document Operations Positioning */}
-      <section className="border-y border-slate-200 bg-white py-20">
+      <section className="border-y border-slate-200 bg-[#f6f8fb] py-24">
         <div className="mx-auto max-w-6xl px-4">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-700">
-                {isThai ? 'แข่งด้วย workflow ทั้งระบบ' : 'Compete on the whole workflow'}
-              </p>
-              <h2 className="mt-3 text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">
+              <h2 className="text-3xl font-semibold leading-tight text-slate-950 sm:text-5xl">
                 {isThai
                   ? 'ไม่ใช่แค่เก็บใบเสร็จ แต่พาเอกสารไปถึงบัญชีและ e-Tax'
                   : 'Not just receipt capture. Documents move all the way to accounting and e-Tax.'}
@@ -877,8 +795,8 @@ export default function Landing() {
               {documentOpsPillars.map(({ icon: Icon, th, en, descTh, descEn }, i) => {
                 const iconBgs = ['bg-primary-700','bg-emerald-700','bg-slate-800','bg-amber-600'];
                 return (
-                  <div key={en} className="rounded-lg border border-slate-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${iconBgs[i % iconBgs.length]} shadow-sm`}>
+                  <div key={en} className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_58px_rgba(15,23,42,0.1)]">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${iconBgs[i % iconBgs.length]} shadow-sm`}>
                       <Icon className="h-5 w-5 text-white" />
                     </div>
                     <h3 className="mt-4 text-base font-bold text-slate-950">{isThai ? th : en}</h3>
@@ -891,10 +809,7 @@ export default function Landing() {
 
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             {marketingArticles.map((article) => (
-              <article key={article.en} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {isThai ? 'คู่มือใช้งานจริง' : 'Playbook'}
-                </p>
+              <article key={article.en} className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.05)]">
                 <h3 className="mt-3 text-lg font-bold text-slate-950">
                   {isThai ? article.th : article.en}
                 </h3>
@@ -911,7 +826,7 @@ export default function Landing() {
       <section id="pricing-checkout" className="bg-white py-24">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-16">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary-700">
+            <p className="mb-3 text-sm font-semibold uppercase text-primary-700">
               {isThai ? 'เริ่มถูกกว่า ซื้อเพิ่มเฉพาะตอนโต' : 'Lower entry price, scale when volume grows'}
             </p>
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
@@ -1575,7 +1490,7 @@ export default function Landing() {
               </div>
 
               <div className="border-t border-slate-200 bg-slate-900 px-5 py-6 text-white lg:border-l lg:border-t-0 sm:px-7">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                <p className="text-xs font-semibold uppercase text-slate-300">
                   {selectedPlan === 'free' ? (isThai ? 'สิ่งที่จะได้' : 'What happens next') : (isThai ? 'หลังเปิดใช้งาน' : 'After activation')}
                 </p>
                 <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
