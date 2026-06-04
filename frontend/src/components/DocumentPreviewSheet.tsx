@@ -9,6 +9,7 @@ interface DocumentPreviewSheetProps {
   description?: string;
   documentNumber: string;
   previewHtml: string | null;
+  previewUrl?: string | null;
   loading: boolean;
   error?: string | null;
   downloading?: boolean;
@@ -23,6 +24,7 @@ export default function DocumentPreviewSheet({
   description,
   documentNumber,
   previewHtml,
+  previewUrl,
   loading,
   error,
   downloading = false,
@@ -130,6 +132,15 @@ export default function DocumentPreviewSheet({
                 sandbox="allow-same-origin"
               />
             </div>
+          ) : previewUrl ? (
+            <div className="document-preview-stage overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10">
+              <iframe
+                src={previewUrl}
+                className="document-preview-frame"
+                title={title}
+                sandbox="allow-same-origin allow-scripts"
+              />
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-slate-500">
               {isThai ? 'ยังไม่มีตัวอย่างเอกสาร' : 'No preview available'}
@@ -147,7 +158,7 @@ export default function DocumentPreviewSheet({
           <button
             type="button"
             onClick={onDownload}
-            disabled={downloading || loading || !previewHtml}
+            disabled={downloading || loading || (!previewHtml && !previewUrl)}
             className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60"
           >
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}

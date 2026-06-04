@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download, FileText, Loader2, Search, Calendar, Receipt, Calculator, TrendingUp, Link2, BadgePercent, Landmark } from 'lucide-react';
+import { Download, FileText, Loader2, Search, Calendar, Receipt, Calculator, TrendingUp, Link2, BadgePercent, Landmark, Eye } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { WhtCertificate } from '../types';
 import SectionSubNav from '../components/SectionSubNav';
 import { ToastStack, type FeedbackToast } from '../components/ui/AppFeedback';
+import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
 
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -36,6 +37,10 @@ export default function WhtCertificateList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [previewCert, setPreviewCert] = useState<WhtCertificate | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [toasts, setToasts] = useState<FeedbackToast[]>([]);
 
   const pushToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
@@ -88,6 +93,34 @@ export default function WhtCertificateList() {
     } finally {
       setDownloadingId(null);
     }
+  }
+
+  async function openPreview(cert: WhtCertificate) {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewCert(cert);
+    setPreviewUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`/api/wht-certificates/${cert.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const blob = await res.blob();
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setPreviewError((err as Error).message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewCert(null);
+    setPreviewUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
   }
 
   const yearOptions: number[] = [];
@@ -296,7 +329,7 @@ export default function WhtCertificateList() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {certificates.map((cert) => (
-                <tr key={cert.id} className="hover:bg-gray-50">
+                <tr key={cert.id} onClick={() => void openPreview(cert)} className="cursor-pointer hover:bg-gray-50">
                   <td className="table-cell text-sm font-semibold text-primary-700 tabular-nums">
                     <div className="flex items-center gap-2">
                       <Receipt className="w-4 h-4 text-primary-600 flex-shrink-0" />
@@ -321,18 +354,35 @@ export default function WhtCertificateList() {
                   <td className="table-cell text-right font-semibold text-rose-600 tabular-nums">{formatCurrency(cert.whtAmount)}</td>
                   <td className="table-cell text-right font-semibold text-gray-700 tabular-nums">{formatCurrency(cert.netAmount)}</td>
                   <td className="table-cell text-center">
-                    <button
-                      onClick={() => handleDownloadPdf(cert.id)}
-                      disabled={downloadingId === cert.id}
-                      className="btn-secondary p-2"
-                      title={isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
-                    >
-                      {downloadingId === cert.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                    </button>
+                    <div className="flex justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void openPreview(cert);
+                        }}
+                        className="btn-secondary p-2"
+                        title={isThai ? 'ดูตัวอย่าง' : 'Preview'}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDownloadPdf(cert.id);
+                        }}
+                        disabled={downloadingId === cert.id}
+                        className="btn-secondary p-2"
+                        title={isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
+                      >
+                        {downloadingId === cert.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -364,6 +414,22 @@ export default function WhtCertificateList() {
           </div>
         </div>
       )}
+
+      <DocumentPreviewSheet
+        open={Boolean(previewCert)}
+        title={isThai ? 'ใบรับรองหักภาษี ณ ที่จ่าย (50 ทวิ)' : 'Withholding tax certificate'}
+        description={previewCert?.recipientName}
+        documentNumber={previewCert?.certificateNumber ?? ''}
+        previewHtml={null}
+        previewUrl={previewUrl}
+        loading={previewLoading}
+        error={previewError}
+        downloading={previewCert ? downloadingId === previewCert.id : false}
+        onDownload={() => {
+          if (previewCert) void handleDownloadPdf(previewCert.id);
+        }}
+        onClose={closePreview}
+      />
     </div>
   );
 }

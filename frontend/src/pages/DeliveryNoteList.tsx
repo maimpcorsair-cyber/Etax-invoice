@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, CalendarClock, FileText, Loader2, CheckCircle, XCircle, Clock, Receipt, Truck, ExternalLink } from 'lucide-react';
+import { Plus, Search, CalendarClock, FileText, Loader2, CheckCircle, XCircle, Clock, Receipt, Truck, ExternalLink, Eye, Download } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
 import type { DeliveryNote, DeliveryNoteStatus } from '../types';
+import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
 
 const STATUS_LABELS: Record<DeliveryNoteStatus, { th: string; en: string; tone: string; icon: typeof Clock }> = {
   draft:     { th: 'แบบร่าง', en: 'Draft', tone: 'bg-slate-100 text-slate-700', icon: FileText },
@@ -39,6 +40,10 @@ export default function DeliveryNoteList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeliveryNoteStatus | 'all'>('all');
+  const [previewNote, setPreviewNote] = useState<DeliveryNote | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const readyToInvoice = deliveryNotes.filter((note) => note.status === 'delivered');
   const inTransit = deliveryNotes.filter((note) => note.status === 'issued');
@@ -103,6 +108,48 @@ export default function DeliveryNoteList() {
   }, [token, search, statusFilter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  async function openPreview(note: DeliveryNote) {
+    if (!token) return;
+    setPreviewNote(note);
+    setPreviewHtml(null);
+    setPreviewError(null);
+    try {
+      const res = await fetch(`/api/delivery-notes/${note.id}/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      setPreviewHtml(await res.text());
+    } catch (err) {
+      setPreviewError((err as Error).message);
+    }
+  }
+
+  function closePreview() {
+    setPreviewNote(null);
+    setPreviewHtml(null);
+    setPreviewError(null);
+  }
+
+  async function downloadPdf(note: DeliveryNote) {
+    if (!token) return;
+    setDownloadingId(note.id);
+    try {
+      const res = await fetch(`/api/delivery-notes/${note.id}/preview?format=pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${note.deliveryNoteNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -262,6 +309,7 @@ export default function DeliveryNoteList() {
                 <th className="table-header text-right">{isThai ? 'ส่ง / สั่ง' : 'Delivered / ordered'}</th>
                 <th className="table-header">{isThai ? 'การจัดส่ง' : 'Delivery'}</th>
                 <th className="table-header text-center">{isThai ? 'สถานะ' : 'Status'}</th>
+                <th className="table-header text-right">{isThai ? 'ไฟล์' : 'File'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -269,7 +317,7 @@ export default function DeliveryNoteList() {
                 const meta = statusMeta(note);
                 const Icon = meta.icon;
                 return (
-                  <tr key={note.id} onClick={() => navigate(`/app/delivery-notes/${note.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                  <tr key={note.id} onClick={() => void openPreview(note)} className="hover:bg-gray-50 cursor-pointer">
                     <td className="table-cell text-sm font-semibold text-primary-700 tabular-nums">{note.deliveryNoteNumber}</td>
                     <td className="table-cell">
                       <div className="font-medium text-gray-900">{note.buyer?.nameTh ?? '-'}</div>
@@ -298,6 +346,33 @@ export default function DeliveryNoteList() {
                         {isThai ? meta.th : meta.en}
                       </span>
                     </td>
+                    <td className="table-cell text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void openPreview(note);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          {isThai ? 'ดู' : 'View'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void downloadPdf(note);
+                          }}
+                          disabled={downloadingId === note.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          {downloadingId === note.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                          PDF
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -306,6 +381,22 @@ export default function DeliveryNoteList() {
           </div>
         </div>
       )}
+
+      <DocumentPreviewSheet
+        open={Boolean(previewNote)}
+        title={isThai ? 'ใบส่งของ' : 'Delivery note'}
+        description={previewNote?.buyer?.nameTh ?? previewNote?.buyer?.nameEn ?? undefined}
+        documentNumber={previewNote?.deliveryNoteNumber ?? ''}
+        previewHtml={previewHtml}
+        loading={Boolean(previewNote) && !previewHtml && !previewError}
+        error={previewError}
+        downloading={previewNote ? downloadingId === previewNote.id : false}
+        editHref={previewNote ? `/app/delivery-notes/${previewNote.id}` : undefined}
+        onDownload={() => {
+          if (previewNote) void downloadPdf(previewNote);
+        }}
+        onClose={closePreview}
+      />
     </div>
   );
 }
