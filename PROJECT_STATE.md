@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (PP.30 filed-return UI deployed)
+Last updated: 2026-06-05 (Outcrowd-style landing redesign deployed)
 
 ## Latest work (2026-06-05)
+
+Outcrowd-style landing page redesign:
+- **Frontend:** `Landing.tsx` first viewport was redesigned toward the Outcrowd-style direction: dark dramatic hero, floating pill navigation, huge Thai-first offer headline, orange/gold CTA energy, tilted Billboy tax-cockpit product preview, and surrounding AI Inbox / VAT ready / Drive evidence cards. The next sections were restyled to continue the dark product-story rhythm before pricing and signup.
+- **Brand fit:** kept Billboy's Thai SME/e-Tax story rather than agency copy: LINE document intake → AI review → Drive evidence → master sheet / PP.30 readiness. Mascot presence remains through the existing Billboy image card and product doodle field.
+- **Production:** commit `f86b7d8` pushed to `main`; GitHub Typecheck `26981697734`, Unit tests `26981697763`, and Prod smoke `26981697761` passed. Vercel deployment `dpl_7k4DubdEHJtFkZGQipfBWAsjTYvA` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** local `cd frontend && npm run typecheck`, `cd frontend && npm run build`, and `git diff --check` pass. Playwright MCP checked desktop `1440x900` and mobile `390x844` with no horizontal overflow. Local console errors were only `/api/billing/config` and `/api/auth/google/config` 500s from incomplete local backend config; production root returns `200`.
 
 PP.30 filed-return UI hook-up:
 - **Accounting workflow:** `Pp30Filing` now lets accountants record that a selected ภ.พ.30 period has already been filed with RD, with an optional RD reference/receipt number. The page also shows filed-period history, current-period filed status, net VAT figures, and Drive/PDF evidence links when the async Drive sync has completed.
