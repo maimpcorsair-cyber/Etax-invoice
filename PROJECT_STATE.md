@@ -1,6 +1,6 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (sales document preview sheet deployed)
+Last updated: 2026-06-05 (document ledger preview sheets expanded)
 
 ## Latest work (2026-06-05)
 
@@ -9,6 +9,11 @@ Sales document preview sheet:
 - **UX rule:** full document creation/editing remains page-based because invoice/quotation builders are long review workflows; quick table review is now modal/sheet-based so users do not lose their place in the ledger.
 - **Production:** commit `1819b09` pushed to `main`; GitHub Typecheck `26977095138`, Unit tests `26977095214`, and Prod smoke `26977095191` passed. Vercel deployment `dpl_5pLsDs2gDVpW6Tbf53v49qBTZfjL` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
 - **Verification:** local `cd frontend && npm run typecheck` and `cd frontend && npm run build` pass. Local browser smoke redirected protected `/app/invoices` to `/login` as expected; console noise was pre-existing React Router future warnings plus local `/api/auth/google/config` 500 from incomplete local backend config, not the preview component.
+
+Delivery note + WHT ledger preview expansion:
+- **Frontend:** `DocumentPreviewSheet` now supports either HTML preview or PDF blob preview. `DeliveryNoteList` opens the sheet from row click / "ดู", uses the existing HTML preview endpoint, keeps PDF download available, and keeps full editing on the delivery-note page. `WhtCertificateList` now opens 50 ทวิ PDFs in the same sheet from row click / "ดู" using the existing `/api/wht-certificates/:id/pdf` endpoint.
+- **Production:** commit `05d0ea0` pushed to `main`; GitHub Typecheck `26977702180`, Unit tests `26977702144`, and Prod smoke `26977702119` passed. Latest Vercel production deployment `https://etax-invoice-2zx0smv86-maimpcorsair-1177s-projects.vercel.app` is `Ready`.
+- **Verification:** local `cd frontend && npm run typecheck`, `cd frontend && npm run build`, and `git diff --check` pass. Public Vercel routes `/app/delivery-notes` and `/app/wht-certificates` return `200`.
 
 PP.30 filed → `9_แบบที่ยื่นแล้ว` (last audit-tree folder — now all wired):
 - **Schema:** new `VatFiling` model + migration `20260605_vat_filing` (`vat_filings`, unique on company+period). Snapshots the filed figures (output/input VAT, payable/refundable, total sales) + full PP.30 payload as `snapshot` JSON, plus `drive*` + `rdReference`/`filedBy`. Snapshot-at-filing so the document never drifts as later edits land.
