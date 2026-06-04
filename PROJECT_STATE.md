@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (PP.30 filed → Drive — audit tree complete)
+Last updated: 2026-06-05 (sales document preview sheet deployed)
 
 ## Latest work (2026-06-05)
+
+Sales document preview sheet:
+- **Frontend:** added reusable `DocumentPreviewSheet` for table-ledger document review. `InvoiceList` now opens the sheet when clicking an invoice row/card or "ดู", while the explicit edit button still goes to the full builder page. `QuotationList` now has the same preview sheet and a "ดู" action; downloads still use the existing PDF endpoints.
+- **UX rule:** full document creation/editing remains page-based because invoice/quotation builders are long review workflows; quick table review is now modal/sheet-based so users do not lose their place in the ledger.
+- **Production:** commit `1819b09` pushed to `main`; GitHub Typecheck `26977095138`, Unit tests `26977095214`, and Prod smoke `26977095191` passed. Vercel deployment `dpl_5pLsDs2gDVpW6Tbf53v49qBTZfjL` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** local `cd frontend && npm run typecheck` and `cd frontend && npm run build` pass. Local browser smoke redirected protected `/app/invoices` to `/login` as expected; console noise was pre-existing React Router future warnings plus local `/api/auth/google/config` 500 from incomplete local backend config, not the preview component.
 
 PP.30 filed → `9_แบบที่ยื่นแล้ว` (last audit-tree folder — now all wired):
 - **Schema:** new `VatFiling` model + migration `20260605_vat_filing` (`vat_filings`, unique on company+period). Snapshots the filed figures (output/input VAT, payable/refundable, total sales) + full PP.30 payload as `snapshot` JSON, plus `drive*` + `rdReference`/`filedBy`. Snapshot-at-filing so the document never drifts as later edits land.
