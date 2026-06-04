@@ -1,12 +1,17 @@
 import { Router } from 'express';
+import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { tenantRlsContext, withRlsContext } from '../config/rls';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireRole } from '../middleware/auth';
 import {
   hasFeatureAccess,
   resolveCompanyAccessPolicy,
 } from '../services/accessPolicyService';
 import { exportPp30ToSheets } from '../services/googleSheetsService';
+import { syncVatFilingToDrive } from '../services/projectDriveSyncService';
+import { enqueueMasterSheetSync } from '../queues';
+import { auditLog } from '../services/auditService';
 import { logger } from '../config/logger';
 
 export const pp30Router = Router();
@@ -203,6 +208,107 @@ pp30Router.get('/', async (req, res) => {
   } catch (err) {
     logger.error('Failed to compute PP.30', { error: err });
     res.status(500).json({ error: 'Failed to compute PP.30' });
+  }
+});
+
+/* ─── Mark a period's PP.30 as filed (snapshot + Drive evidence) ─── */
+const fileSchema = z.object({
+  year: z.union([z.string(), z.number()]),
+  month: z.union([z.string(), z.number()]),
+  rdReference: z.string().trim().max(120).optional(),
+  filedAt: z.string().optional(),
+});
+
+pp30Router.post('/file', requireRole('admin', 'super_admin', 'accountant'), async (req, res) => {
+  try {
+    const body = fileSchema.parse(req.body);
+    const range = parseYearMonth(String(body.year), String(body.month));
+    if (!range) {
+      res.status(400).json({ error: '`year` and `month` are required (e.g. year=2026, month=4)' });
+      return;
+    }
+
+    const data = await buildPp30({ user: req.user! }, range.from, range.to);
+    const snapshot = { period: range.period, ...data } as unknown as Prisma.InputJsonValue;
+    const filedAt = body.filedAt ? new Date(body.filedAt) : new Date();
+
+    const filing = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.vatFiling.upsert({
+      where: { companyId_period: { companyId: req.user!.companyId, period: range.period } },
+      create: {
+        companyId: req.user!.companyId,
+        period: range.period,
+        filedAt,
+        rdReference: body.rdReference ?? null,
+        outputVat: data.summary.outputVat,
+        inputVat: data.summary.inputVat,
+        vatPayable: data.summary.vatPayable,
+        vatRefundable: data.summary.vatRefundable,
+        totalSalesExclVat: data.summary.totalSalesExclVat,
+        snapshot,
+        filedBy: req.user!.userId,
+      },
+      // Re-filing a period overwrites the snapshot and clears the old Drive
+      // file id so syncVatFilingToDrive re-uploads the corrected return.
+      update: {
+        filedAt,
+        rdReference: body.rdReference ?? null,
+        outputVat: data.summary.outputVat,
+        inputVat: data.summary.inputVat,
+        vatPayable: data.summary.vatPayable,
+        vatRefundable: data.summary.vatRefundable,
+        totalSalesExclVat: data.summary.totalSalesExclVat,
+        snapshot,
+        filedBy: req.user!.userId,
+        driveFileId: null,
+        driveUrl: null,
+      },
+    }));
+
+    await auditLog({
+      companyId: req.user!.companyId,
+      userId: req.user!.userId,
+      role: req.user!.role,
+      action: 'vat_filing.file',
+      resourceType: 'vat_filing',
+      resourceId: filing.id,
+      details: { period: range.period, vatPayable: data.summary.vatPayable, vatRefundable: data.summary.vatRefundable },
+      ipAddress: req.ip ?? '',
+      userAgent: req.get('user-agent') ?? '',
+      language: 'th',
+    });
+
+    void syncVatFilingToDrive(filing.id)
+      .then(() => enqueueMasterSheetSync(req.user!.companyId))
+      .catch((error) => logger.warn('Failed to sync PP.30 filing to Drive', { error, vatFilingId: filing.id }));
+    void enqueueMasterSheetSync(req.user!.companyId);
+
+    res.status(201).json({ data: filing });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: err.errors });
+      return;
+    }
+    logger.error('Failed to file PP.30', { error: err });
+    res.status(500).json({ error: 'Failed to record PP.30 filing' });
+  }
+});
+
+/* ─── List filed PP.30 periods ─── */
+pp30Router.get('/filings', async (req, res) => {
+  try {
+    const filings = await withRlsContext(prisma, tenantRlsContext(req.user!), (tx) => tx.vatFiling.findMany({
+      where: { companyId: req.user!.companyId },
+      orderBy: { period: 'desc' },
+      select: {
+        id: true, period: true, filedAt: true, rdReference: true,
+        outputVat: true, inputVat: true, vatPayable: true, vatRefundable: true,
+        driveUrl: true, driveFolderUrl: true,
+      },
+    }));
+    res.json({ data: filings });
+  } catch (err) {
+    logger.error('Failed to list PP.30 filings', { error: err });
+    res.status(500).json({ error: 'Failed to list PP.30 filings' });
   }
 });
 

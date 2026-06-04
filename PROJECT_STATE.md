@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (payslip Drive mirror)
+Last updated: 2026-06-05 (PP.30 filed → Drive — audit tree complete)
 
 ## Latest work (2026-06-05)
+
+PP.30 filed → `9_แบบที่ยื่นแล้ว` (last audit-tree folder — now all wired):
+- **Schema:** new `VatFiling` model + migration `20260605_vat_filing` (`vat_filings`, unique on company+period). Snapshots the filed figures (output/input VAT, payable/refundable, total sales) + full PP.30 payload as `snapshot` JSON, plus `drive*` + `rdReference`/`filedBy`. Snapshot-at-filing so the document never drifts as later edits land.
+- **New PDF:** `pp30Pdf.ts` renders the ภ.พ.30 summary (sales/purchases by VAT type, payable/refundable) — same Puppeteer pipeline.
+- **Route:** `POST /pp30/file` (admin/accountant) computes the period via the existing `buildPp30`, upserts the filing, then `syncVatFilingToDrive` files the PDF under `9_แบบที่ยื่นแล้ว` bucketed by the **tax-period month** (not filing date) + master-sheet re-sync. `GET /pp30/filings` lists them. Re-filing a period overwrites the snapshot and re-uploads.
+- **Master sheet:** new `ภ.พ.30 ที่ยื่นแล้ว` tab (งวด · วันที่ยื่น · เลขที่รับ · ภาษีขาย/ซื้อ · ต้องชำระ/ขอคืน · 📎ไฟล์ · โฟลเดอร์).
+- **Verification:** `prisma generate`, local `db push`, `npm run typecheck`, `npm run test:unit` (126/126) pass. Live check after deploy: `POST /api/pp30/file` for a period with a connected Drive owner → PDF in `9_แบบที่ยื่นแล้ว` + master sheet ภ.พ.30 tab row.
+- **Audit tree now complete:** 1_ภาษีขาย · 2_ภาษีซื้อ · 3_ค่าใช้จ่าย · 4_หัก ณ ที่จ่าย · 5_เงินเดือน · 00_เอกสารบริษัท · 9_แบบที่ยื่นแล้ว. (Frontend "file PP.30" button is the remaining UX hook-up; route is live.)
 
 Payslip → Drive (completes the payroll half of the audit tree):
 - **New PDF:** `payslipPdf.ts` renders a Thai สลิปเงินเดือน (HTML→PDF via the same Puppeteer `launchBrowser` pipeline as the WHT 50ทวิ). Payroll never produced a stored document before.
