@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (recurring schedule quick sheet deployed)
+Last updated: 2026-06-05 (PP.30 filed-return UI deployed)
 
 ## Latest work (2026-06-05)
+
+PP.30 filed-return UI hook-up:
+- **Accounting workflow:** `Pp30Filing` now lets accountants record that a selected ภ.พ.30 period has already been filed with RD, with an optional RD reference/receipt number. The page also shows filed-period history, current-period filed status, net VAT figures, and Drive/PDF evidence links when the async Drive sync has completed.
+- **System chain:** the new UI calls the already-live `POST /api/pp30/file` route, which snapshots the period figures, creates the filed PP.30 PDF in Drive under `9_แบบที่ยื่นแล้ว`, and re-syncs the master sheet tab `ภ.พ.30 ที่ยื่นแล้ว`.
+- **Production:** commit `8b6f839` pushed to `main`; GitHub Typecheck `26979175634`, Unit tests `26979175636`, push Prod smoke `26979175591`, and scheduled Prod smoke `26979204277` passed. Vercel deployment `dpl_FawRv76pxphM5xHLnGMjmCUxsorT` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** local `cd frontend && npm run typecheck`, `cd frontend && npm run build`, and `git diff --check` pass. Public Vercel route `/app/pp30` returns `200`.
 
 Sales document preview sheet:
 - **Frontend:** added reusable `DocumentPreviewSheet` for table-ledger document review. `InvoiceList` now opens the sheet when clicking an invoice row/card or "ดู", while the explicit edit button still goes to the full builder page. `QuotationList` now has the same preview sheet and a "ดู" action; downloads still use the existing PDF endpoints.
