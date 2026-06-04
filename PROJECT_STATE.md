@@ -45,7 +45,7 @@ Drive vault canonical folder link follow-up:
 
 Master sheet queue cleanup follow-up:
 - **Backend:** added super-admin-only `POST /api/system/queues/master-sheet/failed/clean` to remove old BullMQ failed jobs from `master-sheet-sync` without touching waiting/active/delayed work. This is ops cleanup for stale failed counts after Drive was reconnected, not part of normal tenant workflow.
-- **Verification:** local `cd backend && npm run typecheck` passes. After deploy, call the endpoint with a super-admin token and confirm `/api/health/workers` reports `master-sheet-sync.failed: 0`.
+- **Production:** commit `7db58d9` pushed to `main`; GitHub Typecheck `26921090240`, Unit tests `26921090245`, and Prod smoke `26921090215` passed. Render deploy workflow `26921146823` passed. Authenticated production cleanup returned `before: 3`, `after: 0`, `removed: 3`; `/api/health/workers` now reports `master-sheet-sync.failed: 0` and `lastFailedReason: null`.
 
 Drive register audit-ready P0:
 - **Backend:** Drive filing now uses a single `Projects` folder name for project workspace creation from both normal project uploads and tax-period uploads; the old tax-folder path no longer creates a separate `_โปรเจค` sibling.
