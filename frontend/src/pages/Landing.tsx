@@ -577,29 +577,29 @@ export default function Landing() {
     <div className="app-shell">
       <ProductDoodleField />
       {/* Header */}
-      <header className="fixed inset-x-0 top-4 z-50 px-4">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between rounded-[22px] border border-white/10 bg-[#151719]/96 px-4 text-white shadow-[0_22px_70px_rgba(0,0,0,0.32)] backdrop-blur-sm sm:px-5">
-          <Link to="/" className="group flex items-center gap-3 text-white hover:text-white">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary-800 shadow-[0_10px_28px_rgba(255,255,255,0.12)]">
+      <header className="fixed inset-x-0 top-4 z-50 px-3 sm:px-4">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between rounded-[22px] border border-white/80 bg-white/90 px-3 text-slate-950 shadow-[0_20px_70px_rgba(30,58,138,0.16)] backdrop-blur-xl sm:px-5">
+          <Link to="/" className="group flex items-center gap-3 text-slate-950 hover:text-primary-800">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-700 text-white shadow-[0_12px_30px_rgba(30,58,138,0.26)] transition group-hover:-translate-y-0.5">
               <FileText className="h-5 w-5" strokeWidth={2.6} />
             </span>
             <span className="text-lg font-bold">{t('app.shortName')}</span>
           </Link>
-          <nav className="hidden items-center gap-8 text-sm font-semibold text-white/60 md:flex">
-            <a href="#features" className="text-white/60 hover:text-white">{isThai ? 'ระบบ' : 'Product'}</a>
-            <a href="#workflow" className="text-white/60 hover:text-white">{isThai ? 'Workflow' : 'Workflow'}</a>
-            <a href="#pricing-checkout" className="text-white/60 hover:text-white">{isThai ? 'ราคา' : 'Pricing'}</a>
-            <Link to="/contact" className="text-white/60 hover:text-white">{isThai ? 'ติดต่อ' : 'Contact'}</Link>
+          <nav className="hidden items-center gap-7 text-sm font-semibold text-slate-500 md:flex">
+            <a href="#features" className="text-slate-500 hover:text-primary-800">{isThai ? 'ระบบ' : 'Product'}</a>
+            <a href="#workflow" className="text-slate-500 hover:text-primary-800">{isThai ? 'Workflow' : 'Workflow'}</a>
+            <a href="#pricing-checkout" className="text-slate-500 hover:text-primary-800">{isThai ? 'ราคา' : 'Pricing'}</a>
+            <Link to="/contact" className="text-slate-500 hover:text-primary-800">{isThai ? 'ติดต่อ' : 'Contact'}</Link>
           </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <LanguageSwitcher variant="toggle" />
-            <a href={getPlanePath('/login', 'app')} className="hidden rounded-2xl px-3 py-2 text-sm font-semibold text-white/70 hover:bg-white/[0.08] hover:text-white sm:inline-flex">
+            <a href={getPlanePath('/login', 'app')} className="hidden rounded-2xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-primary-50 hover:text-primary-800 sm:inline-flex">
               {t('auth.login')}
             </a>
             <button
               type="button"
               onClick={() => openCheckout('free')}
-              className="inline-flex items-center justify-center rounded-2xl bg-[#f15b3a] px-4 py-2.5 text-sm font-bold text-white shadow-[0_16px_34px_rgba(241,91,58,0.32)] transition hover:-translate-y-0.5 hover:bg-[#ff6b47] sm:px-5"
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-primary-700 px-3 py-2 text-sm font-bold text-white shadow-[0_14px_34px_rgba(30,58,138,0.26)] transition hover:-translate-y-0.5 hover:bg-primary-800 sm:px-5"
             >
               {isThai ? 'เริ่มใช้ฟรี' : 'Start free'}
             </button>
@@ -608,24 +608,24 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section ref={heroMotionRef} className="relative isolate min-h-[820px] overflow-hidden bg-[#07090b] pt-24 text-white sm:min-h-[860px] lg:min-h-[900px]">
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(115deg,rgba(45,212,191,0.13)_0%,transparent_28%),linear-gradient(245deg,rgba(201,168,76,0.12)_0%,transparent_26%),linear-gradient(180deg,#090b0d_0%,#060708_72%,#111827_100%)]" />
-        <div className="absolute inset-x-0 top-0 -z-10 h-80 bg-[linear-gradient(180deg,rgba(30,58,138,0.12),transparent)]" />
-        <div className="absolute left-1/2 top-[17rem] -z-10 h-[30rem] w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.28),transparent)]" />
+      <section ref={heroMotionRef} className="relative isolate min-h-[850px] overflow-hidden bg-[linear-gradient(180deg,rgba(250,252,255,0.94),rgba(241,246,252,0.9)_62%,rgba(255,255,255,0.96))] pt-24 text-slate-950 sm:min-h-[900px] lg:min-h-[930px]">
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(120deg,rgba(45,212,191,0.13)_0%,transparent_30%),linear-gradient(250deg,rgba(30,58,138,0.12)_0%,transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.62),rgba(239,245,251,0.88))]" />
+        <div className="absolute inset-x-0 top-0 -z-10 h-36 border-b border-white/70 bg-white/40 backdrop-blur-[2px]" />
+        <div className="absolute left-1/2 top-[18rem] -z-10 h-[34rem] w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(30,58,138,0.16),transparent)]" />
 
-        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
           <div
-            className="relative mx-auto max-w-5xl pt-16 text-center sm:pt-20"
+            className="relative mx-auto max-w-5xl pt-14 text-center sm:pt-20"
             style={{
-              opacity: 'calc(1 - var(--hero-scroll, 0) * 0.42)',
-              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -170px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.035))',
+              opacity: 'calc(1 - var(--hero-scroll, 0) * 0.36)',
+              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -150px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.025))',
               willChange: 'transform, opacity',
             }}
           >
-            <h1 className="mx-auto max-w-5xl text-balance text-5xl font-semibold leading-[0.98] text-white sm:text-6xl lg:text-7xl xl:text-[5.8rem]">
+            <h1 className="mx-auto max-w-5xl text-balance text-5xl font-semibold leading-[0.98] text-slate-950 sm:text-6xl lg:text-7xl xl:text-[5.8rem]">
               {isThai ? 'เอกสารเข้า LINE วันนี้ ภาษีพร้อมส่งพรุ่งนี้' : 'Documents in today. Tax-ready tomorrow.'}
             </h1>
-            <p className="mx-auto mt-7 max-w-3xl text-pretty text-base leading-8 text-white/70 sm:text-lg">
+            <p className="mx-auto mt-7 max-w-3xl text-pretty text-base leading-8 text-slate-600 sm:text-lg">
               {isThai
                 ? 'AI อ่านบิล สลิป และใบกำกับภาษี แล้วจัดเข้าคลัง Drive + สมุดทะเบียนภาษีให้ทีมบัญชีตรวจต่อได้ทันที'
                 : 'AI reads bills, slips, and tax invoices, then organizes Drive evidence and tax registers for the accounting team.'}
@@ -634,14 +634,14 @@ export default function Landing() {
               <button
                 type="button"
                 onClick={() => openCheckout('free')}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#f15b3a] px-6 py-3 text-base font-bold text-white shadow-[0_18px_46px_rgba(241,91,58,0.34)] transition hover:-translate-y-1 hover:bg-[#ff6b47]"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-primary-700 px-6 py-3 text-base font-bold text-white shadow-[0_18px_46px_rgba(30,58,138,0.28)] transition hover:-translate-y-1 hover:bg-primary-800"
               >
                 {isThai ? 'เริ่มทดลองใช้ฟรี' : 'Start free trial'}
                 <ArrowRight className="h-5 w-5" />
               </button>
               <a
                 href="#workflow"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.08] px-6 py-3 text-base font-bold text-white shadow-[0_16px_42px_rgba(0,0,0,0.22)] backdrop-blur transition hover:-translate-y-1 hover:bg-white/[0.12]"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-6 py-3 text-base font-bold text-primary-800 shadow-[0_16px_42px_rgba(15,23,42,0.08)] backdrop-blur transition hover:-translate-y-1 hover:border-primary-200 hover:bg-primary-50"
               >
                 {isThai ? 'ดูตัวอย่าง workflow' : 'See workflow'}
                 <Smartphone className="h-5 w-5" />
@@ -649,40 +649,40 @@ export default function Landing() {
             </div>
           </div>
 
-          <div className="pointer-events-none relative mx-auto mt-10 min-h-[440px] max-w-6xl sm:min-h-[500px] lg:mt-12">
+          <div className="pointer-events-none relative mx-auto mt-10 min-h-[500px] max-w-6xl sm:min-h-[560px] lg:mt-12">
             <div
-              className="absolute left-0 top-8 hidden w-[17rem] rounded-[24px] border border-white/12 bg-[#1b1d20]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block"
+              className="absolute left-0 top-8 hidden w-[17rem] rounded-[24px] border border-white/80 bg-white/95 p-5 shadow-[0_24px_64px_rgba(30,58,138,0.16)] backdrop-blur-xl lg:block"
               style={{
                 opacity: 'calc(1 - var(--hero-scroll, 0) * 0.18)',
                 transform: 'translate3d(calc(var(--hero-scroll, 0) * -88px), calc(var(--hero-scroll, 0) * -245px), 0) rotate(calc(var(--hero-scroll, 0) * -4deg))',
                 willChange: 'transform, opacity',
               }}
             >
-              <div className="flex items-center justify-between text-xs font-semibold text-white/60">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                 <span>{isThai ? 'AI Inbox' : 'AI Inbox'}</span>
-                <span className="rounded-full bg-[#f15b3a] px-2 py-1 text-white">89</span>
+                <span className="rounded-full bg-primary-700 px-2 py-1 text-white">89</span>
               </div>
               <div className="mt-5 space-y-3">
                 {[
-                  { label: isThai ? 'ใบซื้อรอตรวจ' : 'Purchases to review', value: '34', color: 'bg-amber-300' },
-                  { label: isThai ? 'สลิปรอจับคู่' : 'Slips to match', value: '12', color: 'bg-teal-300' },
-                  { label: isThai ? 'พร้อมบันทึก' : 'Ready to post', value: '43', color: 'bg-emerald-400' },
+                  { label: isThai ? 'ใบซื้อรอตรวจ' : 'Purchases to review', value: '34', color: 'bg-amber-400' },
+                  { label: isThai ? 'สลิปรอจับคู่' : 'Slips to match', value: '12', color: 'bg-teal-400' },
+                  { label: isThai ? 'พร้อมบันทึก' : 'Ready to post', value: '43', color: 'bg-emerald-500' },
                 ].map((item) => (
                   <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-3">
                     <div>
-                      <div className="text-xs text-white/60">{item.label}</div>
-                      <div className="mt-2 h-2 rounded-full bg-white/[0.08]">
+                      <div className="text-xs text-slate-500">{item.label}</div>
+                      <div className="mt-2 h-2 rounded-full bg-slate-100">
                         <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${36 + Number(item.value)}%` }} />
                       </div>
                     </div>
-                    <span className="text-xl font-bold text-white">{item.value}</span>
+                    <span className="text-xl font-bold text-slate-950">{item.value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <div
-              className="absolute right-0 top-10 hidden w-[18rem] rounded-[24px] border border-white/12 bg-[#17191c]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block"
+              className="absolute right-0 top-10 hidden w-[18rem] rounded-[24px] border border-white/80 bg-white/95 p-5 shadow-[0_24px_64px_rgba(30,58,138,0.16)] backdrop-blur-xl lg:block"
               style={{
                 opacity: 'calc(1 - var(--hero-scroll, 0) * 0.16)',
                 transform: 'translate3d(calc(var(--hero-scroll, 0) * 86px), calc(var(--hero-scroll, 0) * -285px), 0) rotate(calc(var(--hero-scroll, 0) * 3deg))',
@@ -690,72 +690,72 @@ export default function Landing() {
               }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white/60">{isThai ? 'VAT Ready' : 'VAT Ready'}</span>
-                <ShieldCheck className="h-5 w-5 text-emerald-300" />
+                <span className="text-xs font-semibold text-slate-500">{isThai ? 'VAT Ready' : 'VAT Ready'}</span>
+                <ShieldCheck className="h-5 w-5 text-emerald-600" />
               </div>
               <div className="mt-5 grid grid-cols-4 items-end gap-2">
                 {[42, 58, 48, 82].map((height, index) => (
                   <div key={index} className="flex flex-col items-center gap-2">
-                    <div className="w-full rounded-xl bg-white/[0.08] p-1">
-                      <div className={`rounded-lg ${index === 3 ? 'bg-emerald-300' : 'bg-white/[0.18]'}`} style={{ height }} />
+                    <div className="w-full rounded-xl bg-slate-100 p-1">
+                      <div className={`rounded-lg ${index === 3 ? 'bg-emerald-500' : 'bg-primary-200'}`} style={{ height }} />
                     </div>
-                    <span className="text-[10px] text-white/40">{['ขาย','ซื้อ','WHT','PP30'][index]}</span>
+                    <span className="text-[10px] text-slate-400">{['ขาย','ซื้อ','WHT','PP30'][index]}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-5 rounded-2xl bg-emerald-300 px-4 py-3 text-sm font-bold text-emerald-950">
+              <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">
                 {isThai ? 'พร้อมยื่น ภ.พ.30' : 'PP.30 ready'}
               </div>
             </div>
 
             <div
-              className="absolute left-1/2 top-0 w-[min(92vw,760px)] rounded-[30px] border border-white/12 bg-[#151719] p-3 shadow-[0_40px_120px_rgba(0,0,0,0.55)] sm:top-3 sm:p-4"
+              className="absolute left-1/2 top-0 w-[min(94vw,820px)] rounded-[30px] border border-white/80 bg-white/95 p-3 shadow-[0_42px_120px_rgba(30,58,138,0.22)] backdrop-blur-xl sm:top-3 sm:p-4"
               style={{
-                transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -300px), 0) rotate(calc(-3deg + var(--hero-scroll, 0) * 3deg)) scale(calc(1 + var(--hero-scroll, 0) * 0.08))',
+                transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -300px), 0) rotate(calc(-2.2deg + var(--hero-scroll, 0) * 2.2deg)) scale(calc(1 + var(--hero-scroll, 0) * 0.07))',
                 willChange: 'transform',
               }}
             >
-              <div className="rounded-[22px] border border-white/10 bg-[#0d0f12] p-4 sm:p-5">
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff,#f7faff)] p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-primary-800">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-700 text-white shadow-[0_12px_28px_rgba(30,58,138,0.2)]">
                       <FileText className="h-5 w-5" />
                     </span>
                     <div className="text-left">
-                      <div className="text-sm font-bold text-white">Billboy Tax Cockpit</div>
-                      <div className="text-xs text-white/40">{isThai ? 'ดม จำกัด · มิ.ย. 2569' : 'Demo Co. · Jun 2026'}</div>
+                      <div className="text-sm font-bold text-slate-950">Billboy Tax Cockpit</div>
+                      <div className="text-xs text-slate-500">{isThai ? 'ดม จำกัด · มิ.ย. 2569' : 'Demo Co. · Jun 2026'}</div>
                     </div>
                   </div>
-                  <span className="rounded-full bg-white/[0.08] px-3 py-1.5 text-xs font-semibold text-white/70">{isThai ? 'ซิงก์ Drive แล้ว' : 'Drive synced'}</span>
+                  <span className="rounded-full bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800 ring-1 ring-primary-100">{isThai ? 'ซิงก์ Drive แล้ว' : 'Drive synced'}</span>
                 </div>
-                <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="mt-5 grid gap-4 md:grid-cols-[1.25fr_0.85fr]">
                   <div className="space-y-3">
                     {[
                       { name: isThai ? 'SYSTEM STANDARD' : 'SYSTEM STANDARD', meta: isThai ? 'ใบกำกับภาษีซื้อ · ฿1,070.00' : 'Purchase invoice · ฿1,070.00', status: isThai ? 'รอยืนยัน' : 'Review' },
                       { name: isThai ? 'SCB มณี SHOP' : 'SCB Manee SHOP', meta: isThai ? 'สลิปโอนเงิน · ฿176.00' : 'Bank slip · ฿176.00', status: isThai ? 'จับคู่สลิป' : 'Match slip' },
                       { name: isThai ? 'ขายสินค้าออนไลน์' : 'Online sale', meta: isThai ? 'e-Tax XML + PDF · พร้อมส่ง RD' : 'e-Tax XML + PDF · RD ready', status: isThai ? 'พร้อมส่ง' : 'Ready' },
                     ].map((row) => (
-                      <div key={row.name} className="grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3 text-left">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white">
+                      <div key={row.name} className="grid grid-cols-[44px_1fr] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.04)] sm:grid-cols-[44px_1fr_auto]">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-800">
                           <FileCheck className="h-5 w-5" />
                         </span>
                         <span>
-                          <span className="block text-sm font-bold text-white">{row.name}</span>
-                          <span className="block text-xs text-white/50">{row.meta}</span>
+                          <span className="block text-sm font-bold text-slate-950">{row.name}</span>
+                          <span className="block text-xs text-slate-500">{row.meta}</span>
                         </span>
-                        <span className="rounded-full bg-[#f3c84b] px-3 py-1 text-xs font-bold text-[#2d2410]">{row.status}</span>
+                        <span className="col-span-2 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 sm:col-span-1">{row.status}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 text-left">
-                    <div className="text-xs font-semibold text-white/60">{isThai ? 'สมุดทะเบียนภาษี' : 'Tax register'}</div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 text-left shadow-[0_18px_44px_rgba(15,23,42,0.18)]">
+                    <div className="text-xs font-semibold text-slate-300">{isThai ? 'สมุดทะเบียนภาษี' : 'Tax register'}</div>
                     <div className="mt-3 text-3xl font-bold text-white">฿28,420</div>
-                    <p className="mt-1 text-xs text-white/50">{isThai ? 'ภาษีซื้อรอตรวจ 9 รายการ' : '9 input-VAT items need review'}</p>
+                    <p className="mt-1 text-xs text-slate-400">{isThai ? 'ภาษีซื้อรอตรวจ 9 รายการ' : '9 input-VAT items need review'}</p>
                     <div className="mt-5 space-y-2">
                       {['1_ภาษีขาย','2_ภาษีซื้อ','9_แบบที่ยื่นแล้ว'].map((label, index) => (
                         <div key={label} className="flex items-center justify-between rounded-xl bg-white/[0.07] px-3 py-2 text-xs">
-                          <span className="text-white/70">{label}</span>
-                          <span className={index === 2 ? 'text-emerald-300' : 'text-white/50'}>{index === 2 ? 'Ready' : 'Synced'}</span>
+                          <span className="text-slate-200">{label}</span>
+                          <span className={index === 2 ? 'text-emerald-300' : 'text-slate-400'}>{index === 2 ? 'Ready' : 'Synced'}</span>
                         </div>
                       ))}
                     </div>
@@ -765,17 +765,17 @@ export default function Landing() {
             </div>
 
             <div
-              className="absolute bottom-4 left-[8%] hidden rounded-full bg-[#f15b3a] px-7 py-6 text-center shadow-[0_24px_70px_rgba(241,91,58,0.34)] md:block"
+              className="absolute bottom-8 left-[8%] hidden rounded-[28px] border border-white/80 bg-white px-7 py-6 text-center text-primary-900 shadow-[0_24px_70px_rgba(30,58,138,0.16)] md:block"
               style={{
                 transform: 'translate3d(calc(var(--hero-scroll, 0) * -30px), calc(var(--hero-scroll, 0) * -230px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.18))',
                 willChange: 'transform',
               }}
             >
               <div className="text-4xl font-bold">3m</div>
-              <div className="mt-1 text-xs font-semibold text-white/80">{isThai ? 'จากรูปถึง draft' : 'photo to draft'}</div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">{isThai ? 'จากรูปถึง draft' : 'photo to draft'}</div>
             </div>
             <div
-              className="absolute bottom-16 right-[10%] hidden h-36 w-36 items-center justify-center rounded-full bg-[#3578ff] text-center shadow-[0_28px_80px_rgba(53,120,255,0.35)] md:flex"
+              className="absolute bottom-20 right-[10%] hidden h-36 w-36 items-center justify-center rounded-[34px] bg-primary-700 text-center text-white shadow-[0_28px_80px_rgba(30,58,138,0.26)] md:flex"
               style={{
                 transform: 'translate3d(calc(var(--hero-scroll, 0) * 40px), calc(var(--hero-scroll, 0) * -270px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.12))',
                 willChange: 'transform',
@@ -787,7 +787,7 @@ export default function Landing() {
               </div>
             </div>
             <div
-              className="absolute bottom-0 left-1/2 w-[min(78vw,430px)] rounded-[28px] border border-white/12 bg-white p-4 text-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.48)] sm:bottom-[-1rem]"
+              className="absolute bottom-0 left-1/2 w-[min(88vw,430px)] rounded-[28px] border border-white/80 bg-white p-4 text-slate-950 shadow-[0_30px_90px_rgba(30,58,138,0.18)] sm:bottom-[-1rem]"
               style={{
                 transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -255px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.04))',
                 willChange: 'transform',
@@ -810,10 +810,10 @@ export default function Landing() {
               { title: isThai ? 'บัญชีกดยืนยัน' : 'Accountant reviews', desc: isThai ? 'แก้เฉพาะรายการเสี่ยง' : 'Only risky items need edits' },
               { title: isThai ? 'พร้อมยื่นภาษี' : 'Tax-ready', desc: isThai ? 'Drive + master sheet ครบ' : 'Drive and sheets complete' },
             ].map((step, index) => (
-              <div key={step.title} className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur">
-                <div className="text-xs font-bold text-[#f3c84b]">0{index + 1}</div>
-                <div className="mt-3 text-sm font-bold text-white">{step.title}</div>
-                <div className="mt-1 text-xs leading-5 text-white/50">{step.desc}</div>
+              <div key={step.title} className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-[0_16px_40px_rgba(30,58,138,0.08)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white">
+                <div className="text-xs font-bold text-primary-700">0{index + 1}</div>
+                <div className="mt-3 text-sm font-bold text-slate-950">{step.title}</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">{step.desc}</div>
               </div>
             ))}
           </div>
@@ -821,16 +821,16 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative overflow-hidden bg-[#111827] py-24 text-white">
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(45,212,191,0.12)_0%,transparent_34%),linear-gradient(250deg,rgba(241,91,58,0.11)_0%,transparent_32%)]" />
+      <section id="features" className="relative overflow-hidden border-y border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(242,247,252,0.9))] py-24">
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(45,212,191,0.1)_0%,transparent_34%),linear-gradient(250deg,rgba(201,168,76,0.13)_0%,transparent_32%)]" />
         <div className="relative z-10 mx-auto max-w-6xl px-4">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
             <div>
-              <h2 className="max-w-3xl text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl">
+              <h2 className="max-w-3xl text-balance text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
                 {isThai ? 'ไม่ใช่หน้าออกใบกำกับอีกหน้า แต่เป็นห้องควบคุมภาษีของทั้งบริษัท' : 'Not another invoice screen. A tax cockpit for the whole company.'}
               </h2>
             </div>
-            <p className="max-w-2xl text-base leading-8 text-white/60">
+            <p className="max-w-2xl text-base leading-8 text-slate-600">
               {isThai
                 ? 'เจ้าของส่งเอกสารจากมือถือ ทีมบัญชีตรวจจาก ledger และระบบเก็บหลักฐานไว้ให้ auditor ตามรอบภาษีเดียวกัน'
                 : 'Owners send documents from mobile, accountants review from ledgers, and evidence is filed for audit by tax period.'}
@@ -839,19 +839,19 @@ export default function Landing() {
 
           <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {features.map(({ icon: Icon, key }, i) => {
-              const accents = ['text-[#f15b3a]', 'text-teal-300', 'text-[#f3c84b]', 'text-emerald-300'];
+              const accents = ['text-primary-800 bg-primary-50', 'text-teal-700 bg-teal-50', 'text-amber-700 bg-amber-50', 'text-emerald-700 bg-emerald-50'];
               return (
                 <div
                   key={key}
-                  className="group rounded-[24px] border border-white/10 bg-white/[0.055] p-6 shadow-[0_22px_70px_rgba(0,0,0,0.22)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white/[0.08]"
+                  className="group rounded-[24px] border border-white/80 bg-white/90 p-6 shadow-[0_22px_70px_rgba(30,58,138,0.1)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-[0_28px_80px_rgba(30,58,138,0.14)]"
                 >
-                  <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.09] ${accents[i % accents.length]}`}>
+                  <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${accents[i % accents.length]}`}>
                     <Icon className="h-6 w-6" strokeWidth={2.2} />
                   </div>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-slate-950">
                     {t(`landing.features.${key}.title`)}
                   </h3>
-                  <p className="mt-3 text-sm leading-7 text-white/60">
+                  <p className="mt-3 text-sm leading-7 text-slate-600">
                     {t(`landing.features.${key}.desc`)}
                   </p>
                 </div>
