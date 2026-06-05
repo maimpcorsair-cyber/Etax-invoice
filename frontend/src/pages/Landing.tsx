@@ -99,6 +99,7 @@ export default function Landing() {
   const { t, i18n } = useTranslation();
   const isThai = i18n.language === 'th';
   const { setAuth } = useAuthStore();
+  const heroMotionRef = useRef<HTMLElement | null>(null);
   const googleSignupRef = useRef<HTMLDivElement | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'starter' | 'business'>('business');
   const [config, setConfig] = useState<{
@@ -277,6 +278,47 @@ export default function Landing() {
     }
     loadBillingConfig();
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const section = heroMotionRef.current;
+    if (!section) return undefined;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let frame = 0;
+
+    const readScrollTop = () => Math.max(
+      window.scrollY,
+      document.documentElement.scrollTop,
+      document.body.scrollTop,
+    );
+
+    const updateMotion = () => {
+      frame = 0;
+      const maxDistance = Math.min(window.innerHeight * 0.9, 760);
+      const rawProgress = maxDistance > 0 ? readScrollTop() / maxDistance : 0;
+      const progress = reducedMotion.matches ? 0 : Math.max(0, Math.min(rawProgress, 1));
+      section.style.setProperty('--hero-scroll', progress.toFixed(4));
+    };
+
+    const queueMotion = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateMotion);
+    };
+
+    updateMotion();
+    window.addEventListener('scroll', queueMotion, { passive: true });
+    window.addEventListener('resize', queueMotion);
+    document.body.addEventListener('scroll', queueMotion, { passive: true });
+    reducedMotion.addEventListener('change', queueMotion);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', queueMotion);
+      window.removeEventListener('resize', queueMotion);
+      document.body.removeEventListener('scroll', queueMotion);
+      reducedMotion.removeEventListener('change', queueMotion);
+    };
   }, []);
 
   useEffect(() => {
@@ -566,13 +608,20 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative isolate min-h-[820px] overflow-hidden bg-[#07090b] pt-24 text-white sm:min-h-[860px] lg:min-h-[900px]">
+      <section ref={heroMotionRef} className="relative isolate min-h-[820px] overflow-hidden bg-[#07090b] pt-24 text-white sm:min-h-[860px] lg:min-h-[900px]">
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(115deg,rgba(45,212,191,0.13)_0%,transparent_28%),linear-gradient(245deg,rgba(201,168,76,0.12)_0%,transparent_26%),linear-gradient(180deg,#090b0d_0%,#060708_72%,#111827_100%)]" />
         <div className="absolute inset-x-0 top-0 -z-10 h-80 bg-[linear-gradient(180deg,rgba(30,58,138,0.12),transparent)]" />
         <div className="absolute left-1/2 top-[17rem] -z-10 h-[30rem] w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.28),transparent)]" />
 
         <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
-          <div className="relative mx-auto max-w-5xl pt-16 text-center sm:pt-20">
+          <div
+            className="relative mx-auto max-w-5xl pt-16 text-center sm:pt-20"
+            style={{
+              opacity: 'calc(1 - var(--hero-scroll, 0) * 0.42)',
+              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -170px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.035))',
+              willChange: 'transform, opacity',
+            }}
+          >
             <h1 className="mx-auto max-w-5xl text-balance text-5xl font-semibold leading-[0.98] text-white sm:text-6xl lg:text-7xl xl:text-[5.8rem]">
               {isThai ? 'เอกสารเข้า LINE วันนี้ ภาษีพร้อมส่งพรุ่งนี้' : 'Documents in today. Tax-ready tomorrow.'}
             </h1>
@@ -601,7 +650,14 @@ export default function Landing() {
           </div>
 
           <div className="pointer-events-none relative mx-auto mt-10 min-h-[440px] max-w-6xl sm:min-h-[500px] lg:mt-12">
-            <div className="absolute left-0 top-8 hidden w-[17rem] rounded-[24px] border border-white/12 bg-[#1b1d20]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
+            <div
+              className="absolute left-0 top-8 hidden w-[17rem] rounded-[24px] border border-white/12 bg-[#1b1d20]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block"
+              style={{
+                opacity: 'calc(1 - var(--hero-scroll, 0) * 0.18)',
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * -88px), calc(var(--hero-scroll, 0) * -245px), 0) rotate(calc(var(--hero-scroll, 0) * -4deg))',
+                willChange: 'transform, opacity',
+              }}
+            >
               <div className="flex items-center justify-between text-xs font-semibold text-white/60">
                 <span>{isThai ? 'AI Inbox' : 'AI Inbox'}</span>
                 <span className="rounded-full bg-[#f15b3a] px-2 py-1 text-white">89</span>
@@ -625,7 +681,14 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="absolute right-0 top-10 hidden w-[18rem] rounded-[24px] border border-white/12 bg-[#17191c]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block">
+            <div
+              className="absolute right-0 top-10 hidden w-[18rem] rounded-[24px] border border-white/12 bg-[#17191c]/92 p-5 shadow-[0_24px_64px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:block"
+              style={{
+                opacity: 'calc(1 - var(--hero-scroll, 0) * 0.16)',
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * 86px), calc(var(--hero-scroll, 0) * -285px), 0) rotate(calc(var(--hero-scroll, 0) * 3deg))',
+                willChange: 'transform, opacity',
+              }}
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-white/60">{isThai ? 'VAT Ready' : 'VAT Ready'}</span>
                 <ShieldCheck className="h-5 w-5 text-emerald-300" />
@@ -645,7 +708,13 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="absolute left-1/2 top-0 w-[min(92vw,760px)] -translate-x-1/2 rotate-[-3deg] rounded-[30px] border border-white/12 bg-[#151719] p-3 shadow-[0_40px_120px_rgba(0,0,0,0.55)] sm:top-3 sm:p-4">
+            <div
+              className="absolute left-1/2 top-0 w-[min(92vw,760px)] rounded-[30px] border border-white/12 bg-[#151719] p-3 shadow-[0_40px_120px_rgba(0,0,0,0.55)] sm:top-3 sm:p-4"
+              style={{
+                transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -300px), 0) rotate(calc(-3deg + var(--hero-scroll, 0) * 3deg)) scale(calc(1 + var(--hero-scroll, 0) * 0.08))',
+                willChange: 'transform',
+              }}
+            >
               <div className="rounded-[22px] border border-white/10 bg-[#0d0f12] p-4 sm:p-5">
                 <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
                   <div className="flex items-center gap-3">
@@ -695,17 +764,35 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="absolute bottom-4 left-[8%] hidden rounded-full bg-[#f15b3a] px-7 py-6 text-center shadow-[0_24px_70px_rgba(241,91,58,0.34)] md:block">
+            <div
+              className="absolute bottom-4 left-[8%] hidden rounded-full bg-[#f15b3a] px-7 py-6 text-center shadow-[0_24px_70px_rgba(241,91,58,0.34)] md:block"
+              style={{
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * -30px), calc(var(--hero-scroll, 0) * -230px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.18))',
+                willChange: 'transform',
+              }}
+            >
               <div className="text-4xl font-bold">3m</div>
               <div className="mt-1 text-xs font-semibold text-white/80">{isThai ? 'จากรูปถึง draft' : 'photo to draft'}</div>
             </div>
-            <div className="absolute bottom-16 right-[10%] hidden h-36 w-36 items-center justify-center rounded-full bg-[#3578ff] text-center shadow-[0_28px_80px_rgba(53,120,255,0.35)] md:flex">
+            <div
+              className="absolute bottom-16 right-[10%] hidden h-36 w-36 items-center justify-center rounded-full bg-[#3578ff] text-center shadow-[0_28px_80px_rgba(53,120,255,0.35)] md:flex"
+              style={{
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * 40px), calc(var(--hero-scroll, 0) * -270px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.12))',
+                willChange: 'transform',
+              }}
+            >
               <div>
                 <div className="text-4xl font-bold">+30%</div>
                 <div className="mt-1 text-xs font-semibold text-white/80">{isThai ? 'ปิดงวดไวขึ้น' : 'faster close'}</div>
               </div>
             </div>
-            <div className="absolute bottom-0 left-1/2 w-[min(78vw,430px)] -translate-x-1/2 rounded-[28px] border border-white/12 bg-white p-4 text-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.48)] sm:bottom-[-1rem]">
+            <div
+              className="absolute bottom-0 left-1/2 w-[min(78vw,430px)] rounded-[28px] border border-white/12 bg-white p-4 text-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.48)] sm:bottom-[-1rem]"
+              style={{
+                transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -255px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.04))',
+                willChange: 'transform',
+              }}
+            >
               <div className="grid grid-cols-[72px_1fr] items-center gap-4">
                 <img src="/brand/billoy-hero-mascot.jpg" alt="" className="h-16 w-16 rounded-2xl object-cover object-[55%_42%]" />
                 <div className="text-left">
