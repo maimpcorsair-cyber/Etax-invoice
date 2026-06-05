@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (Landing scroll motion deployed)
+Last updated: 2026-06-05 (Landing light agency redesign deployed)
 
 ## Latest work (2026-06-05)
+
+Landing light agency redesign:
+- **Frontend:** `Landing.tsx` was reworked away from the dark agency hero into a light Billboy-native premium SaaS direction. The public hero now uses the original soft light workspace feel, floating light navigation, large Thai-first typography, navy primary actions, a bright product cockpit, and light AI Inbox / VAT / mascot evidence cards.
+- **Motion:** kept the scroll-linked `--hero-scroll` system, but applied it to the new light visual system. The headline eases upward/fades, product cockpit lifts/straightens/scales, and supporting cards move at different depths. `prefers-reduced-motion` still pins progress to `0`.
+- **Production:** commit `ef14b84` pushed to `main`; GitHub Typecheck `27002042123`, Unit tests `27002042144`, and Prod smoke `27002042149` passed. Vercel deployment `dpl_Gydd22KuNeiR1VFV9Ae1hfc4AWUi` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** local `cd frontend && npm run typecheck`, `cd frontend && npm run build`, and `git diff --check` pass. Playwright MCP checked desktop `1440x900`, mobile `390x844`, scroll motion (`--hero-scroll` reaches `0.4737` at 360px body scroll), reduced motion (`--hero-scroll` stays `0.0000` at 700px), no horizontal overflow, and the light features section. Production root returns `200`; production bundle `Landing-DyV-pPtJ.js` contains the new light landing strings/classes.
 
 Landing scroll-linked hero motion:
 - **Frontend:** `Landing.tsx` now has Outcrowd-like scroll-linked motion on the public hero. The headline fades/moves upward, the tilted Billboy tax cockpit lifts/straightens/scales, and the surrounding AI Inbox / VAT / metric / mascot cards move at separate depths as the user scrolls into the workflow strip.
