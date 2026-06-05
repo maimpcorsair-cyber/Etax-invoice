@@ -680,17 +680,51 @@ export default function Dashboard() {
           <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.9rem)]">
             {loading ? '—' : formatCurrency(stats?.receivables.totalOutstanding ?? 0)}
           </div>
-          <div className="mt-4 h-px w-full max-w-xl bg-[color-mix(in_oklch,var(--brand-gold)_78%,transparent)]" />
-          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-100">
-            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-              <span className="text-slate-300">{isThai ? 'รายได้เดือนนี้' : 'This month revenue'}</span>
-              <span className="ml-2 font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(latestRevenue)}</span>
-            </div>
-            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-              <span className="text-slate-300">{isThai ? 'ภาษีสุทธิ' : 'Net VAT'}</span>
-              <span className="ml-2 font-bold tabular-nums text-white">{monthEnd ? formatCurrency(netVat) : '—'}</span>
-            </div>
-          </div>
+          <p className="mt-2 text-xs font-semibold text-slate-300">
+            {isThai ? 'ณ วันที่' : 'As of'} {formatDate(new Date().toISOString())}
+          </p>
+
+          <div className="mt-5 h-px w-full max-w-2xl bg-[color-mix(in_oklch,var(--brand-gold)_70%,transparent)]" />
+
+          {/* Ledger strip — money state first: how much, how urgent, then context. */}
+          <dl className="mt-4 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+            {[
+              {
+                key: 'overdue',
+                label: isThai ? 'เกินกำหนด' : 'Overdue',
+                value: stats ? formatCurrency(stats.receivables.overdueOutstanding) : '—',
+                urgent: (stats?.receivables.overdueOutstanding ?? 0) > 0,
+              },
+              {
+                key: 'current',
+                label: isThai ? 'ยังไม่เกินกำหนด' : 'Not yet due',
+                value: stats ? formatCurrency(stats.receivables.currentOutstanding) : '—',
+                urgent: false,
+              },
+              {
+                key: 'revenue',
+                label: isThai ? 'รายได้เดือนนี้' : 'Revenue this month',
+                value: loading ? '—' : formatCurrency(latestRevenue),
+                urgent: false,
+              },
+              {
+                key: 'vat',
+                label: isThai ? 'ภาษีสุทธิ' : 'Net VAT',
+                value: monthEnd ? formatCurrency(netVat) : '—',
+                urgent: false,
+              },
+            ].map((cell) => (
+              <div key={cell.key} className="min-w-0">
+                <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-primary-100/70">
+                  {cell.urgent && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-thai-gold" />}
+                  {cell.label}
+                </dt>
+                <dd className={`mt-1 truncate text-lg font-bold tabular-nums ${cell.urgent ? 'text-thai-gold' : 'text-white'}`}>
+                  {cell.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
         <div className="relative z-10 flex flex-col gap-4 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
