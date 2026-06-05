@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (Outcrowd-style landing redesign deployed)
+Last updated: 2026-06-05 (Landing scroll motion deployed)
 
 ## Latest work (2026-06-05)
+
+Landing scroll-linked hero motion:
+- **Frontend:** `Landing.tsx` now has Outcrowd-like scroll-linked motion on the public hero. The headline fades/moves upward, the tilted Billboy tax cockpit lifts/straightens/scales, and the surrounding AI Inbox / VAT / metric / mascot cards move at separate depths as the user scrolls into the workflow strip.
+- **Implementation:** uses a lightweight `requestAnimationFrame` scroll listener that updates a `--hero-scroll` CSS variable on the hero section, so transforms update without React re-rendering on every scroll. Motion is transform/opacity only and respects `prefers-reduced-motion` by pinning progress to `0`.
+- **Production:** commit `4403d29` pushed to `main`; GitHub Typecheck `26993235167`, Unit tests `26993235191`, and Prod smoke `26993235176` passed. Vercel deployment `dpl_E9BULRqkYgiBLWqqm7FReMUVDMG1` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** local `cd frontend && npm run typecheck`, `cd frontend && npm run build`, and `git diff --check` pass. Playwright MCP verified desktop and mobile scroll progress, no horizontal overflow, and reduced-motion mode (`--hero-scroll` stays `0.0000`). Production root returns `200`.
 
 Outcrowd-style landing page redesign:
 - **Frontend:** `Landing.tsx` first viewport was redesigned toward the Outcrowd-style direction: dark dramatic hero, floating pill navigation, huge Thai-first offer headline, orange/gold CTA energy, tilted Billboy tax-cockpit product preview, and surrounding AI Inbox / VAT ready / Drive evidence cards. The next sections were restyled to continue the dark product-story rhythm before pricing and signup.
