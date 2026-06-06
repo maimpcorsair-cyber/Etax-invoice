@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-06-05 (Landing light agency redesign deployed)
+Last updated: 2026-06-07 (Landing product-theatre redesign deployed)
 
-## Latest work (2026-06-05)
+## Latest work (2026-06-07)
+
+Landing product-theatre redesign:
+- **Frontend:** rebuilt the first public viewport around a large real Billboy product screen, oversized Thai/English offer typography, AI Inbox / monthly tax / evidence cards, and the Billboy mascot. The composition now matches the requested creative-agency reference more closely while staying light and using original Billboy UI/assets.
+- **Motion/responsive:** the hero is a scroll-linked sticky scene. The headline recedes while the product screen lifts, straightens, and scales; supporting cards move on separate depth paths. Mobile uses the real portrait product capture plus a horizontally scrollable four-step workflow strip. `prefers-reduced-motion` keeps `--hero-scroll` at `0`.
+- **Production:** commit `89adc94` pushed to `main`; GitHub unit tests `27070995171`, typecheck `27070995161`, and production smoke `27070995158` passed. Vercel deployment `dpl_JCRB5BpdqCt3XQZS96UjUikNgjLd` is `READY`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** frontend typecheck/build and `git diff --check` pass. Playwright checked desktop `1440x900`, mobile `390x844`, Thai copy, scroll progress (`0.5661` at 430px), reduced motion (`0.0000` at 500px), and no horizontal page overflow. Production root and both new product-image assets return `200`.
+
+## Previous work (2026-06-05)
 
 Landing light agency redesign:
 - **Frontend:** `Landing.tsx` was reworked away from the dark agency hero into a light Billboy-native premium SaaS direction. The public hero now uses the original soft light workspace feel, floating light navigation, large Thai-first typography, navy primary actions, a bright product cockpit, and light AI Inbox / VAT / mascot evidence cards.
