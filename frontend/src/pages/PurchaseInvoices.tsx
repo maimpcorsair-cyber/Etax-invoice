@@ -174,7 +174,7 @@ function DocumentThumbnail({ docId, mimeType, token }: DocumentThumbnailProps) {
           style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
         />
       )}
-      <span className="text-[9px] font-medium text-gray-400 leading-none">{ext}</span>
+      <span className="text-[9px] font-medium text-slate-500 leading-none">{ext}</span>
     </div>
   );
 }
@@ -1453,7 +1453,7 @@ export default function PurchaseInvoices() {
           <div className="flex flex-col flex-1 min-w-[200px]">
             <label className="text-xs font-medium text-gray-500 mb-1">{isThai ? 'ค้นหา' : 'Search'}</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={isThai ? 'ชื่อผู้ขาย / เลขใบกำกับ / เลขผู้เสียภาษี' : 'Supplier / invoice no. / Tax ID'}
@@ -1505,7 +1505,7 @@ export default function PurchaseInvoices() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold text-gray-900">{p.supplierName}</p>
-                  <p className="text-xs text-gray-400 font-mono">{p.supplierTaxId}</p>
+                  <p className="text-xs text-slate-500 font-mono">{p.supplierTaxId}</p>
                   {(p.description ?? '').includes('LINE OCR') && (
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
                       <AlertTriangle className="w-3 h-3" />
@@ -1522,7 +1522,7 @@ export default function PurchaseInvoices() {
                 <span className="font-mono">{p.invoiceNumber}</span>
               </div>
               <div className="flex justify-between items-center pt-1">
-                <span className="text-xs text-gray-400">VAT {formatCurrency(p.vatAmount)}</span>
+                <span className="text-xs text-slate-500">VAT {formatCurrency(p.vatAmount)}</span>
                 <span className="font-bold text-primary-700">{formatCurrency(p.total)}</span>
               </div>
               <div className="flex items-center gap-2 pt-2">
@@ -1577,7 +1577,7 @@ export default function PurchaseInvoices() {
                     <td className="table-cell text-gray-600 whitespace-nowrap">{formatDate(p.invoiceDate)}</td>
                     <td className="table-cell">
                       <p className="font-medium text-gray-900">{p.supplierName}</p>
-                      {p.category && <p className="text-xs text-gray-400">{p.category}</p>}
+                      {p.category && <p className="text-xs text-slate-500">{p.category}</p>}
                       {(p.description ?? '').includes('LINE OCR') && (
                         <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
                           <AlertTriangle className="w-3 h-3" />
@@ -1733,7 +1733,7 @@ export default function PurchaseInvoices() {
                     inputMode="numeric"
                     maxLength={13}
                   />
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     {isThai ? `${form.supplierTaxId.length}/13 หลัก เช่น 0-1055-67123-45-6` : `${form.supplierTaxId.length}/13 digits`}
                   </p>
                 </div>
@@ -1812,7 +1812,7 @@ export default function PurchaseInvoices() {
                     disabled={form.vatType !== 'vat7'}
                   />
                   {form.vatType === 'vat7' && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       {isThai ? 'คำนวณอัตโนมัติ 7% (แก้ไขได้)' : 'Auto-calculated 7% (editable)'}
                     </p>
                   )}
@@ -1974,12 +1974,12 @@ export default function PurchaseInvoices() {
             </div>
             <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-100 p-4" style={{ minHeight: '60vh' }}>
               {previewLoading ? (
-                <div className="flex flex-col items-center gap-3 text-gray-400">
+                <div className="flex flex-col items-center gap-3 text-slate-500">
                   <Loader2 className="w-10 h-10 animate-spin" />
                   <p className="text-sm">{isThai ? 'กำลังโหลดเอกสาร...' : 'Loading document...'}</p>
                 </div>
               ) : !previewUrl ? (
-                <div className="flex flex-col items-center gap-3 text-gray-400">
+                <div className="flex flex-col items-center gap-3 text-slate-500">
                   <AlertTriangle className="w-10 h-10" />
                   <p className="text-sm">{isThai ? 'ไม่สามารถโหลดเอกสารได้' : 'Cannot load document'}</p>
                 </div>

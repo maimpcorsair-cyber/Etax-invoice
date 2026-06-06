@@ -778,7 +778,7 @@ export default function InvoiceList() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="relative flex-1 w-full sm:min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder={t('invoice.search')} className="input-field pl-9"
@@ -882,7 +882,7 @@ export default function InvoiceList() {
 
                 {/* Row 3: date + amount */}
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-gray-400 text-xs">{formatDate(inv.invoiceDate)}</span>
+                  <span className="text-slate-500 text-xs">{formatDate(inv.invoiceDate)}</span>
                   <span className="font-bold text-primary-700 text-sm tabular-nums">{formatCurrency(inv.total)}</span>
                 </div>
                 {inv.project && (
@@ -948,7 +948,7 @@ export default function InvoiceList() {
         {/* Mobile pagination */}
         {!loading && invoices.length > 0 && (
           <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-slate-500">
               {invoices.length} / {pagination.total} {isThai ? 'รายการ' : 'items'}
             </span>
             <div className="flex gap-1">
@@ -1025,7 +1025,7 @@ export default function InvoiceList() {
                       <td className="table-cell">
                         <div className="font-mono text-xs font-medium">{inv.invoiceNumber}</div>
                         {inv.referenceDocNumber && (
-                          <div className="text-xs text-gray-400">อ้างอิง: {inv.referenceDocNumber}</div>
+                          <div className="text-xs text-slate-500">อ้างอิง: {inv.referenceDocNumber}</div>
                         )}
                       </td>
                       <td className="table-cell hidden sm:table-cell">
@@ -1046,7 +1046,7 @@ export default function InvoiceList() {
                             {inv.project.code}
                           </Link>
                         ) : (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className="text-xs text-slate-500">—</span>
                         )}
                       </td>
                       <td className="table-cell text-right font-semibold tabular-nums">{formatCurrency(inv.total)}</td>
@@ -1081,7 +1081,7 @@ export default function InvoiceList() {
                                           s;
                             return <span className={`badge-${color}`}>{label}</span>;
                           })() : (
-                            <span className="text-gray-400 text-xs">{isThai ? 'ยังไม่ส่ง' : 'Not sent'}</span>
+                            <span className="text-slate-500 text-xs">{isThai ? 'ยังไม่ส่ง' : 'Not sent'}</span>
                           )}
                           {canSubmitRD(inv) && (
                             <button
@@ -1246,7 +1246,7 @@ export default function InvoiceList() {
                   {isThai ? 'คัดลอกลูกค้า รายการสินค้า ยอดเงิน และเงื่อนไขจากเอกสารนี้' : 'Copies customer, line items, totals, and payment settings from this invoice.'}
                 </p>
               </div>
-              <button onClick={() => setRecurringModal(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" disabled={creatingRecurring}>
+              <button onClick={() => setRecurringModal(null)} className="rounded-lg p-1.5 text-slate-500 hover:bg-gray-100 hover:text-gray-700" disabled={creatingRecurring}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1457,7 +1457,7 @@ export default function InvoiceList() {
                   {isThai ? `ส่ง ${shareModal.invoiceNumber} ให้ลูกค้า` : `Share ${shareModal.invoiceNumber}`}
                 </span>
               </div>
-              <button onClick={() => setShareModal(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShareModal(null)} className="text-slate-500 hover:text-gray-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1517,7 +1517,7 @@ export default function InvoiceList() {
                   <MessageCircle className="w-4 h-4" />
                   {isThai ? 'เปิด LINE share dialog' : 'Open LINE share dialog'}
                 </button>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-slate-500 leading-relaxed">
                   {isThai
                     ? 'LINE web ส่งให้ลูกค้าได้เฉพาะคนที่เคยแชทกันมาก่อน และต้องกดปุ่ม "ส่ง" สีเขียวที่ล่างสุดให้ครบ — ถ้าไม่ขึ้นในแชทลูกค้า ให้ใช้วิธี Copy → วาง'
                     : 'LINE web only delivers to chats you have an active history with. You must tap the green "Send" button at the bottom. If the message does not appear, use Copy + paste instead.'}

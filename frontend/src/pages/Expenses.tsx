@@ -752,7 +752,7 @@ export default function Expenses() {
           <div className="flex flex-col flex-1 min-w-[200px]">
             <label className="text-xs font-medium text-gray-500 mb-1">{t('common.search')}</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('expenses.voucherNumber')}
@@ -815,7 +815,7 @@ export default function Expenses() {
                 <span>{v.itemCount ?? 0} {t('expenses.expenseItem')}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-400">{t('expenses.total')}</span>
+                <span className="text-xs text-slate-500">{t('expenses.total')}</span>
                 <span className="font-bold text-primary-700 tabular-nums">{formatCurrency(v.totalAmount)}</span>
               </div>
               {v.rejectionNote && (
@@ -902,7 +902,7 @@ export default function Expenses() {
                           {v.project.code}
                         </a>
                       ) : (
-                        <span className="text-xs text-slate-400">—</span>
+                        <span className="text-xs text-slate-500">—</span>
                       )}
                     </td>
                     <td className="table-cell text-center tabular-nums">{v.itemCount ?? 0}</td>
@@ -915,7 +915,7 @@ export default function Expenses() {
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center gap-1">
-                        <button onClick={() => openDetail(v)} className="p-1 text-gray-400 hover:text-gray-600" title={t('common.view', 'View')}>
+                        <button onClick={() => openDetail(v)} className="p-1 text-slate-500 hover:text-gray-600" title={t('common.view', 'View')}>
                           <Eye className="w-4 h-4" />
                         </button>
                         {v.status === 'draft' && (
@@ -1133,8 +1133,8 @@ export default function Expenses() {
                               <a href={att.url} target="_blank" rel="noopener noreferrer" className="hover:underline max-w-[120px] truncate">
                                 {att.fileName || att.url}
                               </a>
-                              <span className="text-gray-400">·</span>
-                              <span className="text-gray-400">{t(`expenses.evidenceType.${att.evidenceType}`, att.evidenceType)}</span>
+                              <span className="text-slate-500">·</span>
+                              <span className="text-slate-500">{t(`expenses.evidenceType.${att.evidenceType}`, att.evidenceType)}</span>
                               <button onClick={() => removeAttachment(idx, attIdx)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
                             </span>
                           ))}
@@ -1171,7 +1171,7 @@ export default function Expenses() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div>
-                <p className="font-mono text-xs text-gray-400">{detailVoucher.voucherNumber}</p>
+                <p className="font-mono text-xs text-slate-500">{detailVoucher.voucherNumber}</p>
                 <h2 className="text-base font-bold text-gray-900">{detailVoucher.description || t('expenses.voucher')}</h2>
               </div>
               <button onClick={() => setDetailVoucher(null)} className="p-1.5 rounded-lg hover:bg-gray-100">
@@ -1206,7 +1206,7 @@ export default function Expenses() {
                           const iconColor = node.action === 'approved' ? 'text-green-500'
                             : node.action === 'rejected' ? 'text-red-500'
                             : node.action === 'submitted' ? 'text-amber-500'
-                            : 'text-gray-400';
+                            : 'text-slate-500';
                           const bgColor = node.action === 'approved' ? 'bg-green-50'
                             : node.action === 'rejected' ? 'bg-red-50'
                             : node.action === 'submitted' ? 'bg-amber-50'
@@ -1220,7 +1220,7 @@ export default function Expenses() {
                                 <p className="text-sm font-semibold text-gray-800 capitalize">
                                   {t(`expenses.status.${node.action}`, node.action)}
                                 </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
+                                <p className="text-xs text-slate-500 mt-0.5">
                                   {node.timestamp ? formatDate(node.timestamp) : '—'}
                                 </p>
                                 {node.note && (
@@ -1246,7 +1246,7 @@ export default function Expenses() {
                         <div className="flex justify-between items-start gap-2">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-800 truncate">{item.description}</p>
-                            {item.vendorName && <p className="text-xs text-gray-400">{item.vendorName}</p>}
+                            {item.vendorName && <p className="text-xs text-slate-500">{item.vendorName}</p>}
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.amount)}</p>
@@ -1256,7 +1256,7 @@ export default function Expenses() {
                           </div>
                         </div>
                         {item.whtApplicable && item.whtRate != null && (
-                          <p className="text-[11px] text-gray-400 mt-1">WHT {item.whtRate}% = {formatCurrency(item.whtAmount ?? 0)}</p>
+                          <p className="text-[11px] text-slate-500 mt-1">WHT {item.whtRate}% = {formatCurrency(item.whtAmount ?? 0)}</p>
                         )}
                         {item.attachments?.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -1385,7 +1385,7 @@ export default function Expenses() {
                 </label>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-gray-400">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
                 <div className="flex-1 h-px bg-gray-200" />
                 {t('common.or', 'or paste URL manually')}
                 <div className="flex-1 h-px bg-gray-200" />
