@@ -1021,7 +1021,7 @@ export default function Customers() {
             ))}
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
               value={search}
@@ -1072,7 +1072,7 @@ export default function Customers() {
                 )}
                 {/* Row 3: tax ID */}
               {c.taxId && (
-                <p className="text-xs text-gray-400 font-mono">
+                <p className="text-xs text-slate-500 font-mono">
                   {customerIdLabel(c)}: {maskedCustomerId(c)}
                 </p>
               )}
@@ -1144,8 +1144,8 @@ export default function Customers() {
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                       <td className="table-cell">
                         <p className="font-medium">{isThai ? c.nameTh : (c.nameEn ?? c.nameTh)}</p>
-                        {c.nameEn && isThai && <p className="text-xs text-gray-400">{c.nameEn}</p>}
-                        {!isThai && <p className="text-xs text-gray-400">{c.nameTh}</p>}
+                        {c.nameEn && isThai && <p className="text-xs text-slate-500">{c.nameEn}</p>}
+                        {!isThai && <p className="text-xs text-slate-500">{c.nameTh}</p>}
                         <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${partyRoleBadgeClass(c.partyRole)}`}>
                           {c.partyRole === 'supplier' ? <Truck className="h-3 w-3" /> : <Handshake className="h-3 w-3" />}
                           {partyRoleLabel(c.partyRole)}
@@ -1292,7 +1292,7 @@ export default function Customers() {
                       {isThai ? selectedUseCaseOption.descriptionTh : selectedUseCaseOption.descriptionEn}
                     </p>
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400">
+                  <span className="text-[11px] font-medium text-slate-500">
                     {isThai ? 'เปลี่ยนได้ภายหลัง' : 'Can be changed later'}
                   </span>
                 </div>
@@ -1537,13 +1537,13 @@ export default function Customers() {
                         : 'Add only when this name has a credit limit or payment term.'}
                     </p>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                  <ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="label">{isThai ? 'วงเงินเครดิต' : 'Credit limit'}</label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">฿</span>
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">฿</span>
                       <input
                         value={form.creditLimit ?? ''}
                         onChange={(e) => field('creditLimit', moneyInput(e.target.value))}
@@ -1682,7 +1682,7 @@ export default function Customers() {
                                   {item.complete ? (
                                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                                   ) : (
-                                    <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${item.required ? 'text-amber-600' : 'text-slate-400'}`} />
+                                    <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${item.required ? 'text-amber-600' : 'text-slate-500'}`} />
                                   )}
                                   <div>
                                     <p className="font-medium text-slate-900">{isThai ? item.labelTh : item.labelEn}</p>

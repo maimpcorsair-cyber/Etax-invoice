@@ -425,7 +425,7 @@ export default function Products() {
       {/* Search */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             value={search}
@@ -549,13 +549,13 @@ export default function Products() {
                     <td className="table-cell font-mono text-xs font-semibold text-primary-700">{p.code}</td>
                     <td className="table-cell">
                       <p className="font-medium">{isThai ? p.nameTh : (p.nameEn ?? p.nameTh)}</p>
-                      {p.nameEn && isThai && <p className="text-xs text-gray-400">{p.nameEn}</p>}
-                      {!isThai && <p className="text-xs text-gray-400">{p.nameTh}</p>}
+                      {p.nameEn && isThai && <p className="text-xs text-slate-500">{p.nameEn}</p>}
+                      {!isThai && <p className="text-xs text-slate-500">{p.nameTh}</p>}
                     </td>
                     <td className="table-cell">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium text-gray-700">{productTypeLabel(p.productType ?? 'product')}</span>
-                        {p.category && <span className="text-xs text-gray-400">{p.category}</span>}
+                        {p.category && <span className="text-xs text-slate-500">{p.category}</span>}
                       </div>
                     </td>
                     <td className="table-cell text-gray-500">{p.unit}</td>
@@ -726,7 +726,7 @@ export default function Products() {
                     className="input-field"
                     placeholder={isThai ? 'เช่น Software, Consulting, ค่าแรง, ค่าวัสดุ' : 'e.g. Software, Consulting, Labor, Materials'}
                   />
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-slate-500">
                     {isThai ? 'ไม่บังคับ แต่ช่วยให้ค้นหาและสรุปรายงานได้ง่ายขึ้น' : 'Optional, but useful for search and reporting.'}
                   </p>
                 </div>
@@ -753,7 +753,7 @@ export default function Products() {
                       </p>
                     </div>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
+                  <ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="grid grid-cols-1 gap-4 border-t border-gray-200 bg-white px-4 py-4 sm:grid-cols-2">
                   <div>
@@ -793,7 +793,7 @@ export default function Products() {
                         <option key={option.value} value={option.value}>{isThai ? option.labelTh : option.labelEn}</option>
                       ))}
                     </select>
-                    <p className="mt-1 flex items-center gap-1 text-xs text-gray-400">
+                    <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
                       <BadgePercent className="h-3 w-3" />
                       {isThai ? 'เป็นค่าแนะนำตอนออกเอกสาร ไม่ใช่ VAT และปรับในเอกสารจริงได้' : 'Suggested on documents. This is not VAT and remains editable.'}
                     </p>
@@ -851,7 +851,7 @@ export default function Products() {
                           disabled={!!editing}
                           placeholder="0"
                         />
-                        <p className="mt-1 text-xs text-gray-400">
+                        <p className="mt-1 text-xs text-slate-500">
                           {editing
                             ? (isThai ? 'หลังบันทึก ใช้ปุ่ม "ปรับสต๊อก" ในรายการสินค้าเพื่อแก้ยอด' : 'After save, use "Adjust" on the row to change stock.')
                             : (isThai ? 'จำนวนที่มีในคลังตอนนี้' : 'Quantity in hand right now')}
@@ -868,7 +868,7 @@ export default function Products() {
                           step={1}
                           placeholder={isThai ? 'เช่น 20' : 'e.g. 20'}
                         />
-                        <p className="mt-1 text-xs text-gray-400">
+                        <p className="mt-1 text-xs text-slate-500">
                           {isThai ? 'ขึ้น Dashboard เมื่อยอดสต๊อก ≤ ค่านี้' : 'Shows on Dashboard when stock ≤ this value'}
                         </p>
                       </div>
@@ -916,7 +916,7 @@ export default function Products() {
                   placeholder={isThai ? 'เช่น +10 (รับเข้า) หรือ -2 (ของหาย)' : 'e.g. +10 (received) or -2 (loss)'}
                   step={1}
                 />
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-slate-500">
                   {isThai ? 'ใส่จำนวนบวกเพื่อเพิ่ม / ลบเพื่อหัก' : 'Positive to add, negative to subtract'}
                 </p>
               </div>
