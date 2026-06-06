@@ -608,212 +608,245 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section ref={heroMotionRef} className="relative isolate min-h-[850px] overflow-hidden bg-[linear-gradient(180deg,rgba(250,252,255,0.94),rgba(241,246,252,0.9)_62%,rgba(255,255,255,0.96))] pt-24 text-slate-950 sm:min-h-[900px] lg:min-h-[930px]">
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(120deg,rgba(45,212,191,0.13)_0%,transparent_30%),linear-gradient(250deg,rgba(30,58,138,0.12)_0%,transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.62),rgba(239,245,251,0.88))]" />
-        <div className="absolute inset-x-0 top-0 -z-10 h-36 border-b border-white/70 bg-white/40 backdrop-blur-[2px]" />
-        <div className="absolute left-1/2 top-[18rem] -z-10 h-[34rem] w-px -translate-x-1/2 bg-[linear-gradient(180deg,transparent,rgba(30,58,138,0.16),transparent)]" />
-
-        <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
+      <section
+        ref={heroMotionRef}
+        className="relative isolate h-[1120px] overflow-clip bg-[#f4f8fc] text-slate-950 sm:h-[1240px] lg:h-[1380px]"
+      >
+        <div className="sticky top-0 h-[100svh] min-h-[720px] overflow-hidden">
+          <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_18%_22%,rgba(45,212,191,0.15),transparent_25rem),radial-gradient(circle_at_82%_16%,rgba(30,58,138,0.14),transparent_29rem),linear-gradient(180deg,#fbfdff_0%,#eef4fa_100%)]" />
+          <div className="absolute inset-0 -z-10 opacity-70 [background-image:linear-gradient(rgba(30,58,138,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(30,58,138,0.045)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)]" />
           <div
-            className="relative mx-auto max-w-5xl pt-14 text-center sm:pt-20"
+            className="absolute left-[8%] top-[31%] hidden h-32 w-32 rounded-full border border-primary-200/70 bg-white/80 shadow-[0_22px_70px_rgba(30,58,138,0.12)] lg:block"
             style={{
-              opacity: 'calc(1 - var(--hero-scroll, 0) * 0.36)',
-              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -150px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.025))',
+              opacity: 'calc(0.8 - var(--hero-scroll, 0) * 0.35)',
+              transform: 'translate3d(calc(var(--hero-scroll, 0) * -90px), calc(var(--hero-scroll, 0) * -80px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.18))',
               willChange: 'transform, opacity',
             }}
           >
-            <h1 className="mx-auto max-w-5xl text-balance text-5xl font-semibold leading-[0.98] text-slate-950 sm:text-6xl lg:text-7xl xl:text-[5.8rem]">
-              {isThai ? 'เอกสารเข้า LINE วันนี้ ภาษีพร้อมส่งพรุ่งนี้' : 'Documents in today. Tax-ready tomorrow.'}
+            <span className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-primary-700 shadow-[0_14px_34px_rgba(30,58,138,0.28)]" />
+            <span className="absolute left-7 top-1/2 h-px w-20 -translate-y-1/2 bg-primary-200" />
+          </div>
+
+          <div
+            className="relative z-20 mx-auto max-w-5xl px-4 pt-32 text-center sm:pt-36 lg:pt-[9.5rem]"
+            style={{
+              opacity: 'calc(1 - var(--hero-scroll, 0) * 0.82)',
+              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -190px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.06))',
+              willChange: 'transform, opacity',
+            }}
+          >
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white/85 px-4 py-2 text-xs font-bold text-primary-800 shadow-[0_12px_40px_rgba(30,58,138,0.1)] backdrop-blur">
+              <Zap className="h-3.5 w-3.5 text-amber-600" />
+              {isThai ? 'ผู้ช่วยเอกสารและภาษีสำหรับ SME ไทย' : 'The document and tax companion for Thai SMEs'}
+            </div>
+            <h1 className="mx-auto mt-7 max-w-5xl text-balance text-[clamp(3.2rem,7.4vw,6.8rem)] font-semibold leading-[0.92] text-slate-950">
+              {isThai ? (
+                <>
+                  เอกสารเข้าแล้ว
+                  <span className="block text-primary-800">ภาษีพร้อมต่อ</span>
+                </>
+              ) : (
+                <>
+                  Documents arrive.
+                  <span className="block text-primary-800">Tax work moves.</span>
+                </>
+              )}
             </h1>
-            <p className="mx-auto mt-7 max-w-3xl text-pretty text-base leading-8 text-slate-600 sm:text-lg">
+            <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
               {isThai
-                ? 'AI อ่านบิล สลิป และใบกำกับภาษี แล้วจัดเข้าคลัง Drive + สมุดทะเบียนภาษีให้ทีมบัญชีตรวจต่อได้ทันที'
-                : 'AI reads bills, slips, and tax invoices, then organizes Drive evidence and tax registers for the accounting team.'}
+                ? 'ส่งบิลและสลิปจาก LINE ให้ AI อ่าน บัญชีกดยืนยัน แล้ว Billboy จัด Drive สมุดทะเบียน และงานยื่นภาษีต่อให้ครบ'
+                : 'Send bills and slips from LINE. AI reads, accountants confirm, and Billboy organizes Drive evidence, registers, and filing work.'}
             </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={() => openCheckout('free')}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-primary-700 px-6 py-3 text-base font-bold text-white shadow-[0_18px_46px_rgba(30,58,138,0.28)] transition hover:-translate-y-1 hover:bg-primary-800"
+                className="pointer-events-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary-700 px-6 py-3 text-base font-bold text-white shadow-[0_18px_46px_rgba(30,58,138,0.28)] transition duration-300 hover:-translate-y-1 hover:bg-primary-800"
               >
                 {isThai ? 'เริ่มทดลองใช้ฟรี' : 'Start free trial'}
                 <ArrowRight className="h-5 w-5" />
               </button>
               <a
                 href="#workflow"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-6 py-3 text-base font-bold text-primary-800 shadow-[0_16px_42px_rgba(15,23,42,0.08)] backdrop-blur transition hover:-translate-y-1 hover:border-primary-200 hover:bg-primary-50"
+                className="pointer-events-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-6 py-3 text-base font-bold text-primary-800 shadow-[0_16px_42px_rgba(15,23,42,0.08)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-primary-200 hover:bg-primary-50"
               >
-                {isThai ? 'ดูตัวอย่าง workflow' : 'See workflow'}
+                {isThai ? 'ดูการทำงาน' : 'See the workflow'}
                 <Smartphone className="h-5 w-5" />
               </a>
             </div>
           </div>
 
-          <div className="pointer-events-none relative mx-auto mt-10 min-h-[500px] max-w-6xl sm:min-h-[560px] lg:mt-12">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 mx-auto h-[52%] min-h-[390px] max-w-[1500px] sm:h-[55%] lg:h-[58%]">
             <div
-              className="absolute left-0 top-8 hidden w-[17rem] rounded-[24px] border border-white/80 bg-white/95 p-5 shadow-[0_24px_64px_rgba(30,58,138,0.16)] backdrop-blur-xl lg:block"
+              className="absolute left-[2%] top-[4%] hidden w-[240px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl md:block lg:left-[4%] lg:w-[270px]"
               style={{
-                opacity: 'calc(1 - var(--hero-scroll, 0) * 0.18)',
-                transform: 'translate3d(calc(var(--hero-scroll, 0) * -88px), calc(var(--hero-scroll, 0) * -245px), 0) rotate(calc(var(--hero-scroll, 0) * -4deg))',
-                willChange: 'transform, opacity',
-              }}
-            >
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                <span>{isThai ? 'AI Inbox' : 'AI Inbox'}</span>
-                <span className="rounded-full bg-primary-700 px-2 py-1 text-white">89</span>
-              </div>
-              <div className="mt-5 space-y-3">
-                {[
-                  { label: isThai ? 'ใบซื้อรอตรวจ' : 'Purchases to review', value: '34', color: 'bg-amber-400' },
-                  { label: isThai ? 'สลิปรอจับคู่' : 'Slips to match', value: '12', color: 'bg-teal-400' },
-                  { label: isThai ? 'พร้อมบันทึก' : 'Ready to post', value: '43', color: 'bg-emerald-500' },
-                ].map((item) => (
-                  <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-3">
-                    <div>
-                      <div className="text-xs text-slate-500">{item.label}</div>
-                      <div className="mt-2 h-2 rounded-full bg-slate-100">
-                        <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${36 + Number(item.value)}%` }} />
-                      </div>
-                    </div>
-                    <span className="text-xl font-bold text-slate-950">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div
-              className="absolute right-0 top-10 hidden w-[18rem] rounded-[24px] border border-white/80 bg-white/95 p-5 shadow-[0_24px_64px_rgba(30,58,138,0.16)] backdrop-blur-xl lg:block"
-              style={{
-                opacity: 'calc(1 - var(--hero-scroll, 0) * 0.16)',
-                transform: 'translate3d(calc(var(--hero-scroll, 0) * 86px), calc(var(--hero-scroll, 0) * -285px), 0) rotate(calc(var(--hero-scroll, 0) * 3deg))',
+                opacity: 'calc(0.96 - var(--hero-scroll, 0) * 0.18)',
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * -95px), calc(var(--hero-scroll, 0) * -155px), 0) rotate(calc(-5deg - var(--hero-scroll, 0) * 4deg))',
                 willChange: 'transform, opacity',
               }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">{isThai ? 'VAT Ready' : 'VAT Ready'}</span>
-                <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-800">
+                    <Files className="h-4 w-4" />
+                  </span>
+                  AI Inbox
+                </div>
+                <span className="rounded-full bg-primary-700 px-2.5 py-1 text-xs font-bold text-white">89</span>
               </div>
-              <div className="mt-5 grid grid-cols-4 items-end gap-2">
-                {[42, 58, 48, 82].map((height, index) => (
-                  <div key={index} className="flex flex-col items-center gap-2">
-                    <div className="w-full rounded-xl bg-slate-100 p-1">
-                      <div className={`rounded-lg ${index === 3 ? 'bg-emerald-500' : 'bg-primary-200'}`} style={{ height }} />
+              <div className="mt-4 space-y-2.5">
+                {[
+                  { label: isThai ? 'ใบซื้อรอตรวจ' : 'Purchases to review', value: '34', width: '72%', tone: 'bg-amber-400' },
+                  { label: isThai ? 'สลิปรอจับคู่' : 'Slips to match', value: '12', width: '46%', tone: 'bg-teal-500' },
+                  { label: isThai ? 'พร้อมบันทึก' : 'Ready to post', value: '43', width: '84%', tone: 'bg-emerald-500' },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-slate-600">{item.label}</span>
+                      <span className="font-bold text-slate-950">{item.value}</span>
                     </div>
-                    <span className="text-[10px] text-slate-400">{['ขาย','ซื้อ','WHT','PP30'][index]}</span>
+                    <div className="mt-2 h-1.5 rounded-full bg-slate-200">
+                      <div className={`h-1.5 rounded-full ${item.tone}`} style={{ width: item.width }} />
+                    </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">
-                {isThai ? 'พร้อมยื่น ภ.พ.30' : 'PP.30 ready'}
+            </div>
+
+            <div
+              className="absolute right-[2%] top-[1%] hidden w-[250px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl md:block lg:right-[3%] lg:w-[280px]"
+              style={{
+                opacity: 'calc(0.96 - var(--hero-scroll, 0) * 0.15)',
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * 105px), calc(var(--hero-scroll, 0) * -185px), 0) rotate(calc(5deg + var(--hero-scroll, 0) * 3deg))',
+                willChange: 'transform, opacity',
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">{isThai ? 'ภาษีเดือนนี้' : 'This month tax'}</span>
+                <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="mt-4 grid grid-cols-4 items-end gap-2">
+                {[42, 58, 49, 86].map((height, index) => (
+                  <div key={index} className="flex flex-col items-center gap-2">
+                    <div className="flex h-24 w-full items-end rounded-lg bg-slate-100 p-1">
+                      <div
+                        className={`w-full rounded-md ${index === 3 ? 'bg-emerald-500' : index === 1 ? 'bg-amber-400' : 'bg-primary-300'}`}
+                        style={{ height: `${height}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-semibold text-slate-500">{['ขาย', 'ซื้อ', 'WHT', 'PP30'][index]}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100">
+                <span>{isThai ? 'พร้อมยื่น ภ.พ.30' : 'PP.30 ready'}</span>
+                <Check className="h-4 w-4" />
               </div>
             </div>
 
             <div
-              className="absolute left-1/2 top-0 w-[min(94vw,820px)] rounded-[30px] border border-white/80 bg-white/95 p-3 shadow-[0_42px_120px_rgba(30,58,138,0.22)] backdrop-blur-xl sm:top-3 sm:p-4"
+              className="absolute left-1/2 top-[26%] w-[min(94vw,1080px)] overflow-hidden rounded-[24px] border-[6px] border-slate-900 bg-slate-900 shadow-[0_50px_140px_rgba(30,58,138,0.3)] sm:border-[9px] lg:top-[20%]"
               style={{
-                transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -300px), 0) rotate(calc(-2.2deg + var(--hero-scroll, 0) * 2.2deg)) scale(calc(1 + var(--hero-scroll, 0) * 0.07))',
+                transform: 'translate3d(-50%, calc(150px - var(--hero-scroll, 0) * 300px), 0) rotate(calc(-4deg + var(--hero-scroll, 0) * 4deg)) scale(calc(0.86 + var(--hero-scroll, 0) * 0.14))',
+                transformOrigin: '50% 12%',
                 willChange: 'transform',
               }}
             >
-              <div className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff,#f7faff)] p-4 sm:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-700 text-white shadow-[0_12px_28px_rgba(30,58,138,0.2)]">
-                      <FileText className="h-5 w-5" />
-                    </span>
-                    <div className="text-left">
-                      <div className="text-sm font-bold text-slate-950">Billboy Tax Cockpit</div>
-                      <div className="text-xs text-slate-500">{isThai ? 'ดม จำกัด · มิ.ย. 2569' : 'Demo Co. · Jun 2026'}</div>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800 ring-1 ring-primary-100">{isThai ? 'ซิงก์ Drive แล้ว' : 'Drive synced'}</span>
-                </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-[1.25fr_0.85fr]">
-                  <div className="space-y-3">
-                    {[
-                      { name: isThai ? 'SYSTEM STANDARD' : 'SYSTEM STANDARD', meta: isThai ? 'ใบกำกับภาษีซื้อ · ฿1,070.00' : 'Purchase invoice · ฿1,070.00', status: isThai ? 'รอยืนยัน' : 'Review' },
-                      { name: isThai ? 'SCB มณี SHOP' : 'SCB Manee SHOP', meta: isThai ? 'สลิปโอนเงิน · ฿176.00' : 'Bank slip · ฿176.00', status: isThai ? 'จับคู่สลิป' : 'Match slip' },
-                      { name: isThai ? 'ขายสินค้าออนไลน์' : 'Online sale', meta: isThai ? 'e-Tax XML + PDF · พร้อมส่ง RD' : 'e-Tax XML + PDF · RD ready', status: isThai ? 'พร้อมส่ง' : 'Ready' },
-                    ].map((row) => (
-                      <div key={row.name} className="grid grid-cols-[44px_1fr] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.04)] sm:grid-cols-[44px_1fr_auto]">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-800">
-                          <FileCheck className="h-5 w-5" />
-                        </span>
-                        <span>
-                          <span className="block text-sm font-bold text-slate-950">{row.name}</span>
-                          <span className="block text-xs text-slate-500">{row.meta}</span>
-                        </span>
-                        <span className="col-span-2 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 sm:col-span-1">{row.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 text-left shadow-[0_18px_44px_rgba(15,23,42,0.18)]">
-                    <div className="text-xs font-semibold text-slate-300">{isThai ? 'สมุดทะเบียนภาษี' : 'Tax register'}</div>
-                    <div className="mt-3 text-3xl font-bold text-white">฿28,420</div>
-                    <p className="mt-1 text-xs text-slate-400">{isThai ? 'ภาษีซื้อรอตรวจ 9 รายการ' : '9 input-VAT items need review'}</p>
-                    <div className="mt-5 space-y-2">
-                      {['1_ภาษีขาย','2_ภาษีซื้อ','9_แบบที่ยื่นแล้ว'].map((label, index) => (
-                        <div key={label} className="flex items-center justify-between rounded-xl bg-white/[0.07] px-3 py-2 text-xs">
-                          <span className="text-slate-200">{label}</span>
-                          <span className={index === 2 ? 'text-emerald-300' : 'text-slate-400'}>{index === 2 ? 'Ready' : 'Synced'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex h-8 items-center gap-2 bg-slate-900 px-3 sm:h-10 sm:px-4">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b5f]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#f6c453]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#4ecb71]" />
+                <span className="ml-auto rounded-md bg-white/10 px-3 py-1 text-[9px] font-semibold text-slate-300 sm:text-[10px]">
+                  app.billboy.co
+                </span>
+              </div>
+              <picture>
+                <source media="(max-width: 639px)" srcSet="/product/billboy-product-ledger-mobile.png" />
+                <img
+                  src="/product/billboy-product-ledger-desktop.png"
+                  alt={isThai ? 'หน้าจอจัดการสินค้าและบริการของ Billboy' : 'Billboy product catalog ledger'}
+                  className="aspect-[4/5] w-full object-cover object-top sm:aspect-[16/9]"
+                />
+              </picture>
+            </div>
+
+            <div
+              className="absolute bottom-[4%] left-[5%] hidden w-[220px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl lg:block"
+              style={{
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * -45px), calc(var(--hero-scroll, 0) * -245px), 0) rotate(calc(4deg - var(--hero-scroll, 0) * 7deg)) scale(calc(1 + var(--hero-scroll, 0) * 0.08))',
+                willChange: 'transform',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                  <Zap className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="text-3xl font-bold leading-none text-slate-950">3 min</div>
+                  <div className="mt-1 text-[11px] font-semibold text-slate-500">{isThai ? 'จากรูปถึง draft' : 'photo to draft'}</div>
                 </div>
               </div>
             </div>
 
             <div
-              className="absolute bottom-8 left-[8%] hidden rounded-[28px] border border-white/80 bg-white px-7 py-6 text-center text-primary-900 shadow-[0_24px_70px_rgba(30,58,138,0.16)] md:block"
+              className="absolute bottom-[7%] right-[4%] hidden w-[235px] rounded-[20px] bg-primary-700 p-4 text-white shadow-[0_30px_90px_rgba(30,58,138,0.28)] lg:block"
               style={{
-                transform: 'translate3d(calc(var(--hero-scroll, 0) * -30px), calc(var(--hero-scroll, 0) * -230px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.18))',
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * 55px), calc(var(--hero-scroll, 0) * -265px), 0) rotate(calc(-4deg + var(--hero-scroll, 0) * 7deg)) scale(calc(1 + var(--hero-scroll, 0) * 0.08))',
                 willChange: 'transform',
               }}
             >
-              <div className="text-4xl font-bold">3m</div>
-              <div className="mt-1 text-xs font-semibold text-slate-500">{isThai ? 'จากรูปถึง draft' : 'photo to draft'}</div>
-            </div>
-            <div
-              className="absolute bottom-20 right-[10%] hidden h-36 w-36 items-center justify-center rounded-[34px] bg-primary-700 text-center text-white shadow-[0_28px_80px_rgba(30,58,138,0.26)] md:flex"
-              style={{
-                transform: 'translate3d(calc(var(--hero-scroll, 0) * 40px), calc(var(--hero-scroll, 0) * -270px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.12))',
-                willChange: 'transform',
-              }}
-            >
-              <div>
-                <div className="text-4xl font-bold">+30%</div>
-                <div className="mt-1 text-xs font-semibold text-white/80">{isThai ? 'ปิดงวดไวขึ้น' : 'faster close'}</div>
-              </div>
-            </div>
-            <div
-              className="absolute bottom-0 left-1/2 w-[min(88vw,430px)] rounded-[28px] border border-white/80 bg-white p-4 text-slate-950 shadow-[0_30px_90px_rgba(30,58,138,0.18)] sm:bottom-[-1rem]"
-              style={{
-                transform: 'translate3d(-50%, calc(var(--hero-scroll, 0) * -255px), 0) scale(calc(1 + var(--hero-scroll, 0) * 0.04))',
-                willChange: 'transform',
-              }}
-            >
-              <div className="grid grid-cols-[72px_1fr] items-center gap-4">
-                <img src="/brand/billoy-hero-mascot.jpg" alt="" className="h-16 w-16 rounded-2xl object-cover object-[55%_42%]" />
-                <div className="text-left">
-                  <div className="text-sm font-bold">{isThai ? 'Billoy ช่วยจัดเอกสารแล้ว' : 'Billoy organized the evidence'}</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-500">{isThai ? 'LINE, Drive, Sheets และ ภ.พ.30 อยู่ใน flow เดียว' : 'LINE, Drive, Sheets, and PP.30 in one flow.'}</div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-primary-100">{isThai ? 'หลักฐานครบ' : 'Evidence complete'}</div>
+                  <div className="mt-2 text-4xl font-bold leading-none">96%</div>
                 </div>
+                <FileSpreadsheet className="h-8 w-8 text-teal-200" />
               </div>
+              <div className="mt-4 h-2 rounded-full bg-white/15">
+                <div className="h-2 w-[96%] rounded-full bg-teal-300" />
+              </div>
+              <div className="mt-3 text-[11px] font-semibold text-primary-100">{isThai ? 'Drive + สมุดทะเบียนซิงก์แล้ว' : 'Drive + register synced'}</div>
             </div>
+
+            <img
+              src="/brand/doodles/billoy-analytics-doodle.png"
+              alt=""
+              className="absolute bottom-[2%] right-[1%] hidden w-32 drop-shadow-[0_24px_42px_rgba(15,23,42,0.16)] xl:block"
+              style={{
+                opacity: 'calc(0.92 - var(--hero-scroll, 0) * 0.22)',
+                transform: 'translate3d(calc(var(--hero-scroll, 0) * 65px), calc(var(--hero-scroll, 0) * -105px), 0) rotate(calc(5deg + var(--hero-scroll, 0) * 4deg))',
+                willChange: 'transform, opacity',
+              }}
+            />
           </div>
 
-          <div id="workflow" className="relative z-10 mx-auto mt-16 grid max-w-5xl gap-3 text-left sm:grid-cols-4">
+          <div
+            className="absolute inset-x-0 bottom-5 z-30 flex justify-center"
+            style={{
+              opacity: 'calc(1 - var(--hero-scroll, 0) * 1.5)',
+              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * 28px), 0)',
+            }}
+          >
+            <span className="rounded-full border border-white/90 bg-white/85 px-4 py-2 text-xs font-semibold text-slate-600 shadow-[0_14px_38px_rgba(30,58,138,0.12)] backdrop-blur">
+              {isThai ? 'เลื่อนเพื่อดูเอกสารประกอบเป็นระบบ' : 'Scroll to assemble the workflow'}
+            </span>
+          </div>
+        </div>
+
+        <div id="workflow" className="absolute inset-x-0 bottom-0 z-30 border-y border-white/80 bg-white/90 py-5 shadow-[0_-24px_70px_rgba(30,58,138,0.08)] backdrop-blur-xl">
+          <div className="mx-auto grid max-w-5xl auto-cols-[minmax(250px,82vw)] grid-flow-col gap-3 overflow-x-auto px-4 text-left [scrollbar-width:none] sm:grid-cols-4 sm:grid-flow-row sm:overflow-visible">
             {[
-              { title: isThai ? 'ส่งเข้า LINE' : 'Send to LINE', desc: isThai ? 'ถ่ายบิล/สลิปจากมือถือ' : 'Capture bills and slips' },
+              { title: isThai ? 'ส่งเข้า LINE' : 'Send to LINE', desc: isThai ? 'ถ่ายบิลหรือสลิปจากมือถือ' : 'Capture bills and slips' },
               { title: isThai ? 'AI อ่านให้' : 'AI reads', desc: isThai ? 'แยกประเภทและเช็ค VAT' : 'Classifies and checks VAT' },
-              { title: isThai ? 'บัญชีกดยืนยัน' : 'Accountant reviews', desc: isThai ? 'แก้เฉพาะรายการเสี่ยง' : 'Only risky items need edits' },
-              { title: isThai ? 'พร้อมยื่นภาษี' : 'Tax-ready', desc: isThai ? 'Drive + master sheet ครบ' : 'Drive and sheets complete' },
+              { title: isThai ? 'บัญชีกดยืนยัน' : 'Accountant reviews', desc: isThai ? 'แก้เฉพาะรายการที่เสี่ยง' : 'Only risky items need edits' },
+              { title: isThai ? 'พร้อมยื่นภาษี' : 'Tax-ready', desc: isThai ? 'Drive และสมุดทะเบียนครบ' : 'Drive and registers complete' },
             ].map((step, index) => (
-              <div key={step.title} className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-[0_16px_40px_rgba(30,58,138,0.08)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white">
-                <div className="text-xs font-bold text-primary-700">0{index + 1}</div>
-                <div className="mt-3 text-sm font-bold text-slate-950">{step.title}</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">{step.desc}</div>
+              <div key={step.title} className="grid grid-cols-[32px_1fr] gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-primary-50/70">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-700 text-xs font-bold text-white">0{index + 1}</div>
+                <div>
+                  <div className="text-sm font-bold text-slate-950">{step.title}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-slate-500">{step.desc}</div>
+                </div>
               </div>
             ))}
           </div>
