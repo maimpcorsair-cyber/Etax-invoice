@@ -1006,7 +1006,7 @@ export default function PurchaseInvoices() {
           </div>
         </div>
       )}
-      <div className="space-y-4">
+      <div className="workspace-page">
       <SectionSubNav
         items={[
           { key: 'bills', to: '/app/purchase-invoices', label: isThai ? 'บันทึกซื้อ' : 'Bills', icon: ShoppingCart },
@@ -1014,38 +1014,38 @@ export default function PurchaseInvoices() {
         ]}
       />
       {/* AI Inbox Hero */}
-      <section className="premium-hero premium-hero-dark overflow-hidden text-white">
+      <section className="workspace-command">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.1fr)]">
-          <div className="p-5 sm:p-6 lg:p-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+          <div className="min-w-0">
+            <div className="premium-eyebrow">
               <Inbox className="h-3.5 w-3.5" />
               {isThai ? 'กล่องเอกสารเข้า AI' : 'AI Document Inbox'}
             </div>
-            <h1 className="mt-4 max-w-2xl text-2xl font-bold leading-tight text-white sm:text-3xl">
+            <h1 className="mt-4 max-w-2xl text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
               {isThai ? 'โยนเอกสารเข้า แล้วให้ AI เตรียมภาษีซื้อให้' : 'Drop documents in. Let AI prepare input VAT.'}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/75">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
               {isThai
                 ? 'ระบบอ่านใบกำกับ/ใบเสร็จจาก PDF หรือรูปภาพ ตรวจช่องสำคัญ แจ้งสิ่งที่ขาด แล้วบันทึกเป็นรายการซื้อเพื่อใช้ยื่น ภ.พ.30'
                 : 'The system reads supplier invoices and receipts from PDFs or images, flags missing fields, and turns approved documents into PP.30-ready purchase records.'}
             </p>
             {projects.length > 0 && (
-              <label className="mt-4 block max-w-md text-xs font-semibold text-emerald-50/80">
+              <label className="mt-4 block max-w-md text-xs font-semibold text-slate-600">
                 {isThai ? 'โปรเจคสำหรับไฟล์อัปโหลด' : 'Upload project'}
                 <select
                   value={uploadProjectId}
                   onChange={(e) => setUploadProjectId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none transition focus:border-emerald-200"
+                  className="input-field mt-1"
                 >
-                  <option className="text-slate-900" value="">{isThai ? 'ยังไม่แยกโปรเจค' : 'No project'}</option>
+                  <option value="">{isThai ? 'ยังไม่แยกโปรเจค' : 'No project'}</option>
                   {projects.map((project) => (
-                    <option className="text-slate-900" key={project.id} value={project.id}>{projectLabel(project)}</option>
+                    <option key={project.id} value={project.id}>{projectLabel(project)}</option>
                   ))}
                 </select>
               </label>
             )}
             <div className="mt-5 flex flex-wrap gap-2">
-              <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+              <label className={`btn-primary cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 {isThai ? 'อัปโหลดเข้า AI' : 'Upload to AI'}
                 <input
@@ -1060,30 +1060,30 @@ export default function PurchaseInvoices() {
                   }}
                 />
               </label>
-              <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50" disabled={isFreePlan}>
+              <button onClick={openCreate} className="btn-secondary" disabled={isFreePlan}>
                 <Plus className="h-4 w-4" />
                 {isThai ? 'กรอกเอง' : 'Manual entry'}
               </button>
             </div>
           </div>
 
-          <div className="border-t border-white/10 bg-white/[0.04] p-4 sm:p-5 xl:border-l xl:border-t-0">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="workspace-command-rail">
+            <div className="grid grid-cols-2 border-y border-slate-200">
               {aiInboxSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <div key={step.key} className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3">
+                  <div key={step.key} className="border-b border-r border-slate-200 px-3 py-4 [&:nth-child(2n)]:border-r-0 [&:nth-last-child(-n+2)]:border-b-0">
                     <div className="flex items-start justify-between gap-3">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-emerald-100 ring-1 ring-white/10">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-800 ring-1 ring-primary-100">
                         <Icon className="h-4 w-4" />
                       </span>
-                      <span className="text-right text-xl font-bold leading-none text-white">{step.value}</span>
+                      <span className="text-right text-xl font-bold leading-none text-primary-800">{step.value}</span>
                     </div>
                     <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs font-bold text-emerald-200">0{index + 1}</span>
-                      <p className="text-xs font-bold uppercase tracking-wide text-emerald-100/80">{step.label}</p>
+                      <span className="text-xs font-bold text-primary-700">0{index + 1}</span>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{step.label}</p>
                     </div>
-                    <p className="mt-1 text-sm leading-5 text-white/85">{step.title}</p>
+                    <p className="mt-1 text-sm leading-5 text-slate-700">{step.title}</p>
                   </div>
                 );
               })}
@@ -1101,7 +1101,7 @@ export default function PurchaseInvoices() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] gap-4">
-        <div className="card space-y-4">
+        <div className="workspace-panel space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -1147,7 +1147,7 @@ export default function PurchaseInvoices() {
           </div>
 
           {documentStats && (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+            <div className="workspace-rail grid-cols-2 lg:grid-cols-5">
               {[
                 { label: isThai ? 'เอกสาร 30 วัน' : '30-day docs', value: documentStats.totalLast30Days, tone: 'bg-gray-50 text-gray-700' },
                 { label: isThai ? 'รอยืนยัน' : 'Awaiting', value: awaitingDocuments.length, tone: 'bg-amber-50 text-amber-700' },
@@ -1155,7 +1155,7 @@ export default function PurchaseInvoices() {
                 { label: isThai ? 'อ่านไม่สำเร็จ' : 'Failed', value: documentStats.failedLast30Days, tone: 'bg-rose-50 text-rose-700' },
                 { label: isThai ? 'ซ้ำที่กันไว้' : 'Duplicates', value: documentStats.duplicateWarnings, tone: 'bg-blue-50 text-blue-700' },
               ].map((stat) => (
-                <div key={stat.label} className={`rounded-lg px-3 py-2 ${stat.tone}`}>
+                <div key={stat.label} className={`workspace-rail-item ${stat.tone}`}>
                   <p className="text-[11px] font-medium opacity-80">{stat.label}</p>
                   <p className="text-lg font-bold">{stat.value}</p>
                 </div>
@@ -1354,7 +1354,7 @@ export default function PurchaseInvoices() {
         </div>
 
         <div className="space-y-4">
-          <div className="card space-y-3">
+          <div className="workspace-panel space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -1369,9 +1369,9 @@ export default function PurchaseInvoices() {
                 {isThai ? 'ไม่มีงานค้างตรวจ' : 'No pending review items'}
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="border-y border-slate-200">
                 {aiReviewItems.slice(0, 3).map((p) => (
-                  <div key={p.id} className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2">
+                  <div key={p.id} className="border-b border-slate-200 bg-amber-50/45 px-3 py-3 last:border-b-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{p.supplierName}</p>
                     <p className="text-xs text-gray-600 truncate">{p.invoiceNumber} · {formatCurrency(p.total)}</p>
                     <div className="mt-2 flex items-center gap-1">
@@ -1387,7 +1387,7 @@ export default function PurchaseInvoices() {
                   </div>
                 ))}
                 {reviewIntakes.slice(0, 4).map((item) => (
-                  <div key={item.id} className="rounded-lg border border-rose-100 bg-rose-50/70 px-3 py-2">
+                  <div key={item.id} className="border-b border-slate-200 bg-rose-50/45 px-3 py-3 last:border-b-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{documentTitle(item)}</p>
                     <p className="text-xs text-gray-600 truncate">
                       {documentStatusLabel(item.status)} · {formatDate(item.createdAt)}
@@ -1402,21 +1402,21 @@ export default function PurchaseInvoices() {
             )}
           </div>
 
-          <div className="card space-y-3">
+          <div className="workspace-panel space-y-3">
             <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <Receipt className="w-4 h-4 text-blue-600" />
               {isThai ? 'ผลลัพธ์หลังยืนยัน' : 'Approved input VAT'}
             </h2>
-            <div className="grid grid-cols-1 gap-2">
-              <div className="rounded-lg bg-blue-50 px-3 py-2">
+            <div className="workspace-rail grid-cols-1">
+              <div className="workspace-rail-item bg-blue-50/70">
                 <p className="text-xs font-medium text-blue-700">{isThai ? 'จำนวนรายการ' : 'Records'}</p>
                 <p className="text-lg font-bold text-blue-950">{items.length}</p>
               </div>
-              <div className="rounded-lg bg-green-50 px-3 py-2">
+              <div className="workspace-rail-item bg-green-50/70">
                 <p className="text-xs font-medium text-green-700">{isThai ? 'ยอดซื้อก่อน VAT' : 'Total excl. VAT'}</p>
                 <p className="text-lg font-bold text-green-950">{formatCurrency(totalSubtotal)}</p>
               </div>
-              <div className="rounded-lg bg-primary-50 px-3 py-2">
+              <div className="workspace-rail-item bg-primary-50/70">
                 <p className="text-xs font-medium text-primary-700">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
                 <p className="text-lg font-bold text-primary-900">{formatCurrency(totalVat)}</p>
               </div>
@@ -1426,7 +1426,7 @@ export default function PurchaseInvoices() {
       </div>
 
       {/* Filters */}
-      <div className="card">
+      <div className="workspace-panel">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-base font-bold text-gray-900">
@@ -1544,7 +1544,7 @@ export default function PurchaseInvoices() {
       </div>
 
       {/* Desktop table */}
-      <div className="card p-0 overflow-hidden hidden sm:block">
+      <div className="workspace-panel hidden overflow-hidden p-0 sm:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -1711,10 +1711,10 @@ export default function PurchaseInvoices() {
                               key={supplier.id}
                               type="button"
                               onClick={() => applySupplierOption(supplier)}
-                              className="rounded-lg bg-white px-2 py-1 text-left text-xs text-slate-700 ring-1 ring-amber-100 hover:bg-amber-100"
+                              className="rounded-lg bg-white px-2 py-1 text-left text-xs text-amber-950 ring-1 ring-amber-100 hover:bg-amber-100"
                             >
                               <span className="block font-semibold">{supplier.nameTh}</span>
-                              <span className="font-mono text-slate-500">{supplier.taxId} · {supplier.branchCode || '00000'}</span>
+                              <span className="font-mono text-amber-700">{supplier.taxId} · {supplier.branchCode || '00000'}</span>
                             </button>
                           ))}
                         </div>

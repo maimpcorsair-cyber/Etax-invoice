@@ -664,27 +664,27 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="premium-hero premium-hero-dark">
+    <div className="workspace-page">
+      <section className="workspace-command grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-center">
         <div className="relative z-10 min-w-0">
-          <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
+          <div className="premium-eyebrow">
             <Bot className="h-3.5 w-3.5" />
             {isThai ? 'ภาพรวมเงินที่ต้องจัดการวันนี้' : 'Billboy Ledger Banner'}
           </div>
-          <p className="mt-5 text-sm font-semibold text-slate-200">
+          <p className="mt-5 text-sm font-semibold text-slate-600">
             {isThai ? `สวัสดี ${user?.name ?? ''} · วันนี้มี ${commandCount} เรื่องที่ควรจัดการ` : `Hi ${user?.name ?? ''} · ${commandCount} finance actions need attention`}
           </p>
-          <h1 className="mt-2 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-tight text-white">
+          <h1 className="mt-2 text-[2rem] font-bold leading-tight text-slate-950 sm:text-[2.35rem]">
             {isThai ? 'ยอดต้องตามเก็บทั้งหมด' : 'Total receivables to collect'}
           </h1>
-          <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.9rem)]">
+          <div className="mt-3 text-[2.1rem] font-bold leading-none text-primary-800 tabular-nums sm:text-[3.4rem]">
             {loading ? '—' : formatCurrency(stats?.receivables.totalOutstanding ?? 0)}
           </div>
-          <p className="mt-2 text-xs font-semibold text-slate-300">
+          <p className="mt-2 text-xs font-semibold text-slate-500">
             {isThai ? 'ณ วันที่' : 'As of'} {formatDate(new Date().toISOString())}
           </p>
 
-          <div className="mt-5 h-px w-full max-w-2xl bg-[color-mix(in_oklch,var(--brand-gold)_70%,transparent)]" />
+          <div className="mt-5 h-px w-full max-w-2xl bg-slate-200" />
 
           {/* Ledger strip — money state first: how much, how urgent, then context. */}
           <dl className="mt-4 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
@@ -715,11 +715,11 @@ export default function Dashboard() {
               },
             ].map((cell) => (
               <div key={cell.key} className="min-w-0">
-                <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-primary-100/70">
+                <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">
                   {cell.urgent && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-thai-gold" />}
                   {cell.label}
                 </dt>
-                <dd className={`mt-1 truncate text-lg font-bold tabular-nums ${cell.urgent ? 'text-thai-gold' : 'text-white'}`}>
+                <dd className={`mt-1 truncate text-sm font-bold tabular-nums sm:text-lg ${cell.urgent ? 'text-rose-700' : 'text-slate-950'}`}>
                   {cell.value}
                 </dd>
               </div>
@@ -727,24 +727,24 @@ export default function Dashboard() {
           </dl>
         </div>
 
-        <div className="relative z-10 flex flex-col gap-4 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
-          <div className="overflow-hidden rounded-2xl bg-white/15">
-            <img src={mascotAssets.hero} alt="" className="h-40 w-full object-cover object-center sm:h-48" />
+        <div className="workspace-command-rail relative z-10 grid grid-cols-[88px_minmax(0,1fr)] gap-3 lg:flex lg:max-w-sm lg:flex-col lg:gap-4 lg:justify-self-end">
+          <div className="overflow-hidden rounded-xl border border-white/80 bg-white/70 lg:w-full">
+            <img src={mascotAssets.hero} alt="" className="h-full min-h-24 w-full object-cover object-center lg:h-44" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">
+            <p className="text-sm font-bold text-slate-950">
               {isThai ? 'เริ่มจากงานที่กระทบเงินก่อน' : 'Start with money-impacting work first'}
             </p>
-            <p className="mt-1 text-xs leading-5 text-slate-200">
+            <p className="mt-1 hidden text-xs leading-5 text-slate-600 sm:block">
               {isThai ? 'เปิด AI Inbox หรือออกเอกสารขายใหม่ได้ทันทีโดยไม่ต้องไล่หาเมนู' : 'Open the AI Inbox or create a sales document without hunting through menus.'}
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-            <Link to="/app/purchase-invoices" className="btn-primary justify-center bg-white text-primary-800 hover:bg-slate-100">
+          <div className="col-span-2 flex flex-col gap-2 sm:flex-row lg:flex-col">
+            <Link to="/app/purchase-invoices" className="btn-primary justify-center">
               <Inbox className="h-4 w-4" />
               {isThai ? 'เปิด AI Inbox' : 'Open AI Inbox'}
             </Link>
-            <Link to="/app/invoices/new" className="btn-secondary justify-center border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+            <Link to="/app/invoices/new" className="btn-secondary justify-center">
               <Plus className="h-4 w-4" />
               {isThai ? 'สร้างเอกสารขาย' : 'Create sales document'}
             </Link>
@@ -753,7 +753,7 @@ export default function Dashboard() {
       </section>
 
       {shouldShowFirstInvoicePath && (
-        <section className="rounded-[20px] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
+        <section className="workspace-panel">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
@@ -788,14 +788,14 @@ export default function Dashboard() {
               {seedError && <p className="text-xs text-rose-600 text-center sm:text-right">{seedError}</p>}
             </div>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="workspace-rail mt-4 md:grid-cols-3">
             {firstInvoiceSteps.map((step, index) => {
               const Icon = step.icon;
               return (
                 <Link
                   key={step.key}
                   to={step.href}
-                  className="group flex min-h-[108px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
+                  className="workspace-rail-item group flex min-h-[108px] flex-col justify-between text-left transition-colors hover:bg-primary-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-inset"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -827,7 +827,7 @@ export default function Dashboard() {
       )}
 
       {!shouldShowFirstInvoicePath && (
-        <section className="rounded-[20px] border border-slate-200 bg-white/90 p-3 shadow-sm">
+        <section className="workspace-panel">
           <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
@@ -841,14 +841,14 @@ export default function Dashboard() {
               {isThai ? 'จัดเรียงตามสิ่งที่ควรเคลียร์ก่อน' : 'Prioritized by what should be cleared first'}
             </p>
           </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          <div className="workspace-rail mt-4 md:grid-cols-2 xl:grid-cols-5">
             {worklistItems.map((item) => {
               const Icon = item.icon;
               return (
                 <Link
                   key={item.key}
                   to={item.href}
-                  className="group rounded-2xl border border-slate-200 bg-white px-4 py-4 transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
+                  className="workspace-rail-item group transition-colors hover:bg-primary-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-inset"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white shadow-sm">
@@ -882,7 +882,7 @@ export default function Dashboard() {
 
       <div className="grid gap-5 xl:grid-cols-12">
         <main className="min-w-0 space-y-5 xl:col-span-8">
-          <section className="card">
+          <section className="workspace-panel">
             <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
@@ -899,7 +899,7 @@ export default function Dashboard() {
               </Link>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+            <div className="mt-4 border-y border-slate-200 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">{isThai ? 'อายุลูกหนี้' : 'AR Aging'}</p>
@@ -910,13 +910,13 @@ export default function Dashboard() {
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />{isThai ? 'ยังไม่เกิน' : 'Current'} {stats ? formatCurrency(stats.receivables.currentOutstanding) : '—'}</span>
                 </div>
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-5">
+              <div className="mt-4 grid gap-0 overflow-hidden border-y border-slate-200 sm:grid-cols-5">
                 {loading ? (
-                  [1, 2, 3, 4, 5].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)
+                  [1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 animate-pulse border-b border-slate-200 bg-slate-100 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0" />)
                 ) : agingBuckets.map((bucket) => {
                   const width = totalAging > 0 ? Math.max((bucket.value / totalAging) * 100, bucket.value > 0 ? 8 : 0) : 0;
                   return (
-                    <div key={bucket.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div key={bucket.key} className="border-b border-slate-200 p-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
                       <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                         <div className={`h-full rounded-full ${bucket.color}`} style={{ width: `${width}%` }} />
                       </div>
@@ -1025,7 +1025,7 @@ export default function Dashboard() {
         </main>
 
         <aside className="min-w-0 space-y-5 xl:col-span-4">
-          <section className="card">
+          <section className="workspace-panel">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
@@ -1040,11 +1040,11 @@ export default function Dashboard() {
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
-            <div className="mt-5 space-y-3">
+            <div className="mt-5 border-y border-slate-200">
               {autopilotLanes.map((lane, index) => {
                 const Icon = lane.icon;
                 return (
-                  <div key={lane.key} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div key={lane.key} className="border-b border-slate-200 px-1 py-4 last:border-b-0">
                     <div className="flex items-center gap-3">
                       <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-primary-700 ring-1 ring-slate-200">
                         <Icon className="h-4 w-4" />
@@ -1091,7 +1091,7 @@ export default function Dashboard() {
             </div>
           </MascotHelperCard>
 
-          <section className="card">
+          <section className="workspace-panel">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">{isThai ? 'ความพร้อม VAT' : 'VAT Readiness'}</p>
             <div className="mt-3 flex items-end justify-between gap-3">
               <div>
@@ -1109,7 +1109,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <details id="drive-tax-register" className="card group scroll-mt-24" open>
+          <details id="drive-tax-register" className="workspace-panel group scroll-mt-24" open>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-gray-900">
@@ -1203,7 +1203,7 @@ export default function Dashboard() {
             </div>
           </details>
 
-          <details className="card group">
+          <details className="workspace-panel group">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-gray-900">

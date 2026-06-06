@@ -40,7 +40,7 @@ export default function MobileBottomNav() {
 
   useEffect(() => {
     function check() {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 1280);
     }
     check();
     window.addEventListener('resize', check);
@@ -85,7 +85,7 @@ export default function MobileBottomNav() {
       {/* Bottom Tab Bar */}
       <nav
         aria-label={t('nav.mobile', { defaultValue: 'Mobile navigation' })}
-        className="fixed inset-x-3 bottom-3 z-50 flex overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl shadow-slate-900/10 backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-3 bottom-3 z-50 flex overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl shadow-slate-900/10 backdrop-blur-xl xl:hidden"
         style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
         {primaryTabs.map((tab) => {
@@ -149,12 +149,12 @@ export default function MobileBottomNav() {
       {sheetOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[2px] lg:hidden"
+            className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[2px] xl:hidden"
             onClick={() => setSheetOpen(false)}
           />
 
           <div
-            className="fixed inset-x-3 bottom-3 z-50 max-h-[min(78vh,34rem)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 lg:hidden"
+            className="fixed inset-x-3 bottom-3 z-50 max-h-[min(78vh,34rem)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 xl:hidden"
             style={{ paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))' }}
             role="dialog"
             aria-modal="true"

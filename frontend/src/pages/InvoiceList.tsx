@@ -677,7 +677,7 @@ export default function InvoiceList() {
     <>
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <ConfirmDialog dialog={confirmDialog} />
-      <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="workspace-page">
       <SectionSubNav
         items={[
           { key: 'quotations', to: '/app/quotations', label: isThai ? 'ใบเสนอราคา' : 'Quotations', icon: FileText },
@@ -686,67 +686,67 @@ export default function InvoiceList() {
           { key: 'invoices', to: '/app/invoices', label: isThai ? 'ใบกำกับภาษี/ใบเสร็จ' : 'Tax Invoices', icon: Receipt },
         ]}
       />
-      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
+      <section className="workspace-command">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
             <p className="premium-eyebrow">{isThai ? 'Sales Tax Ledger' : 'Sales Tax Ledger'}</p>
             <div className="mt-3 flex items-center gap-3 sm:mt-4">
-              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
                 <Receipt className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
                   {t('invoice.list')}
                 </h1>
-                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
                   {isThai ? 'ออกเอกสาร T01-T05, ตรวจรับเงิน และส่ง RD จาก ledger เดียว' : 'Issue T01-T05 documents, track payment, and submit to RD from one ledger.'}
                 </p>
               </div>
             </div>
             <div className="mt-4 sm:mt-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {isThai ? 'มูลค่าเอกสารในมุมมองนี้' : 'Document value in this view'}
               </p>
-              <p className="mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none text-white tabular-nums">
+              <p className="mt-1 text-[2.15rem] font-bold leading-none text-primary-800 tabular-nums sm:text-[2.5rem]">
                 {formatCurrency(totalValue)}
               </p>
-              <div className="mt-3 h-px w-40 bg-amber-200/80" />
+              <div className="mt-3 h-px w-40 bg-slate-200" />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
-                <p className="text-xs font-semibold text-white/55">{isThai ? 'ยังไม่รับชำระ' : 'Unpaid'}</p>
-                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(unpaidValue)}</p>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ยังไม่รับชำระ' : 'Unpaid'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(unpaidValue)}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
-                <p className="text-xs font-semibold text-white/55">{isThai ? 'จำนวนในหน้านี้' : 'Loaded docs'}</p>
-                <p className="mt-1 font-bold text-white tabular-nums">{invoices.length} / {pagination.total}</p>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'จำนวนในหน้านี้' : 'Loaded docs'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{invoices.length} / {pagination.total}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-white">
-              <Wallet className="h-4 w-4 text-amber-100" />
+          <div className="workspace-command-rail">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+              <Wallet className="h-4 w-4 text-primary-700" />
               {isThai ? 'งานขายถัดไป' : 'Next sales action'}
             </div>
             {policy && (
-              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
-                <p className="text-xs font-semibold text-white/55">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
-                <p className="mt-1 text-sm font-bold text-white tabular-nums">
+              <div className="mt-3 border-y border-slate-200 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
+                <p className="mt-1 text-sm font-bold text-slate-950 tabular-nums">
                   {policy.usage.documentsThisMonth}{policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''} {isThai ? 'เอกสารเดือนนี้' : 'docs this month'}
                 </p>
               </div>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-              <Link to="/app/invoices/new" className={`inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 sm:px-4 sm:py-2.5 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
+              <Link to="/app/invoices/new" className={`btn-primary px-3 py-2 text-sm sm:px-4 sm:py-2.5 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
                 <Plus className="h-4 w-4" />
                 <span>{t('invoice.create')}</span>
               </Link>
-              <button onClick={handleExcelExport} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5" disabled={exporting !== null || !policy?.canExportExcel}>
+              <button onClick={handleExcelExport} className="btn-secondary px-3 py-2 text-sm disabled:opacity-60 sm:px-4 sm:py-2.5" disabled={exporting !== null || !policy?.canExportExcel}>
                 {exporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Excel
               </button>
-              <Link to="/app/quotations" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5">
+              <Link to="/app/quotations" className="btn-secondary col-span-2 px-3 py-2 text-sm sm:col-span-1 sm:px-4 sm:py-2.5">
                 <FileText className="h-4 w-4" />
                 {isThai ? 'ดูใบเสนอราคา' : 'Quotations'}
               </Link>
@@ -755,11 +755,11 @@ export default function InvoiceList() {
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="workspace-rail sm:grid-cols-2 xl:grid-cols-4">
         {workItems.map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={item.label} className="workspace-rail-item">
               <div className="flex items-start justify-between gap-3">
                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700 ring-1 ring-primary-100">
                   <Icon className="h-4 w-4" />
@@ -775,7 +775,7 @@ export default function InvoiceList() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="workspace-toolbar">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="relative flex-1 w-full sm:min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -975,7 +975,7 @@ export default function InvoiceList() {
       </div>
 
       {/* Table — hidden on mobile */}
-      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
+      <div className="workspace-panel hidden overflow-hidden p-0 sm:block">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-bold text-slate-950">{isThai ? 'Sales tax document ledger' : 'Sales tax document ledger'}</h2>
           <p className="mt-1 text-xs text-slate-500">{isThai ? 'ติดตามประเภทเอกสาร ลูกค้า ยอดเงิน การรับชำระ และสถานะส่ง RD' : 'Track document type, buyer, value, payment, and RD submission status.'}</p>

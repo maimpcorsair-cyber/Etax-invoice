@@ -123,21 +123,22 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-white/70 bg-white/78 shadow-sm backdrop-blur-xl">
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <nav className="app-navbar">
+      <div className="app-navbar-shell">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/app/dashboard" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg" style={{background:'linear-gradient(135deg,#1e3a8a,#14b8a6)'}}>
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white shadow-[0_8px_20px_rgba(30,58,138,0.22)] transition-transform group-hover:-translate-y-0.5">
               <FileText className="w-4 h-4 text-white" strokeWidth={2.5} />
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-teal-400" />
             </div>
-            <span className="font-bold text-gray-900 text-sm hidden sm:block group-hover:text-primary-600 transition-colors">
+            <span className="hidden text-sm font-bold text-slate-950 transition-colors group-hover:text-primary-700 sm:block">
               {t('app.shortName')}
             </span>
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden xl:flex items-center gap-2">
             {user?.role === 'super_admin' && (
               <Link
                 to="/ops/overview"
@@ -147,7 +148,7 @@ export default function Navbar() {
                 Owner Plane
               </Link>
             )}
-            <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
+            <div className="flex items-center gap-0.5">
               {visibleItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.activePrefixes.some((p) => location.pathname.startsWith(p));
@@ -156,14 +157,15 @@ export default function Navbar() {
                     key={item.key}
                     to={item.href}
                     className={clsx(
-                      'flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all',
+                      'relative flex min-h-10 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
                       isActive
-                        ? 'bg-white text-primary-700 shadow-sm ring-1 ring-primary-100'
-                        : 'text-slate-600 hover:bg-white/80 hover:text-slate-950',
+                        ? 'bg-primary-50 text-primary-800'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950',
                     )}
                   >
                     <Icon className={clsx('w-4 h-4', isActive ? 'text-primary-600' : 'text-slate-400')} />
                     {t(item.labelKey)}
+                    {isActive && <span className="absolute inset-x-3 -bottom-[11px] h-0.5 rounded-full bg-primary-700" />}
                   </Link>
                 );
               })}
@@ -181,7 +183,7 @@ export default function Navbar() {
                 aria-label="User menu"
                 aria-haspopup="true"
                 aria-expanded={userMenuOpen}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+                className="flex min-h-10 items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 transition-colors hover:border-slate-200 hover:bg-slate-50"
               >
                 {linePictureUrl ? (
                   <img
@@ -191,7 +193,7 @@ export default function Navbar() {
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm" style={{background:'linear-gradient(135deg,#1e3a8a,#14b8a6)'}}>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-700 text-xs font-bold text-white shadow-sm">
                     {companyDisplayName.charAt(0).toUpperCase()}
                   </div>
                 )}
