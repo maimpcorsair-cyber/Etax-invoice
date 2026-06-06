@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-07 (Landing scroll choreography correction deployed)
+Last updated: 2026-06-07 (Internal workspace P0 redesign deployed)
 
 ## Latest work (2026-06-07)
+
+Internal workspace visual system P0:
+- **App shell:** added shared light workspace primitives for page spacing, command surfaces, panels, toolbars, and flat ledger rails. The floating app navbar and section navigation now use the same navy/teal authority cues as the landing page without carrying the landing page's theatrical scale into daily operations.
+- **Core workflows:** Dashboard, sales invoices, and the purchase AI Inbox now lead with light command surfaces, clearer money/tax hierarchy, fewer nested cards, and primary actions kept visible. The purchase flow retains upload/manual entry, AI review counts, input-VAT results, and document filters while presenting them as one accounting workspace.
+- **Responsive behavior:** full desktop navigation begins at `1280px`; mobile/tablet bottom navigation remains active below that breakpoint. Ledger separators now remain visible when grids wrap. Playwright verified all three routes at `390x844`, `1024x768`, and `1440x900` with no horizontal overflow.
+- **Production:** commit `c68d276` pushed to `main`; GitHub Unit tests `27072522207`, Typecheck `27072522190`, and Prod smoke `27072522198` passed. Vercel deployment `dpl_HLjNLuhJban4QWVq7z5LPdVfbi2F` is `Ready`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** local frontend typecheck, build, touched-file ESLint, and `git diff --check` pass. Authenticated production login as the accountant demo user succeeded; Dashboard, invoices, and purchase invoices rendered at all three target widths with the expected desktop/mobile navigation and zero browser console errors.
 
 Landing product-theatre redesign:
 - **Frontend:** rebuilt the first public viewport around a large real Billboy product screen, oversized Thai/English offer typography, AI Inbox / monthly tax / evidence cards, and the Billboy mascot. The composition now matches the requested creative-agency reference more closely while staying light and using original Billboy UI/assets.
