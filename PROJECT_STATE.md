@@ -1,14 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-07 (Landing product-theatre redesign deployed)
+Last updated: 2026-06-07 (Landing scroll choreography correction deployed)
 
 ## Latest work (2026-06-07)
 
 Landing product-theatre redesign:
 - **Frontend:** rebuilt the first public viewport around a large real Billboy product screen, oversized Thai/English offer typography, AI Inbox / monthly tax / evidence cards, and the Billboy mascot. The composition now matches the requested creative-agency reference more closely while staying light and using original Billboy UI/assets.
-- **Motion/responsive:** the hero is a scroll-linked sticky scene. The headline recedes while the product screen lifts, straightens, and scales; supporting cards move on separate depth paths. Mobile uses the real portrait product capture plus a horizontally scrollable four-step workflow strip. `prefers-reduced-motion` keeps `--hero-scroll` at `0`.
-- **Production:** commit `89adc94` pushed to `main`; GitHub unit tests `27070995171`, typecheck `27070995161`, and production smoke `27070995158` passed. Vercel deployment `dpl_JCRB5BpdqCt3XQZS96UjUikNgjLd` is `READY`, `target=production`, with alias `https://etax-invoice.vercel.app`.
-- **Verification:** frontend typecheck/build and `git diff --check` pass. Playwright checked desktop `1440x900`, mobile `390x844`, Thai copy, scroll progress (`0.5661` at 430px), reduced motion (`0.0000` at 500px), and no horizontal page overflow. Production root and both new product-image assets return `200`.
+- **Motion/responsive correction:** hero progress is now calculated from the complete sticky-section travel distance, so it reaches `1.0000` exactly when the scene ends. The full product screen lifts into view before the four-step workflow rail; the next editorial section then continues naturally instead of cutting the product scene in half. Mobile uses the portrait product capture and a compact 2x2 workflow grid so all four steps remain visible.
+- **Navigation correction:** Workflow actions no longer navigate to a `#workflow` anchor. They calculate the absolute end position of the hero against the app's real `body` scroll container, which avoids both skipping the scroll choreography and overshooting when a browser restores an older scroll position. Reduced-motion mode uses discrete start/end states instead of continuous transforms.
+- **Production:** commits `6e50cd5` and `3055ce1` pushed to `main`; GitHub unit tests `27071773152`, typecheck `27071773173`, and production smoke `27071773242` passed. Vercel deployment `dpl_CRaSPvQiqhjpgocomhnPKLTxVkkb` is `READY`, `target=production`, with alias `https://etax-invoice.vercel.app`.
+- **Verification:** frontend typecheck/build and `git diff --check` pass. Playwright checked desktop `1440x900`, mobile `390x844`, no horizontal overflow, reduced-motion start/end (`0.0000` / `1.0000`), and production scroll restoration: starting at `3000px`, Workflow lands at the exact `900px` hero target with the product screen at `160-783px` and workflow rail at `796-900px`.
 
 ## Previous work (2026-06-05)
 
