@@ -578,7 +578,15 @@ export default function Landing() {
     const section = heroMotionRef.current;
     if (!section) return;
     const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-    section.scrollIntoView({ behavior, block: 'end' });
+    const top = Math.max(section.offsetTop + section.offsetHeight - window.innerHeight, 0);
+    const bodyIsScroller = document.body.scrollHeight > document.body.clientHeight;
+
+    if (bodyIsScroller) {
+      document.body.scrollTo({ top, behavior });
+      return;
+    }
+
+    window.scrollTo({ top, behavior });
   }
 
   return (
