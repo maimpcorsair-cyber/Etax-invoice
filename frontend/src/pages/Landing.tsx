@@ -295,9 +295,10 @@ export default function Landing() {
 
     const updateMotion = () => {
       frame = 0;
-      const maxDistance = Math.min(window.innerHeight * 0.9, 760);
-      const rawProgress = maxDistance > 0 ? readScrollTop() / maxDistance : 0;
-      const progress = reducedMotion.matches ? 0 : Math.max(0, Math.min(rawProgress, 1));
+      const scrollDistance = Math.max(section.offsetHeight - window.innerHeight, 1);
+      const rawProgress = (readScrollTop() - section.offsetTop) / scrollDistance;
+      const clampedProgress = Math.max(0, Math.min(rawProgress, 1));
+      const progress = reducedMotion.matches ? (clampedProgress >= 0.8 ? 1 : 0) : clampedProgress;
       section.style.setProperty('--hero-scroll', progress.toFixed(4));
     };
 
@@ -573,6 +574,13 @@ export default function Landing() {
     setCheckoutOpen(false);
   }
 
+  function scrollToWorkflow() {
+    const section = heroMotionRef.current;
+    if (!section) return;
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    section.scrollIntoView({ behavior, block: 'end' });
+  }
+
   return (
     <div className="app-shell">
       <ProductDoodleField />
@@ -587,7 +595,9 @@ export default function Landing() {
           </Link>
           <nav className="hidden items-center gap-7 text-sm font-semibold text-slate-500 md:flex">
             <a href="#features" className="text-slate-500 hover:text-primary-800">{isThai ? 'ระบบ' : 'Product'}</a>
-            <a href="#workflow" className="text-slate-500 hover:text-primary-800">{isThai ? 'Workflow' : 'Workflow'}</a>
+            <button type="button" onClick={scrollToWorkflow} className="text-slate-500 hover:text-primary-800">
+              Workflow
+            </button>
             <a href="#pricing-checkout" className="text-slate-500 hover:text-primary-800">{isThai ? 'ราคา' : 'Pricing'}</a>
             <Link to="/contact" className="text-slate-500 hover:text-primary-800">{isThai ? 'ติดต่อ' : 'Contact'}</Link>
           </nav>
@@ -610,7 +620,7 @@ export default function Landing() {
       {/* Hero Section */}
       <section
         ref={heroMotionRef}
-        className="relative isolate h-[1120px] overflow-clip bg-[#f4f8fc] text-slate-950 sm:h-[1240px] lg:h-[1380px]"
+        className="relative isolate h-[1500px] overflow-clip bg-[#f4f8fc] text-slate-950 sm:h-[1650px] lg:h-[1800px]"
       >
         <div className="sticky top-0 h-[100svh] min-h-[720px] overflow-hidden">
           <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_18%_22%,rgba(45,212,191,0.15),transparent_25rem),radial-gradient(circle_at_82%_16%,rgba(30,58,138,0.14),transparent_29rem),linear-gradient(180deg,#fbfdff_0%,#eef4fa_100%)]" />
@@ -630,8 +640,8 @@ export default function Landing() {
           <div
             className="relative z-20 mx-auto max-w-5xl px-4 pt-32 text-center sm:pt-36 lg:pt-[9.5rem]"
             style={{
-              opacity: 'calc(1 - var(--hero-scroll, 0) * 0.82)',
-              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -190px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.06))',
+              opacity: 'calc(1 - var(--hero-scroll, 0) * 1.08)',
+              transform: 'translate3d(0, calc(var(--hero-scroll, 0) * -170px), 0) scale(calc(1 - var(--hero-scroll, 0) * 0.045))',
               willChange: 'transform, opacity',
             }}
           >
@@ -666,19 +676,20 @@ export default function Landing() {
                 {isThai ? 'เริ่มทดลองใช้ฟรี' : 'Start free trial'}
                 <ArrowRight className="h-5 w-5" />
               </button>
-              <a
-                href="#workflow"
+              <button
+                type="button"
+                onClick={scrollToWorkflow}
                 className="pointer-events-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-6 py-3 text-base font-bold text-primary-800 shadow-[0_16px_42px_rgba(15,23,42,0.08)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-primary-200 hover:bg-primary-50"
               >
                 {isThai ? 'ดูการทำงาน' : 'See the workflow'}
                 <Smartphone className="h-5 w-5" />
-              </a>
+              </button>
             </div>
           </div>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 mx-auto h-[52%] min-h-[390px] max-w-[1500px] sm:h-[55%] lg:h-[58%]">
+          <div className="pointer-events-none absolute inset-0 z-10 mx-auto max-w-[1500px]">
             <div
-              className="absolute left-[2%] top-[4%] hidden w-[240px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl md:block lg:left-[4%] lg:w-[270px]"
+              className="absolute left-[2%] top-[43%] hidden w-[240px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl md:block lg:left-[4%] lg:w-[270px]"
               style={{
                 opacity: 'calc(0.96 - var(--hero-scroll, 0) * 0.18)',
                 transform: 'translate3d(calc(var(--hero-scroll, 0) * -95px), calc(var(--hero-scroll, 0) * -155px), 0) rotate(calc(-5deg - var(--hero-scroll, 0) * 4deg))',
@@ -714,7 +725,7 @@ export default function Landing() {
             </div>
 
             <div
-              className="absolute right-[2%] top-[1%] hidden w-[250px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl md:block lg:right-[3%] lg:w-[280px]"
+              className="absolute right-[2%] top-[41%] hidden w-[250px] rounded-[20px] border border-white/90 bg-white/95 p-4 shadow-[0_28px_80px_rgba(30,58,138,0.17)] backdrop-blur-xl md:block lg:right-[3%] lg:w-[280px]"
               style={{
                 opacity: 'calc(0.96 - var(--hero-scroll, 0) * 0.15)',
                 transform: 'translate3d(calc(var(--hero-scroll, 0) * 105px), calc(var(--hero-scroll, 0) * -185px), 0) rotate(calc(5deg + var(--hero-scroll, 0) * 3deg))',
@@ -745,9 +756,9 @@ export default function Landing() {
             </div>
 
             <div
-              className="absolute left-1/2 top-[26%] w-[min(94vw,1080px)] overflow-hidden rounded-[24px] border-[6px] border-slate-900 bg-slate-900 shadow-[0_50px_140px_rgba(30,58,138,0.3)] sm:border-[9px] lg:top-[20%]"
+              className="absolute left-1/2 top-[46%] w-[min(94vw,1080px)] overflow-hidden rounded-[24px] border-[6px] border-slate-900 bg-slate-900 shadow-[0_50px_140px_rgba(30,58,138,0.3)] sm:border-[9px] lg:top-[44%]"
               style={{
-                transform: 'translate3d(-50%, calc(150px - var(--hero-scroll, 0) * 300px), 0) rotate(calc(-4deg + var(--hero-scroll, 0) * 4deg)) scale(calc(0.86 + var(--hero-scroll, 0) * 0.14))',
+                transform: 'translate3d(-50%, calc(140px - var(--hero-scroll, 0) * 380px), 0) rotate(calc(-4deg + var(--hero-scroll, 0) * 4deg)) scale(calc(0.84 + var(--hero-scroll, 0) * 0.11))',
                 transformOrigin: '50% 12%',
                 willChange: 'transform',
               }}
@@ -831,57 +842,81 @@ export default function Landing() {
               {isThai ? 'เลื่อนเพื่อดูเอกสารประกอบเป็นระบบ' : 'Scroll to assemble the workflow'}
             </span>
           </div>
-        </div>
 
-        <div id="workflow" className="absolute inset-x-0 bottom-0 z-30 border-y border-white/80 bg-white/90 py-5 shadow-[0_-24px_70px_rgba(30,58,138,0.08)] backdrop-blur-xl">
-          <div className="mx-auto grid max-w-5xl auto-cols-[minmax(250px,82vw)] grid-flow-col gap-3 overflow-x-auto px-4 text-left [scrollbar-width:none] sm:grid-cols-4 sm:grid-flow-row sm:overflow-visible">
-            {[
-              { title: isThai ? 'ส่งเข้า LINE' : 'Send to LINE', desc: isThai ? 'ถ่ายบิลหรือสลิปจากมือถือ' : 'Capture bills and slips' },
-              { title: isThai ? 'AI อ่านให้' : 'AI reads', desc: isThai ? 'แยกประเภทและเช็ค VAT' : 'Classifies and checks VAT' },
-              { title: isThai ? 'บัญชีกดยืนยัน' : 'Accountant reviews', desc: isThai ? 'แก้เฉพาะรายการที่เสี่ยง' : 'Only risky items need edits' },
-              { title: isThai ? 'พร้อมยื่นภาษี' : 'Tax-ready', desc: isThai ? 'Drive และสมุดทะเบียนครบ' : 'Drive and registers complete' },
-            ].map((step, index) => (
-              <div key={step.title} className="grid grid-cols-[32px_1fr] gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-primary-50/70">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-700 text-xs font-bold text-white">0{index + 1}</div>
-                <div>
-                  <div className="text-sm font-bold text-slate-950">{step.title}</div>
-                  <div className="mt-0.5 text-xs leading-5 text-slate-500">{step.desc}</div>
+          <div
+            id="workflow"
+            className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 border-y border-white/80 bg-white/[0.92] py-5 shadow-[0_-24px_70px_rgba(30,58,138,0.08)] backdrop-blur-xl"
+            style={{
+              opacity: 'calc(var(--hero-scroll, 0) * 1.7)',
+              transform: 'translate3d(0, calc(160px - var(--hero-scroll, 0) * 160px), 0)',
+              willChange: 'transform, opacity',
+            }}
+          >
+            <div className="mx-auto grid max-w-5xl grid-cols-2 gap-x-2 gap-y-1 px-3 text-left sm:grid-cols-4 sm:gap-3 sm:px-4">
+              {[
+                { title: isThai ? 'ส่งเข้า LINE' : 'Send to LINE', desc: isThai ? 'ถ่ายบิลหรือสลิปจากมือถือ' : 'Capture bills and slips' },
+                { title: isThai ? 'AI อ่านให้' : 'AI reads', desc: isThai ? 'แยกประเภทและเช็ค VAT' : 'Classifies and checks VAT' },
+                { title: isThai ? 'บัญชีกดยืนยัน' : 'Accountant reviews', desc: isThai ? 'แก้เฉพาะรายการที่เสี่ยง' : 'Only risky items need edits' },
+                { title: isThai ? 'พร้อมยื่นภาษี' : 'Tax-ready', desc: isThai ? 'Drive และสมุดทะเบียนครบ' : 'Drive and registers complete' },
+              ].map((step, index) => (
+                <div key={step.title} className="grid min-w-0 grid-cols-[28px_1fr] gap-2 rounded-xl px-1 py-1.5 sm:grid-cols-[32px_1fr] sm:gap-3 sm:px-3 sm:py-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-700 text-[11px] font-bold text-white sm:h-8 sm:w-8 sm:text-xs">0{index + 1}</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold leading-5 text-slate-950 sm:text-sm">{step.title}</div>
+                    <div className="mt-0.5 text-[10px] leading-4 text-slate-500 sm:text-xs sm:leading-5">{step.desc}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative overflow-hidden border-y border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(242,247,252,0.9))] py-24">
+      <section id="features" className="relative overflow-hidden border-y border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(242,247,252,0.92))] py-28 lg:py-40">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(45,212,191,0.1)_0%,transparent_34%),linear-gradient(250deg,rgba(201,168,76,0.13)_0%,transparent_32%)]" />
-        <div className="relative z-10 mx-auto max-w-6xl px-4">
-          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[1.35fr_0.65fr] lg:items-end lg:gap-16">
             <div>
-              <h2 className="max-w-3xl text-balance text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
-                {isThai ? 'ไม่ใช่หน้าออกใบกำกับอีกหน้า แต่เป็นห้องควบคุมภาษีของทั้งบริษัท' : 'Not another invoice screen. A tax cockpit for the whole company.'}
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">
+                {isThai ? 'เอกสารเดียว งานทั้งระบบเดินต่อ' : 'One document moves the whole system'}
+              </div>
+              <h2 className="mt-6 max-w-5xl text-balance text-[clamp(3rem,6.4vw,6.5rem)] font-semibold leading-[0.94] text-slate-950">
+                {isThai ? (
+                  <>
+                    จากรูปหนึ่งใบ
+                    <span className="block text-primary-800">ไปถึงภาษีทั้งเดือน</span>
+                  </>
+                ) : (
+                  <>
+                    One document in.
+                    <span className="block text-primary-800">A whole month moves.</span>
+                  </>
+                )}
               </h2>
             </div>
-            <p className="max-w-2xl text-base leading-8 text-slate-600">
+            <p className="max-w-xl text-base leading-8 text-slate-600 lg:pb-2 lg:text-lg">
               {isThai
-                ? 'เจ้าของส่งเอกสารจากมือถือ ทีมบัญชีตรวจจาก ledger และระบบเก็บหลักฐานไว้ให้ auditor ตามรอบภาษีเดียวกัน'
-                : 'Owners send documents from mobile, accountants review from ledgers, and evidence is filed for audit by tax period.'}
+                ? 'เจ้าของส่งเอกสารจากมือถือ AI แยกประเภท ทีมบัญชียืนยัน แล้วหลักฐาน ทะเบียนภาษี และงานยื่นต่อกันโดยไม่ต้องเริ่มใหม่ทุกหน้าจอ'
+                : 'Owners capture from mobile, AI classifies, accountants confirm, and evidence, tax registers, and filing work continue without restarting in each screen.'}
             </p>
           </div>
 
-          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-16 grid gap-8 md:grid-cols-2 lg:mt-24 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-slate-200">
             {features.map(({ icon: Icon, key }, i) => {
               const accents = ['text-primary-800 bg-primary-50', 'text-teal-700 bg-teal-50', 'text-amber-700 bg-amber-50', 'text-emerald-700 bg-emerald-50'];
               return (
                 <div
                   key={key}
-                  className="group rounded-[24px] border border-white/80 bg-white/90 p-6 shadow-[0_22px_70px_rgba(30,58,138,0.1)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-[0_28px_80px_rgba(30,58,138,0.14)]"
+                  className="group border-t border-slate-200 pt-6 lg:border-t-0 lg:px-7 lg:pt-0 lg:first:pl-0 lg:last:pr-0"
                 >
-                  <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${accents[i % accents.length]}`}>
-                    <Icon className="h-6 w-6" strokeWidth={2.2} />
+                  <div className="flex items-center justify-between">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${accents[i % accents.length]}`}>
+                      <Icon className="h-5 w-5" strokeWidth={2.2} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-400">0{i + 1}</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-950">
+                  <h3 className="mt-6 text-lg font-bold text-slate-950">
                     {t(`landing.features.${key}.title`)}
                   </h3>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
