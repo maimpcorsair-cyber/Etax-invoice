@@ -70,6 +70,7 @@ export default function AdminPanel() {
   return (
     <div className="space-y-5">
       <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
         <div className="relative z-10 min-w-0">
           <p className="premium-eyebrow">{isThai ? 'ตั้งค่าระบบ' : 'Workspace settings'}</p>
           <h1 className="mt-3 text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">{t('admin.title')}</h1>
@@ -101,6 +102,7 @@ export default function AdminPanel() {
             {isThai ? 'ดูแพ็กเกจ' : 'View plans'}
             <ArrowRight className="h-4 w-4" />
           </Link>
+        </div>
         </div>
       </section>
 
