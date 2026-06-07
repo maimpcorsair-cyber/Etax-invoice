@@ -8,10 +8,10 @@ import { useLanguage } from '../hooks/useLanguage';
 // The builder component is rendered as-is inside; closing returns to the
 // previous route. Opening the builder URL directly (no backgroundLocation)
 // still renders it as a standalone page, so deep links keep working.
-export default function BuilderOverlay({ title, children }: { title?: string; children: ReactNode }) {
+export default function BuilderOverlay({ title, closeTo, children }: { title?: string; closeTo: string; children: ReactNode }) {
   const navigate = useNavigate();
   const { isThai } = useLanguage();
-  const close = () => navigate(-1);
+  const close = () => navigate(closeTo);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
