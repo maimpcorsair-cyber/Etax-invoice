@@ -693,6 +693,25 @@ export function buildIntakeSavedFlexCard(
   // provides the sender's user.name.
   type BoxObj = { type: string; layout: string; spacing?: string; contents: object[] };
   const body = baseBody as BoxObj;
+  // Lead with a big amount (competitor's clearest LINE-card win): drop the
+  // first "ยอดรวม" label row and replace it with a hero amount block so the
+  // saved confirmation reads "how much" at a glance. The detailed rows below
+  // (vendor, tax id, doc no., dates) stay unchanged.
+  const heroFmt = (n: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(n);
+  if (body.contents.length > 0) body.contents.shift();
+  body.contents.unshift(
+    { type: 'separator', margin: 'md' },
+    {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'xs',
+      contents: [
+        { type: 'text', text: 'ยอดที่บันทึก', size: 'xs', color: '#6b7280' },
+        { type: 'text', text: result.total ? heroFmt(result.total) : '-', size: 'xxl', weight: 'bold' as const, color: '#111111', wrap: true },
+      ],
+    },
+    { type: 'separator', margin: 'md' },
+  );
   const attributionRow = (label: string, value: string) => ({
     type: 'box', layout: 'horizontal',
     contents: [
