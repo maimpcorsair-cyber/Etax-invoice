@@ -231,19 +231,19 @@ export default function Pp30Filing() {
         }
       `}</style>
 
-      <section className="premium-hero premium-hero-dark no-print overflow-hidden p-3.5 sm:p-6 lg:p-7">
+      <section className="workspace-command no-print">
         <div className="grid gap-3 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.75fr)] lg:items-stretch">
           <div className="min-w-0">
             <p className="premium-eyebrow">{isThai ? 'PP.30 Filing Ledger' : 'PP.30 Filing Ledger'}</p>
-            <div className="mt-3 flex items-center gap-3 text-white/80 sm:mt-4">
-              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
                 <Landmark className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
                   {isThai ? 'รายงาน ภ.พ.30' : 'PP.30 Report'}
                 </h1>
-                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
                   {isThai
                     ? 'สรุปภาษีขาย ภาษีซื้อ และภาษีหัก ณ ที่จ่ายของงวดนี้ให้พร้อมพิมพ์หรือส่งออก'
                     : 'Review output VAT, input VAT, and withholding tax for the filing period.'}
@@ -251,43 +251,43 @@ export default function Pp30Filing() {
               </div>
             </div>
             <div className="mt-4 sm:mt-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {mustPay ? (isThai ? 'ภาษีที่ต้องชำระ' : 'VAT payable') : (isThai ? 'ภาษีที่ขอคืน' : 'VAT refundable')}
               </p>
-              <p className={`mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none tabular-nums ${mustPay ? 'text-rose-100' : 'text-emerald-100'}`}>
+              <p className={`mt-1 text-[2.15rem] font-bold leading-none tabular-nums sm:text-[2.5rem] ${mustPay ? 'text-rose-600' : 'text-emerald-700'}`}>
                 {formatCurrency(Math.abs(vatPayable))}
               </p>
-              <div className={`mt-3 h-px w-40 ${mustPay ? 'bg-rose-200/80' : 'bg-amber-200/80'}`} />
+              <div className="mt-3 h-px w-40 bg-slate-200" />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
-                <p className="text-xs font-semibold text-white/55">{isThai ? 'ภาษีขาย' : 'Output VAT'}</p>
-                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(outputVat)}</p>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ภาษีขาย' : 'Output VAT'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(outputVat)}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
-                <p className="text-xs font-semibold text-white/55">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
-                <p className="mt-1 font-bold text-white tabular-nums">{formatCurrency(inputVat)}</p>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(inputVat)}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-white">
-              <Calendar className="h-4 w-4 text-amber-100" />
+          <div className="workspace-command-rail">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+              <Calendar className="h-4 w-4 text-primary-700" />
               {periodLabel}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4">
-              <label className="min-w-0 text-xs font-semibold text-white/70">
+              <label className="min-w-0 text-xs font-semibold text-slate-600">
                 {isThai ? 'เดือน' : 'Month'}
-                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-amber-200">
+                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input-field mt-1 w-full">
                   {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
                     <option key={i} value={i + 1}>{m}</option>
                   ))}
                 </select>
               </label>
-              <label className="min-w-0 text-xs font-semibold text-white/70">
+              <label className="min-w-0 text-xs font-semibold text-slate-600">
                 {isThai ? 'ปี' : 'Year'}
-                <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-amber-200">
+                <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input-field mt-1 w-full">
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>{isThai ? y + 543 : y}</option>
                   ))}
@@ -295,33 +295,33 @@ export default function Pp30Filing() {
               </label>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-3 lg:grid-cols-1">
-              <button onClick={handlePrint} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 sm:px-4 sm:py-2.5">
+              <button onClick={handlePrint} className="btn-primary px-3 py-2 text-sm sm:px-4 sm:py-2.5">
                 <Printer className="h-4 w-4" />
                 {isThai ? 'พิมพ์รายงาน' : 'Print'}
               </button>
-              <button onClick={handleExport} disabled={exporting} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5">
+              <button onClick={handleExport} disabled={exporting} className="btn-secondary px-3 py-2 text-sm disabled:opacity-60 sm:px-4 sm:py-2.5">
                 {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 {isThai ? 'ดาวน์โหลด CSV' : 'Download CSV'}
               </button>
               <button
                 onClick={() => setActiveTab(activeTab === 'wht' ? 'vat' : 'wht')}
-                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5"
+                className="btn-secondary col-span-2 px-3 py-2 text-sm sm:col-span-1 sm:px-4 sm:py-2.5"
               >
                 <Receipt className="h-4 w-4" />
                 {activeTab === 'wht' ? (isThai ? 'กลับไป VAT' : 'VAT Summary') : (isThai ? 'ดูหัก ณ ที่จ่าย' : 'WHT Summary')}
               </button>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-white/12 bg-slate-950/20 p-3">
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-start gap-2">
-                <CheckCircle2 className={`mt-0.5 h-4 w-4 ${currentFiling ? 'text-emerald-200' : 'text-amber-100'}`} />
+                <CheckCircle2 className={`mt-0.5 h-4 w-4 ${currentFiling ? 'text-emerald-600' : 'text-amber-600'}`} />
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-white">
+                  <p className="text-sm font-bold text-slate-950">
                     {currentFiling
                       ? isThai ? 'งวดนี้บันทึกว่ายื่นแล้ว' : 'This period is recorded as filed'
                       : isThai ? 'บันทึกแบบที่ยื่นแล้ว' : 'Record filed return'}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-white/65">
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
                     {currentFiling
                       ? `${isThai ? 'วันที่ยื่น' : 'Filed'} ${new Date(currentFiling.filedAt).toISOString().slice(0, 10)}${currentFiling.rdReference ? ` · ${currentFiling.rdReference}` : ''}`
                       : isThai ? 'หลังยื่นในระบบ RD แล้ว ให้บันทึกที่นี่เพื่อ snapshot และเก็บ PDF เข้า Drive' : 'After filing with RD, record it here to snapshot and mirror the PDF to Drive.'}
@@ -333,13 +333,13 @@ export default function Pp30Filing() {
                   value={rdReference}
                   onChange={(event) => setRdReference(event.target.value)}
                   placeholder={isThai ? 'เลขอ้างอิง/เลขรับจาก RD (ถ้ามี)' : 'RD reference / receipt no. (optional)'}
-                  className="w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-200"
+                  className="input-field w-full"
                 />
                 <button
                   type="button"
                   onClick={handleFilePeriod}
                   disabled={filing || loading}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-success w-full justify-center px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {filing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {currentFiling
@@ -349,11 +349,11 @@ export default function Pp30Filing() {
               </div>
               {currentFiling?.driveUrl && (
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                  <a href={currentFiling.driveUrl} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-3 py-1.5 text-white ring-1 ring-white/15 hover:bg-white/15">
+                  <a href={currentFiling.driveUrl} target="_blank" rel="noreferrer" className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200">
                     {isThai ? 'เปิด PDF ที่ยื่นแล้ว' : 'Open filed PDF'}
                   </a>
                   {currentFiling.driveFolderUrl && (
-                    <a href={currentFiling.driveFolderUrl} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-3 py-1.5 text-white ring-1 ring-white/15 hover:bg-white/15">
+                    <a href={currentFiling.driveFolderUrl} target="_blank" rel="noreferrer" className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200">
                       {isThai ? 'เปิดโฟลเดอร์ Drive' : 'Open Drive folder'}
                     </a>
                   )}
