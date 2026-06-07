@@ -142,11 +142,17 @@ export default function App() {
   usePushNotifications();
   const surface = detectSurface();
   const location = useLocation();
-  // When a builder route is opened from a list, the list passes its own
-  // location as backgroundLocation so the builder renders as a full-screen
-  // overlay over the list. Opening the URL directly (no state) renders the
-  // builder as a standalone page — deep links keep working.
-  const backgroundLocation = (location.state as { backgroundLocation?: Location } | null)?.backgroundLocation;
+  // Document builders render as a full-screen popup over their list. Detect a
+  // builder route by path so EVERY entry point (list, dashboard, empty state,
+  // deep link) opens the overlay — no need for each link to pass state. The
+  // list behind is the matched `list` route; closing returns there.
+  const OVERLAY_BUILDERS: { test: RegExp; list: string }[] = [
+    { test: /^\/app\/invoices\/(new|[^/]+\/edit)$/, list: '/app/invoices' },
+  ];
+  const overlayBuilder = OVERLAY_BUILDERS.find((b) => b.test.test(location.pathname));
+  const backgroundLocation = overlayBuilder
+    ? ({ pathname: overlayBuilder.list, search: '', hash: '', state: null, key: 'overlay-bg' } as Location)
+    : undefined;
 
   useEffect(() => {
     document.documentElement.lang = i18n.language;
@@ -272,11 +278,11 @@ export default function App() {
           <Routes>
             <Route
               path="/app/invoices/new"
-              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ"><InvoiceBuilder /></BuilderOverlay>}
+              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ" closeTo="/app/invoices"><InvoiceBuilder /></BuilderOverlay>}
             />
             <Route
               path="/app/invoices/:id/edit"
-              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ"><InvoiceBuilder /></BuilderOverlay>}
+              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ" closeTo="/app/invoices"><InvoiceBuilder /></BuilderOverlay>}
             />
           </Routes>
         )}
