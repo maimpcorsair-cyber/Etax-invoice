@@ -218,6 +218,10 @@ export default function PurchaseInvoices() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMimeType, setPreviewMimeType] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Inline original-document preview shown beside the AI review form (2-pane).
+  const [reviewPreviewUrl, setReviewPreviewUrl] = useState<string | null>(null);
+  const [reviewPreviewMime, setReviewPreviewMime] = useState<string | null>(null);
+  const [reviewPreviewLoading, setReviewPreviewLoading] = useState(false);
   const [storageUsage, setStorageUsage] = useState<{ usedBytes: number; quotaBytes: number; usedPercent: number } | null>(null);
   const [toasts, setToasts] = useState<FeedbackToast[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -561,6 +565,33 @@ export default function PurchaseInvoices() {
     setError('');
     setShowModal(true);
   }
+
+  // Load the original document beside the AI review form so the user verifies
+  // extracted fields against the source (the competitor's clearest advantage).
+  useEffect(() => {
+    if (!showModal || !reviewingDoc) {
+      setReviewPreviewUrl(null);
+      setReviewPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setReviewPreviewUrl(null);
+    setReviewPreviewLoading(true);
+    setReviewPreviewMime(cleanMimeType(reviewingDoc.mimeType) || reviewingDoc.mimeType);
+    fetch(`/api/purchase-invoices/document-intakes/${reviewingDoc.id}/file`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('fetch failed');
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setReviewPreviewMime(cleanMimeType(blob.type || res.headers.get('content-type')) || reviewingDoc.mimeType);
+        setReviewPreviewUrl(objectUrl);
+      })
+      .catch(() => { if (!cancelled) setReviewPreviewUrl(null); })
+      .finally(() => { if (!cancelled) setReviewPreviewLoading(false); });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [showModal, reviewingDoc, token]);
 
   function field<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1646,7 +1677,7 @@ export default function PurchaseInvoices() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className={`bg-white rounded-xl shadow-2xl w-full max-h-[90vh] overflow-hidden flex flex-col ${reviewingDoc ? 'max-w-5xl' : 'max-w-2xl'}`}>
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">
                 {reviewingDoc
@@ -1660,7 +1691,37 @@ export default function PurchaseInvoices() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className={reviewingDoc ? 'grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]' : 'flex min-h-0 flex-1 flex-col'}>
+              {reviewingDoc && (
+                <div className="hidden min-h-0 flex-col border-b border-slate-200 bg-slate-100 lg:flex lg:border-b-0 lg:border-r">
+                  <div className="flex items-center justify-between gap-2 px-4 pt-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                      {isThai ? 'เอกสารต้นฉบับ' : 'Original document'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => openPreview(reviewingDoc)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-900"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {isThai ? 'ดูเต็มจอ' : 'Full view'}
+                    </button>
+                  </div>
+                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+                    {reviewPreviewLoading ? (
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    ) : !reviewPreviewUrl ? (
+                      <p className="text-sm text-slate-500">{isThai ? 'ไม่มีไฟล์ต้นฉบับให้แสดง' : 'No original file to show'}</p>
+                    ) : (reviewPreviewMime || '').includes('pdf') ? (
+                      <iframe src={reviewPreviewUrl} className="h-full w-full rounded-lg border border-slate-200 bg-white" style={{ minHeight: '55vh' }} title="Original document" />
+                    ) : (
+                      <img src={reviewPreviewUrl} alt="" className="max-h-full max-w-full rounded-lg object-contain shadow" />
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
               )}
@@ -1870,6 +1931,8 @@ export default function PurchaseInvoices() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {isThai ? 'บันทึก' : 'Save'}
               </button>
+            </div>
+              </div>
             </div>
           </div>
         </div>
