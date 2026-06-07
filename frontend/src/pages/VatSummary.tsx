@@ -171,60 +171,51 @@ export default function VatSummary() {
           { key: 'reconciliation', to: '/app/reports/reconciliation', label: isThai ? 'กระทบยอดธนาคาร' : 'Bank Reconciliation', icon: Link2 },
         ]}
       />
-      <section className="premium-hero premium-hero-dark">
-        <div className="relative z-10 min-w-0">
-          <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
-            <Calculator className="h-3.5 w-3.5" />
-            {isThai ? 'ความพร้อมยื่น VAT' : 'VAT Filing Readiness'}
-          </div>
-          <p className="mt-5 text-sm font-semibold text-slate-200">{periodLabel}</p>
-          <h1 className="mt-2 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-tight text-white">
-            {mustPay ? (isThai ? 'ภาษีที่ต้องชำระโดยประมาณ' : 'Estimated VAT payable') : (isThai ? 'ภาษีขอคืนโดยประมาณ' : 'Estimated VAT refundable')}
-          </h1>
-          <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.75rem)]">
-            {loading ? '—' : formatCurrency(Math.abs(vatPayable))}
-          </div>
-          <div className="mt-4 h-px w-full max-w-xl bg-[color-mix(in_oklch,var(--brand-gold)_78%,transparent)]" />
-          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-100">
-            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-              <span className="text-slate-300">{isThai ? 'ภาษีขาย' : 'Output VAT'}</span>
-              <span className="ml-2 font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(outputVat)}</span>
+      <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+          <div className="min-w-0">
+            <p className="premium-eyebrow"><Calculator className="h-3.5 w-3.5" />{isThai ? 'ความพร้อมยื่น VAT' : 'VAT Filing Readiness'}</p>
+            <p className="mt-4 text-sm font-semibold text-slate-500">{periodLabel}</p>
+            <h1 className="mt-1 text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
+              {mustPay ? (isThai ? 'ภาษีที่ต้องชำระโดยประมาณ' : 'Estimated VAT payable') : (isThai ? 'ภาษีขอคืนโดยประมาณ' : 'Estimated VAT refundable')}
+            </h1>
+            <div className={`mt-2 text-[2.15rem] font-bold leading-none tabular-nums sm:text-[2.5rem] ${mustPay ? 'text-rose-600' : 'text-primary-800'}`}>
+              {loading ? '—' : formatCurrency(Math.abs(vatPayable))}
             </div>
-            <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-              <span className="text-slate-300">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</span>
-              <span className="ml-2 font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(inputVat)}</span>
+            <div className="mt-3 h-px w-40 bg-slate-200" />
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ภาษีขาย' : 'Output VAT'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{loading ? '—' : formatCurrency(outputVat)}</p>
+              </div>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ภาษีซื้อ' : 'Input VAT'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{loading ? '—' : formatCurrency(inputVat)}</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="relative z-10 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-200">{isThai ? 'เลือกงวดภาษี' : 'Filing period'}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            <select
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-              className="input-field border-white/15 bg-white/95"
+          <div className="workspace-command-rail">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'เลือกงวดภาษี' : 'Filing period'}</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input-field">
+                {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
+                  <option key={i} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input-field">
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{isThai ? y + 543 : y}</option>
+                ))}
+              </select>
+            </div>
+            <Link
+              to={`/app/pp30?year=${year}&month=${month}`}
+              className="btn-primary mt-4 w-full justify-center px-4 py-2.5 text-sm"
             >
-              {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => (
-                <option key={i} value={i + 1}>{m}</option>
-              ))}
-            </select>
-            <select
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="input-field border-white/15 bg-white/95"
-            >
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>{isThai ? y + 543 : y}</option>
-              ))}
-            </select>
+              {isThai ? 'เปิดรายงาน ภ.พ.30' : 'Open PP.30 report'}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <Link
-            to={`/app/pp30?year=${year}&month=${month}`}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-800 transition hover:bg-slate-100"
-          >
-            {isThai ? 'เปิดรายงาน ภ.พ.30' : 'Open PP.30 report'}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
       </section>
 
