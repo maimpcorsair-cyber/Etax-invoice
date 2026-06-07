@@ -189,19 +189,17 @@ export default function PayrollRuns() {
         ]}
       />
 
-      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
-        <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-end">
+      <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
-            <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
-              {isThai ? 'Payroll Ledger' : 'Payroll Ledger'}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3 sm:mt-4">
-              <div className="hidden h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 sm:flex">
-                <Landmark className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white sm:text-3xl">{isThai ? 'รอบเงินเดือน' : 'Payroll Runs'}</h1>
-                <p className="mt-1 max-w-2xl text-sm text-white/70">
+            <p className="premium-eyebrow">{isThai ? 'Payroll Ledger' : 'Payroll Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
+                <Landmark className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">{isThai ? 'รอบเงินเดือน' : 'Payroll Runs'}</h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
                   {isThai
                     ? 'ประมวลเงินเดือน ภงด.1 และประกันสังคม ให้เห็นยอดจ่ายสุทธิและงานที่ต้องปิดรอบ'
                     : 'Process payroll, WHT, and SSO while keeping net pay and closing work visible.'}
@@ -210,56 +208,57 @@ export default function PayrollRuns() {
             </div>
 
             <div className="mt-4 sm:mt-6">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {isThai ? 'ยอดจ่ายสุทธิปีนี้' : 'Net payroll this year'}
               </p>
-              <div className="mt-2 max-w-2xl border-b border-[rgba(201,168,76,0.7)] pb-2 sm:pb-3">
-                <p className="font-sarabun text-[2rem] font-bold leading-none text-white tabular-nums sm:text-[clamp(2rem,4vw,2.5rem)]">
-                  {formatCurrency(yearlyNet)}
-                </p>
+              <p className="mt-1 text-[2.15rem] font-bold leading-none text-primary-800 tabular-nums sm:text-[2.5rem]">
+                {formatCurrency(yearlyNet)}
+              </p>
+              <div className="mt-3 h-px w-40 bg-slate-200" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'Gross' : 'Gross'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(yearlyGross)}</p>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/75 sm:mt-4 sm:gap-3">
-                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
-                  {isThai ? 'Gross' : 'Gross'} <strong className="text-white tabular-nums">{formatCurrency(yearlyGross)}</strong>
-                </span>
-                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
-                  {isThai ? 'รอบ' : 'Runs'} <strong className="text-white tabular-nums">{runs.length}</strong>
-                </span>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'รอบ' : 'Runs'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{runs.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="min-w-0 rounded-2xl bg-white/10 p-3 text-white ring-1 ring-white/15 backdrop-blur-sm sm:p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
-              {isThai ? 'Next payroll' : 'Next payroll'}
+          <div className="workspace-command-rail">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {isThai ? 'รอบเงินเดือนถัดไป' : 'Next payroll'}
             </p>
-            <p className="mt-1.5 text-base font-semibold sm:mt-2 sm:text-lg">
+            <p className="mt-1.5 text-base font-bold text-slate-950 sm:mt-2 sm:text-lg">
               {latestRun
                 ? `${(isThai ? TH_MONTHS : EN_MONTHS)[latestRun.month - 1]} ${latestRun.year}`
                 : `${(isThai ? TH_MONTHS : EN_MONTHS)[month - 1]} ${year}`}
             </p>
-            <p className="mt-1 text-sm text-white/65">
+            <p className="mt-1 text-sm text-slate-600">
               {latestRun
                 ? `${isThai ? 'จ่ายสุทธิ' : 'Net'} ${formatCurrency(latestRun.totalNet)}`
                 : isThai ? 'เลือกรอบแล้วประมวลเงินเดือนแรก' : 'Choose a period and run the first payroll.'}
             </p>
             <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-              <label className="col-span-2 min-w-0 text-xs font-semibold text-white/70 sm:col-span-1">
+              <label className="col-span-2 min-w-0 text-xs font-semibold text-slate-600 sm:col-span-1">
                 <span className="block">{isThai ? 'ปี' : 'Year'}</span>
-                <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
+                <input type="number" min={2020} max={2100} value={year} onChange={(e) => setYear(Number(e.target.value))} className="input-field mt-1 w-full" />
               </label>
-              <label className="min-w-0 text-xs font-semibold text-white/70">
+              <label className="min-w-0 text-xs font-semibold text-slate-600">
                 <span className="block">{isThai ? 'เดือน' : 'Month'}</span>
-                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm">
+                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input-field mt-1 w-full">
                   {(isThai ? TH_MONTHS : EN_MONTHS).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                 </select>
               </label>
-              <label className="min-w-0 text-xs font-semibold text-white/70">
+              <label className="min-w-0 text-xs font-semibold text-slate-600">
                 <span className="block">{isThai ? 'วันที่จ่าย' : 'Pay date'}</span>
-                <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
+                <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="input-field mt-1 w-full" />
               </label>
             </div>
-            <button type="button" onClick={runPayroll} disabled={running} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-800 shadow-sm hover:bg-primary-50 disabled:opacity-60">
+            <button type="button" onClick={runPayroll} disabled={running} className="btn-primary mt-3 w-full justify-center px-4 py-2.5 text-sm disabled:opacity-60">
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {isThai ? 'ประมวลผล' : 'Run payroll'}
             </button>
