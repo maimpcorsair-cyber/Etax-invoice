@@ -256,58 +256,61 @@ export default function Projects() {
 
   return (
     <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="premium-hero premium-hero-dark overflow-hidden">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+      <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
-            <p className="premium-eyebrow">
-              {isThai ? 'Project Cost Ledger' : 'Project Cost Ledger'}
-            </p>
-            <h1 className="mt-3 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
-              {isThai ? 'โปรเจค / งบงาน' : 'Projects / Cost Centers'}
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-primary-50/80">
-              {isThai
-                ? 'ดูงบที่เหลือ เอกสารเข้า และงานที่เริ่มเสี่ยงเกินงบ ก่อนเปิด Workspace รายโปรเจค'
-                : 'See remaining budget, incoming documents, and cost-risk projects before opening each workspace.'}
-            </p>
-            <div className="mt-5">
-              <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'งบคงเหลือรวม' : 'Total remaining budget'}</p>
-              <p className={clsx('mt-2 font-sarabun text-[clamp(2rem,5vw,3.6rem)] font-bold leading-none tabular-nums', totals.remaining < 0 ? 'text-rose-100' : 'text-white')}>
+            <p className="premium-eyebrow">{isThai ? 'Project Cost Ledger' : 'Project Cost Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
+                <BriefcaseBusiness className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
+                  {isThai ? 'โปรเจค / งบงาน' : 'Projects / Cost Centers'}
+                </h1>
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
+                  {isThai
+                    ? 'ดูงบที่เหลือ เอกสารเข้า และงานที่เริ่มเสี่ยงเกินงบ ก่อนเปิด Workspace รายโปรเจค'
+                    : 'See remaining budget, incoming documents, and cost-risk projects before opening each workspace.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'งบคงเหลือรวม' : 'Total remaining budget'}</p>
+              <p className={clsx('mt-1 text-[2.15rem] font-bold leading-none tabular-nums sm:text-[2.5rem]', totals.remaining < 0 ? 'text-rose-600' : 'text-primary-800')}>
                 {loading ? '—' : formatCurrency(totals.remaining)}
               </p>
-              <div className="mt-4 h-1 w-44 rounded-full bg-gradient-to-r from-thai-gold via-thai-gold/70 to-transparent" />
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-primary-50/80">
-                <div>
-                  <span className="block text-xs font-bold uppercase text-primary-100/60">{isThai ? 'งบตั้งต้น' : 'Total budget'}</span>
-                  <span className="mt-1 block font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(totals.budget)}</span>
-                </div>
-                <div>
-                  <span className="block text-xs font-bold uppercase text-primary-100/60">{isThai ? 'ใช้/จองแล้ว' : 'Committed'}</span>
-                  <span className="mt-1 block font-bold tabular-nums text-white">{loading ? '—' : formatCurrency(totals.committed)}</span>
-                </div>
+              <div className="mt-3 h-px w-40 bg-slate-200" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'งบตั้งต้น' : 'Total budget'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{loading ? '—' : formatCurrency(totals.budget)}</p>
+              </div>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ใช้/จองแล้ว' : 'Committed'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{loading ? '—' : formatCurrency(totals.committed)}</p>
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'โปรเจคในมุมมองนี้' : 'Projects in view'}</p>
-                <p className="mt-2 text-3xl font-bold tabular-nums text-white">{loading ? '—' : projects.length}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-thai-gold">
-                <BriefcaseBusiness className="h-6 w-6" />
-              </div>
+          <div className="workspace-command-rail">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+              <BriefcaseBusiness className="h-4 w-4 text-primary-700" />
+              {isThai ? 'โปรเจคในมุมมองนี้' : 'Projects in view'}
             </div>
-            <p className="mt-4 hidden text-sm leading-6 text-primary-50/75 sm:block">
-              {isThai
-                ? 'ใช้หน้านี้เป็นบัญชีรวมของงานทั้งหมด แล้วค่อยเข้า Workspace เพื่อดูเอกสาร ซื้อ จ่าย และภาษีของแต่ละงาน'
-                : 'Use this as the consolidated project ledger, then open a workspace for documents, purchases, payments, and tax evidence.'}
-            </p>
+            <div className="mt-3 border-y border-slate-200 py-3">
+              <p className="text-2xl font-bold tabular-nums text-slate-950">{loading ? '—' : projects.length}</p>
+              <p className="mt-1 hidden text-xs leading-5 text-slate-600 sm:block">
+                {isThai
+                  ? 'บัญชีรวมของงานทั้งหมด แล้วเข้า Workspace เพื่อดูเอกสาร ซื้อ จ่าย และภาษีของแต่ละงาน'
+                  : 'Consolidated project ledger; open a workspace for each project’s documents, purchases, payments, and tax.'}
+              </p>
+            </div>
             {canManage && (
               <button
                 type="button"
                 onClick={openCreate}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-900 shadow-sm hover:bg-primary-50 sm:mt-5 sm:py-3"
+                className="btn-primary mt-3 w-full justify-center px-4 py-2.5 text-sm"
               >
                 <Plus className="h-4 w-4" />
                 {isThai ? 'สร้างโปรเจค' : 'New project'}

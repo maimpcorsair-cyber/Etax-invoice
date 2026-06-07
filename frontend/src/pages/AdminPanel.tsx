@@ -69,35 +69,35 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-5">
-      <section className="premium-hero premium-hero-dark">
+      <section className="workspace-command">
         <div className="relative z-10 min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">{isThai ? 'ตั้งค่าระบบ' : 'Workspace settings'}</p>
-          <h1 className="mt-3 text-2xl font-bold leading-tight text-white sm:text-3xl">{t('admin.title')}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
+          <p className="premium-eyebrow">{isThai ? 'ตั้งค่าระบบ' : 'Workspace settings'}</p>
+          <h1 className="mt-3 text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">{t('admin.title')}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             {isThai
               ? 'จัดการข้อมูลบริษัท เอกสาร ภาษี ช่องทางส่ง และแพ็กเกจจากที่เดียว'
               : 'Manage company profile, documents, tax submission, channels, and plan from one place.'}
           </p>
-          <div className="mt-6 flex flex-wrap gap-3 text-sm text-white/75">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-              <ShieldCheck className="h-4 w-4 text-emerald-200" />
+          <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-700">
+            <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 ring-1 ring-slate-200">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
               {policy?.planLabel ?? (isThai ? 'กำลังโหลดแพ็กเกจ' : 'Loading plan')}
             </span>
             {policy && (
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-                <FileText className="h-4 w-4 text-white/70" />
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 ring-1 ring-slate-200">
+                <FileText className="h-4 w-4 text-slate-500" />
                 {policy.usage.documentsThisMonth}{policy.maxDocumentsPerMonth ? ` / ${policy.maxDocumentsPerMonth}` : ''} {isThai ? 'เอกสารเดือนนี้' : 'docs this month'}
               </span>
             )}
           </div>
         </div>
-        <div className="relative z-10 rounded-2xl border border-white/15 bg-white/10 p-4 text-white shadow-2xl shadow-slate-950/15 backdrop-blur">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/60">{isThai ? 'สิ่งที่ต้องรู้' : 'Plan readiness'}</p>
-          <p className="mt-3 text-3xl font-bold tabular-nums">{lockedFeatureCount}</p>
-          <p className="mt-1 text-sm text-white/70">
+        <div className="workspace-command-rail relative z-10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'สิ่งที่ต้องรู้' : 'Plan readiness'}</p>
+          <p className="mt-3 text-3xl font-bold tabular-nums text-slate-950">{lockedFeatureCount}</p>
+          <p className="mt-1 text-sm text-slate-600">
             {isThai ? 'ฟีเจอร์ที่ยังล็อกตามแพ็กเกจ' : 'features gated by current plan'}
           </p>
-          <Link to="/#pricing-checkout" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-primary-800 transition hover:bg-primary-50">
+          <Link to="/#pricing-checkout" className="btn-primary mt-4 w-full justify-center px-4 py-2 text-sm">
             {isThai ? 'ดูแพ็กเกจ' : 'View plans'}
             <ArrowRight className="h-4 w-4" />
           </Link>
