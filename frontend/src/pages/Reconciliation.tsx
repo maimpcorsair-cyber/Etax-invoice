@@ -143,47 +143,47 @@ export default function Reconciliation() {
         ]}
       />
 
-      <section className="premium-hero premium-hero-dark overflow-hidden">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-end">
+      <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
             <p className="premium-eyebrow">{isThai ? 'Bank Match Ledger' : 'Bank Match Ledger'}</p>
-            <h1 className="mt-3 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
+            <h1 className="mt-3 text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
               {isThai ? 'กระทบยอดธนาคาร' : 'Bank Reconciliation'}
             </h1>
-            <p className="mt-3 hidden max-w-3xl text-sm leading-6 text-primary-50/80 sm:block">
+            <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
               {isThai
                 ? 'อัปโหลด statement แล้วให้ Billboy แนะนำว่าเงินเข้า/เงินออกตรงกับเอกสารใด ก่อนกดยืนยันบันทึกการชำระเงิน'
                 : 'Upload a statement, let Billboy suggest matching documents, then confirm each payment posting.'}
             </p>
-            <div className="mt-5">
-              <p className="text-xs font-bold uppercase text-primary-100/70">{isThai ? 'จับคู่ยืนยันแล้ว' : 'Confirmed matches'}</p>
-              <p className="mt-2 font-sarabun text-[clamp(2rem,5vw,3.6rem)] font-bold leading-none tabular-nums text-white">
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'จับคู่ยืนยันแล้ว' : 'Confirmed matches'}</p>
+              <p className="mt-1 text-[2.15rem] font-bold leading-none tabular-nums text-primary-800 sm:text-[2.5rem]">
                 {confirmedCount}
               </p>
-              <div className="mt-4 h-1 w-44 rounded-full bg-gradient-to-r from-thai-gold via-thai-gold/70 to-transparent" />
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-primary-50/80">
-                <div>
-                  <span className="block text-xs font-bold uppercase text-primary-100/60">{isThai ? 'เงินเข้า' : 'Cash in'}</span>
-                  <span className="mt-1 block font-bold tabular-nums text-white">{formatCurrency(totalCredit)}</span>
+              <div className="mt-3 h-px w-40 bg-slate-200" />
+              <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+                <div className="border-t border-slate-200 px-1 py-3">
+                  <p className="text-xs font-semibold text-slate-500">{isThai ? 'เงินเข้า' : 'Cash in'}</p>
+                  <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(totalCredit)}</p>
                 </div>
-                <div>
-                  <span className="block text-xs font-bold uppercase text-primary-100/60">{isThai ? 'เงินออก' : 'Cash out'}</span>
-                  <span className="mt-1 block font-bold tabular-nums text-rose-100">{formatCurrency(totalDebit)}</span>
+                <div className="border-t border-slate-200 px-1 py-3">
+                  <p className="text-xs font-semibold text-slate-500">{isThai ? 'เงินออก' : 'Cash out'}</p>
+                  <p className="mt-1 font-bold text-rose-600 tabular-nums">{formatCurrency(totalDebit)}</p>
                 </div>
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-            <label className="block text-xs font-bold uppercase text-primary-100/70">
+          <div className="workspace-command-rail">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
               {isThai ? 'ไฟล์ CSV จากธนาคาร' : 'Bank statement CSV'}
             </label>
             <input
               type="file"
               accept=".csv,text/csv"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="mt-3 block w-full text-sm text-primary-50/80 file:mr-3 file:rounded-xl file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-bold file:text-primary-900 hover:file:bg-primary-50"
+              className="mt-3 block w-full text-sm text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-primary-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-primary-800"
             />
-            <p className="mt-3 hidden text-xs leading-5 text-primary-50/70 sm:block">
+            <p className="mt-3 hidden text-xs leading-5 text-slate-600 sm:block">
               {isThai
                 ? 'รองรับ CSV ที่มีหัว Date / Description / Debit / Credit'
                 : 'Supports CSV columns Date / Description / Debit / Credit.'}
@@ -192,7 +192,7 @@ export default function Reconciliation() {
               type="button"
               onClick={handleUpload}
               disabled={!file || parsing}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-900 shadow-sm hover:bg-primary-50 disabled:opacity-60"
+              className="btn-primary mt-4 w-full justify-center px-4 py-2.5 text-sm disabled:opacity-60"
             >
               {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               {isThai ? 'อัปโหลดและจับคู่' : 'Upload & match'}
