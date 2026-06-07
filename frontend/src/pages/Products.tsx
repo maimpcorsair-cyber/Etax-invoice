@@ -325,53 +325,53 @@ export default function Products() {
           { key: 'products', to: '/app/products', label: isThai ? 'สินค้า/บริการ' : 'Products & Services', icon: Package },
         ]}
       />
-      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
+      <section className="workspace-command">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
             <p className="premium-eyebrow">{isThai ? 'Product Catalog Ledger' : 'Product Catalog Ledger'}</p>
             <div className="mt-3 flex items-center gap-3 sm:mt-4">
-              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-amber-100 ring-1 ring-white/10 sm:inline-flex">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
                 <Package className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <h1 className="text-xl font-bold leading-tight text-white sm:text-3xl">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
                   {isThai ? 'สินค้าและบริการ' : 'Products / Services'}
                 </h1>
-                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-white/70 sm:block">
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
                   {isThai ? 'ตั้งทะเบียนรายการขายให้พร้อมออกเอกสาร ภาษี สต๊อก และ Google Sheet' : 'Keep reusable sales items ready for documents, tax, stock, and Google Sheets.'}
                 </p>
               </div>
             </div>
             <div className="mt-4 sm:mt-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/55">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {isThai ? 'มูลค่าราคาขายใน catalog' : 'Catalog price book value'}
               </p>
-              <p className="mt-1 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-none text-white tabular-nums">
+              <p className="mt-1 text-[2.15rem] font-bold leading-none text-primary-800 tabular-nums sm:text-[2.5rem]">
                 {formatCurrency(catalogValue)}
               </p>
-              <div className="mt-3 h-px w-40 bg-amber-200/80" />
+              <div className="mt-3 h-px w-40 bg-slate-200" />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
-                <p className="text-xs font-semibold text-white/55">{isThai ? 'ใช้งานอยู่' : 'Active'}</p>
-                <p className="mt-1 font-bold text-white tabular-nums">{activeCount}</p>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ใช้งานอยู่' : 'Active'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{activeCount}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
-                <p className="text-xs font-semibold text-white/55">{isThai ? 'ต่ำกว่าจุดสั่งซื้อ' : 'Low stock'}</p>
-                <p className="mt-1 font-bold text-white tabular-nums">{lowStockCount}</p>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ต่ำกว่าจุดสั่งซื้อ' : 'Low stock'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{lowStockCount}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-white">
-              <Package className="h-4 w-4 text-amber-100" />
+          <div className="workspace-command-rail">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+              <Package className="h-4 w-4 text-primary-700" />
               {isThai ? 'จัดการ catalog' : 'Catalog actions'}
             </div>
             {policy && (
-              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
-                <p className="text-xs font-semibold text-white/55">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
-                <p className="mt-1 text-sm font-bold text-white tabular-nums">
+              <div className="mt-3 border-y border-slate-200 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? `แพ็กเกจ ${policy.planLabel}` : `${policy.planLabel} plan`}</p>
+                <p className="mt-1 text-sm font-bold text-slate-950 tabular-nums">
                   {policy.usage.products}{policy.maxProducts ? ` / ${policy.maxProducts}` : ''} {isThai ? 'รายการ' : 'items'}
                 </p>
               </div>
@@ -379,7 +379,7 @@ export default function Products() {
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
               <button
                 onClick={openCreate}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-900 shadow-sm transition hover:bg-amber-50 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                className="btn-primary px-3 py-2 text-sm disabled:opacity-60 sm:px-4 sm:py-2.5"
                 disabled={!!policy && policy.maxProducts !== null && policy.usage.products >= policy.maxProducts}
               >
                 <Plus className="h-4 w-4" />
@@ -387,14 +387,14 @@ export default function Products() {
               </button>
               <button
                 onClick={handleExportSheet}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                className="btn-secondary px-3 py-2 text-sm disabled:opacity-60 sm:px-4 sm:py-2.5"
                 disabled={sheetExporting}
                 title={isThai ? 'ส่งออกทะเบียนสินค้าและบริการไป Google Sheet' : 'Export product catalog to Google Sheets'}
               >
                 {sheetExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                 {isThai ? 'Sync Sheet' : 'Sync Sheet'}
               </button>
-              <Link to="/app/customers" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/15 sm:col-span-1 sm:px-4 sm:py-2.5">
+              <Link to="/app/customers" className="btn-secondary col-span-2 px-3 py-2 text-sm sm:col-span-1 sm:px-4 sm:py-2.5">
                 <Users className="h-4 w-4" />
                 {isThai ? 'รายชื่อลูกค้า' : 'Customers'}
               </Link>
