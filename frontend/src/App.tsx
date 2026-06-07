@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, type Location } from 'react-router-dom';
+import BuilderOverlay from './components/BuilderOverlay';
 import { useTranslation } from 'react-i18next';
 // Layout shells stay eagerly loaded — they render immediately as route wrappers
 import Layout from './components/Layout';
@@ -140,6 +141,12 @@ export default function App() {
   useAuthBootstrap();
   usePushNotifications();
   const surface = detectSurface();
+  const location = useLocation();
+  // When a builder route is opened from a list, the list passes its own
+  // location as backgroundLocation so the builder renders as a full-screen
+  // overlay over the list. Opening the URL directly (no state) renders the
+  // builder as a standalone page — deep links keep working.
+  const backgroundLocation = (location.state as { backgroundLocation?: Location } | null)?.backgroundLocation;
 
   useEffect(() => {
     document.documentElement.lang = i18n.language;
@@ -151,7 +158,7 @@ export default function App() {
       <CookieBanner />
       <ReConsentModal />
       <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
+        <Routes location={backgroundLocation || location}>
           <Route
             path="/"
             element={
@@ -257,6 +264,22 @@ export default function App() {
             }
           />
         </Routes>
+
+        {/* Overlay routes — render document builders as a full-screen popup
+            over the list they were opened from. Only active when a
+            backgroundLocation is set (i.e. launched from a list link). */}
+        {backgroundLocation && (
+          <Routes>
+            <Route
+              path="/app/invoices/new"
+              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ"><InvoiceBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/invoices/:id/edit"
+              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ"><InvoiceBuilder /></BuilderOverlay>}
+            />
+          </Routes>
+        )}
       </Suspense>
     </>
   );

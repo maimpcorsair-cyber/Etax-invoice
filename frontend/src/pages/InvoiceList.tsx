@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
@@ -84,6 +84,9 @@ export default function InvoiceList() {
   const { isThai, formatCurrency, formatDate } = useLanguage();
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Launch builders as a full-screen overlay over this list (see App.tsx).
+  const builderState = { backgroundLocation: location };
   const [searchParams] = useSearchParams();
   const { policy } = useCompanyAccessPolicy();
 
@@ -738,7 +741,7 @@ export default function InvoiceList() {
               </div>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-              <Link to="/app/invoices/new" className={`btn-primary px-3 py-2 text-sm sm:px-4 sm:py-2.5 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
+              <Link to="/app/invoices/new" state={builderState} className={`btn-primary px-3 py-2 text-sm sm:px-4 sm:py-2.5 ${policy?.canCreateInvoice === false ? 'pointer-events-none opacity-50' : ''}`}>
                 <Plus className="h-4 w-4" />
                 <span>{t('invoice.create')}</span>
               </Link>
@@ -935,6 +938,7 @@ export default function InvoiceList() {
                   )}
                   <Link
                     to={`/app/invoices/${inv.id}/edit`}
+                    state={builderState}
                     className="ml-auto inline-flex items-center gap-1.5 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-3 py-1.5 font-medium"
                   >
                     {t('common.edit')}
@@ -1105,7 +1109,7 @@ export default function InvoiceList() {
                       </td>
                       <td className="table-cell">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <Link to={`/app/invoices/${inv.id}/edit`} className="text-xs text-primary-600 hover:underline">
+                          <Link to={`/app/invoices/${inv.id}/edit`} state={builderState} className="text-xs text-primary-600 hover:underline">
                             {t('common.edit')}
                           </Link>
                           <button
