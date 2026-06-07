@@ -176,66 +176,69 @@ export default function QuotationList() {
         ]}
       />
 
-      <section className="premium-hero premium-hero-dark overflow-hidden p-4 sm:p-6 lg:p-7">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-end">
+      <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
-            <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
-              {isThai ? 'Quote Pipeline Ledger' : 'Quote Pipeline Ledger'}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3 sm:mt-4">
-              <div className="hidden h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 sm:flex">
-                <FileText className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white sm:text-3xl">
+            <p className="premium-eyebrow">{isThai ? 'Quote Pipeline Ledger' : 'Quote Pipeline Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
+                <FileText className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
                   {isThai ? 'ใบเสนอราคา' : 'Quotations'}
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm text-white/70">
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
                   {isThai
                     ? 'ดูมูลค่าดีลที่ลูกค้ารับแล้ว งานที่ต้องตาม และแปลงเป็นใบกำกับภาษีเมื่อปิดดีล'
                     : 'Track accepted quote value, follow-up work, and the path into tax invoices.'}
                 </p>
               </div>
             </div>
-
-            <div className="mt-5 sm:mt-6">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
+            <div className="mt-4 sm:mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {isThai ? 'มูลค่าใบเสนอราคาที่ตอบรับแล้ว' : 'Accepted quote value'}
               </p>
-              <div className="mt-2 max-w-2xl border-b border-[rgba(201,168,76,0.7)] pb-2 sm:pb-3">
-                <p className="font-sarabun text-[2rem] font-bold leading-none text-white tabular-nums sm:text-[clamp(2rem,4vw,2.5rem)]">
-                  {formatCurrency(acceptedValue)}
-                </p>
+              <p className="mt-1 text-[2.15rem] font-bold leading-none text-primary-800 tabular-nums sm:text-[2.5rem]">
+                {formatCurrency(acceptedValue)}
+              </p>
+              <div className="mt-3 h-px w-40 bg-slate-200" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'มูลค่าเปิดอยู่' : 'Open value'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(openValue)}</p>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/75 sm:mt-4 sm:gap-3">
-                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
-                  {isThai ? 'มูลค่าเปิดอยู่' : 'Open value'} <strong className="text-white tabular-nums">{formatCurrency(openValue)}</strong>
-                </span>
-                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
-                  {isThai ? 'ทั้งหมด' : 'Total'} <strong className="text-white tabular-nums">{quotations.length}</strong>
-                </span>
+              <div className="border-t border-slate-200 px-1 py-3">
+                <p className="text-xs font-semibold text-slate-500">{isThai ? 'ทั้งหมด' : 'Total'}</p>
+                <p className="mt-1 font-bold text-slate-950 tabular-nums">{quotations.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white/10 p-3 text-white ring-1 ring-white/15 backdrop-blur-sm sm:p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
-              {isThai ? 'Next action' : 'Next action'}
-            </p>
-            <p className="mt-1.5 text-base font-semibold sm:mt-2 sm:text-lg">
-              {latestQuote
-                ? latestQuote.buyer?.nameTh ?? latestQuote.quotationNumber
-                : isThai ? 'เริ่มจากใบเสนอราคาแรก' : 'Start with the first quote'}
-            </p>
-            <p className="mt-1 text-sm text-white/65">
-              {latestQuote
-                ? `${latestQuote.quotationNumber} · ${formatCurrency(latestQuote.total)}`
-                : isThai ? 'สร้าง ส่งลิงก์ให้ลูกค้า แล้วแปลงเป็นเอกสารขายเมื่อยอมรับ' : 'Create, share, then convert once accepted.'}
-            </p>
-            <button onClick={() => navigate('/app/quotations/new')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-800 shadow-sm hover:bg-primary-50 sm:mt-4">
-              <Plus className="h-4 w-4" />
-              {isThai ? 'สร้างใบเสนอราคา' : 'New quotation'}
-            </button>
+          <div className="workspace-command-rail">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+              <FileText className="h-4 w-4 text-primary-700" />
+              {isThai ? 'งานเสนอราคาถัดไป' : 'Next quote action'}
+            </div>
+            <div className="mt-3 border-y border-slate-200 py-3">
+              <p className="text-sm font-bold text-slate-950">
+                {latestQuote
+                  ? latestQuote.buyer?.nameTh ?? latestQuote.quotationNumber
+                  : isThai ? 'เริ่มจากใบเสนอราคาแรก' : 'Start with the first quote'}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {latestQuote
+                  ? `${latestQuote.quotationNumber} · ${formatCurrency(latestQuote.total)}`
+                  : isThai ? 'สร้าง ส่งลิงก์ให้ลูกค้า แล้วแปลงเป็นเอกสารขายเมื่อยอมรับ' : 'Create, share, then convert once accepted.'}
+              </p>
+            </div>
+            <div className="mt-3">
+              <button onClick={() => navigate('/app/quotations/new')} className="btn-primary w-full px-3 py-2 text-sm sm:px-4 sm:py-2.5">
+                <Plus className="h-4 w-4" />
+                <span>{isThai ? 'สร้างใบเสนอราคา' : 'New quotation'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
