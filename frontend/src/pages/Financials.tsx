@@ -141,21 +141,19 @@ export default function Financials() {
         ]}
       />
 
-      <section className="premium-hero premium-hero-dark overflow-hidden p-3.5 sm:p-6 lg:p-7">
-        <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-end">
+      <section className="workspace-command">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
           <div className="min-w-0">
-            <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
-              {isThai ? 'Financial Statement Ledger' : 'Financial Statement Ledger'}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3 sm:mt-4">
-              <div className="hidden h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 sm:flex">
-                <Landmark className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white sm:text-3xl">
+            <p className="premium-eyebrow">{isThai ? 'Financial Statement Ledger' : 'Financial Statement Ledger'}</p>
+            <div className="mt-3 flex items-center gap-3 sm:mt-4">
+              <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-800 ring-1 ring-primary-100 sm:inline-flex">
+                <Landmark className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
                   {isThai ? 'งบกำไรขาดทุน + งบดุล' : 'Profit & Loss + Balance Sheet'}
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm text-white/70">
+                <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-slate-600 sm:block">
                   {isThai
                     ? 'รวมรายได้ ต้นทุน VAT และฐานะการเงินจากเอกสารที่ออกจริงในช่วงที่เลือก'
                     : 'A statement view of revenue, costs, VAT, and balance-sheet position from issued documents.'}
@@ -164,54 +162,45 @@ export default function Financials() {
             </div>
 
             <div className="mt-4 sm:mt-6">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {isThai ? 'กำไรจากดำเนินงาน' : 'Operating profit'}
               </p>
-              <div className="mt-2 max-w-2xl border-b border-[rgba(201,168,76,0.7)] pb-2 sm:pb-3">
-                <p className="font-sarabun text-[2rem] font-bold leading-none text-white tabular-nums sm:text-[clamp(2rem,4vw,2.5rem)]">
-                  {pnl ? formatCurrency(pnl.operatingProfit) : formatCurrency(0)}
-                </p>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/75 sm:mt-4 sm:gap-3">
-                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
-                  {isThai ? 'Margin' : 'Margin'} <strong className="text-white tabular-nums">{pnl ? `${(pnl.operatingMargin * 100).toFixed(1)}%` : '0.0%'}</strong>
-                </span>
-                <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
-                  {isThai ? 'ณ วันที่' : 'As of'} <strong className="text-white tabular-nums">{to}</strong>
-                </span>
+              <p className={`mt-1 text-[2.15rem] font-bold leading-none tabular-nums sm:text-[2.5rem] ${pnl && pnl.operatingProfit < 0 ? 'text-rose-600' : 'text-primary-800'}`}>
+                {pnl ? formatCurrency(pnl.operatingProfit) : formatCurrency(0)}
+              </p>
+              <div className="mt-3 h-px w-40 bg-slate-200" />
+              <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+                <div className="border-t border-slate-200 px-1 py-3">
+                  <p className="text-xs font-semibold text-slate-500">{isThai ? 'Margin' : 'Margin'}</p>
+                  <p className="mt-1 font-bold text-slate-950 tabular-nums">{pnl ? `${(pnl.operatingMargin * 100).toFixed(1)}%` : '0.0%'}</p>
+                </div>
+                <div className="border-t border-slate-200 px-1 py-3">
+                  <p className="text-xs font-semibold text-slate-500">{isThai ? 'ณ วันที่' : 'As of'}</p>
+                  <p className="mt-1 font-bold text-slate-950 tabular-nums">{to}</p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="min-w-0 rounded-2xl bg-white/10 p-3 text-white ring-1 ring-white/15 backdrop-blur-sm sm:p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/55">
-              {isThai ? 'Report period' : 'Report period'}
+          <div className="workspace-command-rail">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {isThai ? 'งวดที่ดูรายงาน' : 'Report period'}
             </p>
             <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <label className="min-w-0 text-xs font-semibold text-white/70">
+              <label className="min-w-0 text-xs font-semibold text-slate-600">
                 <span className="block">{isThai ? 'ตั้งแต่' : 'From'}</span>
-                <input
-                  type="date"
-                  value={from}
-                  onChange={(e) => setFrom(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-                />
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input-field mt-1 w-full" />
               </label>
-              <label className="min-w-0 text-xs font-semibold text-white/70">
+              <label className="min-w-0 text-xs font-semibold text-slate-600">
                 <span className="block">{isThai ? 'ถึง' : 'To'}</span>
-                <input
-                  type="date"
-                  value={to}
-                  onChange={(e) => setTo(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-                />
+                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input-field mt-1 w-full" />
               </label>
             </div>
             <button
               type="button"
               onClick={load}
               disabled={loading}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-800 shadow-sm hover:bg-primary-50 disabled:opacity-60"
+              className="btn-primary mt-3 w-full justify-center px-4 py-2.5 text-sm disabled:opacity-60"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
               {isThai ? 'อัปเดตงบ' : 'Refresh statements'}

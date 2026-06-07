@@ -75,41 +75,40 @@ export default function FinanceOverview() {
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-gray-300" /></div>
       ) : (
         <>
-          <section className="premium-hero premium-hero-dark">
-            <div className="relative z-10 min-w-0">
-              <div className="premium-eyebrow bg-white/10 text-white ring-1 ring-white/20">
-                <Wallet className="h-3.5 w-3.5" />
-                {isThai ? 'ภาพรวมเงินบริษัท' : 'Company Money Overview'}
-              </div>
-              <p className="mt-5 text-sm font-semibold text-slate-200">{formatDate(range.from)} - {formatDate(range.to)}</p>
-              <h1 className="mt-2 text-[clamp(2rem,4vw,2.5rem)] font-bold leading-tight text-white">
+          <section className="workspace-command">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+            <div className="min-w-0">
+              <p className="premium-eyebrow"><Wallet className="h-3.5 w-3.5" />{isThai ? 'ภาพรวมเงินบริษัท' : 'Company Money Overview'}</p>
+              <p className="mt-4 text-sm font-semibold text-slate-500">{formatDate(range.from)} - {formatDate(range.to)}</p>
+              <h1 className="mt-1 text-xl font-bold leading-tight text-slate-950 sm:text-3xl">
                 {isThai ? 'กระแสเงินสดสุทธิช่วงนี้' : 'Net cashflow this period'}
               </h1>
-              <div className="mt-3 font-bold leading-none text-white tabular-nums text-[clamp(2.35rem,5vw,3.75rem)]">
+              <div className={`mt-2 text-[2.15rem] font-bold leading-none tabular-nums sm:text-[2.5rem] ${data.cashflow.net >= 0 ? 'text-primary-800' : 'text-rose-600'}`}>
                 {formatCurrency(data.cashflow.net)}
               </div>
-              <div className="mt-4 h-px w-full max-w-xl bg-[color-mix(in_oklch,var(--brand-gold)_78%,transparent)]" />
-              <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-100">
-                <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-                  <span className="text-slate-300">{isThai ? 'กำไรดำเนินงาน' : 'Operating profit'}</span>
-                  <span className="ml-2 font-bold tabular-nums text-white">{formatCurrency(data.pnl.operatingProfit)}</span>
+              <div className="mt-3 h-px w-40 bg-slate-200" />
+              <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:mt-5 sm:gap-3">
+                <div className="border-t border-slate-200 px-1 py-3">
+                  <p className="text-xs font-semibold text-slate-500">{isThai ? 'กำไรดำเนินงาน' : 'Operating profit'}</p>
+                  <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(data.pnl.operatingProfit)}</p>
                 </div>
-                <div className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">
-                  <span className="text-slate-300">{isThai ? 'VAT โดยประมาณ' : 'VAT estimate'}</span>
-                  <span className="ml-2 font-bold tabular-nums text-white">{formatCurrency(data.vat.payable)}</span>
+                <div className="border-t border-slate-200 px-1 py-3">
+                  <p className="text-xs font-semibold text-slate-500">{isThai ? 'VAT โดยประมาณ' : 'VAT estimate'}</p>
+                  <p className="mt-1 font-bold text-slate-950 tabular-nums">{formatCurrency(data.vat.payable)}</p>
                 </div>
               </div>
             </div>
-            <div className="relative z-10 rounded-[20px] border border-white/20 bg-white/10 p-4 shadow-sm backdrop-blur lg:max-w-sm lg:justify-self-end">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-200">{isThai ? 'ช่วงเวลาที่ดู' : 'Date range'}</p>
+            <div className="workspace-command-rail">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'ช่วงเวลาที่ดู' : 'Date range'}</p>
               <div className="mt-3 grid gap-2">
-                <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="input-field border-white/15 bg-white/95 text-sm" />
-                <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="input-field border-white/15 bg-white/95 text-sm" />
+                <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="input-field text-sm" />
+                <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="input-field text-sm" />
               </div>
-              <Link to="/app/reports/reconciliation" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-primary-800 transition hover:bg-slate-100">
+              <Link to="/app/reports/reconciliation" className="btn-primary mt-4 w-full justify-center px-4 py-2.5 text-sm">
                 {isThai ? 'กระทบยอดธนาคาร' : 'Bank reconciliation'}
                 <ExternalLink className="h-4 w-4" />
               </Link>
+            </div>
             </div>
           </section>
 
