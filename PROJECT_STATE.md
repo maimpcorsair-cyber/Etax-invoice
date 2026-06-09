@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-10 (Sales ledger action cleanup deployed)
+Last updated: 2026-06-10 (Document preview workflow modal deployed)
 
 ## Latest work (2026-06-10)
+
+Document preview workflow modal:
+- **Preview UX:** `DocumentPreviewSheet` is now a centered/inset workflow modal instead of a narrow right drawer. It renders through a portal so it sits above the app shell, mobile bottom nav, and floating chat. Desktop uses a left document-stage rail plus a larger A4 preview; mobile uses a compact horizontal status strip so the document appears sooner.
+- **Status tree:** sales invoices, quotations, delivery notes, and WHT certificates now pass document-specific workflow stages into the preview. Invoice previews show creation → approval → payment/receipt → RD submission, including blocked RD failed states; quotation previews show draft → sent → customer response → conversion; delivery notes and WHT have matching domain stages.
+- **Production:** commit `3084ad0` (`feat(documents): open previews in workflow modal`) pushed to `main`. GitHub Typecheck `27231411382`, Unit tests `27231411930`, and Prod smoke `27231411699` passed. Production alias `https://etax-invoice.vercel.app` returns `200` and serves new assets `index-CvCaHv6V.js` / `index-Ns879B4t.css`; production chunk `DocumentPreviewSheet-DFdsEODN.js` contains the new `document-preview-steps` workflow modal.
+- **Verification:** local frontend typecheck, ESLint, production build, and `git diff --check` pass. Authenticated local Playwright against production API switched into tenant `ดม`, opened quotation and invoice previews from ledger table actions, confirmed desktop modal geometry, mobile no longer loses actions under bottom nav, and invoice RD-failed rows surface the RD stage in the status tree.
 
 Sales document ledger action cleanup:
 - **Table hierarchy:** renamed ambiguous columns to accounting-focused labels, combined project context under the buyer, and reduced the desktop ledger from 10 to 9 columns.
