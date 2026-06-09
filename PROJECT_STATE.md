@@ -1,6 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-07 (Internal workspace P0 redesign deployed)
+Last updated: 2026-06-10 (Impeccable frontend audit deployed)
+
+## Latest work (2026-06-10)
+
+Impeccable frontend accessibility and UI hygiene audit:
+- **Dialogs and overlays:** added a shared `useDialogFocus` hook with focus trapping, Escape close, body scroll locking, initial focus, and focus restoration. Applied it to builder overlays, document previews, and shared confirmation dialogs with complete `aria-modal`, title, and description wiring.
+- **Accessibility/responsive:** company settings fields now have explicit labels and correct input types; Finance Overview date controls and six-month chart have semantic labels/data; payroll actions meet mobile touch-target expectations; loading states support screen readers and reduced motion.
+- **Whole-frontend hygiene:** removed `transition-all`, 9/10px text utilities, side-accent border patterns, and gray-on-color contrast findings across the scanned frontend. `npx --yes impeccable --json frontend/src` returns `[]`.
+- **Production:** commit `0eca142` (`fix(frontend): complete impeccable accessibility audit`) pushed to `main`. GitHub Typecheck `27226109736`, Unit tests `27226109854`, and Prod smoke `27226109971` passed. Vercel production deployment `https://etax-invoice-rdvnzz6js-maimpcorsair-1177s-projects.vercel.app` is `Ready`; alias `https://etax-invoice.vercel.app` returns `200` and serves the new `index-C3k4vy0F.js` / `index-DQcQf6sS.css` assets.
+- **Verification:** local frontend typecheck, ESLint, production build, `git diff --check`, and Impeccable scanner pass. Authenticated Playwright mobile checks confirmed Finance Overview has no page-level overflow and exposes date/chart semantics; invoice preview has dialog semantics, focus placement, scroll lock, and Escape close.
 
 ## Latest work (2026-06-07)
 
