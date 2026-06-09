@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-10 (Inset document workspace modals deployed)
+Last updated: 2026-06-10 (Sales ledger action cleanup deployed)
 
 ## Latest work (2026-06-10)
+
+Sales document ledger action cleanup:
+- **Table hierarchy:** renamed ambiguous columns to accounting-focused labels, combined project context under the buyer, and reduced the desktop ledger from 10 to 9 columns.
+- **Actions:** kept preview, edit, and payment as the visible row actions. Recurring setup, receipt issuance, email, LINE, PDF, and cancellation now live in an accessible portal menu that is not clipped by the table scroll container.
+- **Production:** commit `3890e79` (`feat(invoices): simplify sales ledger actions`) pushed to `main`. GitHub Typecheck `27229460383`, Unit tests `27229460374`, and Prod smoke `27229460427` passed. Vercel deployment `https://etax-invoice-jpmyzbfgp-maimpcorsair-1177s-projects.vercel.app` is `Ready` and aliased to `https://etax-invoice.vercel.app`.
+- **Verification:** frontend typecheck, ESLint, production build, and `git diff --check` pass. Authenticated production Playwright smoke switched from Owner Control Plane into the `ดม` tenant, confirmed the new ledger columns, and opened the row action menu with recurring, LINE, PDF, and cancellation actions.
 
 Inset document workspace modals:
 - **Document workflow:** invoice, quotation, delivery-note, and recurring-document create/edit routes now open in one shared workspace modal. The app remembers the actual prior route and keeps that workspace visible behind the builder; direct builder deep links fall back to the matching document ledger.
