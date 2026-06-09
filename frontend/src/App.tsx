@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useLocation, type Location } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import BuilderOverlay from './components/BuilderOverlay';
@@ -144,22 +144,39 @@ export default function App() {
   usePushNotifications();
   const surface = detectSurface();
   const location = useLocation();
-  // Document builders render as a full-screen popup over their list. Detect a
-  // builder route by path so EVERY entry point (list, dashboard, empty state,
-  // deep link) opens the overlay — no need for each link to pass state. The
-  // list behind is the matched `list` route; closing returns there.
+  // Document builders render in a large workspace modal over the page they
+  // were launched from. Direct deep links fall back to the matching ledger.
   const OVERLAY_BUILDERS: { test: RegExp; list: string }[] = [
     { test: /^\/app\/invoices\/(new|[^/]+\/edit)$/, list: '/app/invoices' },
+    { test: /^\/app\/quotations\/(new|[^/]+)$/, list: '/app/quotations' },
+    { test: /^\/app\/delivery-notes\/(new|[^/]+)$/, list: '/app/delivery-notes' },
+    { test: /^\/app\/recurring-invoices\/(new|[^/]+)$/, list: '/app/recurring-invoices' },
   ];
   const overlayBuilder = OVERLAY_BUILDERS.find((b) => b.test.test(location.pathname));
-  const backgroundLocation = overlayBuilder
+  const previousPageRef = useRef<Location | null>(null);
+  const locationState = location.state as { backgroundLocation?: Location } | null;
+  const explicitBackground = locationState?.backgroundLocation;
+  const rememberedBackground = previousPageRef.current;
+  const fallbackBackground = overlayBuilder
     ? ({ pathname: overlayBuilder.list, search: '', hash: '', state: null, key: 'overlay-bg' } as Location)
     : undefined;
+  const backgroundLocation = overlayBuilder
+    ? explicitBackground ?? rememberedBackground ?? fallbackBackground
+    : undefined;
+  const closeSearch = new URLSearchParams(backgroundLocation?.search ?? '');
+  closeSearch.delete('authHandoff');
+  const normalizedCloseSearch = closeSearch.toString();
+  const closeBuilderTo = backgroundLocation
+    ? `${backgroundLocation.pathname}${normalizedCloseSearch ? `?${normalizedCloseSearch}` : ''}${backgroundLocation.hash}`
+    : overlayBuilder?.list ?? '/app/dashboard';
 
   useEffect(() => {
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
+  useEffect(() => {
+    if (!overlayBuilder) previousPageRef.current = location;
+  }, [location, overlayBuilder]);
 
   return (
     <>
@@ -273,18 +290,40 @@ export default function App() {
           />
         </Routes>
 
-        {/* Overlay routes — render document builders as a full-screen popup
-            over the list they were opened from. Only active when a
-            backgroundLocation is set (i.e. launched from a list link). */}
+        {/* Overlay routes keep the prior workspace visible behind builders. */}
         {backgroundLocation && (
           <Routes>
             <Route
               path="/app/invoices/new"
-              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ" closeTo="/app/invoices"><InvoiceBuilder /></BuilderOverlay>}
+              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ" closeTo={closeBuilderTo}><InvoiceBuilder /></BuilderOverlay>}
             />
             <Route
               path="/app/invoices/:id/edit"
-              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ" closeTo="/app/invoices"><InvoiceBuilder /></BuilderOverlay>}
+              element={<BuilderOverlay title="ใบกำกับภาษี / ใบเสร็จ" closeTo={closeBuilderTo}><InvoiceBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/quotations/new"
+              element={<BuilderOverlay title="ใบเสนอราคา" closeTo={closeBuilderTo}><QuotationBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/quotations/:id"
+              element={<BuilderOverlay title="ใบเสนอราคา" closeTo={closeBuilderTo}><QuotationBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/delivery-notes/new"
+              element={<BuilderOverlay title="ใบส่งของ" closeTo={closeBuilderTo}><DeliveryNoteBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/delivery-notes/:id"
+              element={<BuilderOverlay title="ใบส่งของ" closeTo={closeBuilderTo}><DeliveryNoteBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/recurring-invoices/new"
+              element={<BuilderOverlay title="เอกสารประจำ" closeTo={closeBuilderTo}><RecurringInvoiceBuilder /></BuilderOverlay>}
+            />
+            <Route
+              path="/app/recurring-invoices/:id"
+              element={<BuilderOverlay title="เอกสารประจำ" closeTo={closeBuilderTo}><RecurringInvoiceBuilder /></BuilderOverlay>}
             />
           </Routes>
         )}
