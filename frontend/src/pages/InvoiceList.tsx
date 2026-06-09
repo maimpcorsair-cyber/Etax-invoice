@@ -15,7 +15,7 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { EmptyState } from '../components/ui/AppChrome';
 import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 import SectionSubNav from '../components/SectionSubNav';
-import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -42,6 +42,50 @@ const PAYMENT_METHODS: Record<string, string> = {
   credit_card: 'บัตรเครดิต',
   other: 'อื่นๆ',
 };
+
+function invoicePreviewSteps(invoice: Invoice, isThai: boolean): DocumentPreviewStep[] {
+  const blocked = invoice.status === 'rejected' || invoice.status === 'cancelled';
+  const approved = ['approved', 'submitted'].includes(invoice.status);
+  const isReceiptLike = invoice.type === 'receipt' || invoice.type === 'tax_invoice_receipt';
+  const rdStatus = invoice.rdSubmissionStatus;
+  const rdDone = rdStatus === 'success' || invoice.status === 'submitted';
+  const rdActive = rdStatus === 'pending' || rdStatus === 'in_progress' || rdStatus === 'retrying';
+  const needsRd = invoice.documentMode !== 'ordinary' && invoice.type !== 'receipt';
+
+  return [
+    {
+      id: 'created',
+      label: isThai ? 'สร้างเอกสาร' : 'Document created',
+      description: isThai ? `เลขที่ ${invoice.invoiceNumber}` : `No. ${invoice.invoiceNumber}`,
+      state: invoice.status === 'draft' ? 'current' : 'done',
+    },
+    {
+      id: 'approved',
+      label: isThai ? 'อนุมัติพร้อมใช้งาน' : 'Approved for use',
+      description: isThai ? 'พร้อมส่งลูกค้าหรือใช้เป็นหลักฐาน' : 'Ready to send or use as evidence.',
+      state: blocked ? 'blocked' : approved ? 'done' : invoice.status === 'pending' ? 'current' : 'pending',
+    },
+    {
+      id: 'paid',
+      label: isThai ? 'รับชำระ / ออกใบเสร็จ' : 'Payment or receipt',
+      description: invoice.isPaid
+        ? isThai ? 'บันทึกการชำระแล้ว' : 'Payment has been recorded.'
+        : isReceiptLike ? (isThai ? 'เอกสารชนิดนี้เป็นหลักฐานรับเงิน' : 'This document already represents payment.')
+          : isThai ? 'ยังรอรับชำระหรือออกใบเสร็จ' : 'Awaiting payment or receipt issuance.',
+      state: invoice.isPaid || isReceiptLike ? 'done' : approved ? 'current' : 'pending',
+    },
+    {
+      id: 'rd',
+      label: isThai ? 'ส่งสรรพากร' : 'Revenue Department',
+      description: !needsRd
+        ? isThai ? 'เอกสารปกติ ไม่ต้องส่ง RD' : 'Ordinary document, RD submission is not required.'
+        : rdDone
+          ? isThai ? 'ส่งสำเร็จและมีหลักฐานแล้ว' : 'Submitted successfully with evidence.'
+          : isThai ? 'รอส่งหรือแก้ข้อผิดพลาดก่อนส่ง' : 'Waiting for submission or correction.',
+      state: !needsRd ? 'done' : rdDone ? 'done' : rdStatus === 'failed' ? 'blocked' : rdActive ? 'current' : 'pending',
+    },
+  ];
+}
 
 interface ProjectOption {
   id: string;
@@ -112,6 +156,7 @@ export default function InvoiceList() {
   // Preview modal
   const [previewModal, setPreviewModal] = useState<{ id: string; invoiceNumber: string; buyerName?: string } | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewSteps, setPreviewSteps] = useState<DocumentPreviewStep[] | undefined>();
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Payment modal
@@ -282,6 +327,7 @@ export default function InvoiceList() {
       : inv.buyerName;
 
     setPreviewModal({ id: inv.id, invoiceNumber: inv.invoiceNumber, buyerName });
+    setPreviewSteps('status' in inv ? invoicePreviewSteps(inv, isThai) : undefined);
     setPreviewHtml(null);
     setPreviewError(null);
     try {
@@ -298,6 +344,7 @@ export default function InvoiceList() {
   function closePreview() {
     setPreviewHtml(null);
     setPreviewModal(null);
+    setPreviewSteps(undefined);
     setPreviewError(null);
   }
 
@@ -1611,6 +1658,7 @@ export default function InvoiceList() {
         error={previewError}
         downloading={pdfLoading}
         editHref={previewModal ? `/app/invoices/${previewModal.id}/edit` : undefined}
+        statusSteps={previewSteps}
         onDownload={handleDownloadPdf}
         onClose={closePreview}
       />

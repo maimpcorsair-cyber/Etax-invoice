@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import type { WhtCertificate } from '../types';
 import SectionSubNav from '../components/SectionSubNav';
 import { ToastStack, type FeedbackToast } from '../components/ui/AppFeedback';
-import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -22,6 +22,35 @@ const WHT_RATE_LABELS: Record<string, string> = {
   '2': 'มาตรา 40(2) — ค่าเช่า/ดอกเบี้ย',
   '4': 'มาตรา 40(4) — ค่าบริการ/นายหน้า',
 };
+
+function whtPreviewSteps(cert: WhtCertificate, isThai: boolean, previewReady: boolean, loading: boolean, error?: string | null): DocumentPreviewStep[] {
+  return [
+    {
+      id: 'created',
+      label: isThai ? 'สร้างหนังสือรับรอง' : 'Certificate created',
+      description: isThai ? `เลขที่ ${cert.certificateNumber}` : `No. ${cert.certificateNumber}`,
+      state: 'done',
+    },
+    {
+      id: 'tax-record',
+      label: isThai ? 'บันทึกภาษีหัก ณ ที่จ่าย' : 'Withholding recorded',
+      description: isThai ? `อัตรา ${cert.whtRate}% สำหรับ ${cert.recipientName}` : `${cert.whtRate}% for ${cert.recipientName}`,
+      state: 'done',
+    },
+    {
+      id: 'pdf',
+      label: isThai ? 'เตรียม PDF 50 ทวิ' : 'Prepare PDF',
+      description: isThai ? 'ใช้ส่งให้ผู้ถูกหักและเก็บเป็นหลักฐาน' : 'Ready for recipient sharing and evidence storage.',
+      state: error ? 'blocked' : loading ? 'current' : previewReady ? 'done' : 'pending',
+    },
+    {
+      id: 'download',
+      label: isThai ? 'ดาวน์โหลด / ส่งต่อ' : 'Download or share',
+      description: isThai ? 'เก็บไฟล์เข้ารอบปิดบัญชีและภาษี' : 'Keep the file for accounting and tax close.',
+      state: previewReady ? 'current' : 'pending',
+    },
+  ];
+}
 
 export default function WhtCertificateList() {
   const { isThai, formatCurrency } = useLanguage();
@@ -424,6 +453,7 @@ export default function WhtCertificateList() {
         loading={previewLoading}
         error={previewError}
         downloading={previewCert ? downloadingId === previewCert.id : false}
+        statusSteps={previewCert ? whtPreviewSteps(previewCert, isThai, Boolean(previewUrl), previewLoading, previewError) : undefined}
         onDownload={() => {
           if (previewCert) void handleDownloadPdf(previewCert.id);
         }}

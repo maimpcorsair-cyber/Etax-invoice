@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
 import type { DeliveryNote, DeliveryNoteStatus } from '../types';
-import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 const STATUS_LABELS: Record<DeliveryNoteStatus, { th: string; en: string; tone: string; icon: typeof Clock }> = {
   draft:     { th: 'แบบร่าง', en: 'Draft', tone: 'bg-slate-100 text-slate-700', icon: FileText },
@@ -30,6 +30,44 @@ function statusMeta(note: DeliveryNote) {
     return { th: 'ส่งบางส่วน', en: 'Partial', tone: 'bg-amber-100 text-amber-800', icon: Truck };
   }
   return STATUS_LABELS[note.status];
+}
+
+function deliveryPreviewSteps(note: DeliveryNote, isThai: boolean): DocumentPreviewStep[] {
+  const ordered = itemCount(note);
+  const delivered = deliveredCount(note);
+  const partial = note.status === 'issued' && delivered > 0 && delivered < ordered;
+  const cancelled = note.status === 'cancelled';
+
+  return [
+    {
+      id: 'created',
+      label: isThai ? 'สร้างใบส่งของ' : 'Delivery note created',
+      description: isThai ? `เลขที่ ${note.deliveryNoteNumber}` : `No. ${note.deliveryNoteNumber}`,
+      state: note.status === 'draft' ? 'current' : 'done',
+    },
+    {
+      id: 'issued',
+      label: isThai ? 'ออกเอกสารให้คลัง/ทีมส่ง' : 'Issued to fulfillment',
+      description: note.expectedDate
+        ? isThai ? `กำหนดส่ง ${new Date(note.expectedDate).toLocaleDateString('th-TH')}` : `Expected ${new Date(note.expectedDate).toLocaleDateString('en-US')}`
+        : isThai ? 'พร้อมนำไปจัดส่ง' : 'Ready for delivery handling.',
+      state: cancelled ? 'blocked' : ['issued', 'delivered', 'converted'].includes(note.status) ? 'done' : 'pending',
+    },
+    {
+      id: 'delivered',
+      label: isThai ? 'ยืนยันการส่งมอบ' : 'Delivery confirmed',
+      description: partial
+        ? isThai ? `ส่งแล้ว ${delivered}/${ordered} รายการ` : `${delivered}/${ordered} items delivered.`
+        : isThai ? 'ใช้ตรวจว่าของถึงลูกค้าแล้วหรือยัง' : 'Tracks whether goods reached the customer.',
+      state: cancelled ? 'blocked' : note.status === 'delivered' || note.status === 'converted' ? 'done' : partial || note.status === 'issued' ? 'current' : 'pending',
+    },
+    {
+      id: 'invoice',
+      label: isThai ? 'แปลงเป็นใบกำกับ' : 'Convert to invoice',
+      description: isThai ? 'ส่งมอบครบแล้วจึงออกเอกสารขายต่อ' : 'Create the sales document after fulfillment.',
+      state: note.status === 'converted' ? 'done' : note.status === 'delivered' ? 'current' : 'pending',
+    },
+  ];
 }
 
 export default function DeliveryNoteList() {
@@ -395,6 +433,7 @@ export default function DeliveryNoteList() {
         error={previewError}
         downloading={previewNote ? downloadingId === previewNote.id : false}
         editHref={previewNote ? `/app/delivery-notes/${previewNote.id}` : undefined}
+        statusSteps={previewNote ? deliveryPreviewSteps(previewNote, isThai) : undefined}
         onDownload={() => {
           if (previewNote) void downloadPdf(previewNote);
         }}

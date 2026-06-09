@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
 import type { Quotation, QuotationStatus } from '../types';
-import DocumentPreviewSheet from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 // ใบเสนอราคา — list page. Mirrors InvoiceList layout but simpler since
 // quotations have no e-Tax submission flow.
@@ -19,6 +19,43 @@ const STATUS_LABELS: Record<QuotationStatus, { th: string; en: string; tone: str
   expired:   { th: 'หมดอายุ',     en: 'Expired',   tone: 'bg-amber-100 text-amber-700',   icon: Clock },
   cancelled: { th: 'ยกเลิก',      en: 'Cancelled', tone: 'bg-slate-100 text-slate-500',   icon: XCircle },
 };
+
+function quotationPreviewSteps(quotation: Quotation, isThai: boolean): DocumentPreviewStep[] {
+  const status = quotation.status;
+  const hasSent = ['sent', 'accepted', 'converted', 'rejected', 'expired'].includes(status);
+  const isClosedProblem = ['rejected', 'expired', 'cancelled'].includes(status);
+
+  return [
+    {
+      id: 'draft',
+      label: isThai ? 'เตรียมใบเสนอราคา' : 'Prepare quote',
+      description: isThai ? `เลขที่ ${quotation.quotationNumber}` : `No. ${quotation.quotationNumber}`,
+      state: status === 'draft' ? 'current' : 'done',
+    },
+    {
+      id: 'sent',
+      label: isThai ? 'ส่งให้ลูกค้า' : 'Sent to customer',
+      description: quotation.validUntil
+        ? isThai ? `ใช้ได้ถึง ${new Date(quotation.validUntil).toLocaleDateString('th-TH')}` : `Valid until ${new Date(quotation.validUntil).toLocaleDateString('en-US')}`
+        : isThai ? 'พร้อมส่งลิงก์หรือ PDF' : 'Ready for a link or PDF.',
+      state: status === 'draft' ? 'pending' : hasSent ? 'done' : 'pending',
+    },
+    {
+      id: 'accepted',
+      label: isThai ? 'ลูกค้าตอบรับ' : 'Customer response',
+      description: isClosedProblem
+        ? STATUS_LABELS[status].th
+        : isThai ? 'รออนุมัติหรือยืนยันงาน' : 'Await acceptance or confirmation.',
+      state: isClosedProblem ? 'blocked' : status === 'sent' ? 'current' : ['accepted', 'converted'].includes(status) ? 'done' : 'pending',
+    },
+    {
+      id: 'converted',
+      label: isThai ? 'แปลงเป็นเอกสารขาย' : 'Convert to sales document',
+      description: isThai ? 'เข้าสู่รอบใบกำกับภาษี / ใบเสร็จ' : 'Moves into invoice or receipt workflow.',
+      state: status === 'converted' ? 'done' : status === 'accepted' ? 'current' : 'pending',
+    },
+  ];
+}
 
 export default function QuotationList() {
   const { token } = useAuthStore();
@@ -441,6 +478,7 @@ export default function QuotationList() {
         error={previewError}
         downloading={previewQuotation ? downloadId === previewQuotation.id : false}
         editHref={previewQuotation ? `/app/quotations/${previewQuotation.id}` : undefined}
+        statusSteps={previewQuotation ? quotationPreviewSteps(previewQuotation, isThai) : undefined}
         onDownload={() => {
           if (previewQuotation) void downloadPdf(previewQuotation);
         }}
