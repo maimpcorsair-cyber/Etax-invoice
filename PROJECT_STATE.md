@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-10 (Impeccable frontend audit deployed)
+Last updated: 2026-06-10 (Inset document workspace modals deployed)
 
 ## Latest work (2026-06-10)
+
+Inset document workspace modals:
+- **Document workflow:** invoice, quotation, delivery-note, and recurring-document create/edit routes now open in one shared workspace modal. The app remembers the actual prior route and keeps that workspace visible behind the builder; direct builder deep links fall back to the matching document ledger.
+- **Responsive layout:** desktop uses an inset modal (`90–92vw`, capped at `1720px`) with visible page context around it; tablet keeps a smaller inset; mobile stays full-screen for usable forms and touch targets. Closing restores the prior route and strips transient `authHandoff` query data.
+- **Production:** commit `5b0e631` (`feat(documents): use inset workspace modals for builders`) pushed to `main`. GitHub Typecheck `27227228698`, Unit tests `27227228681`, and Prod smoke `27227228668` passed. Vercel deployment `https://etax-invoice-krw9v2a8k-maimpcorsair-1177s-projects.vercel.app` is `Ready`; alias `https://etax-invoice.vercel.app` returns `200` with `index-Dr_fVthT.js` / `index-DCNjSDZo.css`.
+- **Verification:** local typecheck, ESLint, production build, `git diff --check`, and Impeccable scanner pass. Authenticated Playwright checks covered all four builder families; desktop geometry was `1296x836` on `1440x900` with the Dashboard visible behind, while mobile was `390x844` with no page overflow.
 
 Impeccable frontend accessibility and UI hygiene audit:
 - **Dialogs and overlays:** added a shared `useDialogFocus` hook with focus trapping, Escape close, body scroll locking, initial focus, and focus restoration. Applied it to builder overlays, document previews, and shared confirmation dialogs with complete `aria-modal`, title, and description wiring.
