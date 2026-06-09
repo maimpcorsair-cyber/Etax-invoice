@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Download, FileText, FileSpreadsheet,
   ExternalLink, ChevronDown, Loader2, Receipt, CheckCircle, Clock, CreditCard, Send, Eye, X, Ban, XCircle, Mail,
   BriefcaseBusiness, CalendarClock, Truck, MessageCircle,
-  Wallet,
+  Wallet, Pencil, MoreHorizontal,
 } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
@@ -101,6 +102,7 @@ export default function InvoiceList() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState<'excel' | 'sheets' | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const [actionMenu, setActionMenu] = useState<{ invoice: Invoice; top: number; right: number } | null>(null);
 
   // Issue Receipt modal
   const [receiptModal, setReceiptModal] = useState<{ invoice: Invoice } | null>(null);
@@ -150,6 +152,15 @@ export default function InvoiceList() {
   const [creatingRecurring, setCreatingRecurring] = useState(false);
   const [toasts, setToasts] = useState<FeedbackToast[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+
+  useEffect(() => {
+    if (!actionMenu) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActionMenu(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [actionMenu]);
 
   const showToast = useCallback((toast: Omit<FeedbackToast, 'id'>) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -980,33 +991,37 @@ export default function InvoiceList() {
 
       {/* Table — hidden on mobile */}
       <div className="workspace-panel hidden overflow-hidden p-0 sm:block">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-bold text-slate-950">{isThai ? 'Sales tax document ledger' : 'Sales tax document ledger'}</h2>
-          <p className="mt-1 text-xs text-slate-500">{isThai ? 'ติดตามประเภทเอกสาร ลูกค้า ยอดเงิน การรับชำระ และสถานะส่ง RD' : 'Track document type, buyer, value, payment, and RD submission status.'}</p>
+        <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
+            <FileText className="h-4.5 w-4.5" aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="text-base font-bold text-slate-950">{isThai ? 'ทะเบียนเอกสารขาย' : 'Sales document ledger'}</h2>
+            <p className="mt-1 text-xs text-slate-500">{isThai ? 'ติดตามเลขที่เอกสาร ลูกค้า การรับชำระ และการส่งกรมสรรพากร' : 'Track document numbers, buyers, payments, and Revenue Department submissions.'}</p>
+          </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px]">
+          <table className="w-full min-w-[1080px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="table-header" scope="col">{isThai ? 'เลขที่' : 'Number'}</th>
+                <th className="table-header" scope="col">{isThai ? 'เลขที่เอกสาร' : 'Document no.'}</th>
                 <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ประเภท' : 'Type'}</th>
-                <th className="table-header" scope="col">{t('customer.title')}</th>
-                <th className="table-header hidden sm:table-cell" scope="col">{t('invoice.date')}</th>
-                <th className="table-header hidden lg:table-cell" scope="col">{isThai ? 'โปรเจค' : 'Project'}</th>
-                <th className="table-header text-right" scope="col">{t('common.amount')}</th>
-                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ชำระแล้ว' : 'Payment'}</th>
-                <th className="table-header" scope="col">{t('common.status')}</th>
-                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'ส่ง RD' : 'RD Submit'}</th>
-                <th className="table-header" scope="col">{t('common.actions')}</th>
+                <th className="table-header" scope="col">{isThai ? 'ลูกค้า / โปรเจค' : 'Buyer / project'}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'วันที่ออก' : 'Issue date'}</th>
+                <th className="table-header text-right" scope="col">{isThai ? 'ยอดรวม' : 'Total'}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'การชำระ' : 'Payment'}</th>
+                <th className="table-header" scope="col">{isThai ? 'สถานะเอกสาร' : 'Document status'}</th>
+                <th className="table-header hidden sm:table-cell" scope="col">{isThai ? 'กรมสรรพากร' : 'Revenue Dept.'}</th>
+                <th className="table-header min-w-[190px]" scope="col">{isThai ? 'จัดการ' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={10} className="text-center py-12">
+                <tr><td colSpan={9} className="text-center py-12">
                   <Loader2 className="w-8 h-8 mx-auto animate-spin text-gray-300" />
                 </td></tr>
               ) : invoices.length === 0 ? (
-                <tr><td colSpan={10} className="py-12">
+                <tr><td colSpan={9} className="py-12">
                   <EmptyState
                     title={isThai ? 'ยังไม่มีเอกสารขาย' : 'No sales documents yet'}
                     description={isThai ? 'สร้างเอกสารแรกเพื่อเริ่ม tracking การชำระเงินและการส่ง RD' : 'Create the first document to start tracking payment and RD submissions.'}
@@ -1038,21 +1053,22 @@ export default function InvoiceList() {
                         </span>
                       </td>
                       <td className="table-cell">
-                        {isThai
-                          ? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'
-                          : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ?? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'}
-                      </td>
-                      <td className="table-cell text-gray-500 hidden sm:table-cell">{formatDate(inv.invoiceDate)}</td>
-                      <td className="table-cell hidden lg:table-cell">
-                        {inv.project ? (
-                          <Link to={`/app/projects/${inv.project.id}`} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200">
-                            <BriefcaseBusiness className="h-3 w-3" />
+                        <div className="font-medium text-slate-800">
+                          {isThai
+                            ? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'
+                            : (inv.buyer as { nameEn?: string; nameTh?: string })?.nameEn ?? (inv.buyer as { nameTh?: string })?.nameTh ?? '—'}
+                        </div>
+                        {inv.project && (
+                          <Link
+                            to={`/app/projects/${inv.project.id}`}
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-primary-700"
+                          >
+                            <BriefcaseBusiness className="h-3 w-3" aria-hidden="true" />
                             {inv.project.code}
                           </Link>
-                        ) : (
-                          <span className="text-xs text-slate-500">—</span>
                         )}
                       </td>
+                      <td className="table-cell text-gray-500 hidden sm:table-cell">{formatDate(inv.invoiceDate)}</td>
                       <td className="table-cell text-right font-semibold tabular-nums">{formatCurrency(inv.total)}</td>
                       <td className="table-cell hidden sm:table-cell">
                         {inv.isPaid ? (
@@ -1108,107 +1124,53 @@ export default function InvoiceList() {
                         </div>
                       </td>
                       <td className="table-cell">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Link to={`/app/invoices/${inv.id}/edit`} state={builderState} className="text-xs text-primary-600 hover:underline">
-                            {t('common.edit')}
-                          </Link>
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => openPreview(inv)}
-                            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
                             title={isThai ? 'ดูตัวอย่าง' : 'Preview'}
+                            aria-label={isThai ? `ดู ${inv.invoiceNumber}` : `Preview ${inv.invoiceNumber}`}
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">{isThai ? 'ดู' : 'View'}</span>
+                            <Eye className="h-4 w-4" aria-hidden="true" />
                           </button>
-                          {canCreateRecurringFromInvoice(inv) && (
-                            <button
-                              onClick={() => openRecurringModal(inv)}
-                              className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
-                              title={isThai ? 'สร้าง recurring invoice จากเอกสารนี้' : 'Create recurring invoice from this document'}
-                            >
-                              <CalendarClock className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">{isThai ? 'ทำซ้ำ' : 'Repeat'}</span>
-                            </button>
-                          )}
-                          {canIssueReceipt(inv) && (
-                            <button
-                              onClick={() => { setReceiptModal({ invoice: inv }); setReceiptForm({ paymentMethod: 'transfer', note: '', paidAt: new Date().toISOString().split('T')[0] }); }}
-                              className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium"
-                              title={isThai ? 'ออกใบเสร็จรับเงิน' : 'Issue Receipt'}
-                            >
-                              <Receipt className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">{isThai ? 'ออกใบเสร็จ' : 'Receipt'}</span>
-                            </button>
-                          )}
+                          <Link
+                            to={`/app/invoices/${inv.id}/edit`}
+                            state={builderState}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 hover:text-primary-800"
+                            title={isThai ? 'แก้ไขเอกสาร' : 'Edit document'}
+                            aria-label={isThai ? `แก้ไข ${inv.invoiceNumber}` : `Edit ${inv.invoiceNumber}`}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                          </Link>
                           {canRecordPayment(inv) && inv.type !== 'tax_invoice_receipt' && (
                             <button
                               onClick={() => openPaymentModal(inv)}
-                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-50 px-2.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
                               title={isThai ? 'บันทึกการรับชำระ' : 'Record Payment'}
                             >
-                              <CreditCard className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">{isThai ? 'รับชำระ' : 'Pay'}</span>
+                              <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span>{isThai ? 'รับชำระ' : 'Payment'}</span>
                             </button>
                           )}
-                          {policy?.canSendInvoiceEmail && inv.buyer?.email && (
-                            <button
-                              onClick={() => handleSendEmail(inv)}
-                              disabled={sendingEmail === inv.id}
-                              className={`inline-flex items-center gap-1 text-xs font-medium disabled:opacity-50 ${
-                                emailJustSent[inv.id]
-                                  ? 'text-emerald-600'
-                                  : 'text-sky-600 hover:text-sky-800'
-                              }`}
-                              title={emailJustSent[inv.id]
-                                ? (isThai ? `ส่งแล้วไปยัง ${inv.buyer.email}` : `Sent to ${inv.buyer.email}`)
-                                : (isThai ? `ส่งอีเมลไปยัง ${inv.buyer.email}` : `Email to ${inv.buyer.email}`)}
-                            >
-                              {sendingEmail === inv.id
-                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                : emailJustSent[inv.id]
-                                  ? <CheckCircle className="w-3.5 h-3.5" />
-                                  : <Mail className="w-3.5 h-3.5" />}
-                              <span className="hidden sm:inline">
-                                {emailJustSent[inv.id]
-                                  ? (isThai ? 'ส่งแล้ว' : 'Sent')
-                                  : (isThai ? 'ส่งอีเมล' : 'Email')}
-                              </span>
-                            </button>
-                          )}
-                          {inv.status !== 'cancelled' && (
-                            <button
-                              onClick={() => handleShareLine(inv)}
-                              disabled={sharingLine === inv.id}
-                              className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-800 disabled:opacity-50"
-                              title={isThai ? 'สร้างลิงก์แล้วเปิด LINE เพื่อส่งให้ลูกค้า' : 'Create a link and open LINE to send to customer'}
-                            >
-                              {sharingLine === inv.id
-                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                : <MessageCircle className="w-3.5 h-3.5" />}
-                              <span className="hidden sm:inline">{isThai ? 'ส่ง LINE' : 'LINE'}</span>
-                            </button>
-                          )}
-                          {canCancelInvoice(inv) && (
-                            <button
-                              onClick={() => { setCancelModal({ invoice: inv }); setCancelReason(''); }}
-                              className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
-                              title={isThai ? 'ยกเลิกเอกสาร' : 'Cancel Invoice'}
-                            >
-                              <Ban className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">{isThai ? 'ยกเลิก' : 'Cancel'}</span>
-                            </button>
-                          )}
-                          {inv.pdfUrl && (
-                            <a
-                              href={inv.pdfUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">PDF</span>
-                            </a>
-                          )}
+                          <button
+                            onClick={(event) => {
+                              const rect = event.currentTarget.getBoundingClientRect();
+                              const estimatedMenuHeight = 286;
+                              const opensBelow = rect.bottom + estimatedMenuHeight + 8 <= window.innerHeight;
+                              setActionMenu({
+                                invoice: inv,
+                                top: opensBelow ? rect.bottom + 6 : Math.max(8, rect.top - estimatedMenuHeight - 6),
+                                right: Math.max(8, window.innerWidth - rect.right),
+                              });
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                            title={isThai ? 'การทำงานเพิ่มเติม' : 'More actions'}
+                            aria-label={isThai ? `การทำงานเพิ่มเติมสำหรับ ${inv.invoiceNumber}` : `More actions for ${inv.invoiceNumber}`}
+                            aria-haspopup="menu"
+                            aria-expanded={actionMenu?.invoice.id === inv.id}
+                          >
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1235,6 +1197,113 @@ export default function InvoiceList() {
           </div>
         </div>
       </div>
+
+      {actionMenu && createPortal(
+        <div className="fixed inset-0 z-[80]" onClick={() => setActionMenu(null)}>
+          <div
+            className="fixed w-56 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl"
+            style={{ top: actionMenu.top, right: actionMenu.right }}
+            role="menu"
+            aria-label={isThai ? `การทำงานสำหรับ ${actionMenu.invoice.invoiceNumber}` : `Actions for ${actionMenu.invoice.invoiceNumber}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {canIssueReceipt(actionMenu.invoice) && (
+              <button
+                onClick={() => {
+                  setReceiptModal({ invoice: actionMenu.invoice });
+                  setReceiptForm({ paymentMethod: 'transfer', note: '', paidAt: new Date().toISOString().split('T')[0] });
+                  setActionMenu(null);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+              >
+                <Receipt className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                {isThai ? 'รับเงินและออกใบเสร็จ' : 'Receive and issue receipt'}
+              </button>
+            )}
+            {canCreateRecurringFromInvoice(actionMenu.invoice) && (
+              <button
+                onClick={() => {
+                  openRecurringModal(actionMenu.invoice);
+                  setActionMenu(null);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+              >
+                <CalendarClock className="h-4 w-4 text-primary-600" aria-hidden="true" />
+                {isThai ? 'สร้างเอกสารแบบทำซ้ำ' : 'Create recurring'}
+              </button>
+            )}
+            {policy?.canSendInvoiceEmail && actionMenu.invoice.buyer?.email && (
+              <button
+                onClick={() => {
+                  void handleSendEmail(actionMenu.invoice);
+                  setActionMenu(null);
+                }}
+                disabled={sendingEmail === actionMenu.invoice.id}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                role="menuitem"
+              >
+                {sendingEmail === actionMenu.invoice.id
+                  ? <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
+                  : emailJustSent[actionMenu.invoice.id]
+                    ? <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    : <Mail className="h-4 w-4 text-sky-600" />}
+                {emailJustSent[actionMenu.invoice.id]
+                  ? (isThai ? 'ส่งอีเมลแล้ว' : 'Email sent')
+                  : (isThai ? 'ส่งทางอีเมล' : 'Send by email')}
+              </button>
+            )}
+            {actionMenu.invoice.status !== 'cancelled' && (
+              <button
+                onClick={() => {
+                  void handleShareLine(actionMenu.invoice);
+                  setActionMenu(null);
+                }}
+                disabled={sharingLine === actionMenu.invoice.id}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                role="menuitem"
+              >
+                {sharingLine === actionMenu.invoice.id
+                  ? <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                  : <MessageCircle className="h-4 w-4 text-emerald-600" />}
+                {isThai ? 'ส่งผ่าน LINE' : 'Send via LINE'}
+              </button>
+            )}
+            {actionMenu.invoice.pdfUrl && (
+              <a
+                href={actionMenu.invoice.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+                onClick={() => setActionMenu(null)}
+              >
+                <Download className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                {isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}
+              </a>
+            )}
+            {canCancelInvoice(actionMenu.invoice) && (
+              <>
+                <div className="my-1 border-t border-slate-100" />
+                <button
+                  onClick={() => {
+                    setCancelModal({ invoice: actionMenu.invoice });
+                    setCancelReason('');
+                    setActionMenu(null);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50"
+                  role="menuitem"
+                >
+                  <Ban className="h-4 w-4" aria-hidden="true" />
+                  {isThai ? 'ยกเลิกเอกสาร' : 'Cancel document'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* ── Create Recurring Schedule Modal ── */}
       {recurringModal && (
