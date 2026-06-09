@@ -345,23 +345,23 @@ export default function PayrollRuns() {
                     {run.status === 'paid' && <span className="rounded-full border border-primary-200 bg-white px-2 py-0.5 text-primary-700">{isThai ? 'จ่ายแล้ว' : 'Paid'}</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button type="button" onClick={() => loadPayslips(run)} className="rounded-lg border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50">
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => loadPayslips(run)} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
                         {isThai ? 'ดูรายละเอียด' : 'View'}
                       </button>
                       {run.status === 'draft' && (
-                        <button type="button" onClick={() => finalize(run)} className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700">
-                          <Lock className="h-3 w-3" />
+                        <button type="button" onClick={() => finalize(run)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2">
+                          <Lock className="h-4 w-4" />
                           {isThai ? 'ปิดรอบ' : 'Finalize'}
                         </button>
                       )}
                       {run.status !== 'draft' && (
                         <>
-                          <button type="button" onClick={() => downloadCsv(run.id, 'pnd1')} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
-                            <Download className="h-3 w-3" />ภงด.1
+                          <button type="button" onClick={() => downloadCsv(run.id, 'pnd1')} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
+                            <Download className="h-4 w-4" />ภงด.1
                           </button>
-                          <button type="button" onClick={() => downloadCsv(run.id, 'sso')} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-white px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
-                            <Download className="h-3 w-3" />สปส.
+                          <button type="button" onClick={() => downloadCsv(run.id, 'sso')} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2">
+                            <Download className="h-4 w-4" />สปส.
                           </button>
                         </>
                       )}

@@ -24,7 +24,7 @@ export default function DeleteButton({
   const icon = size === 'sm' ? 'h-4 w-4' : 'h-[18px] w-[18px]';
   const skin = variant === 'solid'
     ? 'bg-red-600 text-white border-transparent hover:bg-red-700'
-    : 'bg-transparent text-slate-400 border-transparent hover:bg-red-50 hover:text-red-600 hover:border-red-100';
+    : 'bg-transparent text-red-500 border-transparent hover:bg-red-50 hover:text-red-700 hover:border-red-100';
 
   return (
     <button

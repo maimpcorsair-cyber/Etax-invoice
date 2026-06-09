@@ -32,7 +32,7 @@ export default function ContactPage() {
               <a
                 key={channel.label}
                 href={channel.href}
-                className="rounded-2xl border border-gray-200 bg-white px-5 py-5 hover:border-primary-200 hover:shadow-md transition-all"
+                className="rounded-2xl border border-gray-200 bg-white px-5 py-5 transition-[border-color,box-shadow] duration-200 hover:border-primary-200 hover:shadow-md"
               >
                 <div className="flex items-start gap-4">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-700">

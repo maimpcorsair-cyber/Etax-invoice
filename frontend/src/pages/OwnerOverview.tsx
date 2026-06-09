@@ -427,14 +427,19 @@ export default function OwnerOverview() {
 
         <Panel title="Coupon Operations" subtitle="See active discounts and watch redemption health.">
           <div className="space-y-3">
-            {overview.coupons.map((coupon) => (
+            {overview.coupons.map((coupon) => {
+              const statusTone = coupon.active
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-slate-100 text-slate-700';
+
+              return (
               <div key={coupon.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium">{coupon.code}</div>
                     <div className="text-sm text-slate-600">{coupon.name}</div>
                   </div>
-                  <div className={`rounded-full px-2.5 py-1 text-xs font-semibold ${coupon.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                  <div className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusTone}`}>
                     {coupon.active ? 'Active' : 'Inactive'}
                   </div>
                 </div>
@@ -445,7 +450,8 @@ export default function OwnerOverview() {
                   Redeemed {coupon.redeemedCount}{coupon.maxRedemptions ? ` / ${coupon.maxRedemptions}` : ''}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </Panel>
       </section>

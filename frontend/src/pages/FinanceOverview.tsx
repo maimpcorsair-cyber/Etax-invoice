@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, Receipt, FileText, ExternalLink, Calculator, Link2, Store } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -34,6 +34,7 @@ export default function FinanceOverview() {
   const [range, setRange] = useState(thisMonthRange());
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  const trendTitleId = useId();
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -72,7 +73,10 @@ export default function FinanceOverview() {
         ]}
       />
       {loading || !data ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-gray-300" /></div>
+        <div className="flex justify-center py-16" role="status" aria-live="polite">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-300 motion-reduce:animate-none" aria-hidden="true" />
+          <span className="sr-only">{isThai ? 'กำลังโหลดภาพรวมการเงิน' : 'Loading finance overview'}</span>
+        </div>
       ) : (
         <>
           <section className="workspace-command">
@@ -101,8 +105,14 @@ export default function FinanceOverview() {
             <div className="workspace-command-rail">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'ช่วงเวลาที่ดู' : 'Date range'}</p>
               <div className="mt-3 grid gap-2">
-                <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="input-field text-sm" />
-                <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="input-field text-sm" />
+                <label className="text-xs font-semibold text-slate-600">
+                  <span className="mb-1 block">{isThai ? 'ตั้งแต่วันที่' : 'From date'}</span>
+                  <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="input-field text-sm" />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  <span className="mb-1 block">{isThai ? 'ถึงวันที่' : 'To date'}</span>
+                  <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="input-field text-sm" />
+                </label>
               </div>
               <Link to="/app/reports/reconciliation" className="btn-primary mt-4 w-full justify-center px-4 py-2.5 text-sm">
                 {isThai ? 'กระทบยอดธนาคาร' : 'Bank reconciliation'}
@@ -211,17 +221,24 @@ export default function FinanceOverview() {
                 {isThai ? 'ยื่น ภ.พ.30' : 'PP30 filing'} <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
-            <div className="card">
-              <h2 className="mb-3 text-sm font-semibold text-slate-900">{isThai ? 'รายได้ 6 เดือนล่าสุด' : 'Revenue — last 6 months'}</h2>
-              <div className="flex items-end justify-between gap-2 pt-2" style={{ height: 140 }}>
+            <figure className="card" aria-labelledby={trendTitleId}>
+              <figcaption id={trendTitleId} className="mb-3 text-sm font-semibold text-slate-900">
+                {isThai ? 'รายได้ 6 เดือนล่าสุด' : 'Revenue — last 6 months'}
+              </figcaption>
+              <ul className="sr-only">
+                {data.trend.map((trend) => (
+                  <li key={trend.month}>{trend.month}: {formatCurrency(trend.revenue)}</li>
+                ))}
+              </ul>
+              <div className="flex items-end justify-between gap-2 pt-2" style={{ height: 140 }} aria-hidden="true">
                 {data.trend.map((t) => (
                   <div key={t.month} className="flex flex-1 flex-col items-center justify-end gap-1">
                     <div className="w-full rounded-t bg-primary-500/80" style={{ height: `${Math.round((t.revenue / maxTrend) * 110)}px` }} title={formatCurrency(t.revenue)} />
-                    <span className="text-[10px] text-slate-400">{t.month.slice(2)}</span>
+                    <span className="text-sm font-medium text-slate-500">{t.month.slice(2)}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </figure>
           </div>
         </>
       )}
@@ -267,11 +284,11 @@ function AgingCard({ title, total, rows, fmt, icon }: { title: string; total: nu
         <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">{icon}{title}</h2>
         <span className="text-lg font-bold text-slate-900">{fmt(total)}</span>
       </div>
-      <div className="grid grid-cols-5 gap-1 text-center">
+      <div className="grid grid-cols-2 gap-1 text-center sm:grid-cols-5">
         {rows.map(([label, val]) => (
           <div key={label} className="rounded-lg bg-slate-50 px-1 py-2">
-            <div className="text-xs font-semibold text-slate-800">{fmt(val)}</div>
-            <div className="mt-0.5 text-[10px] text-slate-400">{label}</div>
+            <div className="text-sm font-semibold text-slate-800">{fmt(val)}</div>
+            <div className="mt-0.5 text-sm text-slate-500">{label}</div>
           </div>
         ))}
       </div>

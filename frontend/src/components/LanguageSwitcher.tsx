@@ -17,7 +17,7 @@ export default function LanguageSwitcher({ variant = 'toggle', className }: Prop
             key={lang}
             onClick={() => switchLanguage(lang)}
             className={clsx(
-              'px-2.5 py-1.5 text-sm font-semibold rounded-md transition-all duration-200',
+              'px-2.5 py-1.5 text-sm font-semibold rounded-md transition-[background-color,color,box-shadow] duration-200',
               currentLanguage === lang
                 ? 'bg-white text-primary-700 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700',

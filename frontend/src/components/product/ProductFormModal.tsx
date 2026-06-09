@@ -172,7 +172,7 @@ export default function ProductFormModal({
                     key={option.value}
                     type="button"
                     onClick={() => field('productType', option.value as Product['productType'])}
-                    className={`rounded-xl border px-3 py-2 text-left transition-all ${
+                    className={`rounded-xl border px-3 py-2 text-left transition-[background-color,border-color,box-shadow] duration-200 ${
                       active
                         ? 'border-primary-300 bg-primary-50 shadow-sm ring-1 ring-primary-100'
                         : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'

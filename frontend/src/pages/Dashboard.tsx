@@ -167,7 +167,7 @@ function ComplianceBar({ rate }: { rate: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${rate}%` }} />
+        <div className={`h-full rounded-full transition-[width] duration-300 ${color}`} style={{ width: `${rate}%` }} />
       </div>
       <span className="text-xs font-semibold text-gray-700 w-10 text-right">{rate}%</span>
     </div>

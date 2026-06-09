@@ -43,7 +43,7 @@ export default function WhtCard({ whtRate, onWhtRateChange, total }: Props) {
             key={opt.value}
             type="button"
             onClick={() => onWhtRateChange(whtRate === opt.value ? '' : opt.value)}
-            className={`p-3 rounded-lg border-2 text-center transition-all ${
+            className={`p-3 rounded-lg border-2 text-center transition-colors duration-200 ${
               whtRate === opt.value
                 ? 'border-red-500 bg-red-50'
                 : 'border-gray-200 hover:border-red-300'

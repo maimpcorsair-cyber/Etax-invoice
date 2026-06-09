@@ -172,16 +172,16 @@ function ProductSearchCell({
               <div className="text-xs font-medium text-gray-900 truncate">{p.nameTh}</div>
               {p.nameEn && <div className="text-xs text-gray-500 truncate">{p.nameEn}</div>}
               <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-semibold leading-tight text-slate-600">
                   {productTypeLabel(p.productType, isThai)}
                 </span>
                 {p.category && (
-                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-emerald-700">
                     {p.category}
                   </span>
                 )}
                 {p.defaultWhtRate && (
-                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-xs font-semibold leading-tight text-amber-700">
                     WHT {p.defaultWhtRate}%
                   </span>
                 )}
@@ -241,10 +241,10 @@ function ItemCard({
   const [showEn, setShowEn] = useState(!!item.nameEn);
 
   return (
-    <div className="group relative bg-white border border-gray-200 rounded-xl p-3 hover:border-primary-200 hover:shadow-sm transition-all">
+    <div className="group relative bg-white border border-gray-200 rounded-xl p-3 transition-[border-color,box-shadow] duration-200 hover:border-primary-200 hover:shadow-sm">
       {/* Row 1: index badge + product search + delete */}
       <div className="flex items-center gap-2 mb-2.5">
-        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary-100 text-primary-700 text-[10px] font-bold flex items-center justify-center">
+        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary-100 text-primary-700 text-xs font-bold leading-none flex items-center justify-center">
           {index + 1}
         </span>
         <ProductSearchCell
@@ -289,7 +289,7 @@ function ItemCard({
       <div className="pl-7 grid grid-cols-2 sm:grid-cols-4 gap-2">
         {/* Qty */}
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium leading-tight text-gray-500 mb-1">
             {isThai ? 'จำนวน' : 'Qty'}
           </label>
           <input
@@ -303,7 +303,7 @@ function ItemCard({
 
         {/* Unit */}
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium leading-tight text-gray-500 mb-1">
             {isThai ? 'หน่วย' : 'Unit'}
           </label>
           <input
@@ -316,7 +316,7 @@ function ItemCard({
 
         {/* Unit price */}
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium leading-tight text-gray-500 mb-1">
             {isThai ? 'ราคา/หน่วย' : 'Unit price'}
           </label>
           <input
@@ -330,7 +330,7 @@ function ItemCard({
 
         {/* Discount */}
         <div>
-          <label className="block text-[10px] font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium leading-tight text-gray-500 mb-1">
             {isThai ? 'ส่วนลด %' : 'Disc. %'}
           </label>
           <input
@@ -347,7 +347,7 @@ function ItemCard({
       {/* Row 4: VAT + total amount */}
       <div className="pl-7 mt-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-medium text-gray-500">VAT</span>
+          <span className="text-xs font-medium leading-tight text-gray-500">VAT</span>
           <div className="relative">
             <select
               value={item.vatType}
@@ -361,7 +361,7 @@ function ItemCard({
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
           </div>
           {item.vatType !== 'vatExempt' && (
-            <span className="text-[10px] text-gray-400">
+            <span className="text-xs leading-tight text-gray-400">
               +{new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2 }).format(
                 item.totalAmount * (item.vatType === 'vat7' ? 0.07 : 0) / (item.vatType === 'vat7' ? 1.07 : 1)
               )}
@@ -369,7 +369,7 @@ function ItemCard({
           )}
         </div>
         <div className="text-right">
-          <div className="text-[10px] text-gray-400">{isThai ? 'รวม' : 'Amount'}</div>
+          <div className="text-xs leading-tight text-gray-400">{isThai ? 'รวม' : 'Amount'}</div>
           <div className="text-sm font-semibold text-gray-900 tabular-nums">
             {formatCurrency(item.totalAmount)}
           </div>

@@ -502,8 +502,10 @@ export default function DeliveryNoteBuilder() {
         </div>
       )}
       {existing?.status === 'issued' && progress === 'partial' && (
-        <div className="flex items-start gap-2 border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <Truck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <span className="mt-0.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+            <Truck className="h-4 w-4" />
+          </span>
           <span>{isThai ? 'กำลังส่งบางส่วน บันทึกจำนวนส่งจริงให้ครบก่อนออกใบกำกับภาษี' : 'Partially delivered. Save the completed quantities before converting to a tax invoice.'}</span>
         </div>
       )}

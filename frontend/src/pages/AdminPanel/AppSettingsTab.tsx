@@ -48,7 +48,7 @@ export default function AppSettingsTab({ isThai }: { isThai: boolean }) {
               <span className="text-sm text-gray-700">{isThai ? n.th : n.en}</span>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" defaultChecked className="sr-only peer" />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600" />
+                <div className="w-9 h-5 bg-gray-200 transition-colors duration-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-transform after:duration-200 peer-checked:bg-primary-600" />
               </label>
             </div>
           ))}

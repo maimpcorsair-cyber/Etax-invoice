@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useId } from 'react';
 import { Download, Loader2, Pencil, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 interface DocumentPreviewSheetProps {
   open: boolean;
@@ -33,15 +34,9 @@ export default function DocumentPreviewSheet({
   onClose,
 }: DocumentPreviewSheetProps) {
   const { isThai } = useLanguage();
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose, open]);
+  const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useDialogFocus<HTMLElement>(open, onClose);
 
   if (!open) return null;
 
@@ -79,10 +74,13 @@ export default function DocumentPreviewSheet({
         }
       `}</style>
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         className="ml-auto flex h-[100dvh] w-full flex-col bg-white shadow-2xl shadow-slate-950/25 sm:max-w-5xl sm:border-l sm:border-slate-200"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="document-preview-title"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-5 sm:py-4">
@@ -90,10 +88,10 @@ export default function DocumentPreviewSheet({
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-700">
               {isThai ? 'ตัวอย่างเอกสาร' : 'Document preview'}
             </p>
-            <h2 id="document-preview-title" className="mt-1 truncate text-base font-bold text-slate-950 sm:text-lg">
+            <h2 id={titleId} className="mt-1 truncate text-base font-bold text-slate-950 sm:text-lg">
               {title}
             </h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
+            <p id={descriptionId} className="mt-1 text-xs leading-5 text-slate-500">
               <span className="font-mono font-semibold text-slate-700">{documentNumber}</span>
               {description ? ` · ${description}` : ''}
             </p>
@@ -103,6 +101,7 @@ export default function DocumentPreviewSheet({
             onClick={onClose}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label={isThai ? 'ปิดตัวอย่างเอกสาร' : 'Close document preview'}
+            data-dialog-initial-focus
           >
             <X className="h-5 w-5" />
           </button>
@@ -112,7 +111,7 @@ export default function DocumentPreviewSheet({
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm">
-                <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+                <Loader2 className="h-4 w-4 animate-spin text-primary-600 motion-reduce:animate-none" />
                 {isThai ? 'กำลังโหลดตัวอย่าง...' : 'Loading preview...'}
               </div>
             </div>
@@ -161,7 +160,7 @@ export default function DocumentPreviewSheet({
             disabled={downloading || loading || (!previewHtml && !previewUrl)}
             className="btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Download className="h-4 w-4" />}
             {downloading
               ? isThai ? 'กำลังสร้าง PDF...' : 'Generating PDF...'
               : isThai ? 'ดาวน์โหลด PDF' : 'Download PDF'}

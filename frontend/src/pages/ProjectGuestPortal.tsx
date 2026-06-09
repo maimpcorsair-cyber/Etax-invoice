@@ -331,9 +331,14 @@ export default function ProjectGuestPortal() {
               {data.recentFiles.length === 0 ? (
                 <div className="py-8 text-center text-sm text-slate-500">ยังไม่มีไฟล์ในโปรเจคนี้</div>
               ) : (
-                data.recentFiles.slice(0, 12).map((file) => (
+                data.recentFiles.slice(0, 12).map((file) => {
+                  const iconTone = file.needsAction
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-slate-100 text-slate-600';
+
+                  return (
                   <div key={file.id} className="flex items-center gap-3 py-3">
-                    <div className={clsx('flex h-9 w-9 items-center justify-center rounded-lg', file.needsAction ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500')}>
+                    <div className={clsx('flex h-9 w-9 items-center justify-center rounded-lg', iconTone)}>
                       {file.needsAction ? <AlertTriangle className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -371,7 +376,8 @@ export default function ProjectGuestPortal() {
                       )}
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

@@ -2473,10 +2473,14 @@ function PurchaseOrderList({
 }
 
 function ThreeWayChip({ label, ok, count }: { label: string; ok: boolean; count?: number }) {
+  const tone = ok
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : 'border-slate-200 bg-slate-50 text-slate-600';
+
   return (
     <div className={clsx(
       'flex items-center justify-between rounded-lg border px-2 py-1.5 text-xs font-semibold',
-      ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500',
+      tone,
     )}>
       <span>{label}</span>
       <span>{ok ? (count ?? 1) : 0}</span>
@@ -2595,7 +2599,7 @@ function DocumentList({
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-1">
                   <span className={clsx(
-                    'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                    'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs font-semibold leading-tight',
                     driveOk ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                       : driveStatus === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-700'
                         : driveStatus === 'skipped' ? 'border-slate-200 bg-slate-50 text-slate-500'

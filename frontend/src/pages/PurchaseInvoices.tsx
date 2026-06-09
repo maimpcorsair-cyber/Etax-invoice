@@ -174,7 +174,7 @@ function DocumentThumbnail({ docId, mimeType, token }: DocumentThumbnailProps) {
           style={{ transform: 'scale(1)', transformOrigin: 'top left' }}
         />
       )}
-      <span className="text-[9px] font-medium text-slate-500 leading-none">{ext}</span>
+      <span className="text-xs font-medium leading-none text-slate-500">{ext}</span>
     </div>
   );
 }
@@ -1210,7 +1210,7 @@ export default function PurchaseInvoices() {
               </div>
               <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${storageUsage.usedPercent >= 90 ? 'bg-rose-500' : storageUsage.usedPercent >= 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+                  className={`h-full rounded-full transition-[width] duration-300 ${storageUsage.usedPercent >= 90 ? 'bg-rose-500' : storageUsage.usedPercent >= 70 ? 'bg-amber-500' : 'bg-green-500'}`}
                   style={{ width: `${Math.min(storageUsage.usedPercent, 100)}%` }}
                 />
               </div>

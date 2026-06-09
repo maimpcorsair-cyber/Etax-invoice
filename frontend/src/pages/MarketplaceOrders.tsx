@@ -85,11 +85,16 @@ export default function MarketplaceOrders() {
 
   function statusChip(s: string) {
     const map: Record<string, string> = {
-      paid: 'bg-emerald-50 text-emerald-700', shipped: 'bg-emerald-50 text-emerald-700', completed: 'bg-emerald-50 text-emerald-700',
-      cancelled: 'bg-rose-50 text-rose-700', returned: 'bg-rose-50 text-rose-700',
-      unpaid: 'bg-amber-50 text-amber-700', unknown: 'bg-slate-100 text-slate-500',
+      paid: 'bg-emerald-50 text-emerald-700',
+      shipped: 'bg-emerald-50 text-emerald-700',
+      completed: 'bg-emerald-50 text-emerald-700',
+      cancelled: 'bg-rose-50 text-rose-700',
+      returned: 'bg-rose-50 text-rose-700',
+      unpaid: 'bg-amber-50 text-amber-700',
+      unknown: 'bg-slate-100 text-slate-700',
     };
-    return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${map[s] ?? 'bg-slate-100 text-slate-500'}`}>{s}</span>;
+    const tone = map[s] ?? 'bg-slate-100 text-slate-700';
+    return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{s}</span>;
   }
 
   const totalOrders = summary?.totalOrders ?? orders.length;

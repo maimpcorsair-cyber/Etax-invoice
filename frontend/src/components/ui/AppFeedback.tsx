@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export type FeedbackTone = 'success' | 'warning' | 'error' | 'info';
 
@@ -88,35 +89,52 @@ export function ToastStack({ toasts, onDismiss }: { toasts: FeedbackToast[]; onD
 }
 
 export function ConfirmDialog({ dialog }: { dialog: ConfirmDialogState | null }) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const detailId = useId();
+  const dialogRef = useDialogFocus<HTMLDivElement>(
+    dialog !== null,
+    () => {
+      if (!dialog?.loading) dialog?.onCancel();
+    },
+  );
+
   if (!dialog) return null;
   const tone = dialog.tone ?? 'info';
   const style = toneStyles[tone];
   const Icon = style.icon;
+  const describedBy = [
+    dialog.description ? descriptionId : null,
+    dialog.detail ? detailId : null,
+  ].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation">
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
+        aria-labelledby={titleId}
+        aria-describedby={describedBy}
       >
         <div className="flex gap-4">
           <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ${style.iconWrap}`}>
             <Icon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 id="confirm-dialog-title" className="text-lg font-bold text-slate-950">
+            <h2 id={titleId} className="text-lg font-bold text-slate-950">
               {dialog.title}
             </h2>
             {dialog.description && (
-              <p className="mt-2 text-sm leading-6 text-slate-600">{dialog.description}</p>
+              <p id={descriptionId} className="mt-2 text-sm leading-6 text-slate-600">{dialog.description}</p>
             )}
           </div>
         </div>
 
         {dialog.detail && (
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <div id={detailId} className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
             {dialog.detail}
           </div>
         )}
@@ -127,6 +145,7 @@ export function ConfirmDialog({ dialog }: { dialog: ConfirmDialogState | null })
             className="btn-secondary justify-center"
             onClick={dialog.onCancel}
             disabled={dialog.loading}
+            data-dialog-initial-focus
           >
             {dialog.cancelLabel}
           </button>
@@ -137,7 +156,7 @@ export function ConfirmDialog({ dialog }: { dialog: ConfirmDialogState | null })
             disabled={dialog.loading}
           >
             {dialog.loading ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none" />
             ) : null}
             {dialog.confirmLabel}
           </button>

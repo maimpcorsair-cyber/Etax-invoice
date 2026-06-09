@@ -234,7 +234,7 @@ function UsageBar({
       <div className="h-2 w-full rounded-full bg-gray-100">
         {!unlimited && (
           <div
-            className={`h-2 rounded-full transition-all ${barColor(p)}`}
+            className={`h-2 rounded-full transition-[width] duration-300 ${barColor(p)}`}
             style={{ width: `${p}%` }}
           />
         )}

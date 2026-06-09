@@ -50,11 +50,11 @@ html, body {
   }
 
   html[lang='en'] {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
   html[lang='zh'] {
-    font-family: 'Noto Sans SC', 'Inter', system-ui, sans-serif;
+    font-family: 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
   }
 
   body {
@@ -177,7 +177,7 @@ html, body {
 
   /* Buttons */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-700 text-white font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-button;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-700 text-white font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 active:scale-95 transition-[color,background-color,border-color,box-shadow,transform] duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-button;
   }
 
   .btn-primary:hover:not(:disabled) {
@@ -195,7 +195,7 @@ html, body {
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white/90 text-slate-700 font-semibold rounded-xl border border-slate-200 hover:bg-white hover:border-primary-300 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 active:scale-95 transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white/90 text-slate-700 font-semibold rounded-xl border border-slate-200 hover:bg-white hover:border-primary-300 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 active:scale-95 transition-[color,background-color,border-color,box-shadow,transform] duration-200;
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
   }
 
@@ -212,20 +212,20 @@ html, body {
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-all duration-150;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-150;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 active:scale-95 transition-[color,background-color,box-shadow,transform] duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-success {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 active:scale-95 transition-all duration-150;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 active:scale-95 transition-[color,background-color,box-shadow,transform] duration-150;
   }
 
   /* Cards */
   .card {
-    @apply border border-slate-200/80 p-6 transition-all duration-300;
+    @apply border border-slate-200/80 p-6 transition-[background-color,border-color,box-shadow,transform] duration-300;
     background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(248,250,252,0.9));
     border-radius: var(--radius-card);
     box-shadow: 0 10px 34px rgba(15,23,42,0.06);
@@ -251,7 +251,7 @@ html, body {
 
   /* Form Elements */
   .input-field {
-    @apply w-full px-4 py-2.5 text-sm bg-white/95 border border-slate-200 rounded-xl focus:outline-none focus:border-primary-500 placeholder-slate-400 transition-all duration-150;
+    @apply w-full px-4 py-2.5 text-sm bg-white/95 border border-slate-200 rounded-xl focus:outline-none focus:border-primary-500 placeholder-slate-400 transition-[background-color,border-color,box-shadow] duration-150;
   }
 
   .input-field:focus {
@@ -556,7 +556,7 @@ html, body {
   }
 
   .metric-card {
-    @apply relative overflow-hidden border border-slate-200/80 bg-white/90 p-4 sm:p-5 transition-all duration-300;
+    @apply relative overflow-hidden border border-slate-200/80 bg-white/90 p-4 sm:p-5 transition-[background-color,border-color,box-shadow,transform] duration-300;
     border-radius: 18px;
     box-shadow: 0 12px 30px rgba(15,23,42,0.06);
   }
@@ -573,7 +573,7 @@ html, body {
   .metric-card-success .metric-icon { @apply bg-emerald-50 text-emerald-700 ring-emerald-100; }
   .metric-card-warning .metric-icon { @apply bg-amber-50 text-amber-700 ring-amber-100; }
   .metric-card-danger .metric-icon { @apply bg-rose-50 text-rose-700 ring-rose-100; }
-  .metric-card-neutral .metric-icon { @apply bg-slate-50 text-slate-700 ring-slate-100; }
+  .metric-card-neutral .metric-icon { @apply bg-slate-50 text-primary-700 ring-slate-100; }
 
   .empty-state-premium {
     @apply mx-auto flex max-w-2xl flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white/75 px-5 py-8 text-center sm:flex-row sm:text-left;

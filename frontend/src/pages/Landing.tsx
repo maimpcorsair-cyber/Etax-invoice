@@ -753,7 +753,7 @@ export default function Landing() {
                         style={{ height: `${height}%` }}
                       />
                     </div>
-                    <span className="text-[9px] font-semibold text-slate-500">{['ขาย', 'ซื้อ', 'WHT', 'PP30'][index]}</span>
+                    <span className="text-xs font-semibold leading-tight text-slate-500">{['ขาย', 'ซื้อ', 'WHT', 'PP30'][index]}</span>
                   </div>
                 ))}
               </div>
@@ -775,7 +775,7 @@ export default function Landing() {
                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b5f]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#f6c453]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#4ecb71]" />
-                <span className="ml-auto rounded-md bg-white/10 px-3 py-1 text-[9px] font-semibold text-slate-300 sm:text-[10px]">
+                <span className="ml-auto rounded-md bg-white/10 px-3 py-1 text-xs font-semibold leading-tight text-slate-300">
                   app.billboy.co
                 </span>
               </div>
@@ -871,7 +871,7 @@ export default function Landing() {
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-700 text-[11px] font-bold text-white sm:h-8 sm:w-8 sm:text-xs">0{index + 1}</div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold leading-5 text-slate-950 sm:text-sm">{step.title}</div>
-                    <div className="mt-0.5 text-[10px] leading-4 text-slate-500 sm:text-xs sm:leading-5">{step.desc}</div>
+                    <div className="mt-0.5 text-xs leading-5 text-slate-500">{step.desc}</div>
                   </div>
                 </div>
               ))}
@@ -958,7 +958,7 @@ export default function Landing() {
               {documentOpsPillars.map(({ icon: Icon, th, en, descTh, descEn }, i) => {
                 const iconBgs = ['bg-primary-700','bg-emerald-700','bg-slate-800','bg-amber-600'];
                 return (
-                  <div key={en} className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_58px_rgba(15,23,42,0.1)]">
+                  <div key={en} className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_16px_44px_rgba(15,23,42,0.06)] transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-[0_20px_58px_rgba(15,23,42,0.1)]">
                     <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${iconBgs[i % iconBgs.length]} shadow-sm`}>
                       <Icon className="h-5 w-5 text-white" />
                     </div>
@@ -1006,7 +1006,7 @@ export default function Landing() {
             {pricingPlans.map((plan, pi) => (
               <div
                 key={plan.key}
-                className={`animate-slide-up relative flex h-full flex-col rounded-lg border bg-white p-6 shadow-sm transition-all duration-300 ${
+                className={`animate-slide-up relative flex h-full flex-col rounded-lg border bg-white p-6 shadow-sm transition-[border-color,box-shadow,transform] duration-300 ${
                   plan.popular
                     ? 'md:scale-105 border-primary-300 ring-2 ring-primary-500 ring-offset-2 shadow-xl'
                     : 'border-slate-200 hover:shadow-md'
@@ -1043,18 +1043,23 @@ export default function Landing() {
 
                 <div className="flex-1">
                   <ul className="space-y-3.5 mb-8">
-                    {planDetails[plan.key].map(({ icon: Icon, available, th, en }, index) => (
-                      <li key={`${plan.key}-${index}`} className="flex items-start gap-3">
-                        <div className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full flex-shrink-0 ${
-                          available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          <Icon className="w-3.5 h-3.5" strokeWidth={2.25} />
-                        </div>
-                        <span className={`text-sm font-medium leading-6 ${available ? 'text-gray-700' : 'text-gray-400'}`}>
-                          {isThai ? th : en}
-                        </span>
-                      </li>
-                    ))}
+                    {planDetails[plan.key].map(({ icon: Icon, available, th, en }, index) => {
+                      const iconTone = available
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-500';
+                      const labelTone = available ? 'text-gray-700' : 'text-gray-500';
+
+                      return (
+                        <li key={`${plan.key}-${index}`} className="flex items-start gap-3">
+                          <div className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full flex-shrink-0 ${iconTone}`}>
+                            <Icon className="w-3.5 h-3.5" strokeWidth={2.25} />
+                          </div>
+                          <span className={`text-sm font-medium leading-6 ${labelTone}`}>
+                            {isThai ? th : en}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 
@@ -1207,7 +1212,7 @@ export default function Landing() {
               <button
                 type="button"
                 onClick={() => openCheckout('free')}
-                className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-green-50 transition-all duration-200 hover:-translate-y-1 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-primary-700 font-bold rounded-xl hover:bg-green-50 transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-1 shadow-lg hover:shadow-xl"
               >
                 {t('landing.hero.cta')}
                 <ArrowRight className="w-5 h-5" />
@@ -1362,7 +1367,7 @@ export default function Landing() {
                           type="button"
                           disabled={!isAvailable}
                           onClick={() => setSelectedPlan(planKey)}
-                          className={`rounded-lg border p-4 text-left transition-all ${
+                          className={`rounded-lg border p-4 text-left transition-[background-color,border-color,box-shadow] duration-200 ${
                             isSelected
                               ? 'border-primary-700 bg-primary-50 shadow-sm ring-1 ring-primary-700/15'
                               : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
@@ -1404,7 +1409,7 @@ export default function Landing() {
                             type="button"
                             disabled={!method.enabled}
                             onClick={() => setPaymentMethod(method.key)}
-                            className={`rounded-lg border p-4 text-left transition-all ${
+                            className={`rounded-lg border p-4 text-left transition-[background-color,border-color,box-shadow] duration-200 ${
                               paymentMethod === method.key
                                 ? 'border-primary-700 bg-primary-50 shadow-sm ring-1 ring-primary-700/15'
                                 : 'border-slate-200 bg-white hover:border-primary-200'
@@ -1572,7 +1577,7 @@ export default function Landing() {
                   )}
 
                   {checkoutResult?.paymentMethod === 'promptpay_qr' && checkoutResult.promptPay && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-slate-950">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
                       <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
                         <QrCode className="h-4 w-4" />
                         {isThai ? 'PromptPay QR พร้อมชำระ' : 'PromptPay QR ready'}

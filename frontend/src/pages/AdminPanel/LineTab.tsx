@@ -422,14 +422,18 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
       status === 'saved' ? 'bg-green-50 text-green-700 border-green-100'
       : status === 'failed' || status === 'rejected' ? 'bg-red-50 text-red-700 border-red-100'
       : status === 'needs_review' || status === 'awaiting_input' || status === 'awaiting_confirmation' ? 'bg-amber-50 text-amber-700 border-amber-100'
-      : 'bg-gray-50 text-gray-700 border-gray-100';
+      : 'bg-slate-50 text-slate-700 border-slate-100';
     return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tone}`}>{status}</span>;
   }
 
   function drivePill(status?: string | null) {
     const ok = status === 'synced';
     const warn = status === 'failed';
-    const tone = ok ? 'bg-blue-50 text-blue-700 border-blue-100' : warn ? 'bg-red-50 text-red-700 border-red-100' : 'bg-gray-50 text-gray-600 border-gray-100';
+    const tone = ok
+      ? 'bg-blue-50 text-blue-700 border-blue-100'
+      : warn
+        ? 'bg-red-50 text-red-700 border-red-100'
+        : 'bg-slate-50 text-slate-700 border-slate-100';
     return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tone}`}>Drive: {status || 'not_synced'}</span>;
   }
 
@@ -591,7 +595,12 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                 {managedUsersLoading ? (isThai ? 'กำลังโหลด...' : 'Loading...') : (isThai ? 'ยังไม่มีผู้ใช้ให้แสดง' : 'No users to show.')}
               </div>
             )}
-            {managedUsers.map((managedUser) => (
+            {managedUsers.map((managedUser) => {
+              const linkTone = managedUser.line.linked
+                ? 'bg-green-50 text-green-700'
+                : 'bg-slate-100 text-slate-700';
+
+              return (
               <div key={managedUser.id} className="grid grid-cols-[1.4fr_.7fr_.9fr] gap-3 px-3 py-3 text-sm md:grid-cols-[1.6fr_.7fr_.9fr_.9fr] md:items-center">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-gray-900">{managedUser.name}</p>
@@ -599,12 +608,12 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                 </div>
                 <span className="text-xs capitalize text-gray-600">{managedUser.role}</span>
                 <div className="min-w-0">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${managedUser.line.linked ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${linkTone}`}>
                     {managedUser.line.linked ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                     {managedUser.line.linked ? (isThai ? 'เชื่อมแล้ว' : 'Linked') : (isThai ? 'ยังไม่เชื่อม' : 'Unlinked')}
                   </span>
                   {managedUser.line.lineUserIdMasked && (
-                    <p className="mt-1 truncate text-[11px] text-gray-400">{managedUser.line.lineUserIdMasked}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">{managedUser.line.lineUserIdMasked}</p>
                   )}
                 </div>
                 <div className="col-span-3 flex flex-wrap gap-2 md:col-span-1">
@@ -624,7 +633,8 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -686,13 +696,18 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                 {managedGroupsLoading ? (isThai ? 'กำลังโหลด...' : 'Loading...') : (isThai ? 'ยังไม่มีกลุ่มที่เชื่อม' : 'No linked groups yet.')}
               </div>
             )}
-            {managedGroups.map((group) => (
+            {managedGroups.map((group) => {
+              const activeTone = group.isActive
+                ? 'bg-green-50 text-green-700'
+                : 'bg-slate-100 text-slate-700';
+
+              return (
               <div key={group.id} className="grid grid-cols-[1.3fr_.8fr_.9fr] gap-3 px-3 py-3 text-sm md:grid-cols-[1.25fr_.7fr_1.15fr_.8fr_.7fr] md:items-center">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-gray-900">{group.groupName ?? (isThai ? 'LINE Group' : 'LINE Group')}</p>
-                  {group.lineGroupIdMasked && <p className="mt-1 truncate text-[11px] text-gray-400">{group.lineGroupIdMasked}</p>}
+                  {group.lineGroupIdMasked && <p className="mt-1 truncate text-[11px] text-slate-500">{group.lineGroupIdMasked}</p>}
                 </div>
-                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${group.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${activeTone}`}>
                   {group.isActive ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                   {group.isActive ? (isThai ? 'เชื่อมแล้ว' : 'Linked') : (isThai ? 'ปิดอยู่' : 'Inactive')}
                 </span>
@@ -732,7 +747,8 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -992,7 +1008,7 @@ export default function LineTab({ policy, isThai }: { policy: CompanyAccessPolic
                       <div key={row.provider} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                         <p className="text-[11px] text-gray-500">{row.provider}</p>
                         <p className="text-sm font-semibold text-gray-900">฿{row.thb.toLocaleString()}</p>
-                        <p className="text-[10px] text-gray-500">${row.usd.toFixed(4)}</p>
+                        <p className="text-xs text-gray-500">${row.usd.toFixed(4)}</p>
                       </div>
                     ))}
                   </div>
@@ -1077,7 +1093,7 @@ function OcrQuotaCard({
           <h4 className="text-sm font-semibold text-gray-900">
             {isThai ? 'โควต้า OCR เดือนนี้' : 'OCR quota this month'}
           </h4>
-          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${tierTone}`}>
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${tierTone}`}>
             {isThai ? tierLabel.th : tierLabel.en}
           </span>
         </div>
@@ -1094,7 +1110,10 @@ function OcrQuotaCard({
 
       {pct != null && (
         <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-          <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+          <div
+            className={`h-full origin-left ${barColor} transition-transform duration-300 motion-reduce:transition-none`}
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
       )}
 

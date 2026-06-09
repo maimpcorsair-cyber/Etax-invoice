@@ -1,7 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 // Full-screen overlay used to present a full document builder "as a popup"
 // over the list it was launched from (React Router background-location).
@@ -12,27 +13,26 @@ export default function BuilderOverlay({ title, closeTo, children }: { title?: s
   const navigate = useNavigate();
   const { isThai } = useLanguage();
   const close = () => navigate(closeTo);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
-    window.addEventListener('keydown', onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const titleId = useId();
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, close);
+  const resolvedTitle = title ?? (isThai ? 'สร้างเอกสาร' : 'Document builder');
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-slate-100">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-[60] flex flex-col bg-slate-100"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <p className="min-w-0 truncate text-sm font-bold text-slate-950">{title}</p>
+        <h1 id={titleId} className="min-w-0 truncate text-sm font-bold text-slate-950">{resolvedTitle}</h1>
         <button
           type="button"
           onClick={close}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          data-dialog-initial-focus
         >
           <X className="h-4 w-4" />
           {isThai ? 'ปิดหน้าต่าง' : 'Close'}

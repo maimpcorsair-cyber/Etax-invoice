@@ -1785,7 +1785,7 @@ export default function QuotationBuilder() {
                 <span key={`${swatch}-${index}`} className={`h-3.5 w-3.5 shrink-0 rounded-full border border-slate-200 ${swatch}`} />
               ))}
               <div className="min-w-0 flex-1">
-                <label className="block text-[10px] font-semibold leading-3 text-slate-400">
+                <label className="block text-xs font-semibold leading-tight text-slate-400">
                   {isThai ? 'เทมเพลตใบเสนอราคา' : 'Quotation template'}
                 </label>
                 <div className="relative">

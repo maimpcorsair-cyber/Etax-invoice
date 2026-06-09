@@ -231,8 +231,8 @@ export default function DocumentAppearanceCard({
         </div>
 
         {selectedBank ? (
-          <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-xs leading-5 text-slate-700">
-            <div className="font-semibold text-slate-900">{selectedBank.accountName}</div>
+          <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-xs leading-5 text-emerald-800">
+            <div className="font-semibold text-emerald-950">{selectedBank.accountName}</div>
             <div>{selectedBank.bankName} - {selectedBank.accountNumber}</div>
             {selectedBank.branch && <div>{isThai ? 'สาขา' : 'Branch'}: {selectedBank.branch}</div>}
             {selectedBank.promptPayId && <div>PromptPay: {selectedBank.promptPayId}</div>}
@@ -251,26 +251,27 @@ export default function DocumentAppearanceCard({
         <label className="label">
           {isThai ? 'โลโก้/ตราเฉพาะเอกสาร (ไม่บังคับ)' : 'Document mark or badge (optional)'}
         </label>
-        <label className="flex items-center gap-4 cursor-pointer">
-          <span className="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
-            {isThai ? 'เลือกไฟล์ภาพ' : 'Choose image'}
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="sr-only"
-          />
+        <div className="flex items-center gap-3">
+          <label className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2">
+            <span>{isThai ? 'เลือกไฟล์ภาพ' : 'Choose image'}</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+          </label>
           {documentLogoUrl && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDocumentLogoChange(null); }}
-              className="rounded px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700"
+              onClick={() => onDocumentLogoChange(null)}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2"
+              aria-label={isThai ? 'ลบรูปเอกสาร' : 'Remove document image'}
             >
-              x
+              <X className="h-4 w-4" />
             </button>
           )}
-        </label>
+        </div>
         {documentLogoUrl && (
           <img src={documentLogoUrl} alt="document mark preview" className="mt-3 h-16 object-contain" />
         )}

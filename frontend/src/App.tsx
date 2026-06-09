@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, type Location } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import BuilderOverlay from './components/BuilderOverlay';
 import { useTranslation } from 'react-i18next';
 // Layout shells stay eagerly loaded — they render immediately as route wrappers
@@ -130,8 +131,9 @@ function OwnerRoute({ children }: { children: React.ReactNode }) {
 
 function LoadingSpinner() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+    <div className="flex min-h-screen items-center justify-center" role="status" aria-live="polite">
+      <Loader2 className="h-12 w-12 animate-spin text-primary-600 motion-reduce:animate-none" aria-hidden="true" />
+      <span className="sr-only">Loading Billboy</span>
     </div>
   );
 }

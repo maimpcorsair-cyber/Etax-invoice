@@ -700,7 +700,7 @@ export default function InvoiceBuilder() {
     }
     if (key === 'items' && form.items.length > 0) {
       return (
-        <span className="inline-flex h-4 min-w-[16px] flex-shrink-0 items-center justify-center rounded-full bg-slate-200 px-1 text-[9px] font-bold text-slate-700">
+        <span className="inline-flex h-4 min-w-[16px] flex-shrink-0 items-center justify-center rounded-full bg-slate-200 px-1 text-xs font-bold leading-none text-slate-700">
           {form.items.length}
         </span>
       );
@@ -733,7 +733,7 @@ export default function InvoiceBuilder() {
                 aria-current={isActive ? 'step' : undefined}
               >
                 <span className={`
-                  flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
+                  flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-xs font-bold leading-none
                   ${isActive ? 'bg-primary-50 text-primary-800' : 'bg-slate-100 text-slate-500'}
                 `}>
                   {idx + 1}
@@ -878,7 +878,7 @@ export default function InvoiceBuilder() {
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 focus-within:border-primary-700 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-100">
           {renderTemplateSwatches(selectedBuiltinTemplate)}
           <div className="min-w-0 flex-1">
-            <label className="block text-[10px] font-semibold leading-3 text-slate-400">
+            <label className="block text-xs font-semibold leading-tight text-slate-400">
               {isThai ? 'เทมเพลตเอกสาร' : 'Document template'}
             </label>
             <div className="relative">
@@ -981,7 +981,7 @@ export default function InvoiceBuilder() {
               <div className="mt-4 space-y-2">
                 {previewValidationErrors.map((e, idx) => (
                   <div key={e} className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold leading-none text-amber-700">
                       {idx + 1}
                     </span>
                     <span>{e}</span>

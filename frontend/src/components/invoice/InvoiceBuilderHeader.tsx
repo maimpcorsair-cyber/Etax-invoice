@@ -175,7 +175,7 @@ export default function InvoiceBuilderHeader({
           <div className="flex min-w-0 flex-wrap gap-1.5 sm:ml-auto sm:justify-end">
             {validationErrors.map((error, i) => (
               <span key={error} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs text-slate-700 ring-1 ring-slate-200">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold leading-none text-slate-500">
                   {i + 1}
                 </span>
                 <span className="truncate">{error}</span>

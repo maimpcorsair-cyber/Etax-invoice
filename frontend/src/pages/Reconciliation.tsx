@@ -286,7 +286,7 @@ export default function Reconciliation() {
                             <div className="truncate text-xs text-slate-500">
                               {top.partyName} · {formatCurrency(top.total)} · {top.invoiceDate}
                             </div>
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-xs leading-tight text-slate-400">
                               {isThai ? 'ความมั่นใจ' : 'confidence'} {Math.round(top.score * 100)}%
                             </div>
                           </div>
