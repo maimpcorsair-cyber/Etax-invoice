@@ -20,16 +20,25 @@ const STATUS_LABELS: Record<QuotationStatus, { th: string; en: string; tone: str
   cancelled: { th: 'ยกเลิก',      en: 'Cancelled', tone: 'bg-slate-100 text-slate-500',   icon: XCircle },
 };
 
+function stageDate(value: string | null | undefined, isThai: boolean) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString(isThai ? 'th-TH' : 'en-GB');
+}
+
 function quotationPreviewSteps(quotation: Quotation, isThai: boolean): DocumentPreviewStep[] {
   const status = quotation.status;
   const hasSent = ['sent', 'accepted', 'converted', 'rejected', 'expired'].includes(status);
   const isClosedProblem = ['rejected', 'expired', 'cancelled'].includes(status);
+  const validUntil = stageDate(quotation.validUntil, isThai);
 
   return [
     {
       id: 'draft',
       label: isThai ? 'เตรียมใบเสนอราคา' : 'Prepare quote',
       description: isThai ? `เลขที่ ${quotation.quotationNumber}` : `No. ${quotation.quotationNumber}`,
+      meta: stageDate(quotation.quotationDate, isThai) ?? (isThai ? 'วันที่เสนอราคา' : 'Quote date'),
       state: status === 'draft' ? 'current' : 'done',
     },
     {
@@ -38,20 +47,25 @@ function quotationPreviewSteps(quotation: Quotation, isThai: boolean): DocumentP
       description: quotation.validUntil
         ? isThai ? `ใช้ได้ถึง ${new Date(quotation.validUntil).toLocaleDateString('th-TH')}` : `Valid until ${new Date(quotation.validUntil).toLocaleDateString('en-US')}`
         : isThai ? 'พร้อมส่งลิงก์หรือ PDF' : 'Ready for a link or PDF.',
+      meta: quotation.validUntil ? validUntil ? `${isThai ? 'หมดอายุ' : 'Expires'} ${validUntil}` : (isThai ? 'มีวันหมดอายุ' : 'Expiry date set') : (isThai ? 'พร้อมส่ง' : 'Ready to send'),
       state: status === 'draft' ? 'pending' : hasSent ? 'done' : 'pending',
     },
     {
       id: 'accepted',
       label: isThai ? 'ลูกค้าตอบรับ' : 'Customer response',
       description: isClosedProblem
-        ? STATUS_LABELS[status].th
+        ? isThai ? STATUS_LABELS[status].th : STATUS_LABELS[status].en
         : isThai ? 'รออนุมัติหรือยืนยันงาน' : 'Await acceptance or confirmation.',
+      meta: isClosedProblem
+        ? (isThai ? 'ปิดงานแล้ว' : 'Closed')
+        : ['accepted', 'converted'].includes(status) ? (isThai ? 'ตอบรับแล้ว' : 'Accepted') : (isThai ? 'รอลูกค้า' : 'Awaiting customer'),
       state: isClosedProblem ? 'blocked' : status === 'sent' ? 'current' : ['accepted', 'converted'].includes(status) ? 'done' : 'pending',
     },
     {
       id: 'converted',
       label: isThai ? 'แปลงเป็นเอกสารขาย' : 'Convert to sales document',
       description: isThai ? 'เข้าสู่รอบใบกำกับภาษี / ใบเสร็จ' : 'Moves into invoice or receipt workflow.',
+      meta: quotation.convertedAt ? stageDate(quotation.convertedAt, isThai) : (isThai ? 'รอแปลงเอกสาร' : 'Awaiting conversion'),
       state: status === 'converted' ? 'done' : status === 'accepted' ? 'current' : 'pending',
     },
   ];

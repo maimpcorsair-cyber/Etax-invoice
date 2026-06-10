@@ -32,17 +32,26 @@ function statusMeta(note: DeliveryNote) {
   return STATUS_LABELS[note.status];
 }
 
+function stageDate(value: string | null | undefined, isThai: boolean) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString(isThai ? 'th-TH' : 'en-GB');
+}
+
 function deliveryPreviewSteps(note: DeliveryNote, isThai: boolean): DocumentPreviewStep[] {
   const ordered = itemCount(note);
   const delivered = deliveredCount(note);
   const partial = note.status === 'issued' && delivered > 0 && delivered < ordered;
   const cancelled = note.status === 'cancelled';
+  const expectedDate = stageDate(note.expectedDate, isThai);
 
   return [
     {
       id: 'created',
       label: isThai ? 'สร้างใบส่งของ' : 'Delivery note created',
       description: isThai ? `เลขที่ ${note.deliveryNoteNumber}` : `No. ${note.deliveryNoteNumber}`,
+      meta: stageDate(note.deliveryDate, isThai) ?? (isThai ? 'วันที่ส่งของ' : 'Delivery date'),
       state: note.status === 'draft' ? 'current' : 'done',
     },
     {
@@ -51,6 +60,7 @@ function deliveryPreviewSteps(note: DeliveryNote, isThai: boolean): DocumentPrev
       description: note.expectedDate
         ? isThai ? `กำหนดส่ง ${new Date(note.expectedDate).toLocaleDateString('th-TH')}` : `Expected ${new Date(note.expectedDate).toLocaleDateString('en-US')}`
         : isThai ? 'พร้อมนำไปจัดส่ง' : 'Ready for delivery handling.',
+      meta: note.expectedDate ? expectedDate ? `${isThai ? 'กำหนดส่ง' : 'Expected'} ${expectedDate}` : (isThai ? 'มีวันกำหนดส่ง' : 'Expected date set') : (isThai ? 'พร้อมจัดส่ง' : 'Ready'),
       state: cancelled ? 'blocked' : ['issued', 'delivered', 'converted'].includes(note.status) ? 'done' : 'pending',
     },
     {
@@ -59,12 +69,14 @@ function deliveryPreviewSteps(note: DeliveryNote, isThai: boolean): DocumentPrev
       description: partial
         ? isThai ? `ส่งแล้ว ${delivered}/${ordered} รายการ` : `${delivered}/${ordered} items delivered.`
         : isThai ? 'ใช้ตรวจว่าของถึงลูกค้าแล้วหรือยัง' : 'Tracks whether goods reached the customer.',
+      meta: note.deliveredAt ? stageDate(note.deliveredAt, isThai) : `${delivered}/${ordered} ${isThai ? 'รายการ' : 'items'}`,
       state: cancelled ? 'blocked' : note.status === 'delivered' || note.status === 'converted' ? 'done' : partial || note.status === 'issued' ? 'current' : 'pending',
     },
     {
       id: 'invoice',
       label: isThai ? 'แปลงเป็นใบกำกับ' : 'Convert to invoice',
       description: isThai ? 'ส่งมอบครบแล้วจึงออกเอกสารขายต่อ' : 'Create the sales document after fulfillment.',
+      meta: note.invoiceId ? (isThai ? 'เชื่อมใบกำกับแล้ว' : 'Invoice linked') : (isThai ? 'รอออกเอกสารขาย' : 'Awaiting invoice'),
       state: note.status === 'converted' ? 'done' : note.status === 'delivered' ? 'current' : 'pending',
     },
   ];

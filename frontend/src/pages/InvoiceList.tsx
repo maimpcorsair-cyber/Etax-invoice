@@ -43,6 +43,30 @@ const PAYMENT_METHODS: Record<string, string> = {
   other: 'อื่นๆ',
 };
 
+function stageDate(value: string | null | undefined, isThai: boolean) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString(isThai ? 'th-TH' : 'en-GB');
+}
+
+function rdStageLabel(status: Invoice['rdSubmissionStatus'], isThai: boolean) {
+  switch (status) {
+    case 'success':
+      return isThai ? 'ส่ง RD สำเร็จ' : 'RD accepted';
+    case 'failed':
+      return isThai ? 'ส่ง RD ไม่สำเร็จ' : 'RD failed';
+    case 'in_progress':
+      return isThai ? 'กำลังส่ง RD' : 'Sending to RD';
+    case 'retrying':
+      return isThai ? 'รอลองส่งใหม่' : 'Retry scheduled';
+    case 'pending':
+      return isThai ? 'รอส่ง RD' : 'Queued for RD';
+    default:
+      return isThai ? 'ยังไม่ส่ง' : 'Not sent';
+  }
+}
+
 function invoicePreviewSteps(invoice: Invoice, isThai: boolean): DocumentPreviewStep[] {
   const blocked = invoice.status === 'rejected' || invoice.status === 'cancelled';
   const approved = ['approved', 'submitted'].includes(invoice.status);
@@ -51,18 +75,21 @@ function invoicePreviewSteps(invoice: Invoice, isThai: boolean): DocumentPreview
   const rdDone = rdStatus === 'success' || invoice.status === 'submitted';
   const rdActive = rdStatus === 'pending' || rdStatus === 'in_progress' || rdStatus === 'retrying';
   const needsRd = invoice.documentMode !== 'ordinary' && invoice.type !== 'receipt';
+  const dueDate = stageDate(invoice.dueDate, isThai);
 
   return [
     {
       id: 'created',
       label: isThai ? 'สร้างเอกสาร' : 'Document created',
       description: isThai ? `เลขที่ ${invoice.invoiceNumber}` : `No. ${invoice.invoiceNumber}`,
+      meta: stageDate(invoice.invoiceDate, isThai) ?? (isThai ? 'วันที่เอกสาร' : 'Document date'),
       state: invoice.status === 'draft' ? 'current' : 'done',
     },
     {
       id: 'approved',
       label: isThai ? 'อนุมัติพร้อมใช้งาน' : 'Approved for use',
       description: isThai ? 'พร้อมส่งลูกค้าหรือใช้เป็นหลักฐาน' : 'Ready to send or use as evidence.',
+      meta: blocked ? (isThai ? 'ยกเลิก/ถูกปฏิเสธ' : 'Stopped') : approved ? (isThai ? 'พร้อมใช้งาน' : 'Ready') : (isThai ? 'รออนุมัติ' : 'Awaiting approval'),
       state: blocked ? 'blocked' : approved ? 'done' : invoice.status === 'pending' ? 'current' : 'pending',
     },
     {
@@ -72,6 +99,11 @@ function invoicePreviewSteps(invoice: Invoice, isThai: boolean): DocumentPreview
         ? isThai ? 'บันทึกการชำระแล้ว' : 'Payment has been recorded.'
         : isReceiptLike ? (isThai ? 'เอกสารชนิดนี้เป็นหลักฐานรับเงิน' : 'This document already represents payment.')
           : isThai ? 'ยังรอรับชำระหรือออกใบเสร็จ' : 'Awaiting payment or receipt issuance.',
+      meta: invoice.isPaid
+        ? stageDate(invoice.paidAt, isThai) ?? (isThai ? 'ชำระแล้ว' : 'Paid')
+        : invoice.dueDate
+          ? dueDate ? `${isThai ? 'ครบกำหนด' : 'Due'} ${dueDate}` : (isThai ? 'มีวันครบกำหนด' : 'Due date set')
+          : isReceiptLike ? (isThai ? 'รับเงินพร้อมเอกสาร' : 'Receipt document') : (isThai ? 'ค้างชำระ' : 'Unpaid'),
       state: invoice.isPaid || isReceiptLike ? 'done' : approved ? 'current' : 'pending',
     },
     {
@@ -82,6 +114,7 @@ function invoicePreviewSteps(invoice: Invoice, isThai: boolean): DocumentPreview
         : rdDone
           ? isThai ? 'ส่งสำเร็จและมีหลักฐานแล้ว' : 'Submitted successfully with evidence.'
           : isThai ? 'รอส่งหรือแก้ข้อผิดพลาดก่อนส่ง' : 'Waiting for submission or correction.',
+      meta: !needsRd ? (isThai ? 'ไม่ต้องส่ง' : 'Not required') : invoice.rdSubmittedAt ? stageDate(invoice.rdSubmittedAt, isThai) : rdStageLabel(rdStatus, isThai),
       state: !needsRd ? 'done' : rdDone ? 'done' : rdStatus === 'failed' ? 'blocked' : rdActive ? 'current' : 'pending',
     },
   ];

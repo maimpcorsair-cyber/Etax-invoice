@@ -23,30 +23,41 @@ const WHT_RATE_LABELS: Record<string, string> = {
   '4': 'มาตรา 40(4) — ค่าบริการ/นายหน้า',
 };
 
+function stageDate(value: string | null | undefined, isThai: boolean) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString(isThai ? 'th-TH' : 'en-GB');
+}
+
 function whtPreviewSteps(cert: WhtCertificate, isThai: boolean, previewReady: boolean, loading: boolean, error?: string | null): DocumentPreviewStep[] {
   return [
     {
       id: 'created',
       label: isThai ? 'สร้างหนังสือรับรอง' : 'Certificate created',
       description: isThai ? `เลขที่ ${cert.certificateNumber}` : `No. ${cert.certificateNumber}`,
+      meta: stageDate(cert.createdAt, isThai) ?? (isThai ? 'วันที่สร้าง' : 'Created date'),
       state: 'done',
     },
     {
       id: 'tax-record',
       label: isThai ? 'บันทึกภาษีหัก ณ ที่จ่าย' : 'Withholding recorded',
       description: isThai ? `อัตรา ${cert.whtRate}% สำหรับ ${cert.recipientName}` : `${cert.whtRate}% for ${cert.recipientName}`,
+      meta: stageDate(cert.paymentDate, isThai) ?? (isThai ? 'วันที่จ่ายเงิน' : 'Payment date'),
       state: 'done',
     },
     {
       id: 'pdf',
       label: isThai ? 'เตรียม PDF 50 ทวิ' : 'Prepare PDF',
       description: isThai ? 'ใช้ส่งให้ผู้ถูกหักและเก็บเป็นหลักฐาน' : 'Ready for recipient sharing and evidence storage.',
+      meta: error ? (isThai ? 'ต้องแก้ไข' : 'Needs attention') : loading ? (isThai ? 'กำลังสร้าง' : 'Generating') : previewReady ? (isThai ? 'พร้อมใช้งาน' : 'Ready') : (isThai ? 'รอสร้าง PDF' : 'Awaiting PDF'),
       state: error ? 'blocked' : loading ? 'current' : previewReady ? 'done' : 'pending',
     },
     {
       id: 'download',
       label: isThai ? 'ดาวน์โหลด / ส่งต่อ' : 'Download or share',
       description: isThai ? 'เก็บไฟล์เข้ารอบปิดบัญชีและภาษี' : 'Keep the file for accounting and tax close.',
+      meta: previewReady ? (isThai ? 'พร้อมส่งต่อ' : 'Ready to share') : (isThai ? 'รอ PDF' : 'Waiting for PDF'),
       state: previewReady ? 'current' : 'pending',
     },
   ];

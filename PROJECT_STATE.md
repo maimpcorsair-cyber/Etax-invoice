@@ -1,8 +1,14 @@
 # Project State Handoff
 
-Last updated: 2026-06-10 (Document preview workflow modal deployed)
+Last updated: 2026-06-10 (Document stage calendar in preview modal)
 
 ## Latest work (2026-06-10)
+
+Document stage calendar:
+- **Preview workflow:** added shared `DocumentStageCalendar` and replaced the plain preview stage rail with a richer calendar-like stage strip. The preview modal now shows progress count, animated current/blocked stages, and per-stage metadata.
+- **Accounting status:** invoice previews now expose document date, approval readiness, paid/unpaid or due date, and RD submission state in the stage cards. Quotations, delivery notes, and WHT certificates also pass their domain dates/statuses into the same component.
+- **Responsive behavior:** desktop keeps a readable one-column stage panel beside the A4 preview; mobile uses a horizontal stage strip so the document preview starts sooner instead of being pushed far below the workflow cards.
+- **Verification:** local frontend typecheck, ESLint, production build, and `git diff --check` pass. Authenticated local Playwright against the production API opened an RD-failed paid invoice preview and confirmed the stage calendar shows `3/4`, paid as done, and RD as blocked; mobile `390x844` verified the compact horizontal strip.
 
 Document preview workflow modal:
 - **Preview UX:** `DocumentPreviewSheet` is now a centered/inset workflow modal instead of a narrow right drawer. It renders through a portal so it sits above the app shell, mobile bottom nav, and floating chat. Desktop uses a left document-stage rail plus a larger A4 preview; mobile uses a compact horizontal status strip so the document appears sooner.
