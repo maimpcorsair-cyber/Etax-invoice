@@ -4,6 +4,7 @@ import { Calculator, Users, Play, Lock, Loader2, AlertTriangle, CheckCircle2, Do
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
+import BillboyBalanceOrb from '../components/ui/BillboyBalanceOrb';
 
 interface PayrollRun {
   id: string;
@@ -190,7 +191,7 @@ export default function PayrollRuns() {
       />
 
       <section className="workspace-command">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.82fr)_minmax(280px,0.62fr)]">
           <div className="min-w-0">
             <p className="premium-eyebrow">{isThai ? 'Payroll Ledger' : 'Payroll Ledger'}</p>
             <div className="mt-3 flex items-center gap-3 sm:mt-4">
@@ -227,6 +228,26 @@ export default function PayrollRuns() {
               </div>
             </div>
           </div>
+
+          <BillboyBalanceOrb
+            title={isThai ? 'สมดุลเงินเดือน' : 'Payroll balance'}
+            subtitle={isThai ? 'เทียบยอดเงินเดือนรวมกับภาระ ภงด.1 และ สปส. ก่อนปิดรอบ' : 'Compare payroll gross with WHT and SSO liability before closing.'}
+            centerLabel={isThai ? 'จ่ายสุทธิ' : 'Net pay'}
+            centerValue={formatCurrency(yearlyNet)}
+            left={{
+              label: isThai ? 'Gross ทั้งปี' : 'Yearly gross',
+              value: formatCurrency(yearlyGross),
+              amount: yearlyGross,
+              tone: 'navy',
+            }}
+            right={{
+              label: isThai ? 'ภาษี/สปส.' : 'Tax / SSO',
+              value: formatCurrency(payrollTaxDue),
+              amount: payrollTaxDue,
+              tone: payrollTaxDue > 0 ? 'amber' : 'emerald',
+            }}
+            footnote={isThai ? 'ใช้ช่วยเช็คก่อน export ภงด.1 และประกันสังคม' : 'Use before exporting WHT and SSO files.'}
+          />
 
           <div className="workspace-command-rail">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { EmptyState, MascotHelperCard, mascotAssets } from '../components/ui/AppChrome';
+import BillboyBalanceOrb from '../components/ui/BillboyBalanceOrb';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import DashboardCharts from '../components/dashboard/DashboardCharts';
 import { useLanguage } from '../hooks/useLanguage';
@@ -728,6 +729,26 @@ export default function Dashboard() {
         </div>
 
         <div className="workspace-command-rail relative z-10 grid grid-cols-[88px_minmax(0,1fr)] gap-3 lg:flex lg:max-w-sm lg:flex-col lg:gap-4 lg:justify-self-end">
+          <BillboyBalanceOrb
+            className="col-span-2"
+            title={isThai ? 'สมดุลวันนี้' : 'Today balance'}
+            subtitle={isThai ? 'เทียบยอดที่ต้องตามเก็บกับภาษีสุทธิ ก่อนเลือกงานถัดไป' : 'Compare receivables with net VAT before choosing the next action.'}
+            centerLabel={isThai ? 'งานควรจัดการ' : 'Action items'}
+            centerValue={`${commandCount}`}
+            left={{
+              label: isThai ? 'ลูกหนี้รวม' : 'Receivables',
+              value: loading ? '—' : formatCurrency(stats?.receivables.totalOutstanding ?? 0),
+              amount: stats?.receivables.totalOutstanding ?? 0,
+              tone: (stats?.receivables.overdueOutstanding ?? 0) > 0 ? 'rose' : 'navy',
+            }}
+            right={{
+              label: isThai ? 'VAT สุทธิ' : 'Net VAT',
+              value: monthEnd ? formatCurrency(netVat) : '—',
+              amount: netVat,
+              tone: netVat > 0 ? 'amber' : 'emerald',
+            }}
+            footnote={isThai ? 'วงแหวนนี้เป็นตัวช่วยอ่านภาพรวม ไม่แทนรายงานภาษีเต็ม' : 'This is a quick scan, not a replacement for the full tax report.'}
+          />
           <div className="overflow-hidden rounded-xl border border-white/80 bg-white/70 lg:w-full">
             <img src={mascotAssets.hero} alt="" className="h-full min-h-24 w-full object-cover object-center lg:h-44" />
           </div>

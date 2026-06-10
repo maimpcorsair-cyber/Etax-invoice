@@ -1,8 +1,16 @@
 # Project State Handoff
 
-Last updated: 2026-06-10 (Document stage calendar in preview modal)
+Last updated: 2026-06-11 (Billboy balance orb dashboard system)
 
-## Latest work (2026-06-10)
+## Latest work (2026-06-11)
+
+Billboy balance orb dashboard system:
+- **Frontend:** added shared `BillboyBalanceOrb`, a light Billboy-native animated balance widget inspired by the requested justice/balance prompt without copying its code, assets, or dark legal theme. It uses inline SVG/CSS only, no new dependency, and respects `prefers-reduced-motion`.
+- **Dashboard:** Ledger Banner right rail now shows a compact daily balance readout comparing receivables and net VAT before the mascot/action stack.
+- **Finance + Payroll:** Finance Overview now compares cash in/out and net cashflow in the hero. Payroll Runs compares yearly gross, net pay, and tax/SSO liability before closing/exporting payroll.
+- **Verification:** `npm run typecheck --prefix frontend`, `npm run lint --prefix frontend`, `npm run build --prefix frontend`, and `git diff --check` pass. Local Playwright against the production API checked Dashboard, Finance Overview, and Payroll Runs on desktop `1440x900` and mobile `390x844`; no console errors were introduced. Existing mobile horizontal scroll remains only in pre-existing tab/table surfaces, not from the new balance widget.
+
+## Previous work (2026-06-10)
 
 Document stage calendar:
 - **Preview workflow:** added shared `DocumentStageCalendar` and replaced the plain preview stage rail with a richer calendar-like stage strip. The preview modal now shows progress count, animated current/blocked stages, and per-stage metadata.

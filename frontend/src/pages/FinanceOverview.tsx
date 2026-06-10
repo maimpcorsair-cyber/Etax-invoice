@@ -4,6 +4,7 @@ import { Loader2, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight,
 import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
+import BillboyBalanceOrb from '../components/ui/BillboyBalanceOrb';
 
 interface Aging { current: number; days1_30: number; days31_60: number; days61_90: number; days90plus: number }
 interface Overview {
@@ -80,7 +81,7 @@ export default function FinanceOverview() {
       ) : (
         <>
           <section className="workspace-command">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.7fr)] lg:items-stretch xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.82fr)_minmax(280px,0.62fr)]">
             <div className="min-w-0">
               <p className="premium-eyebrow"><Wallet className="h-3.5 w-3.5" />{isThai ? 'ภาพรวมเงินบริษัท' : 'Company Money Overview'}</p>
               <p className="mt-4 text-sm font-semibold text-slate-500">{formatDate(range.from)} - {formatDate(range.to)}</p>
@@ -102,6 +103,25 @@ export default function FinanceOverview() {
                 </div>
               </div>
             </div>
+            <BillboyBalanceOrb
+              title={isThai ? 'สมดุลเงินสด' : 'Cash balance'}
+              subtitle={isThai ? 'อ่านเงินเข้าและเงินออกในช่วงวันที่เลือกแบบเห็นแรงถ่วงทันที' : 'See cash-in and cash-out pressure for the selected period.'}
+              centerLabel={isThai ? 'สุทธิ' : 'Net'}
+              centerValue={formatCurrency(data.cashflow.net)}
+              left={{
+                label: isThai ? 'เงินเข้า' : 'Cash in',
+                value: formatCurrency(data.cashflow.in),
+                amount: data.cashflow.in,
+                tone: 'emerald',
+              }}
+              right={{
+                label: isThai ? 'เงินออก' : 'Cash out',
+                value: formatCurrency(data.cashflow.out),
+                amount: data.cashflow.out,
+                tone: 'rose',
+              }}
+              footnote={isThai ? 'ใช้คู่กับงบการเงินและกระทบยอดธนาคารด้านล่าง' : 'Use with the financial statements and bank reconciliation below.'}
+            />
             <div className="workspace-command-rail">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isThai ? 'ช่วงเวลาที่ดู' : 'Date range'}</p>
               <div className="mt-3 grid gap-2">
