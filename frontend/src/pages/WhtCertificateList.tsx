@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import type { WhtCertificate } from '../types';
 import SectionSubNav from '../components/SectionSubNav';
 import { ToastStack, type FeedbackToast } from '../components/ui/AppFeedback';
-import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewArtifact, type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -59,6 +59,65 @@ function whtPreviewSteps(cert: WhtCertificate, isThai: boolean, previewReady: bo
       description: isThai ? 'เก็บไฟล์เข้ารอบปิดบัญชีและภาษี' : 'Keep the file for accounting and tax close.',
       meta: previewReady ? (isThai ? 'พร้อมส่งต่อ' : 'Ready to share') : (isThai ? 'รอ PDF' : 'Waiting for PDF'),
       state: previewReady ? 'current' : 'pending',
+    },
+  ];
+}
+
+function whtPreviewArtifacts(cert: WhtCertificate, isThai: boolean, previewReady: boolean, loading: boolean, error?: string | null): DocumentPreviewArtifact[] {
+  const previewState = error ? 'blocked' : loading ? 'pending' : previewReady || Boolean(cert.pdfUrl) ? 'ready' : 'pending';
+
+  return [
+    {
+      id: 'wht-workflow',
+      label: cert.certificateNumber,
+      description: isThai ? 'แฟ้มหนังสือรับรองหัก ณ ที่จ่าย' : 'Withholding tax certificate workspace.',
+      kind: 'folder',
+      state: previewState,
+      children: [
+        {
+          id: 'pdf',
+          label: isThai ? 'PDF 50 ทวิ' : '50 bis PDF',
+          description: isThai ? 'ใช้ส่งให้ผู้ถูกหักและเก็บเป็นหลักฐานบัญชี' : 'Sent to the recipient and kept as accounting evidence.',
+          href: cert.pdfUrl,
+          kind: 'pdf',
+          state: previewState,
+          meta: cert.pdfUrl ? (isThai ? 'มีไฟล์ถาวร' : 'Stored file') : (isThai ? 'สร้างจาก preview' : 'Generated from preview'),
+        },
+        {
+          id: 'tax-record',
+          label: isThai ? 'รายการภาษีหัก ณ ที่จ่าย' : 'Withholding tax record',
+          description: isThai ? `อัตรา ${cert.whtRate}% สำหรับ ${cert.recipientName}` : `${cert.whtRate}% for ${cert.recipientName}`,
+          kind: 'file',
+          state: 'ready',
+          meta: stageDate(cert.paymentDate, isThai),
+        },
+      ],
+    },
+    {
+      id: 'accounting-links',
+      label: isThai ? 'ความเชื่อมโยงบัญชี' : 'Accounting links',
+      description: isThai ? 'จุดที่เอกสารนี้ควรไปสัมพันธ์กับ invoice และรอบภาษี' : 'Where this certificate connects to invoice and tax close.',
+      kind: 'folder',
+      state: cert.invoiceId ? 'ready' : 'pending',
+      children: [
+        {
+          id: 'invoice',
+          label: isThai ? 'เอกสารขายที่เกี่ยวข้อง' : 'Related sales document',
+          description: cert.invoiceId
+            ? isThai ? 'มี invoice ที่ผูกกับ 50 ทวินี้' : 'A sales document is linked to this certificate.'
+            : isThai ? 'ยังไม่ผูกกับเอกสารขาย' : 'Not linked to a sales document yet.',
+          kind: 'file',
+          state: cert.invoiceId ? 'ready' : 'pending',
+        },
+        {
+          id: 'tax-close',
+          label: isThai ? 'รอบปิดภาษี' : 'Tax close period',
+          description: isThai ? 'ยอดหัก ณ ที่จ่ายควรถูกสะท้อนในรายงานปิดรอบ' : 'The withheld amount should be reflected in tax close reports.',
+          kind: 'sheet',
+          state: 'pending',
+          meta: stageDate(cert.paymentDate, isThai),
+        },
+      ],
     },
   ];
 }
@@ -465,6 +524,7 @@ export default function WhtCertificateList() {
         error={previewError}
         downloading={previewCert ? downloadingId === previewCert.id : false}
         statusSteps={previewCert ? whtPreviewSteps(previewCert, isThai, Boolean(previewUrl), previewLoading, previewError) : undefined}
+        artifacts={previewCert ? whtPreviewArtifacts(previewCert, isThai, Boolean(previewUrl), previewLoading, previewError) : undefined}
         onDownload={() => {
           if (previewCert) void handleDownloadPdf(previewCert.id);
         }}

@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
 import type { Quotation, QuotationStatus } from '../types';
-import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewArtifact, type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 // ใบเสนอราคา — list page. Mirrors InvoiceList layout but simpler since
 // quotations have no e-Tax submission flow.
@@ -67,6 +67,68 @@ function quotationPreviewSteps(quotation: Quotation, isThai: boolean): DocumentP
       description: isThai ? 'เข้าสู่รอบใบกำกับภาษี / ใบเสร็จ' : 'Moves into invoice or receipt workflow.',
       meta: quotation.convertedAt ? stageDate(quotation.convertedAt, isThai) : (isThai ? 'รอแปลงเอกสาร' : 'Awaiting conversion'),
       state: status === 'converted' ? 'done' : status === 'accepted' ? 'current' : 'pending',
+    },
+  ];
+}
+
+function quotationPreviewArtifacts(quotation: Quotation, isThai: boolean): DocumentPreviewArtifact[] {
+  const closedProblem = ['rejected', 'expired', 'cancelled'].includes(quotation.status);
+  const sent = ['sent', 'accepted', 'converted'].includes(quotation.status);
+  const converted = quotation.status === 'converted' || Boolean(quotation.convertedToInvoiceId);
+
+  return [
+    {
+      id: 'quotation-workflow',
+      label: quotation.quotationNumber,
+      description: isThai ? 'แฟ้มใบเสนอราคาและไฟล์ที่ใช้คุยกับลูกค้า' : 'Quotation workspace and customer-facing artifacts.',
+      kind: 'folder',
+      state: closedProblem ? 'blocked' : sent ? 'ready' : 'pending',
+      children: [
+        {
+          id: 'pdf',
+          label: isThai ? 'PDF ใบเสนอราคา' : 'Quotation PDF',
+          description: isThai ? 'สร้างจากตัวอย่างเพื่อส่งให้ลูกค้า' : 'Generated from preview for customer sharing.',
+          kind: 'pdf',
+          state: closedProblem ? 'blocked' : 'pending',
+          meta: isThai ? 'สร้างเมื่อดาวน์โหลด' : 'Generated on download',
+        },
+        {
+          id: 'customer-share',
+          label: isThai ? 'ลิงก์ส่งลูกค้า' : 'Customer share link',
+          description: sent
+            ? isThai ? 'ใบเสนอราคาถูกส่งหรือพร้อม follow-up แล้ว' : 'Quote has been sent or is ready for follow-up.'
+            : isThai ? 'ส่งได้หลังออกจากแบบร่าง' : 'Available after leaving draft.',
+          kind: 'link',
+          state: sent ? 'ready' : closedProblem ? 'blocked' : 'pending',
+          meta: STATUS_LABELS[quotation.status][isThai ? 'th' : 'en'],
+        },
+      ],
+    },
+    {
+      id: 'conversion-workflow',
+      label: isThai ? 'ต่อยอดเป็นเอกสารขาย' : 'Sales conversion',
+      description: isThai ? 'จุดเชื่อมจากใบเสนอราคาไปใบกำกับ/ใบเสร็จ' : 'Bridge from quote into invoice or receipt workflow.',
+      kind: 'folder',
+      state: converted ? 'ready' : quotation.status === 'accepted' ? 'pending' : closedProblem ? 'blocked' : 'pending',
+      children: [
+        {
+          id: 'accepted',
+          label: isThai ? 'หลักฐานลูกค้าตอบรับ' : 'Customer acceptance',
+          description: isThai ? 'ใช้ยืนยันก่อนสร้างเอกสารขายจริง' : 'Confirmation before creating the real sales document.',
+          kind: 'file',
+          state: ['accepted', 'converted'].includes(quotation.status) ? 'ready' : closedProblem ? 'blocked' : 'pending',
+        },
+        {
+          id: 'invoice',
+          label: isThai ? 'เอกสารขายที่แปลงแล้ว' : 'Converted sales document',
+          description: converted
+            ? isThai ? 'เชื่อมไป workflow ใบกำกับ/ใบเสร็จแล้ว' : 'Connected to the invoice or receipt workflow.'
+            : isThai ? 'รอแปลงเมื่อชนะงาน' : 'Waiting for conversion after acceptance.',
+          kind: 'file',
+          state: converted ? 'ready' : quotation.status === 'accepted' ? 'pending' : closedProblem ? 'blocked' : 'pending',
+          meta: quotation.convertedToInvoiceId ? (isThai ? 'มี invoice id' : 'Invoice linked') : undefined,
+        },
+      ],
     },
   ];
 }
@@ -493,6 +555,7 @@ export default function QuotationList() {
         downloading={previewQuotation ? downloadId === previewQuotation.id : false}
         editHref={previewQuotation ? `/app/quotations/${previewQuotation.id}` : undefined}
         statusSteps={previewQuotation ? quotationPreviewSteps(previewQuotation, isThai) : undefined}
+        artifacts={previewQuotation ? quotationPreviewArtifacts(previewQuotation, isThai) : undefined}
         onDownload={() => {
           if (previewQuotation) void downloadPdf(previewQuotation);
         }}

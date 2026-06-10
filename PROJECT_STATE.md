@@ -704,6 +704,7 @@ To finish on production:
 - Product catalog: products/services support type, category, account code, unit cost, default WHT, and sync into the company Google Sheet tab `สินค้าและบริการ`.
 - Customer evidence/Drive/Sheet: `รายชื่อ` supports customer/vendor evidence metadata, Drive folders, compact checklist, and company month-end `รายชื่อและเอกสาร` sheet tab.
 - Customer credit terms: optional `creditLimit` and `creditDays` are stored and invoice due date auto-fills from `creditDays` when empty.
+- Document preview workflow: invoice, quotation, delivery note, and WHT preview modals now show a file/evidence artifact tree beside the status path, covering PDF/XML/RD/payment/Drive-ledger/tracking/conversion states where data exists.
 
 ## Next Best Actions
 

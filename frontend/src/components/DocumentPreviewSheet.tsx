@@ -5,9 +5,11 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import DocumentStageCalendar, { type DocumentStageState, type DocumentStageStep } from './ui/DocumentStageCalendar';
+import DocumentArtifactTree, { type DocumentArtifactNode } from './ui/DocumentArtifactTree';
 
 export type DocumentPreviewStepState = DocumentStageState;
 export type DocumentPreviewStep = DocumentStageStep;
+export type DocumentPreviewArtifact = DocumentArtifactNode;
 
 interface DocumentPreviewSheetProps {
   open: boolean;
@@ -21,6 +23,7 @@ interface DocumentPreviewSheetProps {
   downloading?: boolean;
   editHref?: string;
   statusSteps?: DocumentPreviewStep[];
+  artifacts?: DocumentPreviewArtifact[];
   onDownload: () => void;
   onClose: () => void;
 }
@@ -58,6 +61,64 @@ function fallbackSteps(isThai: boolean, loading: boolean, error?: string | null)
   ];
 }
 
+function fallbackArtifacts({
+  isThai,
+  documentNumber,
+  previewHtml,
+  previewUrl,
+  loading,
+  error,
+  editHref,
+}: {
+  isThai: boolean;
+  documentNumber: string;
+  previewHtml: string | null;
+  previewUrl?: string | null;
+  loading: boolean;
+  error?: string | null;
+  editHref?: string;
+}): DocumentPreviewArtifact[] {
+  const previewReady = Boolean(previewHtml || previewUrl);
+  const previewState = error ? 'blocked' : loading ? 'pending' : previewReady ? 'ready' : 'pending';
+
+  return [
+    {
+      id: 'document-workflow',
+      label: documentNumber || (isThai ? 'เอกสารนี้' : 'This document'),
+      description: isThai ? 'พื้นที่ทำงานของเอกสารที่กำลังดู' : 'Workspace for the document in this preview.',
+      kind: 'folder',
+      state: error ? 'blocked' : previewReady ? 'ready' : 'pending',
+      children: [
+        {
+          id: 'preview',
+          label: isThai ? 'ตัวอย่างเอกสาร' : 'Document preview',
+          description: isThai ? 'ใช้ตรวจหน้าตาเอกสารก่อนดาวน์โหลดหรือส่งต่อ' : 'Review the document before download or sharing.',
+          kind: 'file',
+          state: previewState,
+          meta: error ? (isThai ? 'โหลดไม่สำเร็จ' : 'Load failed') : loading ? (isThai ? 'กำลังโหลด' : 'Loading') : previewReady ? (isThai ? 'พร้อมดู' : 'Ready') : undefined,
+        },
+        {
+          id: 'pdf',
+          label: 'PDF',
+          description: isThai ? 'สร้างหรือดาวน์โหลดจากปุ่มด้านล่าง' : 'Generate or download from the footer action.',
+          kind: 'pdf',
+          state: previewState,
+        },
+        ...(editHref
+          ? [{
+            id: 'edit-workspace',
+            label: isThai ? 'หน้าจอแก้ไข' : 'Edit workspace',
+            description: isThai ? 'กลับไปแก้ข้อมูลต้นทางของเอกสาร' : 'Return to the source editing workspace.',
+            href: editHref,
+            kind: 'link' as const,
+            state: 'ready' as const,
+          }]
+          : []),
+      ],
+    },
+  ];
+}
+
 export default function DocumentPreviewSheet({
   open,
   title,
@@ -70,6 +131,7 @@ export default function DocumentPreviewSheet({
   downloading = false,
   editHref,
   statusSteps,
+  artifacts,
   onDownload,
   onClose,
 }: DocumentPreviewSheetProps) {
@@ -78,6 +140,9 @@ export default function DocumentPreviewSheet({
   const descriptionId = useId();
   const dialogRef = useDialogFocus<HTMLElement>(open, onClose);
   const steps = statusSteps?.length ? statusSteps : fallbackSteps(isThai, loading, error);
+  const artifactNodes = artifacts?.length
+    ? artifacts
+    : fallbackArtifacts({ isThai, documentNumber, previewHtml, previewUrl, loading, error, editHref });
   const currentStep = steps.find((step) => step.state === 'current')
     ?? steps.find((step) => step.state === 'blocked')
     ?? [...steps].reverse().find((step) => step.state === 'done')
@@ -163,8 +228,8 @@ export default function DocumentPreviewSheet({
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 bg-slate-100 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="min-h-0 max-h-[360px] overflow-auto border-b border-slate-200 bg-white/95 p-3 sm:p-4 lg:max-h-none lg:border-b-0 lg:border-r lg:p-5">
+        <div className="grid min-h-0 flex-1 bg-slate-100 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <aside className="min-h-0 max-h-[430px] overflow-auto border-b border-slate-200 bg-white/95 p-3 sm:p-4 lg:max-h-none lg:border-b-0 lg:border-r lg:p-5">
             <DocumentStageCalendar
               title={isThai ? 'เส้นทางเอกสาร' : 'Document path'}
               description={
@@ -173,6 +238,11 @@ export default function DocumentPreviewSheet({
                   : 'Track issuance, payment, and tax submission from the ledger into this preview workspace.'
               }
               steps={steps}
+              isThai={isThai}
+            />
+            <DocumentArtifactTree
+              className="mt-4"
+              nodes={artifactNodes}
               isThai={isThai}
             />
           </aside>

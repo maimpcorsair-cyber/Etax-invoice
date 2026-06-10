@@ -15,7 +15,7 @@ import { useCompanyAccessPolicy } from '../hooks/useCompanyAccessPolicy';
 import { EmptyState } from '../components/ui/AppChrome';
 import { ConfirmDialog, ToastStack, type ConfirmDialogState, type FeedbackToast } from '../components/ui/AppFeedback';
 import SectionSubNav from '../components/SectionSubNav';
-import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewArtifact, type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'approved', 'submitted', 'rejected', 'cancelled'];
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -120,6 +120,105 @@ function invoicePreviewSteps(invoice: Invoice, isThai: boolean): DocumentPreview
   ];
 }
 
+function invoicePreviewArtifacts(invoice: Invoice, isThai: boolean): DocumentPreviewArtifact[] {
+  const needsRd = invoice.documentMode !== 'ordinary' && invoice.type !== 'receipt';
+  const rdStatus = invoice.rdSubmissionStatus;
+  const rdReady = rdStatus === 'success' || invoice.status === 'submitted';
+  const rdBlocked = rdStatus === 'failed' || invoice.status === 'rejected' || invoice.status === 'cancelled';
+  const pdfReady = Boolean(invoice.pdfUrl);
+  const xmlReady = Boolean(invoice.xmlUrl);
+  const receiptReady = invoice.isPaid || invoice.type === 'receipt' || invoice.type === 'tax_invoice_receipt';
+  const issued = invoice.status === 'approved' || invoice.status === 'submitted';
+
+  return [
+    {
+      id: 'sales-document',
+      label: invoice.invoiceNumber,
+      description: isThai ? 'แฟ้มเอกสารขายของรายการนี้' : 'Sales document workspace for this record.',
+      kind: 'folder',
+      state: rdBlocked ? 'blocked' : issued || pdfReady ? 'ready' : 'pending',
+      children: [
+        {
+          id: 'pdf',
+          label: isThai ? 'PDF เอกสารขาย' : 'Sales document PDF',
+          description: isThai ? 'ไฟล์ที่ใช้ส่งลูกค้า ดาวน์โหลด หรือแนบหลักฐาน' : 'Customer-facing file for sending, download, or evidence.',
+          href: invoice.pdfUrl,
+          kind: 'pdf',
+          state: pdfReady ? 'ready' : issued ? 'pending' : 'pending',
+          meta: pdfReady ? (isThai ? 'มีไฟล์แล้ว' : 'File ready') : (isThai ? 'สร้างจากตัวอย่างได้' : 'Generated from preview'),
+        },
+        {
+          id: 'payment-receipt',
+          label: isThai ? 'รับชำระ / ใบเสร็จ' : 'Payment / receipt',
+          description: receiptReady
+            ? isThai ? 'สถานะรับเงินถูกบันทึกใน ledger แล้ว' : 'Payment state is recorded in the ledger.'
+            : isThai ? 'ยังรอรับชำระหรือออกใบเสร็จ' : 'Awaiting payment or receipt issuance.',
+          kind: 'file',
+          state: receiptReady ? 'ready' : issued ? 'pending' : 'pending',
+          meta: invoice.isPaid ? (isThai ? 'ชำระแล้ว' : 'Paid') : (isThai ? 'ยังไม่ชำระ' : 'Unpaid'),
+        },
+      ],
+    },
+    {
+      id: 'tax-submission',
+      label: isThai ? 'ภาษีและสรรพากร' : 'Tax and RD',
+      description: isThai ? 'ไฟล์ที่เกี่ยวกับ e-Tax, XML และการส่ง RD' : 'e-Tax XML and Revenue Department submission artifacts.',
+      kind: 'folder',
+      state: !needsRd || rdReady ? 'ready' : rdBlocked ? 'blocked' : 'pending',
+      children: [
+        {
+          id: 'xml',
+          label: 'XML e-Tax',
+          description: !needsRd
+            ? isThai ? 'เอกสารปกติ ไม่ต้องสร้าง XML ส่ง RD' : 'Ordinary document; RD XML is not required.'
+            : isThai ? 'ไฟล์ XML ที่ลงลายเซ็นและใช้ส่ง RD' : 'Signed XML used for RD submission.',
+          href: invoice.xmlUrl,
+          kind: 'xml',
+          state: !needsRd || xmlReady ? 'ready' : rdBlocked ? 'blocked' : 'pending',
+          meta: xmlReady ? (isThai ? 'พร้อมตรวจ' : 'Ready') : rdStageLabel(rdStatus, isThai),
+        },
+        {
+          id: 'rd',
+          label: isThai ? 'หลักฐานส่ง RD' : 'RD receipt',
+          description: !needsRd
+            ? isThai ? 'เอกสารนี้ไม่อยู่ในคิวส่งสรรพากร' : 'This document is not queued for RD submission.'
+            : rdReady
+              ? isThai ? 'ส่งสำเร็จแล้วและ ledger รับรู้สถานะ' : 'Accepted by RD and reflected in the ledger.'
+              : isThai ? 'รอคิวส่งหรือรอแก้ข้อผิดพลาด' : 'Queued, retrying, or waiting for correction.',
+          kind: 'rd',
+          state: !needsRd || rdReady ? 'ready' : rdBlocked ? 'blocked' : 'pending',
+          meta: invoice.rdDocId ?? rdStageLabel(rdStatus, isThai),
+        },
+      ],
+    },
+    {
+      id: 'ledger-storage',
+      label: isThai ? 'คลังหลักฐานและทะเบียน' : 'Evidence and ledgers',
+      description: isThai ? 'ปลายทางที่ควรเห็นใน Drive และสมุดทะเบียนภาษี' : 'Where this document belongs in Drive and tax ledgers.',
+      kind: 'folder',
+      state: rdBlocked ? 'blocked' : 'pending',
+      children: [
+        {
+          id: 'drive',
+          label: isThai ? 'Google Drive evidence' : 'Google Drive evidence',
+          description: isThai ? 'ใช้ลิงก์จาก Drive เมื่อ worker ซิงก์ไฟล์สำเร็จ' : 'Uses the Drive link once the worker syncs the file.',
+          kind: 'drive',
+          state: 'pending',
+          meta: isThai ? 'รอ field ลิงก์ Drive จาก API' : 'Waiting for API Drive link',
+        },
+        {
+          id: 'sales-ledger',
+          label: isThai ? 'สมุดทะเบียนภาษีขาย' : 'Sales tax ledger',
+          description: isThai ? 'ข้อมูลรายการนี้ควรถูกสะท้อนใน master sheet' : 'This row should be reflected in the master sheet.',
+          kind: 'sheet',
+          state: rdBlocked ? 'blocked' : issued || rdReady ? 'pending' : 'pending',
+          meta: isThai ? 'ซิงก์ผ่าน worker' : 'Worker sync',
+        },
+      ],
+    },
+  ];
+}
+
 interface ProjectOption {
   id: string;
   code: string;
@@ -190,6 +289,7 @@ export default function InvoiceList() {
   const [previewModal, setPreviewModal] = useState<{ id: string; invoiceNumber: string; buyerName?: string } | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewSteps, setPreviewSteps] = useState<DocumentPreviewStep[] | undefined>();
+  const [previewArtifacts, setPreviewArtifacts] = useState<DocumentPreviewArtifact[] | undefined>();
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Payment modal
@@ -361,6 +461,7 @@ export default function InvoiceList() {
 
     setPreviewModal({ id: inv.id, invoiceNumber: inv.invoiceNumber, buyerName });
     setPreviewSteps('status' in inv ? invoicePreviewSteps(inv, isThai) : undefined);
+    setPreviewArtifacts('status' in inv ? invoicePreviewArtifacts(inv, isThai) : undefined);
     setPreviewHtml(null);
     setPreviewError(null);
     try {
@@ -378,6 +479,7 @@ export default function InvoiceList() {
     setPreviewHtml(null);
     setPreviewModal(null);
     setPreviewSteps(undefined);
+    setPreviewArtifacts(undefined);
     setPreviewError(null);
   }
 
@@ -1692,6 +1794,7 @@ export default function InvoiceList() {
         downloading={pdfLoading}
         editHref={previewModal ? `/app/invoices/${previewModal.id}/edit` : undefined}
         statusSteps={previewSteps}
+        artifacts={previewArtifacts}
         onDownload={handleDownloadPdf}
         onClose={closePreview}
       />

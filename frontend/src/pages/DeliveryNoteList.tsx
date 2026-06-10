@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLanguage } from '../hooks/useLanguage';
 import SectionSubNav from '../components/SectionSubNav';
 import type { DeliveryNote, DeliveryNoteStatus } from '../types';
-import DocumentPreviewSheet, { type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
+import DocumentPreviewSheet, { type DocumentPreviewArtifact, type DocumentPreviewStep } from '../components/DocumentPreviewSheet';
 
 const STATUS_LABELS: Record<DeliveryNoteStatus, { th: string; en: string; tone: string; icon: typeof Clock }> = {
   draft:     { th: 'แบบร่าง', en: 'Draft', tone: 'bg-slate-100 text-slate-700', icon: FileText },
@@ -78,6 +78,75 @@ function deliveryPreviewSteps(note: DeliveryNote, isThai: boolean): DocumentPrev
       description: isThai ? 'ส่งมอบครบแล้วจึงออกเอกสารขายต่อ' : 'Create the sales document after fulfillment.',
       meta: note.invoiceId ? (isThai ? 'เชื่อมใบกำกับแล้ว' : 'Invoice linked') : (isThai ? 'รอออกเอกสารขาย' : 'Awaiting invoice'),
       state: note.status === 'converted' ? 'done' : note.status === 'delivered' ? 'current' : 'pending',
+    },
+  ];
+}
+
+function deliveryPreviewArtifacts(note: DeliveryNote, isThai: boolean): DocumentPreviewArtifact[] {
+  const ordered = itemCount(note);
+  const delivered = deliveredCount(note);
+  const cancelled = note.status === 'cancelled';
+  const fulfilled = note.status === 'delivered' || note.status === 'converted';
+  const converted = note.status === 'converted' || Boolean(note.invoiceId);
+  const hasTracking = Boolean(note.trackingUrl || note.trackingNo);
+
+  return [
+    {
+      id: 'delivery-workflow',
+      label: note.deliveryNoteNumber,
+      description: isThai ? 'แฟ้มใบส่งของและหลักฐานการจัดส่ง' : 'Delivery note workspace and fulfillment evidence.',
+      kind: 'folder',
+      state: cancelled ? 'blocked' : note.status === 'draft' ? 'pending' : 'ready',
+      children: [
+        {
+          id: 'pdf',
+          label: isThai ? 'PDF ใบส่งของ' : 'Delivery note PDF',
+          description: isThai ? 'ใช้ให้คลัง/คนส่งของ/ลูกค้าตรวจรายการ' : 'Used by fulfillment, couriers, and customers to confirm items.',
+          kind: 'pdf',
+          state: cancelled ? 'blocked' : note.status === 'draft' ? 'pending' : 'ready',
+          meta: `${delivered}/${ordered} ${isThai ? 'รายการ' : 'items'}`,
+        },
+        {
+          id: 'tracking',
+          label: isThai ? 'หลักฐานติดตามการส่ง' : 'Shipment tracking',
+          description: hasTracking
+            ? isThai ? 'มีเลขหรือ URL สำหรับติดตามการจัดส่ง' : 'Tracking number or URL is available.'
+            : isThai ? 'ยังไม่มีเลขติดตามจากขนส่ง' : 'No tracking details from carrier yet.',
+          href: note.trackingUrl,
+          kind: 'link',
+          state: hasTracking ? 'ready' : cancelled ? 'blocked' : 'pending',
+          meta: note.trackingNo ?? note.carrierName ?? undefined,
+        },
+      ],
+    },
+    {
+      id: 'sales-followup',
+      label: isThai ? 'ต่อยอดหลังส่งมอบ' : 'After delivery',
+      description: isThai ? 'จุดเชื่อมจากใบส่งของไปเอกสารขาย' : 'Bridge from fulfillment into sales documentation.',
+      kind: 'folder',
+      state: converted ? 'ready' : fulfilled ? 'pending' : cancelled ? 'blocked' : 'pending',
+      children: [
+        {
+          id: 'delivered-proof',
+          label: isThai ? 'ยืนยันส่งมอบ' : 'Delivery confirmation',
+          description: fulfilled
+            ? isThai ? 'ส่งมอบครบและพร้อมออกเอกสารขายต่อ' : 'Fulfillment is complete and ready for sales document creation.'
+            : isThai ? 'รอข้อมูลส่งมอบจากทีมงาน' : 'Waiting for fulfillment confirmation.',
+          kind: 'file',
+          state: fulfilled ? 'ready' : cancelled ? 'blocked' : 'pending',
+          meta: note.deliveredAt ? stageDate(note.deliveredAt, isThai) : undefined,
+        },
+        {
+          id: 'invoice',
+          label: isThai ? 'ใบกำกับ/ใบเสร็จที่เชื่อม' : 'Linked invoice or receipt',
+          description: converted
+            ? isThai ? 'มีเอกสารขายที่เกิดจากใบส่งของนี้แล้ว' : 'A sales document has been created from this delivery note.'
+            : isThai ? 'สร้างหลังยืนยันส่งมอบ' : 'Created after delivery confirmation.',
+          kind: 'file',
+          state: converted ? 'ready' : fulfilled ? 'pending' : cancelled ? 'blocked' : 'pending',
+          meta: note.invoiceId ? (isThai ? 'เชื่อมแล้ว' : 'Linked') : undefined,
+        },
+      ],
     },
   ];
 }
@@ -446,6 +515,7 @@ export default function DeliveryNoteList() {
         downloading={previewNote ? downloadingId === previewNote.id : false}
         editHref={previewNote ? `/app/delivery-notes/${previewNote.id}` : undefined}
         statusSteps={previewNote ? deliveryPreviewSteps(previewNote, isThai) : undefined}
+        artifacts={previewNote ? deliveryPreviewArtifacts(previewNote, isThai) : undefined}
         onDownload={() => {
           if (previewNote) void downloadPdf(previewNote);
         }}
