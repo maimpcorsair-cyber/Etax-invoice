@@ -25,6 +25,7 @@ import { EmptyState, MascotHelperCard, mascotAssets } from '../components/ui/App
 import BillboyBalanceOrb from '../components/ui/BillboyBalanceOrb';
 import { MonthEndWorkspacePreview, type MonthEndWorkspace } from '../components/monthEnd/MonthEndWorkspacePreview';
 import DashboardCharts from '../components/dashboard/DashboardCharts';
+import DriveEvidenceTree from '../components/dashboard/DriveEvidenceTree';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuthStore } from '../store/authStore';
 import type { Invoice, InvoiceStatus } from '../types';
@@ -1205,22 +1206,15 @@ export default function Dashboard() {
                   {resyncMsg}
                 </div>
               )}
-              {driveSummary?.projects?.length ? (
-                <div className="space-y-2">
-                  {driveSummary.projects.slice(0, 4).map((project) => (
-                    <div key={project.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <p className="truncate text-sm font-bold text-slate-950">{project.code} · {project.name}</p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {isThai ? `${project.fileCount} ไฟล์หลักฐานใน Drive` : `${project.fileCount} evidence files in Drive`} · {project.status}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">
-                  {isThai ? 'ยังไม่มีแฟ้มหลักฐานโปรเจคที่ sync เข้า Drive' : 'No project evidence folders have been synced yet.'}
-                </div>
-              )}
+              <DriveEvidenceTree
+                summary={driveSummary}
+                isThai={isThai}
+                driveModeLabel={driveModeLabel}
+                openingVault={driveOpening}
+                onOpenVault={handleOpenCompanyDrive}
+                disabled={driveSummary?.driveConfigured === false}
+                formatDate={formatDate}
+              />
             </div>
           </details>
 

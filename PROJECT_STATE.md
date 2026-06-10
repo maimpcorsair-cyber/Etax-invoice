@@ -1,8 +1,15 @@
 # Project State Handoff
 
-Last updated: 2026-06-11 (Billboy balance orb dashboard system)
+Last updated: 2026-06-11 (Drive Evidence Tree on Dashboard)
 
 ## Latest work (2026-06-11)
+
+Drive Evidence Tree on Dashboard:
+- **Frontend:** Dashboard "คลังหลักฐาน Drive + สมุดทะเบียนภาษี" now includes a Billboy-native `DriveEvidenceTree` adapted from the pasted expandable-tabs/file-tree ideas without adding framer-motion/usehooks-ts. The tree has map/project/recent tabs, expandable folders, and direct Google Drive/Sheets links for the master tax register, project folders, project sheets, recent Drive files, and containing folders.
+- **Audit map:** the tree shows the canonical Drive tax spine (`1_ภาษีขาย`, `2_ภาษีซื้อ`, `3_ค่าใช้จ่าย`, `4_หัก ณ ที่จ่าย`, `5_เงินเดือน`, `6_สลิป-หลักฐานจ่าย`, `9_แบบที่ยื่นแล้ว`) so owners/accountants can understand what Billboy is organizing before opening Drive.
+- **Verification:** frontend typecheck, ESLint, production build, and `git diff --check` pass. Local Playwright against the production API verified the Dashboard tree on desktop and mobile, confirmed no new console errors, no page-level mobile horizontal overflow, tab switching works, and production data exposed clickable Drive/Sheets links.
+
+## Previous work (2026-06-11)
 
 Billboy balance orb dashboard system:
 - **Frontend:** added shared `BillboyBalanceOrb`, a light Billboy-native animated balance widget inspired by the requested justice/balance prompt without copying its code, assets, or dark legal theme. It uses inline SVG/CSS only, no new dependency, and respects `prefers-reduced-motion`.
